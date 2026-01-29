@@ -1,9 +1,9 @@
 package com.g42.platform.gms.common.handler;
 
-import com.g42.platform.gms.common.constant.AuthErrorCode;
+import com.g42.platform.gms.auth.constant.AuthErrorCode;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
-import com.g42.platform.gms.common.exception.AuthException;
+import com.g42.platform.gms.auth.exception.AuthException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;

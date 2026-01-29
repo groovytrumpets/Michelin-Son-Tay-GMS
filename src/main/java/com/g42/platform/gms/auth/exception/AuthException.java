@@ -1,4 +1,4 @@
-package com.g42.platform.gms.common.exception;
+package com.g42.platform.gms.auth.exception;
 
 import lombok.Getter;
 

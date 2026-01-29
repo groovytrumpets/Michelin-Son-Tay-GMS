@@ -27,13 +27,20 @@ public class SecurityConfig {
                         sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .authorizeHttpRequests(auth -> auth
+                        // Cấu hình danh sách API cho phép truy cập tự do (Không cần Token)
                         .requestMatchers(
-                                "/api/auth/**",
+                                "/api/auth/customer/check-status",
+                                "/api/auth/customer/request-otp",
+                                "/api/auth/customer/verify-otp",
+                                "/api/auth/customer/setup-pin",
+                                "/api/auth/customer/login",
+                                "/api/auth/**",      // Giữ cái này làm fallback
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
                                 "/error"
                         ).permitAll()
+                        // Tất cả các API khác bắt buộc phải có Token
                         .anyRequest().authenticated()
                 )
                 .httpBasic(httpBasic -> httpBasic.disable())
