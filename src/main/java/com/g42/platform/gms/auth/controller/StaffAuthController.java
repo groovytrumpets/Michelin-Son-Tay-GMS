@@ -1,6 +1,8 @@
 package com.g42.platform.gms.auth.controller;
 
+import com.g42.platform.gms.auth.dto.LoginRequest;
 import com.g42.platform.gms.auth.dto.StaffAuthDto;
+import com.g42.platform.gms.auth.entity.StaffPrincipal;
 import com.g42.platform.gms.auth.entity.Staffauth;
 import com.g42.platform.gms.auth.mapper.StaffAuthMapper;
 import com.g42.platform.gms.auth.repository.StaffAuthRepo;
@@ -11,6 +13,10 @@ import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,6 +26,7 @@ import org.springframework.web.bind.annotation.*;
 public class StaffAuthController {
     @Autowired
     private final StaffAuthService staffAuthService;
+    private final AuthenticationManager authenticationManager;
 
 
     //@RequestMapping("/StaffAuth")
@@ -41,6 +48,13 @@ public class StaffAuthController {
         }
         System.out.println("login successful");
         return staffAuthDto;
+    }
+    @PostMapping("/login")
+    public String login(@RequestBody LoginRequest loginRequest){
+//        System.out.println("PHONE = " + loginRequest.getPhone());
+//        System.out.println("PIN   = " + loginRequest.getPin());
+
+        return staffAuthService.verifyStaffAuth(loginRequest);
     }
 
 }

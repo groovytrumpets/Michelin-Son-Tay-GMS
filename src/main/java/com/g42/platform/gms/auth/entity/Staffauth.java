@@ -3,18 +3,18 @@ package com.g42.platform.gms.auth.entity;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "staffauth")
+@Table(name = "staff_auth")
 public class Staffauth {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
 
-  private Long staffAuthId;
-  private Long staffId;
+  private long staffAuthId;
+  private long staffId;
   private String email;
   private String passwordHash;
   private String authProvider;
   private String status;
-  private Long failedLoginCount;
+  private long failedLoginCount;
   private java.sql.Timestamp lockedUntil;
   private java.sql.Timestamp lastLoginAt;
   private java.sql.Timestamp createdAt;
