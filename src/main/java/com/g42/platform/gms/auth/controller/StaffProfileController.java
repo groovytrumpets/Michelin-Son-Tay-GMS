@@ -13,10 +13,14 @@ import org.springframework.web.bind.annotation.RestController;
 @AllArgsConstructor
 @RequestMapping("/api/staff-profile")
 public class StaffProfileController {
-    @Autowired
-    private final StaffAuthService staffAuthService;
     @GetMapping
-    public Iterable<StaffAuthDto> getAllStaffAuth(){
-        return staffAuthService.getAllStaffAuth();
+    public String getAllStaffAuth(){
+        try{
+
+        return "JWT LOGIN TEST";
+        }catch (Exception e){
+            System.out.println(e.getMessage());
+            return "JWT SAI";
+        }
     }
 }

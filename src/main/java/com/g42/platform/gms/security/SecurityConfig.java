@@ -1,5 +1,6 @@
 package com.g42.platform.gms.security;
 
+import com.g42.platform.gms.auth.filter.StaffJwtFilter;
 import com.g42.platform.gms.auth.service.StaffAuthService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -21,6 +22,8 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
     @Autowired
     private UserDetailsService userDetailsService;
+    @Autowired
+    StaffJwtFilter staffJwtFilter;
 
     private final JwtUtil jwtUtil;
 
@@ -31,6 +34,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 
+        //có bị sai ko?
         JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtUtil);
 
         http
@@ -58,6 +62,8 @@ public class SecurityConfig {
                 .httpBasic(httpBasic -> httpBasic.disable())
                 .formLogin(form -> form.disable());
         http.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+        http.addFilterBefore(staffJwtFilter, UsernamePasswordAuthenticationFilter.class);
+
         return http.build();
     }
 

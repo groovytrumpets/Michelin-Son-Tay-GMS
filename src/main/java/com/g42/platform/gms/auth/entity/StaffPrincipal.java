@@ -32,12 +32,12 @@ public class StaffPrincipal implements UserDetails {
 
     @Override
     public boolean isAccountNonExpired() {
-        return UserDetails.super.isAccountNonExpired();
+        return true;
     }
 
     @Override
     public boolean isAccountNonLocked() {
-        return true;
+        return (staffAuth.getStatus().equals("ACTIVE"));
     }
 
     @Override
