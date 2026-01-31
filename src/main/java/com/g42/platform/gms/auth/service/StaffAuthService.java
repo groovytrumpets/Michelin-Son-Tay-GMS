@@ -1,5 +1,6 @@
 package com.g42.platform.gms.auth.service;
 
+import com.g42.platform.gms.auth.dto.LoginRequest;
 import com.g42.platform.gms.auth.dto.StaffAuthDto;
 import com.g42.platform.gms.auth.entity.Staffauth;
 import com.g42.platform.gms.auth.mapper.StaffAuthMapper;
@@ -7,6 +8,10 @@ import com.g42.platform.gms.auth.repository.StaffAuthRepo;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -16,6 +21,10 @@ import java.util.List;
 public class StaffAuthService {
     @Autowired
     private StaffAuthRepo staffAuthRepo;
+    @Autowired
+    private AuthenticationManager authenticationManager;
+    @Autowired
+    private JWTService jwtService;
     private final StaffAuthMapper staffAuthMapper; //Mapper giúp biến entity thành dto
 
     public Iterable<StaffAuthDto> getAllStaffAuth() {
@@ -40,6 +49,23 @@ public class StaffAuthService {
             return staffAuthDto;
         }
         return null;
+    }
+
+    public String verifyStaffAuth(LoginRequest loginRequest){
+        try{
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                        loginRequest.getPhone(),
+                        loginRequest.getPin()
+                ));
+        if (authentication.isAuthenticated()) {
+            return jwtService.generateJWToken(loginRequest.getPhone());
+        }
+        }catch (BadCredentialsException e){
+            System.out.println(e.getMessage());
+        return  "LOGIN FAILED ";
+        }
+        return "LOGIN FAILED ";
     }
 
 
