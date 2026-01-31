@@ -1,4 +1,4 @@
-package com.g42.platform.gms.common.constant;
+package com.g42.platform.gms.auth.constant;
 
 public enum AuthErrorCode { // Đổi class thành enum
     INVALID_PIN,
