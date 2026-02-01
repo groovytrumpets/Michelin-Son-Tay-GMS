@@ -3,8 +3,7 @@ package com.g42.platform.gms.auth.service;
 import com.g42.platform.gms.auth.dto.LoginRequest;
 import com.g42.platform.gms.auth.dto.StaffAuthDto;
 import com.g42.platform.gms.auth.entity.StaffPrincipal;
-import com.g42.platform.gms.auth.entity.StaffProfile;
-import com.g42.platform.gms.auth.entity.Staffauth;
+import com.g42.platform.gms.auth.entity.StaffAuth;
 import com.g42.platform.gms.auth.mapper.StaffAuthMapper;
 import com.g42.platform.gms.auth.repository.StaffAuthRepo;
 import lombok.AllArgsConstructor;
@@ -44,7 +43,7 @@ public class StaffAuthService {
         if(staffAuth == null){
             return staffAuthMapper.toDto(null);
         }
-        StaffAuthDto staffAuthDto = staffAuthMapper.toDto((Staffauth) staffAuth);
+        StaffAuthDto staffAuthDto = staffAuthMapper.toDto((StaffAuth) staffAuth);
         if (staffAuthDto.getPasswordHash().equals(password)) {
             return staffAuthDto;
         }

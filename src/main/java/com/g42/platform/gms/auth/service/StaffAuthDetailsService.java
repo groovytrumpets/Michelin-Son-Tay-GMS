@@ -1,9 +1,8 @@
 package com.g42.platform.gms.auth.service;
 
-import com.g42.platform.gms.auth.dto.StaffAuthDto;
+import com.g42.platform.gms.auth.entity.StaffAuth;
 import com.g42.platform.gms.auth.entity.StaffPrincipal;
 import com.g42.platform.gms.auth.entity.StaffProfile;
-import com.g42.platform.gms.auth.entity.Staffauth;
 import com.g42.platform.gms.auth.repository.StaffAuthRepo;
 import com.g42.platform.gms.auth.repository.StaffProfileRepo;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,7 +19,7 @@ public class StaffAuthDetailsService implements UserDetailsService {
     @Autowired
     private StaffProfileRepo staffProfileRepo;
 
-    Staffauth staffAuth =null;
+    StaffAuth staffAuth =null;
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {

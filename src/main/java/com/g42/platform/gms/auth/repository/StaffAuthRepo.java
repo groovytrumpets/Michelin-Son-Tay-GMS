@@ -1,10 +1,10 @@
 package com.g42.platform.gms.auth.repository;
 
-import com.g42.platform.gms.auth.entity.Staffauth;
+import com.g42.platform.gms.auth.entity.StaffAuth;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface StaffAuthRepo extends JpaRepository<Staffauth, Integer> {
-    Staffauth searchByEmail(String email);
+public interface StaffAuthRepo extends JpaRepository<StaffAuth, Integer> {
+    StaffAuth searchByEmail(String email);
 
-    Staffauth searchByStaffAuthId(long staffAuthId);
+    StaffAuth searchByStaffAuthId(long staffAuthId);
 }

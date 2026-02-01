@@ -2,22 +2,11 @@ package com.g42.platform.gms.auth.controller;
 
 import com.g42.platform.gms.auth.dto.LoginRequest;
 import com.g42.platform.gms.auth.dto.StaffAuthDto;
-import com.g42.platform.gms.auth.entity.StaffPrincipal;
-import com.g42.platform.gms.auth.entity.Staffauth;
-import com.g42.platform.gms.auth.mapper.StaffAuthMapper;
-import com.g42.platform.gms.auth.repository.StaffAuthRepo;
 import com.g42.platform.gms.auth.service.StaffAuthService;
-import com.g42.platform.gms.common.dto.ApiResponse;
-import jakarta.servlet.http.HttpSession;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 @RestController

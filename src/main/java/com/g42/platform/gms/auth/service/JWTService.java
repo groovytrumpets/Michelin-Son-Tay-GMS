@@ -1,6 +1,7 @@
 package com.g42.platform.gms.auth.service;
 
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
@@ -54,9 +55,14 @@ public class JWTService {
                 .getBody();
     }
 
-    public boolean validateToken(String token, UserDetails userDetails) {
-        final String username = extractUserName(token);
-        return (username.equals(userDetails.getUsername())&& !isTokenExpired(token));
+    public boolean validateToken(String token) {
+        try {
+            extractAllClaims(token);
+        return (!isTokenExpired(token));
+        }catch (JwtException e){
+            return false;
+        }
+
     }
 
     private boolean isTokenExpired(String token) {

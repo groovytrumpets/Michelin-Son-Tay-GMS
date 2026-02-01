@@ -6,7 +6,7 @@ import lombok.Data;
 @Data
 @Entity
 @Table(name = "staff_auth")
-public class Staffauth {
+public class StaffAuth {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
 
