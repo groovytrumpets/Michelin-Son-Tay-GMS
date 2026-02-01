@@ -18,26 +18,16 @@ public class StaffAuthController {
     private final AuthenticationManager authenticationManager;
 
 
-    //@RequestMapping("/StaffAuth")
-    @GetMapping
-    public Iterable<StaffAuthDto> getAllStaffAuth(){
-        return staffAuthService.getAllStaffAuth();
-    }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<StaffAuthDto> getStaftAuthById(@PathVariable int id){
-        return staffAuthService.getStaffAuthById(id);
-    }
-    @PostMapping("/staff-login")
-    public StaffAuthDto doLogin(
-            @RequestParam("email") String email, @RequestParam("password") String password){
-        StaffAuthDto staffAuthDto = staffAuthService.AuthenticateStaff(email, password);
-        if (staffAuthDto == null) {
-            return new StaffAuthDto((long) -1, (long) -1,"WRONG","WRONG");
-        }
-        System.out.println("login successful");
-        return staffAuthDto;
-    }
+//    @GetMapping
+//    public Iterable<StaffAuthDto> getAllStaffAuth(){
+//        return staffAuthService.getAllStaffAuth();
+//    }
+
+//    @GetMapping("/{id}")
+//    public ResponseEntity<StaffAuthDto> getStaftAuthById(@PathVariable int id){
+//        return staffAuthService.getStaffAuthById(id);
+//    }
     @PostMapping("/login")
     public String login(@RequestBody LoginRequest loginRequest){
 //        System.out.println("PHONE = " + loginRequest.getPhone());
