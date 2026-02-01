@@ -19,6 +19,6 @@ public class StaffProfile {
     private java.sql.Timestamp createdAt;
 
     @OneToOne(mappedBy = "staffProfile")
-    private Staffauth staffauth;
+    private StaffAuth staffauth;
 
 }

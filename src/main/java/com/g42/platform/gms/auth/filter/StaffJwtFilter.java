@@ -1,7 +1,7 @@
 package com.g42.platform.gms.auth.filter;
 
 import com.g42.platform.gms.auth.entity.StaffPrincipal;
-import com.g42.platform.gms.auth.entity.Staffauth;
+import com.g42.platform.gms.auth.entity.StaffAuth;
 import com.g42.platform.gms.auth.repository.StaffAuthRepo;
 import com.g42.platform.gms.auth.service.JWTService;
 import com.g42.platform.gms.auth.service.StaffAuthDetailsService;
@@ -50,13 +50,17 @@ public class StaffJwtFilter extends OncePerRequestFilter {
             String token = authHeader.substring(7);
             //decoding jwt get username
             String subject = jwtService.extractUserName(token);
-            Staffauth staffauth = staffAuthRepo.searchByStaffAuthId(Long.parseLong(subject));
+            StaffAuth staffauth = staffAuthRepo.searchByStaffAuthId(Long.parseLong(subject));
+            if (staffauth == null) {
+                filterChain.doFilter(request, response);
+                return;
+            }
             //System.out.println( "USERNAME: "+username);
             if (subject != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 //load user from database check staff exist in db and acc status
                 StaffPrincipal  staffPrincipal = new StaffPrincipal(staffauth);
                 //validate token
-                if (jwtService.validateToken(token,staffPrincipal)){
+                if (jwtService.validateToken(token)){
                     //create authentication obj
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken
                             (staffPrincipal,null,staffPrincipal.getAuthorities());
