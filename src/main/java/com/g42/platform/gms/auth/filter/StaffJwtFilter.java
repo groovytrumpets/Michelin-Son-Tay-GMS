@@ -1,7 +1,12 @@
 package com.g42.platform.gms.auth.filter;
 
+import com.g42.platform.gms.auth.entity.StaffPrincipal;
+import com.g42.platform.gms.auth.entity.Staffauth;
+import com.g42.platform.gms.auth.repository.StaffAuthRepo;
 import com.g42.platform.gms.auth.service.JWTService;
 import com.g42.platform.gms.auth.service.StaffAuthDetailsService;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,6 +28,8 @@ public class StaffJwtFilter extends OncePerRequestFilter {
     private JWTService jwtService;
     @Autowired
     ApplicationContext context;
+    @Autowired
+    StaffAuthRepo staffAuthRepo;
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
         String path = request.getRequestURI();
@@ -34,24 +41,31 @@ public class StaffJwtFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
             return;
         }
+        try{
+
 
         String authHeader = request.getHeader("Authorization");
 
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7);
             //decoding jwt get username
-            String username = jwtService.extractUserName(token);
-
-            if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            String subject = jwtService.extractUserName(token);
+            Staffauth staffauth = staffAuthRepo.searchByStaffAuthId(Long.parseLong(subject));
+            //System.out.println( "USERNAME: "+username);
+            if (subject != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 //load user from database check staff exist in db and acc status
-                UserDetails userDetails = context.getBean(StaffAuthDetailsService.class).loadUserByUsername(username);
+                StaffPrincipal  staffPrincipal = new StaffPrincipal(staffauth);
                 //validate token
-                if (jwtService.validateToken(token,userDetails)){
+                if (jwtService.validateToken(token,staffPrincipal)){
                     //create authentication obj
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken
-                            (userDetails,null,userDetails.getAuthorities());
+                            (staffPrincipal,null,staffPrincipal.getAuthorities());
                     //attach request metadata contain ip, sessionId
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    String userAgent = request.getHeader("User-Agent");
+                    String ip = request.getHeader("X-Forwarded-For");
+                    System.out.println("WEB: "+userAgent);
+                    System.out.println("IP: "+ip);
                     //save authen to secirityContext
                     SecurityContextHolder.getContext().setAuthentication(authToken);
                 }
@@ -59,5 +73,25 @@ public class StaffJwtFilter extends OncePerRequestFilter {
 
             filterChain.doFilter(request, response);
     }
-}
+        }catch (ExpiredJwtException e){
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json");
+            response.getWriter().write("""
+            {
+              "error": "JWT_EXPIRED",
+              "message": "Token expired"
+            }
+        """);
+        }catch (JwtException e){
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json");
+            response.getWriter().write("""
+            {
+              "error": "INVALID_JWT",
+              "message": "Token not valid"
+            }
+        """);
+        }
+
+    }
 }
