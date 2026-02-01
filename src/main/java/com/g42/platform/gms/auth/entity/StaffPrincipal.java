@@ -10,9 +10,9 @@ import java.util.Collections;
 @Data
 public class StaffPrincipal implements UserDetails {
 
-    private Staffauth staffAuth;
+    private StaffAuth staffAuth;
 
-    public StaffPrincipal(Staffauth staffAuth) {
+    public StaffPrincipal(StaffAuth staffAuth) {
         this.staffAuth = staffAuth;
     }
 
