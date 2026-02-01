@@ -1,18 +1,23 @@
 package com.g42.platform.gms.auth.entity;
 
+import lombok.Data;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
 import java.util.Collections;
-
+@Data
 public class StaffPrincipal implements UserDetails {
 
     private Staffauth staffAuth;
 
     public StaffPrincipal(Staffauth staffAuth) {
         this.staffAuth = staffAuth;
+    }
+
+    public Long getAuthId() {
+        return staffAuth.getStaffAuthId();
     }
 
     @Override
@@ -27,7 +32,7 @@ public class StaffPrincipal implements UserDetails {
 
     @Override
     public String getUsername() {
-        return staffAuth.getEmail(); //truyền vào giá trị username
+        return String.valueOf(staffAuth.getStaffAuthId()); //truyền vào giá trị username
     }
 
     @Override

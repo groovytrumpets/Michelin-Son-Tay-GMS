@@ -2,6 +2,8 @@ package com.g42.platform.gms.auth.service;
 
 import com.g42.platform.gms.auth.dto.LoginRequest;
 import com.g42.platform.gms.auth.dto.StaffAuthDto;
+import com.g42.platform.gms.auth.entity.StaffPrincipal;
+import com.g42.platform.gms.auth.entity.StaffProfile;
 import com.g42.platform.gms.auth.entity.Staffauth;
 import com.g42.platform.gms.auth.mapper.StaffAuthMapper;
 import com.g42.platform.gms.auth.repository.StaffAuthRepo;
@@ -13,8 +15,6 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
 
 @Service
 @AllArgsConstructor
@@ -58,8 +58,9 @@ public class StaffAuthService {
                         loginRequest.getPhone(),
                         loginRequest.getPin()
                 ));
+            StaffPrincipal  staffPrincipal = (StaffPrincipal) authentication.getPrincipal();
         if (authentication.isAuthenticated()) {
-            return jwtService.generateJWToken(loginRequest.getPhone());
+            return jwtService.generateStaffJWToken(staffPrincipal.getAuthId());
         }
         }catch (BadCredentialsException e){
             System.out.println(e.getMessage());

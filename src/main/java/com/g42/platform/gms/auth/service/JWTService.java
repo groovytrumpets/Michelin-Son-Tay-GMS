@@ -7,7 +7,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
-import javax.crypto.SecretKey;
 import java.security.Key;
 import java.util.Base64;
 import java.util.Date;
@@ -20,14 +19,14 @@ public class JWTService {
     @Value("${jwt.secret}") String secretKey;
     @Value("${jwt.expirationMs}") long expirationTime;
 
-    public String generateJWToken(String username) {
+    public String generateStaffJWToken(Long authId) {
 
         Map<String, Object> claims = new HashMap<>();
         return Jwts
                 .builder()
                 .setClaims(claims)
                 .addClaims(claims)
-                .setSubject(username)
+                .setSubject(String.valueOf(authId)) //phone or email
                 .setIssuedAt(new Date(System.currentTimeMillis()))
                 .setExpiration(new Date(System.currentTimeMillis()+expirationTime))
                 .signWith(getKey())
