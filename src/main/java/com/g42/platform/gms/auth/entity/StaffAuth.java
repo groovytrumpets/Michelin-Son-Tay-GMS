@@ -19,6 +19,7 @@ public class StaffAuth {
   private java.sql.Timestamp lockedUntil;
   private java.sql.Timestamp lastLoginAt;
   private java.sql.Timestamp createdAt;
+  private String google_id;
 
   @OneToOne
   @JoinColumn(name = "staff_id")
