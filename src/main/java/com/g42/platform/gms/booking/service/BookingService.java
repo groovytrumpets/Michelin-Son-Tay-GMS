@@ -47,18 +47,18 @@ public class BookingService {
             });
         }
 
-        // 2. XỬ LÝ XE (Gọi sang Domain Vehicle)
-        var vehicle = vehicleService.findOrCreateVehicle(
-                request.getLicensePlate(),
-                request.getCarBrand(),
-                request.getCarModel(),
-                customer
-        );
+//        // 2. XỬ LÝ XE (Gọi sang Domain Vehicle)
+//        var vehicle = vehicleService.findOrCreateVehicle(
+//                request.getLicensePlate(),
+//                request.getCarBrand(),
+//                request.getCarModel(),
+//                customer
+//        );
 
         // 3. TẠO BOOKING
         Booking booking = new Booking();
         booking.setCustomer(customer);
-        booking.setVehicle(vehicle);
+//        booking.setVehicle(vehicle);
         booking.setScheduledDate(request.getAppointmentDate());
         booking.setScheduledTime(request.getAppointmentTime());
         booking.setIsGuest(isGuest);
