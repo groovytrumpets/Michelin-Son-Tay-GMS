@@ -7,4 +7,6 @@ public interface StaffAuthRepo extends JpaRepository<StaffAuth, Integer> {
     StaffAuth searchByEmail(String email);
 
     StaffAuth searchByStaffAuthId(long staffAuthId);
+
+    StaffAuth getStaffAuthByEmail(String email);
 }
