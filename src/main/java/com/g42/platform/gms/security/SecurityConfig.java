@@ -67,6 +67,7 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
+                                "/home/**",
                                 "/error"
                         ).permitAll()
                         .requestMatchers("/api/booking/create").permitAll()

@@ -41,6 +41,7 @@ public class ServiceJpaEntity {
     @Column
     @UpdateTimestamp
     private LocalDateTime updatedAt;
+    private String mediaThumbnail;
 
     @OneToMany(mappedBy = "service", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ServiceMediaJpaEntity> media = new ArrayList<>();

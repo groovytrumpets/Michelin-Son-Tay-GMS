@@ -17,7 +17,6 @@ public class ServiceMediaJpaEntity {
     @Column(nullable = false)
     private MediaType mediaType;
     private String mediaUrl;
-    private String mediaThumbnail;
     private String mediaDescription;
     @Column(nullable = false)
     private int displayOrder = 0;
