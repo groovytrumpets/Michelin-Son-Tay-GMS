@@ -6,7 +6,7 @@ public class ServiceMedia {
     private Long serviceMediaId;
     private int displayOrder;
     private String mediaDescription;
-    private String mediaThumbnail;
-    private String mediaUrl;
+    private String urlThumbnail;
+    private String url;
     private MediaType mediaType;
 }
