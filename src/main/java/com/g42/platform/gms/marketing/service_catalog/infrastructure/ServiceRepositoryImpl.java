@@ -1,5 +1,6 @@
 package com.g42.platform.gms.marketing.service_catalog.infrastructure;
 
+import com.g42.platform.gms.marketing.service_catalog.api.dto.ServiceDetailRespond;
 import com.g42.platform.gms.marketing.service_catalog.api.dto.ServiceSumaryRespond;
 import com.g42.platform.gms.marketing.service_catalog.domain.entity.Service;
 import com.g42.platform.gms.marketing.service_catalog.domain.enums.ServiceStatus;
@@ -22,5 +23,11 @@ public class ServiceRepositoryImpl implements ServiceRepository {
     public List<Service> findAllActive() {
         List<ServiceJpaEntity> serviceJpaEntities = serviceJpaRepository.findAllByStatus(ServiceStatus.ACTIVE);
         return serviceMapper.toDomain(serviceJpaEntities);
+    }
+
+    @Override
+    public Service findServiceDetailById(Long serviceId) {
+        ServiceJpaEntity serviceDetailJpa = serviceJpaRepository.searchByServiceId(serviceId);
+        return serviceMapper.toDomain(serviceDetailJpa);
     }
 }

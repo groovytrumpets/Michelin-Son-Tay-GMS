@@ -10,4 +10,6 @@ import java.util.List;
 public interface ServiceJpaRepository extends JpaRepository<ServiceJpaEntity, Long> {
 
     List<ServiceJpaEntity> findAllByStatus(ServiceStatus status);
+
+    ServiceJpaEntity searchByServiceId(Long serviceId);
 }

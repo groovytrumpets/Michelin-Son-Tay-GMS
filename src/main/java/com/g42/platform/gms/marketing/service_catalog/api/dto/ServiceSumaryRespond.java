@@ -14,7 +14,7 @@ public class ServiceSumaryRespond {
     private String shortDescription;
     private boolean showPrice;
     private String displayPrice;
-    private String thumbnailUrl;
+    private String mediaThumbnail;
     private ServiceStatus status;
 
 }
