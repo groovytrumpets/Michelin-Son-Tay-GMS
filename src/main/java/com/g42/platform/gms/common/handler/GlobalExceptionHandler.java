@@ -4,6 +4,7 @@ import com.g42.platform.gms.auth.constant.AuthErrorCode;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.auth.exception.AuthException;
+import com.g42.platform.gms.marketing.service_catalog.domain.exception.ServiceException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -58,5 +59,16 @@ public class GlobalExceptionHandler {
                         AuthErrorCode.SYSTEM_ERROR.name(),
                         "Lỗi hệ thống. Vui lòng thử lại sau."
                 ));
+    }
+
+    @ExceptionHandler(ServiceException.class)
+    public ResponseEntity<ApiResponse<?>> handleServiceException(ServiceException ex) {
+
+        System.err.println("Service Catalog Error: " + ex.getCode() + " - " + ex.getMessage());
+
+
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponses.error(ex.getCode().name(), ex.getMessage()));
     }
 }
