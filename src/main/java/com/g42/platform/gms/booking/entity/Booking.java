@@ -1,7 +1,7 @@
 package com.g42.platform.gms.booking.entity;
 
 import com.g42.platform.gms.auth.entity.CustomerProfile;
-import com.g42.platform.gms.catalog.entity.CatalogItem;
+import com.g42.platform.gms.marketing.service_catalog.infrastructure.entity.CatalogItemJpaEntity;
 import com.g42.platform.gms.vehicle.entity.Vehicle;
 import jakarta.persistence.*;
 import lombok.Data;
@@ -43,5 +43,5 @@ public class Booking {
             joinColumns = @JoinColumn(name = "booking_id"),
             inverseJoinColumns = @JoinColumn(name = "item_id")
     )
-    private List<CatalogItem> services;
+    private List<CatalogItemJpaEntity> services;
 }

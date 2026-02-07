@@ -1,10 +1,10 @@
 package com.g42.platform.gms.catalog.repository;
 
-import com.g42.platform.gms.catalog.entity.CatalogItem;
+import com.g42.platform.gms.marketing.service_catalog.infrastructure.entity.CatalogItemJpaEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
-public interface CatalogItemRepository extends JpaRepository<CatalogItem, Integer> {
+public interface CatalogItemRepository extends JpaRepository<CatalogItemJpaEntity, Integer> {
     // Tìm các dịch vụ đang hoạt động để hiển thị lên App
-    List<CatalogItem> findByIsActiveTrue();
+    List<CatalogItemJpaEntity> findByIsActiveTrue();
 }
