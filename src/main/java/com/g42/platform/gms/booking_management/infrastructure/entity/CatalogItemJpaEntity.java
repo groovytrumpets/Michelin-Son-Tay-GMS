@@ -1,5 +1,6 @@
-package com.g42.platform.gms.marketing.service_catalog.infrastructure.entity;
+package com.g42.platform.gms.booking_management.infrastructure.entity;
 
+import com.g42.platform.gms.marketing.service_catalog.infrastructure.entity.ServiceJpaEntity;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;

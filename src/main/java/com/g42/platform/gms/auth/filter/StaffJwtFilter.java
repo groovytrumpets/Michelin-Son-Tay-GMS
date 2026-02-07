@@ -39,7 +39,8 @@ public class StaffJwtFilter extends OncePerRequestFilter {
                 || path.startsWith("/v3/api-docs")
                 || path.startsWith("/swagger-ui")
                 || path.startsWith("/swagger-ui.html")
-        || path.startsWith("/home")){
+        || path.startsWith("/home")
+        || path.startsWith("/home/uploads")){
             filterChain.doFilter(request, response);
             return;
         }
