@@ -23,8 +23,8 @@ public class ServiceController {
         List<ServiceSumaryRespond> respondList = serviceCatalogService.getListActiveServices();
         return ResponseEntity.ok(ApiResponses.success(respondList));
     }
-    @PostMapping("/service")
-    public ResponseEntity<ApiResponse<ServiceDetailRespond>> getServiceDetail(@RequestParam("serviceId") Long serviceId) {
+    @GetMapping("/service/{serviceId}")
+    public ResponseEntity<ApiResponse<ServiceDetailRespond>> getServiceDetail(@PathVariable Long serviceId) {
         ServiceDetailRespond serviceDetailRespond = serviceCatalogService.getServiceDetailById(serviceId);
         return ResponseEntity.ok(ApiResponses.success(serviceDetailRespond));
     }
