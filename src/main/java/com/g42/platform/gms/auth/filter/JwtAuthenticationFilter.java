@@ -1,5 +1,6 @@
-package com.g42.platform.gms.security;
+package com.g42.platform.gms.auth.filter;
 
+import com.g42.platform.gms.auth.service.JwtUtilCustomer;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -23,7 +24,7 @@ import java.util.List;
 @RequiredArgsConstructor // Tự tạo Constructor cho jwtUtil
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-    private final JwtUtil jwtUtil;
+    private final JwtUtilCustomer jwtUtilCustomer;
 
     @Override
     protected void doFilterInternal(
@@ -50,8 +51,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         try {
             // Kiểm tra Token hợp lệ
-            if (jwtUtil.isTokenValid(token)) {
-                Claims claims = jwtUtil.extractClaims(token);
+            if (jwtUtilCustomer.isTokenValid(token)) {
+                Claims claims = jwtUtilCustomer.extractClaims(token);
                 username = claims.getSubject(); // Lấy số điện thoại hoặc username
 
                 // 3. XỬ LÝ PHÂN QUYỀN (QUAN TRỌNG)

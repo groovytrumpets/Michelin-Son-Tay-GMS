@@ -1,4 +1,4 @@
-package com.g42.platform.gms.security;
+package com.g42.platform.gms.auth.service;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
@@ -11,12 +11,12 @@ import java.util.Date;
 import java.util.Map;
 
 @Component
-public class JwtUtil {
+public class JwtUtilCustomer {
 
     private final Key key;
     private final long expirationMs;
 
-    public JwtUtil(
+    public JwtUtilCustomer(
             @Value("${jwt.secret}") String secret,
             @Value("${jwt.expirationMs}") long expirationMs
     ) {
