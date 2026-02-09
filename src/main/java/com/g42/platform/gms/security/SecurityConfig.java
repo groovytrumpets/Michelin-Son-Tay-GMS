@@ -2,7 +2,7 @@ package com.g42.platform.gms.security;
 
 import com.g42.platform.gms.auth.filter.JwtAuthenticationFilter;
 import com.g42.platform.gms.auth.filter.StaffJwtFilter;
-import com.g42.platform.gms.auth.service.JwtUtilCustomer;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -10,6 +10,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;  // ← THÊM
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -21,6 +22,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import java.util.List;
 
 @Configuration
+@EnableMethodSecurity  // ← THÊM: Để @PreAuthorize hoạt động
 public class SecurityConfig {
     @Autowired
     private UserDetailsService userDetailsService;
@@ -28,38 +30,27 @@ public class SecurityConfig {
     StaffJwtFilter staffJwtFilter;
     @Autowired
     AuthenticationSuccessHandler OAuth2LoginSuccessHandler;
-
-    private final JwtUtilCustomer jwtUtilCustomer;
-
-    public SecurityConfig(JwtUtilCustomer jwtUtilCustomer) {
-        this.jwtUtilCustomer = jwtUtilCustomer;
-    }
+    @Autowired  // ← THÊM: Inject bean
+    JwtAuthenticationFilter jwtAuthenticationFilter;  // ← THÊM: Inject bean
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-
-        //có bị sai ko?
-        JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtUtilCustomer);
+        // XÓA: JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtUtilCustomer);
 
         http
-                // 1. Thêm cấu hình CORS tại đây
                 .cors(cors -> cors.configurationSource(request -> {
                     CorsConfiguration config = new CorsConfiguration();
-                    config.setAllowedOrigins(List.of("http://localhost:5173")); // Cho phép Frontend Vite
+                    config.setAllowedOrigins(List.of("http://localhost:5173"));
                     config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
                     config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept"));
                     config.setAllowCredentials(true);
                     return config;
                 }))
                 .csrf(csrf -> csrf.disable())
-//                .sessionManagement(sm ->
-//                        sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-//                )
                 .authorizeHttpRequests(auth -> auth
-                        // Cấu hình danh sách API cho phép truy cập tự do (Không cần Token)
                         .requestMatchers(
-                                "/api/auth/**", // Gộp chung cho gọn
-                                "/api/booking/guest/**", // Guest booking endpoints (không cần auth)
+                                "/api/auth/**",
+                                "/api/booking/guest/**",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
@@ -69,11 +60,36 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2 -> oauth2
-                        .successHandler(OAuth2LoginSuccessHandler))
+                        .successHandler(OAuth2LoginSuccessHandler)
+                )
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            String path = request.getRequestURI();
+                            String acceptHeader = request.getHeader("Accept");
+
+                            boolean isApiRequest = path.startsWith("/api/")
+                                    || (acceptHeader != null && acceptHeader.contains("application/json"));
+
+                            if (isApiRequest) {
+                                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                                response.setContentType("application/json; charset=UTF-8");
+                                response.getWriter().write("""
+                            {
+                              "success": false,
+                              "code": "UNAUTHORIZED",
+                              "message": "Token không hợp lệ hoặc đã hết hạn. Vui lòng đăng nhập lại."
+                            }
+                            """);
+                            } else {
+                                response.sendRedirect("/oauth2/authorization/google");
+                            }
+                        })
+                )
                 .httpBasic(httpBasic -> httpBasic.disable())
                 .formLogin(form -> form.disable());
 
-        http.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+        // SỬA: Dùng bean đã inject
+        http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         http.addFilterBefore(staffJwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

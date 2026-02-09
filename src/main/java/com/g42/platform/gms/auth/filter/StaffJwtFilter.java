@@ -33,10 +33,9 @@ public class StaffJwtFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
         String path = request.getRequestURI();
-
-
         if (path.startsWith("/api/auth/")
-                || path.startsWith("/api/booking/guest/") // Thêm dòng này
+                || path.startsWith("/api/booking/guest/")
+                || path.startsWith("/api/booking/customer/")  //  THÊM DÒNG NÀY
                 || path.startsWith("/v3/api-docs")
                 || path.startsWith("/swagger-ui")
                 || path.startsWith("/swagger-ui.html")){
