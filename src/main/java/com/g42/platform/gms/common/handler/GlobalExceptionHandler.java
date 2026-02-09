@@ -1,7 +1,7 @@
 package com.g42.platform.gms.common.handler;
 
 import com.g42.platform.gms.auth.constant.AuthErrorCode;
-import com.g42.platform.gms.booking.customer.exception.BookingException;
+import com.g42.platform.gms.booking.customer.domain.exception.BookingException;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.auth.exception.AuthException;
