@@ -2,7 +2,7 @@ package com.g42.platform.gms.booking.customer.infrastructure.mapper;
 
 import com.g42.platform.gms.booking.customer.domain.entity.Booking;
 import com.g42.platform.gms.booking.customer.infrastructure.entity.BookingJpaEntity;
-import com.g42.platform.gms.booking_management.infrastructure.entity.CatalogItemJpaEntity;
+import com.g42.platform.gms.booking.customer.infrastructure.entity.CatalogItemJpaEntity;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Mappings;

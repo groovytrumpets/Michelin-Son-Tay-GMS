@@ -1,5 +1,4 @@
-package com.g42.platform.gms.booking.customer.infrastructure.entity;
-
+package com.g42.platform.gms.booking_management.infrastructure.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
@@ -7,7 +6,7 @@ import lombok.Data;
 @Entity
 @Table(name = "booking_request_details")
 @Data
-public class BookingRequestDetailJpaEntity {
+public class BookingRequestDetailJpa {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "request_detail_id")
@@ -15,9 +14,9 @@ public class BookingRequestDetailJpaEntity {
 
     @ManyToOne
     @JoinColumn(name = "request_id", nullable = false)
-    private BookingRequestJpaEntity request;
+    private BookingRequestJpa request;
 
     @ManyToOne
     @JoinColumn(name = "item_id", nullable = false)
-    private CatalogItemJpaEntity item;
+    private CatalogItemJpa item;
 }

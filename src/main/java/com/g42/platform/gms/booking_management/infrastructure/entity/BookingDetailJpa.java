@@ -15,15 +15,15 @@ public class BookingDetailJpa {
     @Column(name = "booking_details_id", nullable = false)
     private Integer id;
 
-//    @NotNull
-//    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-//    @JoinColumn(name = "booking_id", nullable = false)
-//    private Booking booking;
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "booking_id", nullable = false)
+    private BookingJpa booking;
 
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "item_id", nullable = false)
-    private CatalogItemJpaEntity item;
+    private CatalogItemJpa item;
 
 
 }

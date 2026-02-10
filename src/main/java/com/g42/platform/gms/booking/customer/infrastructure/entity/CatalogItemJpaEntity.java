@@ -1,12 +1,10 @@
-package com.g42.platform.gms.booking_management.infrastructure.entity;
+package com.g42.platform.gms.booking.customer.infrastructure.entity;
 
 import com.g42.platform.gms.marketing.service_catalog.infrastructure.entity.ServiceJpaEntity;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import org.hibernate.annotations.ColumnDefault;
-
-import java.util.List;
 
 @Entity
 @Table(name = "catalog_item")
