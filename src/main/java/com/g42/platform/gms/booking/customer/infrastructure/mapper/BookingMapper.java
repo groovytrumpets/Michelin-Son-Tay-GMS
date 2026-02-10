@@ -2,6 +2,7 @@ package com.g42.platform.gms.booking.customer.infrastructure.mapper;
 
 import com.g42.platform.gms.booking.customer.domain.entity.Booking;
 import com.g42.platform.gms.booking.customer.infrastructure.entity.BookingJpaEntity;
+import com.g42.platform.gms.booking_management.infrastructure.entity.CatalogItemJpaEntity;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Mappings;
@@ -31,7 +32,7 @@ public interface BookingMapper {
     BookingJpaEntity toJpa(Booking domain);
 
     // ===== Helper method cho MapStruct =====
-    default List<Integer> mapServiceIds(List<com.g42.platform.gms.catalog.entity.CatalogItem> services) {
+    default List<Integer> mapServiceIds(List<CatalogItemJpaEntity> services) {
         if (services == null) {
             return null;
         }

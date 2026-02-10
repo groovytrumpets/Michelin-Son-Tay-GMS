@@ -1,6 +1,6 @@
 package com.g42.platform.gms.booking.customer.infrastructure.entity;
 
-import com.g42.platform.gms.catalog.entity.CatalogItem;
+import com.g42.platform.gms.booking_management.infrastructure.entity.CatalogItemJpaEntity;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -19,5 +19,5 @@ public class BookingRequestDetailJpaEntity {
 
     @ManyToOne
     @JoinColumn(name = "item_id", nullable = false)
-    private CatalogItem item;
+    private CatalogItemJpaEntity item;
 }

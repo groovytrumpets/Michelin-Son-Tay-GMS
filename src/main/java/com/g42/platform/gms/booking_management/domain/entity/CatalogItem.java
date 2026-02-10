@@ -10,7 +10,7 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class CatalogItemJpaEntity {
+public class CatalogItem {
     private Integer itemId;
     private String itemName;
     private String itemType;
@@ -18,4 +18,5 @@ public class CatalogItemJpaEntity {
     private Boolean isActive;
     private Integer warrantyDurationMonths;
     private ServiceJpaEntity serviceService;
+
 }

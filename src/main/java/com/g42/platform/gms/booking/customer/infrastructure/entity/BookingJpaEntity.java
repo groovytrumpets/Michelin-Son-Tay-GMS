@@ -1,8 +1,7 @@
-package com.g42.platform.gms.booking.entity;
+package com.g42.platform.gms.booking.customer.infrastructure.entity;
 
 import com.g42.platform.gms.auth.entity.CustomerProfile;
 import com.g42.platform.gms.booking.customer.domain.enums.BookingStatus;
-import com.g42.platform.gms.catalog.entity.CatalogItem;
 import com.g42.platform.gms.booking_management.infrastructure.entity.CatalogItemJpaEntity;
 import com.g42.platform.gms.vehicle.entity.Vehicle;
 import jakarta.persistence.*;
@@ -58,7 +57,7 @@ public class BookingJpaEntity {
             joinColumns = @JoinColumn(name = "booking_id"),
             inverseJoinColumns = @JoinColumn(name = "item_id")
     )
-    private List<CatalogItem> services;
+    private List<CatalogItemJpaEntity> services;
 
     @PrePersist
     protected void onCreate() {

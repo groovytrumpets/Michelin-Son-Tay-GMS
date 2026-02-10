@@ -7,7 +7,7 @@ import com.g42.platform.gms.booking.customer.infrastructure.entity.BookingReques
 import com.g42.platform.gms.booking.customer.infrastructure.repository.BookingRequestDetailJpaRepository;
 import com.g42.platform.gms.booking.customer.infrastructure.repository.BookingRequestJpaRepository;
 import com.g42.platform.gms.booking.customer.infrastructure.mapper.BookingRequestDetailMapper;
-import com.g42.platform.gms.catalog.entity.CatalogItem;
+import com.g42.platform.gms.booking_management.infrastructure.entity.CatalogItemJpaEntity;
 import com.g42.platform.gms.catalog.repository.CatalogItemRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
@@ -35,7 +35,7 @@ public class BookingRequestDetailRepositoryImpl implements BookingRequestDetailR
         }
         
         if (domain.getItemId() != null) {
-            CatalogItem item = catalogItemRepository.findById(domain.getItemId())
+            CatalogItemJpaEntity item = catalogItemRepository.findById(domain.getItemId())
                 .orElseThrow(() -> new RuntimeException("CatalogItem not found: " + domain.getItemId()));
             jpa.setItem(item);
         }
@@ -57,7 +57,7 @@ public class BookingRequestDetailRepositoryImpl implements BookingRequestDetailR
                 }
                 
                 if (domain.getItemId() != null) {
-                    CatalogItem item = catalogItemRepository.findById(domain.getItemId())
+                    CatalogItemJpaEntity item = catalogItemRepository.findById(domain.getItemId())
                         .orElseThrow(() -> new RuntimeException("CatalogItem not found: " + domain.getItemId()));
                     jpa.setItem(item);
                 }
