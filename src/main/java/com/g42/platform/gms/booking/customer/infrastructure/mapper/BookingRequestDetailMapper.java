@@ -2,43 +2,22 @@ package com.g42.platform.gms.booking.customer.infrastructure.mapper;
 
 import com.g42.platform.gms.booking.customer.domain.entity.BookingRequestDetail;
 import com.g42.platform.gms.booking.customer.infrastructure.entity.BookingRequestDetailJpaEntity;
-import org.springframework.stereotype.Component;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.Mappings;
 
-@Component
-public class BookingRequestDetailMapper {
-    
-    public BookingRequestDetail toDomain(BookingRequestDetailJpaEntity jpa) {
-        if (jpa == null) {
-            return null;
-        }
-        
-        BookingRequestDetail domain = new BookingRequestDetail();
-        domain.setRequestDetailId(jpa.getRequestDetailId());
-        
-        Integer requestId = null;
-        if (jpa.getRequest() != null) {
-            requestId = jpa.getRequest().getRequestId();
-        }
-        domain.setRequestId(requestId);
-        
-        Integer itemId = null;
-        if (jpa.getItem() != null) {
-            itemId = jpa.getItem().getItemId();
-        }
-        domain.setItemId(itemId);
-        
-        return domain;
-    }
-    
-    public BookingRequestDetailJpaEntity toJpa(BookingRequestDetail domain) {
-        if (domain == null) {
-            return null;
-        }
-        
-        BookingRequestDetailJpaEntity jpa = new BookingRequestDetailJpaEntity();
-        jpa.setRequestDetailId(domain.getRequestDetailId());
-        // Note: item and request will be set in repository implementation
-        
-        return jpa;
-    }
+@Mapper(componentModel = "spring")
+public interface BookingRequestDetailMapper {
+
+    @Mapping(target = "requestId",
+            expression = "java(jpa.getRequest() != null ? jpa.getRequest().getRequestId() : null)")
+    @Mapping(target = "itemId",
+            expression = "java(jpa.getItem() != null ? jpa.getItem().getItemId() : null)")
+    BookingRequestDetail toDomain(BookingRequestDetailJpaEntity jpa);
+
+    @Mappings({
+            @Mapping(target = "request", ignore = true),
+            @Mapping(target = "item", ignore = true)
+    })
+    BookingRequestDetailJpaEntity toJpa(BookingRequestDetail domain);
 }

@@ -1,11 +1,11 @@
-package com.g42.platform.gms.booking.customer.infrastructure.repository;
+package com.g42.platform.gms.booking.customer.infrastructure.implement;
 
 import com.g42.platform.gms.booking.customer.domain.entity.BookingRequestDetail;
 import com.g42.platform.gms.booking.customer.domain.repository.BookingRequestDetailRepository;
 import com.g42.platform.gms.booking.customer.infrastructure.entity.BookingRequestDetailJpaEntity;
 import com.g42.platform.gms.booking.customer.infrastructure.entity.BookingRequestJpaEntity;
-import com.g42.platform.gms.booking.customer.infrastructure.jpa.BookingRequestDetailJpaRepository;
-import com.g42.platform.gms.booking.customer.infrastructure.jpa.BookingRequestJpaRepository;
+import com.g42.platform.gms.booking.customer.infrastructure.repository.BookingRequestDetailJpaRepository;
+import com.g42.platform.gms.booking.customer.infrastructure.repository.BookingRequestJpaRepository;
 import com.g42.platform.gms.booking.customer.infrastructure.mapper.BookingRequestDetailMapper;
 import com.g42.platform.gms.catalog.entity.CatalogItem;
 import com.g42.platform.gms.catalog.repository.CatalogItemRepository;

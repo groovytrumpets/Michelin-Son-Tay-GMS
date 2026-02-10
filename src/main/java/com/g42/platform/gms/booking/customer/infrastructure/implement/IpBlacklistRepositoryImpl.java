@@ -1,11 +1,11 @@
-package com.g42.platform.gms.booking.customer.infrastructure.repository;
+package com.g42.platform.gms.booking.customer.infrastructure.implement;
 
 import com.g42.platform.gms.auth.entity.StaffProfile;
 import com.g42.platform.gms.auth.repository.StaffProfileRepo;
 import com.g42.platform.gms.booking.customer.domain.entity.IpBlacklist;
 import com.g42.platform.gms.booking.customer.domain.repository.IpBlacklistRepository;
 import com.g42.platform.gms.booking.customer.infrastructure.entity.IpBlacklistJpaEntity;
-import com.g42.platform.gms.booking.customer.infrastructure.jpa.IpBlacklistJpaRepository;
+import com.g42.platform.gms.booking.customer.infrastructure.repository.IpBlacklistJpaRepository;
 import com.g42.platform.gms.booking.customer.infrastructure.mapper.IpBlacklistMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;

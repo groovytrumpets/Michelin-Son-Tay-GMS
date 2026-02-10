@@ -1,4 +1,4 @@
-package com.g42.platform.gms.booking.customer.infrastructure.jpa;
+package com.g42.platform.gms.booking.customer.infrastructure.repository;
 
 import com.g42.platform.gms.booking.customer.infrastructure.entity.BookingRequestDetailJpaEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
