@@ -1,6 +1,7 @@
 package com.g42.platform.gms.common.handler;
 
 import com.g42.platform.gms.auth.constant.AuthErrorCode;
+import com.g42.platform.gms.booking.customer.domain.exception.BookingException;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.auth.exception.AuthException;
@@ -13,16 +14,17 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    /**
-     * Xử lý lỗi nghiệp vụ (AuthException)
-     * Trả về HTTP 400 (Bad Request) hoặc 401 (Unauthorized) tùy logic
-     */
     @ExceptionHandler(AuthException.class)
     public ResponseEntity<ApiResponse<?>> handleAuthException(AuthException ex) {
-        // Log lỗi để debug (tùy chọn)
         System.err.println("Auth Error: " + ex.getCode() + " - " + ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponses.error(ex.getCode(), ex.getMessage()));
+    }
 
-        // Trả về JSON chuẩn
+    @ExceptionHandler(BookingException.class)
+    public ResponseEntity<ApiResponse<?>> handleBookingException(BookingException ex) {
+        System.err.println("Booking Error: " + ex.getCode() + " - " + ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponses.error(ex.getCode(), ex.getMessage()));

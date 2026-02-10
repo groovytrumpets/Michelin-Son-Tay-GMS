@@ -10,7 +10,6 @@ import com.g42.platform.gms.auth.exception.AuthException;
 import com.g42.platform.gms.auth.repository.CustomerAuthRepository;
 import com.g42.platform.gms.auth.repository.CustomerProfileRepository;
 import com.g42.platform.gms.common.service.OtpService;
-import com.g42.platform.gms.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -29,7 +28,7 @@ public class CustomerAuthService {
     private final CustomerAuthRepository authRepo;
     private final PasswordEncoder passwordEncoder;
     private final OtpService otpService;
-    private final JwtUtil jwtUtil;
+    private final JwtUtilCustomer jwtUtilCustomer;
 
     private static final int MAX_PIN_ATTEMPTS = 5;
 
@@ -198,7 +197,7 @@ public class CustomerAuthService {
                 "customerId", profile.getCustomerId(),
                 "name", profile.getFullName()
         );
-        String token = jwtUtil.generateToken(req.getPhone(), claims);
+        String token = jwtUtilCustomer.generateToken(req.getPhone(), claims);
 
         return new AuthResponse("LOGIN_SUCCESS", "CUSTOMER", token);
     }

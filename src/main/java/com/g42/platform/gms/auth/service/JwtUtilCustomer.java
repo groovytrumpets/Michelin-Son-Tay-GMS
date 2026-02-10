@@ -1,7 +1,8 @@
-package com.g42.platform.gms.security;
+package com.g42.platform.gms.auth.service;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -10,13 +11,14 @@ import java.security.Key;
 import java.util.Date;
 import java.util.Map;
 
+@Slf4j
 @Component
-public class JwtUtil {
+public class JwtUtilCustomer {
 
     private final Key key;
     private final long expirationMs;
 
-    public JwtUtil(
+    public JwtUtilCustomer(
             @Value("${jwt.secret}") String secret,
             @Value("${jwt.expirationMs}") long expirationMs
     ) {
@@ -44,9 +46,29 @@ public class JwtUtil {
 
     public boolean isTokenValid(String token) {
         try {
-            extractClaims(token);
+            Claims claims = extractClaims(token);
+            Date expiration = claims.getExpiration();
+            Date now = new Date();
+            if (expiration.before(now)) {
+                log.error("Token expired: exp={}, now={}", expiration, now);
+                return false;
+            }
+            log.debug("Token is valid: exp={}, now={}", expiration, now);
             return true;
+        } catch (ExpiredJwtException e) {
+            log.error("Token expired: exp={}, now={}", e.getClaims().getExpiration(), new Date());
+            return false;
+        } catch (io.jsonwebtoken.security.SecurityException e) {
+            log.error("Token signature invalid - Secret key mismatch? Error: {}", e.getMessage());
+            return false;
+        } catch (MalformedJwtException e) {
+            log.error("Token malformed: {}", e.getMessage());
+            return false;
+        } catch (UnsupportedJwtException e) {
+            log.error("Token unsupported: {}", e.getMessage());
+            return false;
         } catch (JwtException | IllegalArgumentException e) {
+            log.error("Token validation failed: {} - {}", e.getClass().getSimpleName(), e.getMessage());
             return false;
         }
     }
