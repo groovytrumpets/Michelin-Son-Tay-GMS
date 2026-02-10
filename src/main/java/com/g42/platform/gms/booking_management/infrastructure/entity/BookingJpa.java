@@ -2,6 +2,7 @@ package com.g42.platform.gms.booking_management.infrastructure.entity;
 
 import com.g42.platform.gms.auth.entity.CustomerProfile;
 import com.g42.platform.gms.booking.customer.domain.enums.BookingStatus;
+import com.g42.platform.gms.booking_management.domain.enums.BookingEnum;
 import com.g42.platform.gms.vehicle.entity.Vehicle;
 import jakarta.persistence.*;
 import lombok.Data;
@@ -39,7 +40,7 @@ public class BookingJpa {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
-    private BookingStatus status;
+    private BookingEnum status;
 
     @Column(name = "description", columnDefinition = "TEXT", nullable = false)
     private String description;
@@ -58,16 +59,4 @@ public class BookingJpa {
     )
     private List<CatalogItemJpa> services;
 
-    @PrePersist
-    protected void onCreate() {
-        if (createdAt == null) {
-            createdAt = LocalDateTime.now();
-        }
-        if (status == null) {
-            status = BookingStatus.PENDING;
-        }
-        if (isGuest == null) {
-            isGuest = false;
-        }
-    }
 }

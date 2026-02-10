@@ -1,5 +1,6 @@
 package com.g42.platform.gms.booking_management.domain.entity;
 
+import com.g42.platform.gms.booking_management.infrastructure.entity.BookingJpa;
 import com.g42.platform.gms.booking_management.infrastructure.entity.CatalogItemJpa;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -12,6 +13,7 @@ import lombok.Setter;
 @AllArgsConstructor
 public class BookingDetail {
     private Integer id;
+    private BookingJpa booking;
     private CatalogItemJpa item;
 
 }

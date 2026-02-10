@@ -1,8 +1,11 @@
 package com.g42.platform.gms.booking_management.domain.entity;
 
 import com.g42.platform.gms.auth.entity.CustomerProfile;
+import com.g42.platform.gms.booking.customer.domain.enums.BookingStatus;
 import com.g42.platform.gms.booking_management.domain.enums.BookingEnum;
+import com.g42.platform.gms.booking_management.infrastructure.entity.CatalogItemJpa;
 import com.g42.platform.gms.vehicle.entity.Vehicle;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -10,7 +13,9 @@ import lombok.Setter;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
 
 @Getter
 @Setter
@@ -18,14 +23,17 @@ import java.time.LocalTime;
 @AllArgsConstructor
 public class Booking {
 
-    private Integer id;
+    private Integer bookingId;
     private CustomerProfile customer;
     private Vehicle vehicle;
     private LocalDate scheduledDate;
     private LocalTime scheduledTime;
     private String serviceCategory;
     private BookingEnum status;
-    private Instant createdAt;
+    private String description;
+    private Boolean isGuest = false;
+    private LocalDateTime createdAt;
+    private List<CatalogItemJpa> services;
 
 
 }
