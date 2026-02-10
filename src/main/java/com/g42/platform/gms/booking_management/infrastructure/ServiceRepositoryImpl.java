@@ -1,6 +1,6 @@
 package com.g42.platform.gms.booking_management.infrastructure;
 
-import com.g42.platform.gms.booking_management.domain.repository.BookingRepository;
+import com.g42.platform.gms.booking_management.domain.repository.BookingManageRepository;
 
-public class ServiceRepositoryImpl implements BookingRepository {
+public class ServiceRepositoryImpl implements BookingManageRepository {
 }
