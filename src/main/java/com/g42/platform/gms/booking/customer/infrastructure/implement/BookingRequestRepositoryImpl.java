@@ -1,4 +1,4 @@
-package com.g42.platform.gms.booking.customer.infrastructure.repository;
+package com.g42.platform.gms.booking.customer.infrastructure.implement;
 
 import com.g42.platform.gms.auth.entity.CustomerProfile;
 import com.g42.platform.gms.auth.repository.CustomerProfileRepository;
@@ -6,7 +6,7 @@ import com.g42.platform.gms.booking.customer.domain.entity.BookingRequest;
 import com.g42.platform.gms.booking.customer.domain.enums.BookingRequestStatus;
 import com.g42.platform.gms.booking.customer.domain.repository.BookingRequestRepository;
 import com.g42.platform.gms.booking.customer.infrastructure.entity.BookingRequestJpaEntity;
-import com.g42.platform.gms.booking.customer.infrastructure.jpa.BookingRequestJpaRepository;
+import com.g42.platform.gms.booking.customer.infrastructure.repository.BookingRequestJpaRepository;
 import com.g42.platform.gms.booking.customer.infrastructure.mapper.BookingRequestMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
