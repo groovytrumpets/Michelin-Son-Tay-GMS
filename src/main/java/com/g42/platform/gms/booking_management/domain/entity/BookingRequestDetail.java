@@ -11,5 +11,5 @@ public class BookingRequestDetail {
 
     private Integer requestDetailId;
     private BookingRequest request;
-    private CatalogItemJpa item;
+    private CatalogItem item;
 }

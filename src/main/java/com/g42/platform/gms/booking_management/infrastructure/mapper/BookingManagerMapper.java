@@ -13,12 +13,5 @@ import java.util.List;
 @Mapper(componentModel = "spring")
 public interface BookingManagerMapper {
     Booking toDomain(BookingJpa bookingJpa);
-    BookingJpa toJpa(Booking booking);
     List<Booking> toBookingJpa(List<BookingJpa> bookingJpa);
-    BookingDetail toDomain(BookingDetailJpa bookingDetailJpa);
-    List<BookingDetail> toDetailJpa(List<BookingDetailJpa> bookingDetailJpa);
-    BookingDetailJpa  toDomainDetail(BookingDetail bookingDetailJpa);
-    CatalogItem toDomain(CatalogItemJpa catalogItemJpa);
-    CatalogItemJpa  toDomainCatalog(CatalogItem catalogItem);
-    List<CatalogItem> toCatalogJpa(List<CatalogItemJpa> catalogItemJpa);
 }
