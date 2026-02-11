@@ -10,7 +10,7 @@ public class StaffAuth {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
 
-  private long staffAuthId;
+  private Integer staffAuthId;
   private String email;
   private String passwordHash;
   private String authProvider;
