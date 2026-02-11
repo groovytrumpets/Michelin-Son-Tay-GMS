@@ -24,7 +24,7 @@ import java.util.Set;
 @AllArgsConstructor
 public class BookedRespond {
     private Integer bookingId;
-    private CustomerProfile customer;
+    private CustomerDto customer;
     private LocalDate scheduledDate;
     private LocalTime scheduledTime;
     private String serviceCategory;
