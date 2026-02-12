@@ -16,7 +16,7 @@ public class StaffPrincipal implements UserDetails {
         this.staffAuth = staffAuth;
     }
 
-    public Long getAuthId() {
+    public Integer getAuthId() {
         return staffAuth.getStaffAuthId();
     }
 

@@ -20,7 +20,7 @@ public class JWTService {
     @Value("${jwt.secret}") String secretKey;
     @Value("${jwt.expirationMs}") long expirationTime;
 
-    public String generateStaffJWToken(Long authId) {
+    public String generateStaffJWToken(Integer authId) {
 
         Map<String, Object> claims = new HashMap<>();
         return Jwts
