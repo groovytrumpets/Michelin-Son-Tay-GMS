@@ -41,6 +41,7 @@ public class StaffJwtFilter extends OncePerRequestFilter {
         // - swagger, home, error: public endpoints
         if (path.startsWith("/api/auth/")
                 || path.startsWith("/api/booking/guest/")
+                || path.startsWith("/api/booking/slots/")
                 || path.startsWith("/api/booking/customer/")
                 || path.startsWith("/v3/api-docs")
                 || path.startsWith("/swagger-ui")

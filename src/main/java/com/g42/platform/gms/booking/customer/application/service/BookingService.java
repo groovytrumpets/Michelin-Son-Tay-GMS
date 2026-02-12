@@ -20,7 +20,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 @Slf4j
@@ -29,12 +28,14 @@ import java.util.List;
 public class BookingService {
 
     private static final long MODIFY_LIMIT_HOURS = 2L;
-    private static final int MAX_BOOKINGS_PER_SLOT = 3;
+    private static final long MIN_BOOKING_LEAD_TIME_HOURS = 2L;
+    private static final int DEFAULT_DURATION_MINUTES = 60;
 
     private final BookingRepository bookingRepository;
     private final CustomerProfileRepository customerRepository;
     private final CatalogItemRepository catalogItemRepository;
     private final JwtUtilCustomer jwtUtilCustomer;
+    private final SlotService slotService;
 
     @Transactional
     public Booking createCustomerBooking(CustomerBookingRequest request, String token) {
@@ -67,8 +68,41 @@ public class BookingService {
             booking.setServiceIds(new ArrayList<>());
         }
         
+        // Validate thời gian đặt lịch
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime scheduledDateTime = LocalDateTime.of(
+            booking.getScheduledDate(),
+            booking.getScheduledTime()
+        );
+        
+        // Check không được trong quá khứ
+        if (scheduledDateTime.isBefore(now)) {
+            throw new BookingException("Không thể đặt lịch trong quá khứ.");
+        }
+        
+        // Check phải cách hiện tại ít nhất 2 giờ
+        LocalDateTime minBookingTime = now.plusHours(MIN_BOOKING_LEAD_TIME_HOURS);
+        if (scheduledDateTime.isBefore(minBookingTime)) {
+            throw new BookingException("Vui lòng đặt lịch trước ít nhất 2 giờ.");
+        }
+        
+        int estimatedDuration = calculateEstimatedDuration(booking.getServiceIds());
+        
+        boolean slotAvailable = slotService.isSlotAvailable(
+                booking.getScheduledDate(),
+                booking.getScheduledTime(),
+                estimatedDuration,
+                null
+        );
+        if (!slotAvailable) {
+            throw new BookingException("Khung giờ này đã đầy, vui lòng chọn giờ khác.");
+        }
+        
         booking.initializeDefaults();
         Booking savedBooking = bookingRepository.save(booking);
+        
+        slotService.reserveForBooking(savedBooking.getBookingId(), estimatedDuration);
+        
         log.info("Customer booking created: bookingId={}, customerId={}", savedBooking.getBookingId(), customerId);
         
         return savedBooking;
@@ -122,15 +156,33 @@ public class BookingService {
             throw new BookingException("Không thể chọn thời gian trong quá khứ.");
         }
 
+        // Check phải cách hiện tại ít nhất 2 giờ
+        LocalDateTime minBookingTime = now.plusHours(MIN_BOOKING_LEAD_TIME_HOURS);
+        if (scheduledDateTime.isBefore(minBookingTime)) {
+            throw new BookingException("Vui lòng chọn lịch trước ít nhất 2 giờ.");
+        }
+
         LocalDateTime modifyDeadline = scheduledDateTime.minusHours(MODIFY_LIMIT_HOURS);
 
         if (now.isAfter(modifyDeadline)) {
             throw new BookingException("Đã quá thời hạn cho phép thay đổi lịch.");
         }
 
-        boolean slotAvailable = isSlotAvailable(newDate, newTime, booking.getBookingId());
-        if (!slotAvailable) {
-            throw new BookingException("Khung giờ mới đã đầy, vui lòng chọn giờ khác.");
+        LocalDate oldDate = booking.getScheduledDate();
+        LocalTime oldTime = booking.getScheduledTime();
+        boolean timeChanged = !oldDate.equals(newDate) || !oldTime.equals(newTime);
+
+        int estimatedDuration = calculateEstimatedDuration(booking.getServiceIds());
+        
+        if (timeChanged) {
+            boolean slotAvailable = slotService.isSlotAvailable(
+                    newDate, newTime, estimatedDuration, booking.getBookingId()
+            );
+            if (!slotAvailable) {
+                throw new BookingException("Khung giờ mới đã đầy, vui lòng chọn giờ khác.");
+            }
+            
+            slotService.releaseForBooking(booking.getBookingId());
         }
 
         booking.setScheduledDate(newDate);
@@ -159,6 +211,11 @@ public class BookingService {
 
         booking.initializeDefaults();
         Booking saved = bookingRepository.save(booking);
+        
+        if (timeChanged) {
+            slotService.reserveForBooking(saved.getBookingId(), estimatedDuration);
+        }
+        
         log.info("Customer booking modified: bookingId={}, customerId={}", saved.getBookingId(), customerId);
         return saved;
     }
@@ -201,30 +258,19 @@ public class BookingService {
         booking.setStatus(BookingStatus.CANCELLED);
 
         bookingRepository.save(booking);
+        
+        slotService.releaseForBooking(booking.getBookingId());
+        
         log.info("Customer booking cancelled: bookingId={}, customerId={}", booking.getBookingId(), customerId);
-
-        // TODO: khi triển khai slot chi tiết, release slot tại đây
     }
 
-    private boolean isSlotAvailable(LocalDate date, LocalTime time, Integer excludeBookingId) {
-        List<BookingStatus> activeStatuses = Arrays.asList(
-            BookingStatus.PENDING,
-            BookingStatus.CONFIRMED
-        );
-
-        long count = bookingRepository.countByDateTimeAndStatuses(date, time, activeStatuses);
-
-        if (excludeBookingId != null) {
-            // Khi dùng countBy... theo JPA, booking hiện tại vẫn nằm trong count.
-            // Để đơn giản, cho phép giữ nguyên giờ cũ kể cả khi đủ MAX_BOOKINGS_PER_SLOT.
-            Booking existing = bookingRepository.findById(excludeBookingId).orElse(null);
-            if (existing != null
-                && existing.getScheduledDate().equals(date)
-                && existing.getScheduledTime().equals(time)) {
-                return true;
-            }
+    private int calculateEstimatedDuration(List<Integer> serviceIds) {
+        if (serviceIds == null || serviceIds.isEmpty()) {
+            return DEFAULT_DURATION_MINUTES;
         }
-
-        return count < MAX_BOOKINGS_PER_SLOT;
+        
+        // TODO: Tính duration từ catalog_item.estimated_duration_minutes
+        // Hiện tại tạm thời return default
+        return DEFAULT_DURATION_MINUTES;
     }
 }

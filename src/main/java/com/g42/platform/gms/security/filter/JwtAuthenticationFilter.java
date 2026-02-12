@@ -42,6 +42,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         // - swagger, home, error: public endpoints
         if (path.startsWith("/api/auth/")
                 || path.startsWith("/api/booking/guest/")
+                || path.startsWith("/api/booking/slots/")
                 || path.startsWith("/api/staff-profile")
                 || path.startsWith("/api/book/handle")
                 || path.startsWith("/v3/api-docs")
