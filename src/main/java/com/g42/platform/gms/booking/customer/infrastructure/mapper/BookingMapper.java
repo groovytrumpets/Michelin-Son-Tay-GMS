@@ -15,12 +15,9 @@ import java.util.stream.Collectors;
 public interface BookingMapper {
 
     @Mappings({
-            @Mapping(target = "customerId",
-                    expression = "java(jpa.getCustomer() != null ? jpa.getCustomer().getCustomerId() : null)"),
-            @Mapping(target = "vehicleId",
-                    expression = "java(jpa.getVehicle() != null ? jpa.getVehicle().getVehicleId() : null)"),
-            @Mapping(target = "serviceIds",
-                    expression = "java(mapServiceIds(jpa.getServices()))")
+            @Mapping(target = "customerId", source = "customer.customerId"),
+            @Mapping(target = "vehicleId", source = "vehicle.vehicleId"),
+            @Mapping(target = "serviceIds", expression = "java(mapServiceIds(jpa.getServices()))")
     })
     Booking toDomain(BookingJpaEntity jpa);
 

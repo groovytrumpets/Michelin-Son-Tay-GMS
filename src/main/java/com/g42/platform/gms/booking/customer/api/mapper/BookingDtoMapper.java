@@ -8,10 +8,6 @@ import org.mapstruct.Mapping;
 @Mapper(componentModel = "spring")
 public interface BookingDtoMapper {
 
-    @Mapping(
-            target = "status",
-            expression = "java(domain.getStatus() != null ? domain.getStatus().name() : null)"
-    )
     @Mapping(target = "customerName", ignore = true)
     @Mapping(target = "phone", ignore = true)
     BookingResponse toResponse(Booking domain);

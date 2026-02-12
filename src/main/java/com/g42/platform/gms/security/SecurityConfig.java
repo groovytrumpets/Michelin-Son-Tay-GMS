@@ -1,7 +1,7 @@
 package com.g42.platform.gms.security;
 
-import com.g42.platform.gms.auth.filter.JwtAuthenticationFilter;
-import com.g42.platform.gms.auth.filter.StaffJwtFilter;
+import com.g42.platform.gms.security.filter.JwtAuthenticationFilter;
+import com.g42.platform.gms.security.filter.StaffJwtFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -22,7 +22,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import java.util.List;
 
 @Configuration
-@EnableMethodSecurity  // ← THÊM: Để @PreAuthorize hoạt động
+@EnableMethodSecurity  
 public class SecurityConfig {
     @Autowired
     private UserDetailsService userDetailsService;
@@ -30,12 +30,11 @@ public class SecurityConfig {
     StaffJwtFilter staffJwtFilter;
     @Autowired
     AuthenticationSuccessHandler OAuth2LoginSuccessHandler;
-    @Autowired  // ← THÊM: Inject bean
-    JwtAuthenticationFilter jwtAuthenticationFilter;  // ← THÊM: Inject bean
+    @Autowired 
+    JwtAuthenticationFilter jwtAuthenticationFilter; 
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        // XÓA: JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtUtilCustomer);
 
         http
                 .cors(cors -> cors.configurationSource(request -> {
@@ -51,13 +50,13 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/auth/**",
                                 "/api/booking/guest/**",
+                                "/api/booking/slots/**",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
                                 "/home/**",
                                 "/error"
                         ).permitAll()
-                        .requestMatchers("/api/booking/create").permitAll()
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2 -> oauth2
@@ -89,7 +88,6 @@ public class SecurityConfig {
                 .httpBasic(httpBasic -> httpBasic.disable())
                 .formLogin(form -> form.disable());
 
-        // SỬA: Dùng bean đã inject
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         http.addFilterBefore(staffJwtFilter, UsernamePasswordAuthenticationFilter.class);
 

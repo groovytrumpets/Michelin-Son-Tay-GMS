@@ -3,6 +3,7 @@ package com.g42.platform.gms.booking.customer.infrastructure.implement;
 import com.g42.platform.gms.auth.entity.CustomerProfile;
 import com.g42.platform.gms.auth.repository.CustomerProfileRepository;
 import com.g42.platform.gms.booking.customer.domain.entity.Booking;
+import com.g42.platform.gms.booking.customer.domain.enums.BookingStatus;
 import com.g42.platform.gms.booking.customer.domain.repository.BookingRepository;
 import com.g42.platform.gms.booking.customer.infrastructure.entity.BookingJpaEntity;
 import com.g42.platform.gms.booking.customer.infrastructure.entity.CatalogItemJpaEntity;
@@ -12,6 +13,8 @@ import com.g42.platform.gms.catalog.repository.CatalogItemRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -80,5 +83,10 @@ public class BookingRepositoryImpl implements BookingRepository {
     public void delete(Booking booking) {
         jpaRepository.findById(booking.getBookingId())
             .ifPresent(jpaRepository::delete);
+    }
+
+    @Override
+    public long countByDateTimeAndStatuses(LocalDate date, LocalTime time, List<BookingStatus> statuses) {
+        return jpaRepository.countByScheduledDateAndScheduledTimeAndStatusIn(date, time, statuses);
     }
 }

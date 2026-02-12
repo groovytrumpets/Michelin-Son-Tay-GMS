@@ -22,17 +22,20 @@ public class StaffPrincipal implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return Collections.singleton(new SimpleGrantedAuthority("STAFF"));
-    }// thể hiện role của user
+        // trả về role của staff, cần có prefix "ROLE_" để @PreAuthorize("hasRole('STAFF')") hoạt động
+        return Collections.singleton(new SimpleGrantedAuthority("ROLE_STAFF"));
+    }
 
     @Override
     public String getPassword() {
-        return staffAuth.getPasswordHash(); //truyền vào giá trị pass
+        // trả về password hash của staff
+        return staffAuth.getPasswordHash();
     }
 
     @Override
     public String getUsername() {
-        return String.valueOf(staffAuth.getStaffAuthId()); //truyền vào giá trị username
+        // trả về staff auth id dưới dạng string làm username
+        return String.valueOf(staffAuth.getStaffAuthId());
     }
 
     @Override
