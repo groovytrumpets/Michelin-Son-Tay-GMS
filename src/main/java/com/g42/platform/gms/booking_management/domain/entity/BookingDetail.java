@@ -1,0 +1,22 @@
+package com.g42.platform.gms.booking_management.domain.entity;
+
+import com.g42.platform.gms.booking_management.infrastructure.entity.BookingJpa;
+import com.g42.platform.gms.booking_management.infrastructure.entity.CatalogItemJpa;
+import jakarta.persistence.*;
+import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+public class BookingDetail {
+
+    private Integer id;
+    private Booking booking;
+    private CatalogItem item;
+
+}
