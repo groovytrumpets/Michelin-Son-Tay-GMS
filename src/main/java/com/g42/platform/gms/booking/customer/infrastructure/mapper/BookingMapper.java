@@ -16,14 +16,12 @@ public interface BookingMapper {
 
     @Mappings({
             @Mapping(target = "customerId", source = "customer.customerId"),
-            @Mapping(target = "vehicleId", source = "vehicle.vehicleId"),
             @Mapping(target = "serviceIds", expression = "java(mapServiceIds(jpa.getServices()))")
     })
     Booking toDomain(BookingJpaEntity jpa);
 
     @Mappings({
             @Mapping(target = "customer", ignore = true),
-            @Mapping(target = "vehicle", ignore = true),
             @Mapping(target = "services", ignore = true)
     })
     BookingJpaEntity toJpa(Booking domain);

@@ -13,7 +13,6 @@ import java.util.List;
 public class Booking {
     private Integer bookingId;
     private Integer customerId;
-    private Integer vehicleId;
     private LocalDate scheduledDate;
     private LocalTime scheduledTime;
     private String serviceCategory;
