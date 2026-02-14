@@ -36,6 +36,7 @@ public class BookingRequestService {
     private final CustomerProfileRepository customerRepository;
     private final CatalogItemRepository catalogItemRepository;
     private final StaffProfileRepo staffRepository;
+    private final SlotService slotService;
     
     private final Map<String, RateLimitInfo> rateLimitCache = new ConcurrentHashMap<>();
     
@@ -60,6 +61,36 @@ public class BookingRequestService {
         }
         
         CustomerProfile customer = customerRepository.findByPhone(request.getPhone()).orElse(null);
+        
+        // Validate thời gian đặt lịch
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime scheduledDateTime = LocalDateTime.of(
+            request.getAppointmentDate(),
+            request.getAppointmentTime()
+        );
+        
+        // Check không được trong quá khứ
+        if (scheduledDateTime.isBefore(now)) {
+            throw new BookingException("Không thể đặt lịch trong quá khứ.");
+        }
+        
+        // Check phải cách hiện tại ít nhất 2 giờ
+        LocalDateTime minBookingTime = now.plusHours(2L);
+        if (scheduledDateTime.isBefore(minBookingTime)) {
+            throw new BookingException("Vui lòng đặt lịch trước ít nhất 2 giờ.");
+        }
+        
+        // Validate slot availability
+        int estimatedDuration = calculateEstimatedDuration(request.getSelectedServiceIds());
+        boolean slotAvailable = slotService.isSlotAvailable(
+                request.getAppointmentDate(),
+                request.getAppointmentTime(),
+                estimatedDuration,
+                null
+        );
+        if (!slotAvailable) {
+            throw new BookingException("Khung giờ này đã đầy, vui lòng chọn giờ khác.");
+        }
         
         BookingRequest bookingRequest = new BookingRequest();
         bookingRequest.setPhone(request.getPhone());
@@ -172,6 +203,16 @@ public class BookingRequestService {
     
     private boolean isValidPhoneNumber(String phone) {
         return phone != null && phone.matches("^0[0-9]{9,10}$");
+    }
+    
+    private int calculateEstimatedDuration(List<Integer> serviceIds) {
+        if (serviceIds == null || serviceIds.isEmpty()) {
+            return 60; // DEFAULT_DURATION_MINUTES
+        }
+        
+        // TODO: Tính duration từ catalog_item.estimated_duration_minutes
+        // Hiện tại tạm thời return default
+        return 60;
     }
     
     @lombok.Data

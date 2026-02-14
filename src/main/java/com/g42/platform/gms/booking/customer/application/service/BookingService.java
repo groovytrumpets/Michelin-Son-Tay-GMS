@@ -172,7 +172,12 @@ public class BookingService {
         LocalTime oldTime = booking.getScheduledTime();
         boolean timeChanged = !oldDate.equals(newDate) || !oldTime.equals(newTime);
 
-        int estimatedDuration = calculateEstimatedDuration(booking.getServiceIds());
+        // Tính duration từ serviceIds CUỐI CÙNG (sau khi update)
+        List<Integer> finalServiceIds = booking.getServiceIds();
+        if (request.getNewServiceIds() != null && !request.getNewServiceIds().isEmpty()) {
+            finalServiceIds = request.getNewServiceIds();
+        }
+        int estimatedDuration = calculateEstimatedDuration(finalServiceIds);
         
         if (timeChanged) {
             boolean slotAvailable = slotService.isSlotAvailable(
