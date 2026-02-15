@@ -1,10 +1,7 @@
 package com.g42.platform.gms.booking_management.infrastructure;
 
-import com.g42.platform.gms.booking_management.api.dto.BookedDetailResponse;
 import com.g42.platform.gms.booking_management.domain.entity.Booking;
-import com.g42.platform.gms.booking_management.domain.entity.BookingDetail;
 import com.g42.platform.gms.booking_management.domain.repository.BookingManageRepository;
-import com.g42.platform.gms.booking_management.infrastructure.entity.BookingDetailJpa;
 import com.g42.platform.gms.booking_management.infrastructure.entity.BookingJpa;
 import com.g42.platform.gms.booking_management.infrastructure.mapper.BookingDetailManagerMapper;
 import com.g42.platform.gms.booking_management.infrastructure.mapper.BookingManagerMapper;

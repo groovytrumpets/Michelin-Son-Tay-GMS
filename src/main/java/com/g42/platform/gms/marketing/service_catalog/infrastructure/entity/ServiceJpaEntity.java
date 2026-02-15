@@ -45,4 +45,6 @@ public class ServiceJpaEntity {
 
     @OneToMany(mappedBy = "service", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ServiceMediaJpaEntity> media = new ArrayList<>();
+    @Column(name = "estimate_time")
+    private Integer estimateTime;
 }

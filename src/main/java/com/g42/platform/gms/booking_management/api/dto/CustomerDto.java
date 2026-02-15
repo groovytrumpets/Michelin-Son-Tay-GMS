@@ -17,6 +17,5 @@ import java.time.LocalDateTime;
 public class CustomerDto {
     private String fullName;
     private String phone;
-    private String email;
     private LocalDateTime firstBookingAt;
 }

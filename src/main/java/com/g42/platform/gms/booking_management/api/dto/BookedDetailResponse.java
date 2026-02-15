@@ -1,7 +1,5 @@
 package com.g42.platform.gms.booking_management.api.dto;
 
-import com.g42.platform.gms.booking_management.domain.entity.Booking;
-import com.g42.platform.gms.booking_management.domain.entity.CatalogItem;
 import com.g42.platform.gms.booking_management.domain.enums.BookingEnum;
 import lombok.AllArgsConstructor;
 import lombok.Getter;

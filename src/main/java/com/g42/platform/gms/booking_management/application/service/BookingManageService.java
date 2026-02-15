@@ -6,10 +6,7 @@ import com.g42.platform.gms.booking_management.api.dto.BookedDetailResponse;
 import com.g42.platform.gms.booking_management.api.dto.BookedRespond;
 import com.g42.platform.gms.booking_management.api.mapper.BookingMDetailDtoMapper;
 import com.g42.platform.gms.booking_management.api.mapper.BookingManageDtoMapper;
-import com.g42.platform.gms.booking_management.domain.entity.Booking;
 import com.g42.platform.gms.booking_management.domain.repository.BookingManageRepository;
-import com.g42.platform.gms.common.dto.ApiResponse;
-import com.g42.platform.gms.marketing.service_catalog.domain.repository.ServiceRepository;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 
