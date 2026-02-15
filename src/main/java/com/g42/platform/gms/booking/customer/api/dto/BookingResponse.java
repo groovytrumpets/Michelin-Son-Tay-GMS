@@ -18,5 +18,4 @@ public class BookingResponse {
     private String status;
     private Boolean isGuest;
     private List<Integer> serviceIds;
-    private Integer vehicleId;
 }

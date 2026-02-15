@@ -2,7 +2,6 @@ package com.g42.platform.gms.booking.customer.application.service;
 
 import com.g42.platform.gms.auth.entity.CustomerProfile;
 import com.g42.platform.gms.auth.repository.CustomerProfileRepository;
-import com.g42.platform.gms.auth.service.JwtUtilCustomer;
 import com.g42.platform.gms.booking.customer.api.dto.CustomerBookingRequest;
 import com.g42.platform.gms.booking.customer.api.dto.ModifyBookingRequest;
 import com.g42.platform.gms.booking.customer.domain.entity.Booking;
@@ -10,7 +9,6 @@ import com.g42.platform.gms.booking.customer.domain.enums.BookingStatus;
 import com.g42.platform.gms.booking.customer.domain.exception.BookingException;
 import com.g42.platform.gms.booking.customer.domain.repository.BookingRepository;
 import com.g42.platform.gms.catalog.repository.CatalogItemRepository;
-import io.jsonwebtoken.Claims;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,18 +32,11 @@ public class BookingService {
     private final BookingRepository bookingRepository;
     private final CustomerProfileRepository customerRepository;
     private final CatalogItemRepository catalogItemRepository;
-    private final JwtUtilCustomer jwtUtilCustomer;
     private final SlotService slotService;
 
     @Transactional
-    public Booking createCustomerBooking(CustomerBookingRequest request, String token) {
-        Claims claims = jwtUtilCustomer.extractClaims(token);
-        Integer customerId = claims.get("customerId", Integer.class);
-        
-        if (customerId == null) {
-            throw new BookingException("Không tìm thấy thông tin khách hàng trong token.");
-        }
-        
+    public Booking createCustomerBooking(CustomerBookingRequest request, Integer customerId) {
+        // ✅ Nhận customerId trực tiếp, không cần parse token
         CustomerProfile customer = customerRepository.findById(customerId)
             .orElseThrow(() -> new BookingException("Không tìm thấy thông tin khách hàng."));
         
@@ -108,26 +99,14 @@ public class BookingService {
         return savedBooking;
     }
 
-    public List<Booking> getCustomerBookings(String token) {
-        Claims claims = jwtUtilCustomer.extractClaims(token);
-        Integer customerId = claims.get("customerId", Integer.class);
-        
-        if (customerId == null) {
-            throw new BookingException("Không tìm thấy thông tin khách hàng trong token.");
-        }
-        
+    public List<Booking> getCustomerBookings(Integer customerId) {
+        // ✅ Nhận customerId trực tiếp
         return bookingRepository.findByCustomerIdOrderByDateDesc(customerId);
     }
 
     @Transactional
-    public Booking modifyCustomerBooking(Integer bookingId, ModifyBookingRequest request, String token) {
-        Claims claims = jwtUtilCustomer.extractClaims(token);
-        Integer customerId = claims.get("customerId", Integer.class);
-
-        if (customerId == null) {
-            throw new BookingException("Không tìm thấy thông tin khách hàng trong token.");
-        }
-
+    public Booking modifyCustomerBooking(Integer bookingId, ModifyBookingRequest request, Integer customerId) {
+        // ✅ Nhận customerId trực tiếp
         Booking booking = bookingRepository.findByIdAndCustomerId(bookingId, customerId)
             .orElseThrow(() -> new BookingException("Không tìm thấy booking của bạn."));
 
@@ -172,7 +151,12 @@ public class BookingService {
         LocalTime oldTime = booking.getScheduledTime();
         boolean timeChanged = !oldDate.equals(newDate) || !oldTime.equals(newTime);
 
-        int estimatedDuration = calculateEstimatedDuration(booking.getServiceIds());
+        // Tính duration từ serviceIds CUỐI CÙNG (sau khi update)
+        List<Integer> finalServiceIds = booking.getServiceIds();
+        if (request.getNewServiceIds() != null && !request.getNewServiceIds().isEmpty()) {
+            finalServiceIds = request.getNewServiceIds();
+        }
+        int estimatedDuration = calculateEstimatedDuration(finalServiceIds);
         
         if (timeChanged) {
             boolean slotAvailable = slotService.isSlotAvailable(
@@ -221,14 +205,8 @@ public class BookingService {
     }
 
     @Transactional
-    public void cancelCustomerBooking(Integer bookingId, String token) {
-        Claims claims = jwtUtilCustomer.extractClaims(token);
-        Integer customerId = claims.get("customerId", Integer.class);
-
-        if (customerId == null) {
-            throw new BookingException("Không tìm thấy thông tin khách hàng trong token.");
-        }
-
+    public void cancelCustomerBooking(Integer bookingId, Integer customerId) {
+        // ✅ Nhận customerId trực tiếp
         Booking booking = bookingRepository.findByIdAndCustomerId(bookingId, customerId)
             .orElseThrow(() -> new BookingException("Không tìm thấy booking của bạn."));
 
