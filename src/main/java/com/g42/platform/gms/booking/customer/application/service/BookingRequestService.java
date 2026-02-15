@@ -61,6 +61,26 @@ public class BookingRequestService {
         
         CustomerProfile customer = customerRepository.findByPhone(request.getPhone()).orElse(null);
         
+        // Validate thời gian đặt lịch
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime scheduledDateTime = LocalDateTime.of(
+            request.getAppointmentDate(),
+            request.getAppointmentTime()
+        );
+        
+        // Check không được trong quá khứ
+        if (scheduledDateTime.isBefore(now)) {
+            throw new BookingException("Không thể đặt lịch trong quá khứ.");
+        }
+        
+        // Check phải cách hiện tại ít nhất 2 giờ
+        LocalDateTime minBookingTime = now.plusHours(2L);
+        if (scheduledDateTime.isBefore(minBookingTime)) {
+            throw new BookingException("Vui lòng đặt lịch trước ít nhất 2 giờ.");
+        }
+        
+        // Guest không cần check slot availability - có thể đặt lịch bất kỳ
+        
         BookingRequest bookingRequest = new BookingRequest();
         bookingRequest.setPhone(request.getPhone());
         bookingRequest.setFullName(request.getFullName());
