@@ -7,4 +7,5 @@ import org.mapstruct.Mapper;
 @Mapper(componentModel = "spring")
 public interface BookingMSlotReservationMapper {
     BookingSlotReservation toDomain(BookingSlotReservationJpa reservation);
+    BookingSlotReservationJpa toJpa(BookingSlotReservation bookingSlotReservation);
 }

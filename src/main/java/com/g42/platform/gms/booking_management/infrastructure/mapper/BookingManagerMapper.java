@@ -10,4 +10,5 @@ import java.util.List;
 public interface BookingManagerMapper {
     Booking toDomain(BookingJpa bookingJpa);
     List<Booking> toBookingJpa(List<BookingJpa> bookingJpa);
+    BookingJpa toBooking(Booking booking);
 }

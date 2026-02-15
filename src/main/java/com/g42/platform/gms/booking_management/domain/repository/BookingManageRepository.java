@@ -2,7 +2,9 @@ package com.g42.platform.gms.booking_management.domain.repository;
 
 import com.g42.platform.gms.booking_management.domain.entity.Booking;
 import com.g42.platform.gms.booking_management.domain.entity.BookingRequest;
+import com.g42.platform.gms.booking_management.domain.entity.BookingSlotReservation;
 import com.g42.platform.gms.booking_management.domain.entity.TimeSlot;
+import com.g42.platform.gms.booking_management.infrastructure.entity.BookingJpa;
 
 import java.time.LocalTime;
 import java.util.List;
@@ -19,4 +21,8 @@ public interface BookingManageRepository {
     TimeSlot getTimeSlotByTime(LocalTime scheduledTime);
 
     int countReserverdBasedOnTime(LocalTime scheduledTime);
+
+    BookingJpa createBookingByRequest(BookingRequest request, int customerId);
+
+    BookingSlotReservation createBookingSlotReservation(BookingRequest request, BookingJpa bookingId);
 }

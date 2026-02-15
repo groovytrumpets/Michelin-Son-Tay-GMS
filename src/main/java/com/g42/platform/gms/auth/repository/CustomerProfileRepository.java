@@ -9,5 +9,7 @@ public interface CustomerProfileRepository
         extends JpaRepository<CustomerProfile, Integer> {
 
     Optional<CustomerProfile> findByPhone(String phone);
+
+    CustomerProfile getCustomerProfilesByCustomerId(Integer customerId);
 }
 
