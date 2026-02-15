@@ -74,9 +74,13 @@ public class BookingRequestJpa {
     @Column(name = "client_ip", length = 45)
     private String clientIp;
 
-    @OneToMany(mappedBy = "request", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<BookingRequestDetailJpa> details;
-
+    @ManyToMany
+    @JoinTable(
+            name = "booking_request_details",
+            joinColumns = @JoinColumn(name = "request_id"),
+            inverseJoinColumns = @JoinColumn(name = "item_id")
+    )
+    private List<CatalogItemJpa> services;
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) {
