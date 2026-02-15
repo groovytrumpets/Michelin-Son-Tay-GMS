@@ -11,9 +11,11 @@ import com.g42.platform.gms.booking_management.api.mapper.BookingMRequestDtoMapp
 import com.g42.platform.gms.booking_management.api.mapper.BookingManageDtoMapper;
 import com.g42.platform.gms.booking_management.domain.entity.Booking;
 import com.g42.platform.gms.booking_management.domain.entity.BookingRequest;
+import com.g42.platform.gms.booking_management.domain.entity.TimeSlot;
 import com.g42.platform.gms.booking_management.domain.repository.BookingManageRepository;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -43,5 +45,27 @@ public class BookingManageService {
     public BookingRequestDetailRes getBookingRequestById(Integer bookingId) {
         BookingRequest bookingRequest = bookingRepository.getBookingRequestById(bookingId);
         return bookingMRequestDtoMapper.toBookingRequestDetailRes(bookingRequest);
+    }
+    @Transactional
+    public BookedRespond confirmBookingRequest(Integer requestId) {
+        BookingRequest request = bookingRepository.getBookingRequestById(requestId);
+        if (!request.isPending()){
+            //todo: wrong status handle
+        }
+        //todo: check slot capacity
+        System.out.println("request slot: " + request.getScheduledTime());
+            //todo: search for reservedCount
+        int reservedCount = bookingRepository.countReserverdBasedOnTime(request.getScheduledTime());
+        System.out.println("reserved count: " + reservedCount);
+            //todo: compare reservedCount to available slot
+        TimeSlot timeSlot = bookingRepository.getTimeSlotByTime(request.getScheduledTime());
+        System.out.println("time slot: " + timeSlot);
+        //todo: check acc available else create customer acc
+
+        //todo: create booking
+        Booking booking = new Booking();
+
+        //todo: create Reservation
+return null;
     }
 }
