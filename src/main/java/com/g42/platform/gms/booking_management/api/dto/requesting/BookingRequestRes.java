@@ -1,6 +1,7 @@
-package com.g42.platform.gms.booking_management.api.dto;
+package com.g42.platform.gms.booking_management.api.dto.requesting;
 
-import com.g42.platform.gms.booking_management.domain.enums.BookingEnum;
+import com.g42.platform.gms.booking.customer.domain.enums.BookingRequestStatus;
+import com.g42.platform.gms.booking_management.domain.entity.BookingRequestDetail;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -9,19 +10,17 @@ import lombok.Setter;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class BookedRespond {
-    private Integer bookingId;
-    private CustomerDto customer;
+public class BookingRequestRes {
+    private Integer requestId;
+    private String phone;
+    private String fullName;
     private LocalDate scheduledDate;
     private LocalTime scheduledTime;
     private String serviceCategory;
-    private BookingEnum status;
-    private String description;
-    private Boolean isGuest;
+    private BookingRequestStatus status;
     private LocalDateTime createdAt;
 }

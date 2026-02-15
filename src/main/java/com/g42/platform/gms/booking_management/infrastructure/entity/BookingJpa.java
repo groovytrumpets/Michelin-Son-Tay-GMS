@@ -24,10 +24,6 @@ public class BookingJpa {
     @JoinColumn(name = "customer_id", nullable = false)
     private CustomerProfile customer;
 
-    @ManyToOne
-    @JoinColumn(name = "vehicle_id", nullable = true)
-    private Vehicle vehicle;
-
     @Column(name = "scheduled_date", nullable = false)
     private LocalDate scheduledDate;
 

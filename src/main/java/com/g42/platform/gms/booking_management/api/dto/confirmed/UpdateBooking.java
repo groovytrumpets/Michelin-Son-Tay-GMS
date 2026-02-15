@@ -1,4 +1,4 @@
-package com.g42.platform.gms.booking_management.api.dto;
+package com.g42.platform.gms.booking_management.api.dto.confirmed;
 
 import com.g42.platform.gms.booking_management.domain.entity.CatalogItem;
 import com.g42.platform.gms.booking_management.domain.enums.BookingEnum;
