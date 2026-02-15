@@ -6,6 +6,7 @@ import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedRespond;
 import com.g42.platform.gms.booking_management.api.dto.requesting.BookingRequestDetailRes;
 import com.g42.platform.gms.booking_management.api.dto.requesting.BookingRequestRes;
 import com.g42.platform.gms.booking_management.application.service.BookingManageService;
+import com.g42.platform.gms.booking_management.domain.entity.TimeSlot;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import lombok.AllArgsConstructor;
@@ -43,9 +44,15 @@ public class BookingManageController {
         return  ResponseEntity.ok(ApiResponses.success(bookingRequestDetailRes));
     }
     @PostMapping("/booking-request/{requestId}/confirm")
-    public ResponseEntity<ApiResponse<BookedRespond>> confirmBookingRequest(@PathVariable Integer requestId){
+    public ResponseEntity<ApiResponse<Boolean>> confirmBookingRequest(@PathVariable Integer requestId){
          return ResponseEntity.ok(ApiResponses.success(bookingService.confirmBookingRequest(requestId)));
     }
+//    @GetMapping("/booking-request/{bookingId}")
+//    public ResponseEntity<ApiResponse<List<TimeSlot>>> getListTimeSlotByBookingId(@PathVariable Integer bookingId){
+//        return ResponseEntity.ok(ApiResponses.success(bookingService.getListTimeSlotByBookingId(bookingId)));
+//    }
+
+
 
 
 

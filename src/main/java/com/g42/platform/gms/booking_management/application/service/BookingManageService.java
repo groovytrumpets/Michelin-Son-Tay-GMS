@@ -17,6 +17,8 @@ import com.g42.platform.gms.booking_management.domain.entity.BookingSlotReservat
 import com.g42.platform.gms.booking_management.domain.entity.TimeSlot;
 import com.g42.platform.gms.booking_management.domain.repository.BookingManageRepository;
 import com.g42.platform.gms.booking_management.infrastructure.entity.BookingJpa;
+import com.g42.platform.gms.booking_management.infrastructure.entity.TimeSlotJpa;
+import com.g42.platform.gms.booking_management.infrastructure.mapper.TimeSlotMMapper;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,7 +54,7 @@ public class BookingManageService {
     }
     private final CustomerGateway customerGateway;
     @Transactional
-    public BookedRespond confirmBookingRequest(Integer requestId) {
+    public Boolean confirmBookingRequest(Integer requestId) {
         BookingRequest request = bookingRepository.getBookingRequestById(requestId);
         if (!request.isPending()){
             //todo: wrong status handle
@@ -77,6 +79,15 @@ public class BookingManageService {
         //todo: create Reservation
         BookingSlotReservation bookingSlotReservation = bookingRepository.createBookingSlotReservation(request, booking);
         System.out.println("booking slot reservation: " + bookingSlotReservation);
-return null;
+        //todo: update booking request status
+        boolean confirmed = request.confirm();
+        bookingRepository.setConfirmStatus(request);
+return confirmed;
+    }
+    private final TimeSlotMMapper  timeSlotMMapper;
+    public List<TimeSlot> getListTimeSlotByBookingId(Integer bookingId) {
+//        List<TimeSlotJpa> list = bookingRepository.getListOfTimeSlotByBookingId(bookingId);
+//        return timeSlotMMapper.toDomainTimeSlotList(list);
+        return null;
     }
 }

@@ -13,4 +13,5 @@ import java.util.List;
 public interface BookingDraffManagerMapper {
 BookingRequest toDomain(BookingRequestJpa bookingRequestJpa );
 List<BookingRequest> toDomain(List<BookingRequestJpa> bookingRequestJpas);
+BookingRequestJpa toDomainJpa(BookingRequest bookingRequestJpa );
 }

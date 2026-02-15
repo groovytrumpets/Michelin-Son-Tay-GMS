@@ -95,4 +95,9 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
         BookingSlotReservationJpa bookingSlotReservationJpa = bookingMSlotReservationRepo.save(bookingMSlotReservationMapper.toJpa(bookingSlotReservation));
         return bookingMSlotReservationMapper.toDomain(bookingSlotReservationJpa);
     }
+
+    @Override
+    public void setConfirmStatus(BookingRequest request) {
+        bookingMRequestJpaRepo.save(bookingDraffManagerMapper.toDomainJpa(request));
+    }
 }

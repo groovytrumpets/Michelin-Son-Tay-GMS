@@ -40,4 +40,12 @@ public class BookingRequest {
     public boolean isPending() {
         return status == BookingRequestStatus.PENDING;
     }
+
+    public boolean confirm() {
+        if (this.status != BookingRequestStatus.PENDING) {
+            throw new IllegalStateException("Invalid state");
+        }
+        this.status = BookingRequestStatus.CONFIRMED;
+        return true;
+    }
 }

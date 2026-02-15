@@ -25,4 +25,5 @@ public class TimeSlotJpa {
 
     @Column(name = "period", length = 20)
     private String period;
+
 }
