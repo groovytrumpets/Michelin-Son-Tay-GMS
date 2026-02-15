@@ -33,4 +33,19 @@ public class BookingRequest {
     private LocalDateTime expiresAt;
     private String clientIp;
     private List<CatalogItem> services;
+
+    public boolean isGuest() {
+        return isGuest;
+    }
+    public boolean isPending() {
+        return status == BookingRequestStatus.PENDING;
+    }
+
+    public boolean confirm() {
+        if (this.status != BookingRequestStatus.PENDING) {
+            throw new IllegalStateException("Invalid state");
+        }
+        this.status = BookingRequestStatus.CONFIRMED;
+        return true;
+    }
 }

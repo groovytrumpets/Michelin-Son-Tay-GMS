@@ -1,19 +1,18 @@
 package com.g42.platform.gms.booking_management.api.controller;
 
+import com.g42.platform.gms.booking.customer.api.dto.BookingResponse;
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedDetailResponse;
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedRespond;
 import com.g42.platform.gms.booking_management.api.dto.requesting.BookingRequestDetailRes;
 import com.g42.platform.gms.booking_management.api.dto.requesting.BookingRequestRes;
 import com.g42.platform.gms.booking_management.application.service.BookingManageService;
+import com.g42.platform.gms.booking_management.domain.entity.TimeSlot;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -44,6 +43,17 @@ public class BookingManageController {
         BookingRequestDetailRes bookingRequestDetailRes = bookingService.getBookingRequestById(bookingId);
         return  ResponseEntity.ok(ApiResponses.success(bookingRequestDetailRes));
     }
+    @PostMapping("/booking-request/{requestId}/confirm")
+    public ResponseEntity<ApiResponse<Boolean>> confirmBookingRequest(@PathVariable Integer requestId){
+         return ResponseEntity.ok(ApiResponses.success(bookingService.confirmBookingRequest(requestId)));
+    }
+//    @GetMapping("/booking-request/{bookingId}")
+//    public ResponseEntity<ApiResponse<List<TimeSlot>>> getListTimeSlotByBookingId(@PathVariable Integer bookingId){
+//        return ResponseEntity.ok(ApiResponses.success(bookingService.getListTimeSlotByBookingId(bookingId)));
+//    }
+
+
+
 
 
 }
