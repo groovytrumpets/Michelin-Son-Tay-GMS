@@ -1,5 +1,6 @@
 package com.g42.platform.gms.security.filter;
 
+import com.g42.platform.gms.auth.entity.CustomerPrincipal;
 import com.g42.platform.gms.auth.service.JwtUtilCustomer;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
@@ -73,19 +74,27 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (isValid) {
                 // parse claims từ token
                 Claims claims = jwtUtilCustomer.extractClaims(token);
-                String username = claims.getSubject();
+                String phone = claims.getSubject(); // phone từ token
                 String role = claims.get("role", String.class);
                 Integer customerId = claims.get("customerId", Integer.class);
+                String name = claims.get("name", String.class); // ✅ Lấy name từ token
+
+                // ✅ Tạo CustomerPrincipal với đầy đủ thông tin
+                CustomerPrincipal customerPrincipal = new CustomerPrincipal(
+                    customerId,
+                    phone,
+                    name
+                );
 
                 // tạo authorities từ role trong token
                 List<SimpleGrantedAuthority> authorities = (role == null)
                         ? Collections.emptyList()
                         : List.of(new SimpleGrantedAuthority("ROLE_" + role));
 
-                // tạo authentication object
+                // ✅ Set CustomerPrincipal vào Authentication
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(
-                                username,
+                                customerPrincipal, // ✅ Thay vì chỉ lưu username
                                 null,
                                 authorities
                         );
@@ -96,7 +105,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 // set authentication vào security context để authorization sử dụng
                 SecurityContextHolder.getContext().setAuthentication(authentication);
 
-                log.info("JWT Authentication successful - User: {}, Role: {}, Path: {}", username, role, request.getRequestURI());
+                log.info("JWT Authentication successful - CustomerId: {}, Phone: {}, Path: {}", 
+                    customerId, phone, request.getRequestURI());
             } else {
                 log.warn("JWT Token validation failed for path: {}", request.getRequestURI());
             }

@@ -1,4 +1,4 @@
-package com.g42.platform.gms.booking.customer.infrastructure.entity;
+package com.g42.platform.gms.booking_management.infrastructure.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
@@ -8,7 +8,7 @@ import java.time.LocalTime;
 @Entity
 @Table(name = "time_slot")
 @Data
-public class TimeSlotJpaEntity {
+public class TimeSlotJpa {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "slot_id")
@@ -25,7 +25,5 @@ public class TimeSlotJpaEntity {
 
     @Column(name = "period", length = 20)
     private String period;
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "reservation_id")
-    private BookingSlotReservationJpaEntity reservation;
+
 }

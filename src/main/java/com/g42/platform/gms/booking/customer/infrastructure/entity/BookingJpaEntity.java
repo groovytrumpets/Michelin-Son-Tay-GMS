@@ -2,7 +2,6 @@ package com.g42.platform.gms.booking.customer.infrastructure.entity;
 
 import com.g42.platform.gms.auth.entity.CustomerProfile;
 import com.g42.platform.gms.booking.customer.domain.enums.BookingStatus;
-import com.g42.platform.gms.vehicle.entity.Vehicle;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -23,10 +22,6 @@ public class BookingJpaEntity {
     @ManyToOne
     @JoinColumn(name = "customer_id", nullable = false)
     private CustomerProfile customer;
-
-    @ManyToOne
-    @JoinColumn(name = "vehicle_id", nullable = true)
-    private Vehicle vehicle;
 
     @Column(name = "scheduled_date", nullable = false)
     private LocalDate scheduledDate;

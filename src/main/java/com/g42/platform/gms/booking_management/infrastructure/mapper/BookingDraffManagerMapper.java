@@ -11,13 +11,7 @@ import java.util.List;
 
 @Mapper(componentModel = "spring")
 public interface BookingDraffManagerMapper {
-    BookingRequest toDomain(BookingRequestJpa bookingRequestJpa);
-    List<BookingRequest> toDomain(List<BookingRequestJpa> bookingRequestJpa);
-    BookingRequestJpa toJpaEntity(BookingRequest bookingRequestJpa);
-    List<BookingRequestJpa> toJpaEntity(List<BookingRequest> bookingRequestJpa);
-    BookingRequestDetail toJpaEntityDetail(BookingRequestDetailJpa bookingRequestDetailJpa);
-    List<BookingRequestDetail> toJpaEntityDetail(List<BookingRequestDetailJpa> bookingRequestDetailJpa);
-    BookingRequestDetailJpa  toJpaEntityDetailDomain(BookingRequestDetail bookingRequestDetailJpa);
-    List<BookingRequestDetailJpa>  toJpaEntityDetailDomain(List<BookingRequestDetail> bookingRequestDetailJpa);
-
+BookingRequest toDomain(BookingRequestJpa bookingRequestJpa );
+List<BookingRequest> toDomain(List<BookingRequestJpa> bookingRequestJpas);
+BookingRequestJpa toDomainJpa(BookingRequest bookingRequestJpa );
 }
