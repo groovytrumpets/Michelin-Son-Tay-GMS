@@ -9,7 +9,7 @@ import lombok.Data;
 public class StaffProfile {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private long staffId;
+    private Integer staffId;
     private String fullName;
     private String phone;
     private String position;

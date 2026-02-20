@@ -1,8 +1,8 @@
-package com.g42.platform.gms.booking_management.domain.entity;
+package com.g42.platform.gms.booking_management.api.dto.confirmed;
 
-import com.g42.platform.gms.auth.entity.CustomerProfile;
+import com.g42.platform.gms.booking_management.api.dto.CatalogItemRes;
+import com.g42.platform.gms.booking_management.api.dto.CustomerDto;
 import com.g42.platform.gms.booking_management.domain.enums.BookingEnum;
-import com.g42.platform.gms.vehicle.entity.Vehicle;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -17,18 +17,15 @@ import java.util.List;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class Booking {
-
+public class BookedDetailResponse {
     private Integer bookingId;
-    private CustomerProfile customer;
+    private CustomerDto customer;
     private LocalDate scheduledDate;
     private LocalTime scheduledTime;
     private String serviceCategory;
     private BookingEnum status;
     private String description;
-    private Boolean isGuest = false;
+    private Boolean isGuest;
     private LocalDateTime createdAt;
-    private List<CatalogItem> services;
-
-
+    private List<CatalogItemRes> items;
 }
