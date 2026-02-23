@@ -9,6 +9,7 @@ import com.g42.platform.gms.booking.customer.application.service.BookingService;
 import com.g42.platform.gms.booking.customer.domain.entity.Booking;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -31,14 +32,15 @@ public class BookingController {
     @PreAuthorize("hasRole('CUSTOMER')")
     public ResponseEntity<ApiResponse<BookingResponse>> createBooking(
             @RequestBody @Valid CustomerBookingRequest request,
-            @AuthenticationPrincipal CustomerPrincipal principal
+            @AuthenticationPrincipal CustomerPrincipal principal,
+            HttpServletRequest httpRequest
     ) {
-        // ✅ Lấy customerId từ principal
         Integer customerId = principal.getCustomerId();
-        Booking domain = bookingService.createCustomerBooking(request, customerId);
+        String clientIp = getClientIp(httpRequest);
+        Booking domain = bookingService.createCustomerBooking(request, customerId, clientIp);
         BookingResponse response = dtoMapper.toResponse(domain);
         
-        // ✅ Enrich từ token (đã có trong principal), không cần query DB
+        // Populate customer info from token
         response.setCustomerName(principal.getName());
         response.setPhone(principal.getPhone());
         
@@ -55,7 +57,7 @@ public class BookingController {
         List<BookingResponse> responses = bookings.stream()
             .map(booking -> {
                 BookingResponse response = dtoMapper.toResponse(booking);
-                // ✅ Enrich từ token
+                // Populate customer info from token
                 response.setCustomerName(principal.getName());
                 response.setPhone(principal.getPhone());
                 return response;
@@ -75,7 +77,7 @@ public class BookingController {
         Booking domain = bookingService.modifyCustomerBooking(bookingId, request, customerId);
         BookingResponse response = dtoMapper.toResponse(domain);
 
-        // ✅ Enrich từ token
+        // Populate customer info from token
         response.setCustomerName(principal.getName());
         response.setPhone(principal.getPhone());
 
@@ -91,5 +93,19 @@ public class BookingController {
         Integer customerId = principal.getCustomerId();
         bookingService.cancelCustomerBooking(bookingId, customerId);
         return ResponseEntity.ok(ApiResponses.success(null));
+    }
+    
+    private String getClientIp(HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("X-Real-IP");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getRemoteAddr();
+        }
+        if (ip != null && ip.contains(",")) {
+            ip = ip.split(",")[0].trim();
+        }
+        return ip;
     }
 }

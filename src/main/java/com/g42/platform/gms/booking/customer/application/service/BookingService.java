@@ -8,6 +8,7 @@ import com.g42.platform.gms.booking.customer.domain.entity.Booking;
 import com.g42.platform.gms.booking.customer.domain.enums.BookingStatus;
 import com.g42.platform.gms.booking.customer.domain.exception.BookingException;
 import com.g42.platform.gms.booking.customer.domain.repository.BookingRepository;
+import com.g42.platform.gms.booking.customer.domain.repository.IpBlacklistRepository;
 import com.g42.platform.gms.catalog.repository.CatalogItemRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,8 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Service
@@ -33,10 +36,27 @@ public class BookingService {
     private final CustomerProfileRepository customerRepository;
     private final CatalogItemRepository catalogItemRepository;
     private final SlotService slotService;
+    private final IpBlacklistRepository ipBlacklistRepository;
+    
+    private final Map<String, RateLimitInfo> rateLimitCache = new ConcurrentHashMap<>();
+    
+    private static final int MAX_REQUESTS_PER_CUSTOMER_PER_HOUR = 5;
 
     @Transactional
-    public Booking createCustomerBooking(CustomerBookingRequest request, Integer customerId) {
-        // ✅ Nhận customerId trực tiếp, không cần parse token
+    public Booking createCustomerBooking(CustomerBookingRequest request, Integer customerId, String clientIp) {
+        // Check IP blacklist
+        if (ipBlacklistRepository.existsByIpAddressAndIsActiveTrue(clientIp)) {
+            throw new BookingException("Địa chỉ IP này đã bị chặn.");
+        }
+        
+        // Rate limiting per customer
+        String customerKey = "customer:" + customerId;
+        if (!checkRateLimit(customerKey, MAX_REQUESTS_PER_CUSTOMER_PER_HOUR)) {
+            throw new BookingException(
+                "Bạn đã đặt quá nhiều lịch trong thời gian ngắn. Vui lòng thử lại sau 1 giờ."
+            );
+        }
+        
         CustomerProfile customer = customerRepository.findById(customerId)
             .orElseThrow(() -> new BookingException("Không tìm thấy thông tin khách hàng."));
         
@@ -51,7 +71,7 @@ public class BookingService {
         }
         booking.setDescription(description);
         booking.setIsGuest(false);
-        booking.setStatus(BookingStatus.PENDING);
+        booking.setStatus(BookingStatus.CONFIRMED);
         
         if (request.getSelectedServiceIds() != null && !request.getSelectedServiceIds().isEmpty()) {
             booking.setServiceIds(request.getSelectedServiceIds());
@@ -100,13 +120,11 @@ public class BookingService {
     }
 
     public List<Booking> getCustomerBookings(Integer customerId) {
-        // ✅ Nhận customerId trực tiếp
         return bookingRepository.findByCustomerIdOrderByDateDesc(customerId);
     }
 
     @Transactional
     public Booking modifyCustomerBooking(Integer bookingId, ModifyBookingRequest request, Integer customerId) {
-        // ✅ Nhận customerId trực tiếp
         Booking booking = bookingRepository.findByIdAndCustomerId(bookingId, customerId)
             .orElseThrow(() -> new BookingException("Không tìm thấy booking của bạn."));
 
@@ -206,7 +224,6 @@ public class BookingService {
 
     @Transactional
     public void cancelCustomerBooking(Integer bookingId, Integer customerId) {
-        // ✅ Nhận customerId trực tiếp
         Booking booking = bookingRepository.findByIdAndCustomerId(bookingId, customerId)
             .orElseThrow(() -> new BookingException("Không tìm thấy booking của bạn."));
 
@@ -250,5 +267,37 @@ public class BookingService {
         // TODO: Tính duration từ catalog_item.estimated_duration_minutes
         // Hiện tại tạm thời return default
         return DEFAULT_DURATION_MINUTES;
+    }
+    
+    private boolean checkRateLimit(String key, int maxRequests) {
+        RateLimitInfo info = rateLimitCache.get(key);
+        if (info == null || !info.isWithinWindow()) {
+            rateLimitCache.put(key, new RateLimitInfo(1));
+            return true;
+        }
+        if (info.getCount() >= maxRequests) {
+            return false;
+        }
+        info.increment();
+        return true;
+    }
+    
+    @lombok.Data
+    private static class RateLimitInfo {
+        private int count;
+        private LocalDateTime firstRequestTime;
+        
+        public RateLimitInfo(int count) {
+            this.count = count;
+            this.firstRequestTime = LocalDateTime.now();
+        }
+        
+        public void increment() {
+            this.count++;
+        }
+        
+        public boolean isWithinWindow() {
+            return LocalDateTime.now().isBefore(firstRequestTime.plusHours(1));
+        }
     }
 }
