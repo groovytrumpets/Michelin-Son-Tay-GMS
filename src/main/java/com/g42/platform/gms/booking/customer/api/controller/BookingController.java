@@ -17,6 +17,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -54,15 +55,15 @@ public class BookingController {
     ) {
         Integer customerId = principal.getCustomerId();
         List<Booking> bookings = bookingService.getCustomerBookings(customerId);
-        List<BookingResponse> responses = bookings.stream()
-            .map(booking -> {
-                BookingResponse response = dtoMapper.toResponse(booking);
-                // Populate customer info from token
-                response.setCustomerName(principal.getName());
-                response.setPhone(principal.getPhone());
-                return response;
-            })
-            .collect(Collectors.toList());
+        
+        List<BookingResponse> responses = new ArrayList<>();
+        for (Booking booking : bookings) {
+            BookingResponse response = dtoMapper.toResponse(booking);
+            response.setCustomerName(principal.getName());
+            response.setPhone(principal.getPhone());
+            responses.add(response);
+        }
+        
         return ResponseEntity.ok(ApiResponses.success(responses));
     }
     
