@@ -65,6 +65,35 @@ public class BookingController {
             .collect(Collectors.toList());
         return ResponseEntity.ok(ApiResponses.success(responses));
     }
+    
+    @GetMapping("/{identifier}")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ResponseEntity<ApiResponse<BookingResponse>> getBooking(
+            @PathVariable String identifier,
+            @AuthenticationPrincipal CustomerPrincipal principal
+    ) {
+        Booking booking;
+        
+        // Check if identifier is a booking code (matches BK_XXXXXX pattern for random code)
+        if (identifier.matches("^BK_[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{6}$")) {
+            booking = bookingService.findByCode(identifier);
+        } else {
+            // It's a booking ID
+            try {
+                Integer bookingId = Integer.parseInt(identifier);
+                booking = bookingService.findById(bookingId);
+            } catch (NumberFormatException e) {
+                return ResponseEntity.badRequest()
+                    .body(ApiResponses.error("INVALID_IDENTIFIER", "Mã booking không hợp lệ"));
+            }
+        }
+        
+        BookingResponse response = dtoMapper.toResponse(booking);
+        response.setCustomerName(principal.getName());
+        response.setPhone(principal.getPhone());
+        
+        return ResponseEntity.ok(ApiResponses.success(response));
+    }
 
     @PutMapping("/{bookingId}/modify")
     @PreAuthorize("hasRole('CUSTOMER')")

@@ -6,7 +6,9 @@ import com.g42.platform.gms.booking.customer.api.dto.CustomerBookingRequest;
 import com.g42.platform.gms.booking.customer.api.dto.ModifyBookingRequest;
 import com.g42.platform.gms.booking.customer.domain.entity.Booking;
 import com.g42.platform.gms.booking.customer.domain.enums.BookingStatus;
+import com.g42.platform.gms.booking.customer.domain.enums.CodePrefix;
 import com.g42.platform.gms.booking.customer.domain.exception.BookingException;
+import com.g42.platform.gms.booking.customer.domain.exception.CodeGenerationException;
 import com.g42.platform.gms.booking.customer.domain.repository.BookingRepository;
 import com.g42.platform.gms.booking.customer.domain.repository.IpBlacklistRepository;
 import com.g42.platform.gms.catalog.repository.CatalogItemRepository;
@@ -37,10 +39,11 @@ public class BookingService {
     private final CatalogItemRepository catalogItemRepository;
     private final SlotService slotService;
     private final IpBlacklistRepository ipBlacklistRepository;
+    private final BookingCodeGenerator bookingCodeGenerator;
     
     private final Map<String, RateLimitInfo> rateLimitCache = new ConcurrentHashMap<>();
     
-    private static final int MAX_REQUESTS_PER_CUSTOMER_PER_HOUR = 5;
+    private static final int MAX_REQUESTS_PER_CUSTOMER_PER_HOUR = 3;
 
     @Transactional
     public Booking createCustomerBooking(CustomerBookingRequest request, Integer customerId, String clientIp) {
@@ -109,18 +112,39 @@ public class BookingService {
             throw new BookingException("Khung giờ này đã đầy, vui lòng chọn giờ khác.");
         }
         
+        // Generate booking code
+        try {
+            String bookingCode = bookingCodeGenerator.generateCode(LocalDate.now(), CodePrefix.BOOKING);
+            booking.setBookingCode(bookingCode);
+            log.info("Generated booking code: {}", bookingCode);
+        } catch (CodeGenerationException e) {
+            log.error("Failed to generate booking code: {}", e.getMessage());
+            throw new BookingException("Không thể tạo mã booking: " + e.getMessage());
+        }
+        
         booking.initializeDefaults();
         Booking savedBooking = bookingRepository.save(booking);
         
         slotService.reserveForBooking(savedBooking.getBookingId(), estimatedDuration);
         
-        log.info("Customer booking created: bookingId={}, customerId={}", savedBooking.getBookingId(), customerId);
+        log.info("Customer booking created: bookingId={}, bookingCode={}, customerId={}", 
+            savedBooking.getBookingId(), savedBooking.getBookingCode(), customerId);
         
         return savedBooking;
     }
 
     public List<Booking> getCustomerBookings(Integer customerId) {
         return bookingRepository.findByCustomerIdOrderByDateDesc(customerId);
+    }
+    
+    public Booking findByCode(String bookingCode) {
+        return bookingRepository.findByBookingCode(bookingCode)
+            .orElseThrow(() -> new BookingException("Không tìm thấy booking với mã: " + bookingCode));
+    }
+    
+    public Booking findById(Integer bookingId) {
+        return bookingRepository.findById(bookingId)
+            .orElseThrow(() -> new BookingException("Không tìm thấy booking với ID: " + bookingId));
     }
 
     @Transactional
@@ -205,10 +229,6 @@ public class BookingService {
 
         if (request.getNewServiceIds() != null && !request.getNewServiceIds().isEmpty()) {
             booking.setServiceIds(request.getNewServiceIds());
-        }
-
-        if (currentStatus == BookingStatus.CONFIRMED) {
-            booking.setStatus(BookingStatus.PENDING);
         }
 
         booking.initializeDefaults();

@@ -71,6 +71,21 @@ public class BookingRepositoryImpl implements BookingRepository {
     }
     
     @Override
+    public Optional<Booking> findByBookingCode(String bookingCode) {
+        return jpaRepository.findByBookingCode(bookingCode)
+            .map(mapper::toDomain)
+            .map(booking -> {
+                booking.initializeDefaults();
+                return booking;
+            });
+    }
+    
+    @Override
+    public boolean existsByBookingCode(String bookingCode) {
+        return jpaRepository.existsByBookingCode(bookingCode);
+    }
+    
+    @Override
     public List<Booking> findByCustomerIdOrderByDateDesc(Integer customerId) {
         return jpaRepository.findByCustomer_CustomerIdOrderByScheduledDateDescScheduledTimeDesc(customerId)
             .stream()

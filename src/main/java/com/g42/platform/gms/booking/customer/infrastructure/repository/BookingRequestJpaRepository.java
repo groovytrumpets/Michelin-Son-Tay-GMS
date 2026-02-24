@@ -12,6 +12,10 @@ import java.util.Optional;
 
 public interface BookingRequestJpaRepository extends JpaRepository<BookingRequestJpaEntity, Integer> {
     
+    Optional<BookingRequestJpaEntity> findByRequestCode(String requestCode);
+    
+    boolean existsByRequestCode(String requestCode);
+    
     List<BookingRequestJpaEntity> findByStatus(BookingRequestStatus status);
     
     List<BookingRequestJpaEntity> findByPhone(String phone);
