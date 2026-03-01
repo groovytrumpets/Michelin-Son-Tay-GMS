@@ -2,12 +2,11 @@ package com.g42.platform.gms.booking_management.application.service;
 
 
 
-import com.g42.platform.gms.booking.customer.domain.enums.BookingRequestStatus;
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedDetailResponse;
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedRespond;
 import com.g42.platform.gms.booking_management.api.dto.requesting.BookingRequestDetailRes;
 import com.g42.platform.gms.booking_management.api.dto.requesting.BookingRequestRes;
-import com.g42.platform.gms.booking_management.api.dto.requesting.CancelBookingRequest;
+import com.g42.platform.gms.booking_management.api.dto.requesting.ActionBookingRequest;
 import com.g42.platform.gms.booking_management.api.mapper.BookingMDetailDtoMapper;
 import com.g42.platform.gms.booking_management.api.mapper.BookingMRequestDtoMapper;
 import com.g42.platform.gms.booking_management.api.mapper.BookingManageDtoMapper;
@@ -90,9 +89,16 @@ return confirmed;
         return null;
     }
 
-    public Boolean cancelBookingRequest(Integer requestId, CancelBookingRequest cancelBookingRequest) {
+    public Boolean cancelBookingRequest(Integer requestId, ActionBookingRequest actionBookingRequest) {
         BookingRequest request = bookingRepository.getBookingRequestById(requestId);
-        request.cancel(cancelBookingRequest.getReason(),cancelBookingRequest.getNote());
+        request.cancel(actionBookingRequest.getReason(), actionBookingRequest.getNote());
+        bookingRepository.setRequestBooking(request);
+        return true;
+    }
+
+    public Boolean spamNotedBookingRequest(Integer requestId, ActionBookingRequest actionBookingRequest) {
+        BookingRequest request = bookingRepository.getBookingRequestById(requestId);
+        request.spam(actionBookingRequest.getReason(), actionBookingRequest.getNote());
         bookingRepository.setRequestBooking(request);
         return true;
     }

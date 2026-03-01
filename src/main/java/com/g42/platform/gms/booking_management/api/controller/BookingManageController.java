@@ -4,7 +4,7 @@ import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedDetailRes
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedRespond;
 import com.g42.platform.gms.booking_management.api.dto.requesting.BookingRequestDetailRes;
 import com.g42.platform.gms.booking_management.api.dto.requesting.BookingRequestRes;
-import com.g42.platform.gms.booking_management.api.dto.requesting.CancelBookingRequest;
+import com.g42.platform.gms.booking_management.api.dto.requesting.ActionBookingRequest;
 import com.g42.platform.gms.booking_management.application.service.BookingManageService;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
@@ -47,8 +47,12 @@ public class BookingManageController {
          return ResponseEntity.ok(ApiResponses.success(bookingService.confirmBookingRequest(requestId)));
     }
     @PutMapping("/booking-request/{requestId}/cancel")
-    public ResponseEntity<ApiResponse<Boolean>> cancelBookingRequest(@PathVariable Integer requestId, @RequestBody CancelBookingRequest cancelBookingRequest){
-        return ResponseEntity.ok(ApiResponses.success(bookingService.cancelBookingRequest(requestId,cancelBookingRequest)));
+    public ResponseEntity<ApiResponse<Boolean>> cancelBookingRequest(@PathVariable Integer requestId, @RequestBody ActionBookingRequest actionBookingRequest){
+        return ResponseEntity.ok(ApiResponses.success(bookingService.cancelBookingRequest(requestId, actionBookingRequest)));
+    }
+    @PutMapping("/booking-request/{requestId}/spam")
+    public ResponseEntity<ApiResponse<Boolean>> spamNotedBookingRequest(@PathVariable Integer requestId, @RequestBody ActionBookingRequest actionBookingRequest){
+        return ResponseEntity.ok(ApiResponses.success(bookingService.spamNotedBookingRequest(requestId, actionBookingRequest)));
     }
 //    @GetMapping("/booking-request/{bookingId}")
 //    public ResponseEntity<ApiResponse<List<TimeSlot>>> getListTimeSlotByBookingId(@PathVariable Integer bookingId){

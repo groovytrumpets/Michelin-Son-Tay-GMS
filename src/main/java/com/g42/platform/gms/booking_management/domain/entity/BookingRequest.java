@@ -3,8 +3,8 @@ package com.g42.platform.gms.booking_management.domain.entity;
 import com.g42.platform.gms.auth.entity.CustomerProfile;
 import com.g42.platform.gms.auth.entity.StaffProfile;
 import com.g42.platform.gms.booking.customer.domain.enums.BookingRequestStatus;
-import jakarta.persistence.Column;
-import jakarta.persistence.Lob;
+import com.g42.platform.gms.booking_management.domain.exception.BookingStaffErrorCode;
+import com.g42.platform.gms.booking_management.domain.exception.BookingStaffException;
 import lombok.*;
 
 import java.time.LocalDate;
@@ -47,7 +47,7 @@ public class BookingRequest {
 
     public boolean confirm() {
         if (this.status != BookingRequestStatus.PENDING) {
-            throw new IllegalStateException("Invalid state");
+            throw new BookingStaffException("Không thể confirm booking!", BookingStaffErrorCode.BOOKING_STATUS_WRONG);
         }
         this.status = BookingRequestStatus.CONFIRMED;
         return true;
@@ -55,8 +55,8 @@ public class BookingRequest {
 
     public void cancel(String reason, String userNote) {
 
-        if (!canCancel()) {
-            throw new IllegalStateException("Cannot cancel this request");
+        if (cantCancel()) {
+            throw new BookingStaffException("Booking này đã hủy rồi!", BookingStaffErrorCode.BOOKING_CANT_CANCEL);
         }
 
         this.status = BookingRequestStatus.REJECTED;
@@ -65,9 +65,19 @@ public class BookingRequest {
 
         this.note = finalNote;
     }
+    public void spam(String reason, String userNote) {
 
-    private boolean canCancel() {
-        return this.status == BookingRequestStatus.PENDING || this.status == BookingRequestStatus.CONFIRMED;
+        if (cantCancel()) {
+            throw new BookingStaffException("Booking này đã hủy rồi!", BookingStaffErrorCode.BOOKING_CANT_CANCEL);
+        }
+
+        this.status = BookingRequestStatus.SPAM;
+
+        this.note = buildCancelMessage(reason, userNote);
+    }
+
+    private boolean cantCancel() {
+        return this.status != BookingRequestStatus.PENDING && this.status != BookingRequestStatus.CONFIRMED;
     }
 
     private String buildCancelMessage(String reason, String userNote) {

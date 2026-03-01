@@ -9,7 +9,7 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class CancelBookingRequest {
+public class ActionBookingRequest {
     private String reason;
     private String note;
 }
