@@ -12,6 +12,8 @@ public interface BookingRepository {
     Booking save(Booking booking);
     Optional<Booking> findById(Integer bookingId);
     Optional<Booking> findByIdAndCustomerId(Integer bookingId, Integer customerId);
+    Optional<Booking> findByBookingCode(String bookingCode);
+    boolean existsByBookingCode(String bookingCode);
     List<Booking> findByCustomerIdOrderByDateDesc(Integer customerId);
     void delete(Booking booking);
 

@@ -77,9 +77,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 String phone = claims.getSubject(); // phone từ token
                 String role = claims.get("role", String.class);
                 Integer customerId = claims.get("customerId", Integer.class);
-                String name = claims.get("name", String.class); // ✅ Lấy name từ token
+                String name = claims.get("name", String.class);
 
-                // ✅ Tạo CustomerPrincipal với đầy đủ thông tin
+                // Create principal with customer info
                 CustomerPrincipal customerPrincipal = new CustomerPrincipal(
                     customerId,
                     phone,
@@ -91,10 +91,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         ? Collections.emptyList()
                         : List.of(new SimpleGrantedAuthority("ROLE_" + role));
 
-                // ✅ Set CustomerPrincipal vào Authentication
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(
-                                customerPrincipal, // ✅ Thay vì chỉ lưu username
+                                customerPrincipal,
                                 null,
                                 authorities
                         );

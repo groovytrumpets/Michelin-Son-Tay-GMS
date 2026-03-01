@@ -8,5 +8,5 @@ import java.util.List;
 @Data
 public class AvailableSlotsResponse {
     private LocalDate date;
-    private List<AvailableSlotResponse> slots;
+    private List<TimeSlotResponse> slots;
 }

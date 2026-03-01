@@ -22,11 +22,12 @@ public interface BookingMapper {
 
     @Mappings({
             @Mapping(target = "customer", ignore = true),
-            @Mapping(target = "services", ignore = true)
+            @Mapping(target = "services", ignore = true),
+            @Mapping(target = "bookingId", source = "bookingId")
     })
     BookingJpaEntity toJpa(Booking domain);
 
-    // ===== Helper method cho MapStruct =====
+    // Helper method for MapStruct
     default List<Integer> mapServiceIds(List<CatalogItemJpaEntity> services) {
         if (services == null) {
             return null;
