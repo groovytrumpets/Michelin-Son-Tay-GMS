@@ -12,6 +12,7 @@ import java.util.List;
 @Data
 public class Booking {
     private Integer bookingId;
+    private String bookingCode;
     private Integer customerId;
     private LocalDate scheduledDate;
     private LocalTime scheduledTime;

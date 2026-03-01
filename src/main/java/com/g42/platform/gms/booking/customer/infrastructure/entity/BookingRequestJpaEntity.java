@@ -17,7 +17,8 @@ import java.util.List;
     @Index(name = "idx_status", columnList = "status"),
     @Index(name = "idx_created", columnList = "created_at"),
     @Index(name = "idx_customer", columnList = "customer_id"),
-    @Index(name = "idx_expires", columnList = "expires_at")
+    @Index(name = "idx_expires", columnList = "expires_at"),
+    @Index(name = "idx_request_code", columnList = "request_code", unique = true)
 })
 @Data
 public class BookingRequestJpaEntity {
@@ -25,6 +26,9 @@ public class BookingRequestJpaEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "request_id")
     private Integer requestId;
+
+    @Column(name = "request_code", length = 20, unique = true)
+    private String requestCode;
 
     @Column(name = "phone", nullable = false, length = 20)
     private String phone;

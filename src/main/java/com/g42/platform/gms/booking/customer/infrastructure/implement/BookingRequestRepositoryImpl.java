@@ -51,6 +51,21 @@ public class BookingRequestRepositoryImpl implements BookingRequestRepository {
     }
     
     @Override
+    public Optional<BookingRequest> findByRequestCode(String requestCode) {
+        return jpaRepository.findByRequestCode(requestCode)
+            .map(mapper::toDomain)
+            .map(request -> {
+                request.initializeDefaults();
+                return request;
+            });
+    }
+    
+    @Override
+    public boolean existsByRequestCode(String requestCode) {
+        return jpaRepository.existsByRequestCode(requestCode);
+    }
+    
+    @Override
     public Optional<BookingRequest> findByIdAndStatus(Integer requestId, BookingRequestStatus status) {
         return jpaRepository.findByRequestIdAndStatus(requestId, status)
             .map(mapper::toDomain)
