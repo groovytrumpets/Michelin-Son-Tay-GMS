@@ -2,22 +2,21 @@ package com.g42.platform.gms.booking_management.application.service;
 
 
 
+import com.g42.platform.gms.booking.customer.domain.enums.BookingRequestStatus;
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedDetailResponse;
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedRespond;
 import com.g42.platform.gms.booking_management.api.dto.requesting.BookingRequestDetailRes;
 import com.g42.platform.gms.booking_management.api.dto.requesting.BookingRequestRes;
+import com.g42.platform.gms.booking_management.api.dto.requesting.CancelBookingRequest;
 import com.g42.platform.gms.booking_management.api.mapper.BookingMDetailDtoMapper;
 import com.g42.platform.gms.booking_management.api.mapper.BookingMRequestDtoMapper;
 import com.g42.platform.gms.booking_management.api.mapper.BookingManageDtoMapper;
-import com.g42.platform.gms.booking_management.application.command.CreateCustomerCommand;
 import com.g42.platform.gms.booking_management.application.port.CustomerGateway;
-import com.g42.platform.gms.booking_management.domain.entity.Booking;
 import com.g42.platform.gms.booking_management.domain.entity.BookingRequest;
 import com.g42.platform.gms.booking_management.domain.entity.BookingSlotReservation;
 import com.g42.platform.gms.booking_management.domain.entity.TimeSlot;
 import com.g42.platform.gms.booking_management.domain.repository.BookingManageRepository;
 import com.g42.platform.gms.booking_management.infrastructure.entity.BookingJpa;
-import com.g42.platform.gms.booking_management.infrastructure.entity.TimeSlotJpa;
 import com.g42.platform.gms.booking_management.infrastructure.mapper.TimeSlotMMapper;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -68,13 +67,13 @@ public class BookingManageService {
         TimeSlot timeSlot = bookingRepository.getTimeSlotByTime(request.getScheduledTime());
         System.out.println("time slot: " + timeSlot);
         //todo: check acc available else create customer acc
-        int customerId = customerGateway.getOrCreateCustomer(
-                new CreateCustomerCommand(request.getFullName(),request.getPhone(),request.getCreatedAt())
-        );
-        System.out.println("customer id: " + customerId);
+//        int customerId = customerGateway.getOrCreateCustomer(
+//                new CreateCustomerCommand(request.getFullName(),request.getPhone(),request.getCreatedAt())
+//        );
+//        System.out.println("customer id: " + customerId);
         //todo: check if create account success
         //todo: create booking
-        BookingJpa booking = bookingRepository.createBookingByRequest(request,customerId);
+        BookingJpa booking = bookingRepository.createBookingByRequest(request);
         System.out.println("booking: " + booking.getBookingId());
         //todo: create Reservation
         BookingSlotReservation bookingSlotReservation = bookingRepository.createBookingSlotReservation(request, booking);
@@ -89,5 +88,12 @@ return confirmed;
 //        List<TimeSlotJpa> list = bookingRepository.getListOfTimeSlotByBookingId(bookingId);
 //        return timeSlotMMapper.toDomainTimeSlotList(list);
         return null;
+    }
+
+    public Boolean cancelBookingRequest(Integer requestId, CancelBookingRequest cancelBookingRequest) {
+        BookingRequest request = bookingRepository.getBookingRequestById(requestId);
+        request.cancel(cancelBookingRequest.getReason(),cancelBookingRequest.getNote());
+        bookingRepository.setRequestBooking(request);
+        return true;
     }
 }

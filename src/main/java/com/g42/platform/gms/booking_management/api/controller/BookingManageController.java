@@ -1,12 +1,11 @@
 package com.g42.platform.gms.booking_management.api.controller;
 
-import com.g42.platform.gms.booking.customer.api.dto.BookingResponse;
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedDetailResponse;
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedRespond;
 import com.g42.platform.gms.booking_management.api.dto.requesting.BookingRequestDetailRes;
 import com.g42.platform.gms.booking_management.api.dto.requesting.BookingRequestRes;
+import com.g42.platform.gms.booking_management.api.dto.requesting.CancelBookingRequest;
 import com.g42.platform.gms.booking_management.application.service.BookingManageService;
-import com.g42.platform.gms.booking_management.domain.entity.TimeSlot;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import lombok.AllArgsConstructor;
@@ -46,6 +45,10 @@ public class BookingManageController {
     @PostMapping("/booking-request/{requestId}/confirm")
     public ResponseEntity<ApiResponse<Boolean>> confirmBookingRequest(@PathVariable Integer requestId){
          return ResponseEntity.ok(ApiResponses.success(bookingService.confirmBookingRequest(requestId)));
+    }
+    @PutMapping("/booking-request/{requestId}/cancel")
+    public ResponseEntity<ApiResponse<Boolean>> cancelBookingRequest(@PathVariable Integer requestId, @RequestBody CancelBookingRequest cancelBookingRequest){
+        return ResponseEntity.ok(ApiResponses.success(bookingService.cancelBookingRequest(requestId,cancelBookingRequest)));
     }
 //    @GetMapping("/booking-request/{bookingId}")
 //    public ResponseEntity<ApiResponse<List<TimeSlot>>> getListTimeSlotByBookingId(@PathVariable Integer bookingId){

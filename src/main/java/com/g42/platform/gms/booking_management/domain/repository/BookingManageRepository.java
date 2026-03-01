@@ -23,9 +23,11 @@ public interface BookingManageRepository {
 
     int countReserverdBasedOnTime(LocalTime scheduledTime);
 
-    BookingJpa createBookingByRequest(BookingRequest request, int customerId);
+    BookingJpa createBookingByRequest(BookingRequest request);
 
     BookingSlotReservation createBookingSlotReservation(BookingRequest request, BookingJpa bookingId);
 
     void setConfirmStatus(BookingRequest request);
+
+    void setRequestBooking(BookingRequest request);
 }

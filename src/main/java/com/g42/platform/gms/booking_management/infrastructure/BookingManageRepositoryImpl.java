@@ -70,11 +70,11 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
 
        private final CustomerProfileRepository customerProfileRepository;
     @Override
-    public BookingJpa createBookingByRequest(BookingRequest request, int customerId) {
+    public BookingJpa createBookingByRequest(BookingRequest request) {
         //todo: fixing architect, not call customer another module repo
         Booking booking = new Booking();
         booking.setCreatedAt(LocalDateTime.now());
-        booking.setCustomer(customerProfileRepository.getCustomerProfilesByCustomerId(customerId));
+        booking.setCustomer(null);
         booking.setDescription(request.getDescription());
         booking.setIsGuest(request.getIsGuest());
         booking.setStatus(BookingEnum.CONFIRMED);
@@ -99,5 +99,11 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
     @Override
     public void setConfirmStatus(BookingRequest request) {
         bookingMRequestJpaRepo.save(bookingDraffManagerMapper.toDomainJpa(request));
+    }
+
+    @Override
+    public void setRequestBooking(BookingRequest request) {
+        BookingRequestJpa bookingRequestJpa = bookingDraffManagerMapper.toDomainJpa(request);
+        bookingMRequestJpaRepo.save(bookingRequestJpa);
     }
 }
