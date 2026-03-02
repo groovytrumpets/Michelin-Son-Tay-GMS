@@ -4,16 +4,14 @@ package com.g42.platform.gms.booking_management.application.service;
 
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedDetailResponse;
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedRespond;
-import com.g42.platform.gms.booking_management.api.dto.requesting.ActionBookingRespond;
-import com.g42.platform.gms.booking_management.api.dto.requesting.BookingRequestDetailRes;
-import com.g42.platform.gms.booking_management.api.dto.requesting.BookingRequestRes;
-import com.g42.platform.gms.booking_management.api.dto.requesting.ActionBookingRequest;
+import com.g42.platform.gms.booking_management.api.dto.requesting.*;
 import com.g42.platform.gms.booking_management.api.mapper.BookingMDetailDtoMapper;
 import com.g42.platform.gms.booking_management.api.mapper.BookingMRequestDtoMapper;
 import com.g42.platform.gms.booking_management.api.mapper.BookingManageDtoMapper;
 import com.g42.platform.gms.booking_management.application.port.CustomerGateway;
 import com.g42.platform.gms.booking_management.domain.entity.BookingRequest;
 import com.g42.platform.gms.booking_management.domain.entity.BookingSlotReservation;
+import com.g42.platform.gms.booking_management.domain.entity.CatalogItem;
 import com.g42.platform.gms.booking_management.domain.entity.TimeSlot;
 import com.g42.platform.gms.booking_management.domain.exception.BookingStaffErrorCode;
 import com.g42.platform.gms.booking_management.domain.exception.BookingStaffException;
@@ -25,6 +23,7 @@ import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @AllArgsConstructor
@@ -121,5 +120,27 @@ return confirmed;
         request.contacted(actionBookingRequest.getReason(), actionBookingRequest.getNote());
         bookingRepository.setRequestBooking(request);
         return new ActionBookingRespond("SUCCESS","SUCCESS");
+    }
+
+    public Boolean updateBookingRequest(Integer requestId, BookingRequestUpdateReq actionBookingRequest) {
+        BookingRequest request = bookingRepository.getBookingRequestById(requestId);
+        if (request==null){
+            throw new BookingStaffException("Không tìm thấy booking", BookingStaffErrorCode.INVALID_ID);
+        }
+        if (request.cantCancel()){
+            throw new BookingStaffException("Booking này đã xử lý rồi!", BookingStaffErrorCode.BOOKING_CANT_EDIT);
+        }
+        request.setScheduledDate(actionBookingRequest.getScheduledDate());
+        request.setScheduledTime(actionBookingRequest.getScheduledTime());
+        request.setDescription(actionBookingRequest.getDescription());
+        request.setServiceCategory(actionBookingRequest.getServiceCategory());
+        request.setIsGuest(actionBookingRequest.getIsGuest());
+        List<CatalogItem> catalogItems = new ArrayList<>();
+        catalogItems = bookingRepository.getListOfCatalogById(actionBookingRequest.getServices());
+        request.setServices(catalogItems);
+
+
+        bookingRepository.setRequestBooking(request);
+        return true;
     }
 }

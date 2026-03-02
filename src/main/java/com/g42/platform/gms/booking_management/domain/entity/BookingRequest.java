@@ -87,7 +87,7 @@ public class BookingRequest {
         this.note = buildCancelMessage(reason, userNote);
     }
 
-    private boolean cantCancel() {
+    public boolean cantCancel() {
         return this.status != BookingRequestStatus.PENDING && this.status != BookingRequestStatus.CONFIRMED;
     }
 

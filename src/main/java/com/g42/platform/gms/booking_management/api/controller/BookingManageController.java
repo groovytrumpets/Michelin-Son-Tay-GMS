@@ -2,10 +2,7 @@ package com.g42.platform.gms.booking_management.api.controller;
 
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedDetailResponse;
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedRespond;
-import com.g42.platform.gms.booking_management.api.dto.requesting.ActionBookingRespond;
-import com.g42.platform.gms.booking_management.api.dto.requesting.BookingRequestDetailRes;
-import com.g42.platform.gms.booking_management.api.dto.requesting.BookingRequestRes;
-import com.g42.platform.gms.booking_management.api.dto.requesting.ActionBookingRequest;
+import com.g42.platform.gms.booking_management.api.dto.requesting.*;
 import com.g42.platform.gms.booking_management.application.service.BookingManageService;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
@@ -61,7 +58,12 @@ public class BookingManageController {
         return ResponseEntity.ok(ApiResponses.success(bookingService.contactedBookingRequest(requestId, actionBookingRequest)));
     }
 
-    
+    @PutMapping("/booking-request/{requestId}/update")
+    public ResponseEntity<ApiResponse<Boolean>> updateBookingRequest(@PathVariable Integer requestId, @RequestBody BookingRequestUpdateReq actionBookingRequest){
+        return ResponseEntity.ok(ApiResponses.success(bookingService.updateBookingRequest(requestId, actionBookingRequest)));
+    }
+
+
 
 
 

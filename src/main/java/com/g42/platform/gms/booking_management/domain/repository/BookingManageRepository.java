@@ -1,9 +1,6 @@
 package com.g42.platform.gms.booking_management.domain.repository;
 
-import com.g42.platform.gms.booking_management.domain.entity.Booking;
-import com.g42.platform.gms.booking_management.domain.entity.BookingRequest;
-import com.g42.platform.gms.booking_management.domain.entity.BookingSlotReservation;
-import com.g42.platform.gms.booking_management.domain.entity.TimeSlot;
+import com.g42.platform.gms.booking_management.domain.entity.*;
 import com.g42.platform.gms.booking_management.infrastructure.entity.BookingJpa;
 import com.g42.platform.gms.booking_management.infrastructure.entity.TimeSlotJpa;
 
@@ -30,4 +27,6 @@ public interface BookingManageRepository {
     void setConfirmStatus(BookingRequest request);
 
     void setRequestBooking(BookingRequest request);
+
+    List<CatalogItem> getListOfCatalogById(List<Integer> services);
 }

@@ -7,5 +7,5 @@ public enum BookingStaffErrorCode {
     BOOKING_CANT_CANCEL,
     BOOKING_SLOT_REVOKED,
     BOOKING_STATUS_WRONG,
-
+    BOOKING_CANT_EDIT,
 }
