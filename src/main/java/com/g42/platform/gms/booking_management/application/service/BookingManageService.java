@@ -4,6 +4,7 @@ package com.g42.platform.gms.booking_management.application.service;
 
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedDetailResponse;
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedRespond;
+import com.g42.platform.gms.booking_management.api.dto.requesting.ActionBookingRespond;
 import com.g42.platform.gms.booking_management.api.dto.requesting.BookingRequestDetailRes;
 import com.g42.platform.gms.booking_management.api.dto.requesting.BookingRequestRes;
 import com.g42.platform.gms.booking_management.api.dto.requesting.ActionBookingRequest;
@@ -14,9 +15,12 @@ import com.g42.platform.gms.booking_management.application.port.CustomerGateway;
 import com.g42.platform.gms.booking_management.domain.entity.BookingRequest;
 import com.g42.platform.gms.booking_management.domain.entity.BookingSlotReservation;
 import com.g42.platform.gms.booking_management.domain.entity.TimeSlot;
+import com.g42.platform.gms.booking_management.domain.exception.BookingStaffErrorCode;
+import com.g42.platform.gms.booking_management.domain.exception.BookingStaffException;
 import com.g42.platform.gms.booking_management.domain.repository.BookingManageRepository;
 import com.g42.platform.gms.booking_management.infrastructure.entity.BookingJpa;
 import com.g42.platform.gms.booking_management.infrastructure.mapper.TimeSlotMMapper;
+import com.g42.platform.gms.marketing.service_catalog.domain.exception.ServiceException;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -88,18 +92,24 @@ return confirmed;
 //        return timeSlotMMapper.toDomainTimeSlotList(list);
         return null;
     }
-
-    public Boolean cancelBookingRequest(Integer requestId, ActionBookingRequest actionBookingRequest) {
+    @Transactional(noRollbackFor = BookingStaffException.class)
+    public ActionBookingRespond cancelBookingRequest(Integer requestId, ActionBookingRequest actionBookingRequest) {
         BookingRequest request = bookingRepository.getBookingRequestById(requestId);
+        if (request==null){
+            throw new BookingStaffException("LOI", BookingStaffErrorCode.INVALID_ID);
+        }
         request.cancel(actionBookingRequest.getReason(), actionBookingRequest.getNote());
         bookingRepository.setRequestBooking(request);
-        return true;
+        return new ActionBookingRespond("SUCCESS","SUCCESS");
     }
-
-    public Boolean spamNotedBookingRequest(Integer requestId, ActionBookingRequest actionBookingRequest) {
+    @Transactional(noRollbackFor = BookingStaffException.class)
+    public ActionBookingRespond spamNotedBookingRequest(Integer requestId, ActionBookingRequest actionBookingRequest) {
         BookingRequest request = bookingRepository.getBookingRequestById(requestId);
+        if (request==null){
+            throw new BookingStaffException("Không tìm thấy booking", BookingStaffErrorCode.INVALID_ID);
+        }
         request.spam(actionBookingRequest.getReason(), actionBookingRequest.getNote());
         bookingRepository.setRequestBooking(request);
-        return true;
+        return new ActionBookingRespond("SUCCESS","SUCCESS");
     }
 }

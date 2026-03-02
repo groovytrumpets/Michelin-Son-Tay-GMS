@@ -2,6 +2,7 @@ package com.g42.platform.gms.common.handler;
 
 import com.g42.platform.gms.auth.constant.AuthErrorCode;
 import com.g42.platform.gms.booking.customer.domain.exception.BookingException;
+import com.g42.platform.gms.booking_management.domain.exception.BookingStaffException;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.auth.exception.AuthException;
@@ -67,6 +68,16 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<?>> handleServiceException(ServiceException ex) {
 
         System.err.println("Service Catalog Error: " + ex.getCode() + " - " + ex.getMessage());
+
+
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponses.error(ex.getCode().name(), ex.getMessage()));
+    }
+    @ExceptionHandler(BookingStaffException.class)
+    public ResponseEntity<ApiResponse<?>> handleBookingManagementException(BookingStaffException ex) {
+
+        System.err.println("Booking Management Error: " + ex.getCode() + " - " + ex.getMessage());
 
 
         return ResponseEntity
