@@ -9,6 +9,7 @@ import java.time.LocalTime;
 @Data
 public class BookingRequestResponse {
     private Integer requestId;
+    private String requestCode;
     private String phone;
     private String fullName;
     private LocalDate scheduledDate;
