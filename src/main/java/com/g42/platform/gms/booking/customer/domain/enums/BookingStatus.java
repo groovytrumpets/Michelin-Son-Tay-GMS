@@ -1,6 +1,7 @@
 package com.g42.platform.gms.booking.customer.domain.enums;
 
 public enum BookingStatus {
+    DONE,
     NEW,
     DRAFT,        // Nháp
     PENDING,      // Chờ xác nhận
