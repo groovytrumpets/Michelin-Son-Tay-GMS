@@ -55,10 +55,13 @@ public class BookingManageController {
     public ResponseEntity<ApiResponse<ActionBookingRespond>> spamNotedBookingRequest(@PathVariable Integer requestId, @RequestBody ActionBookingRequest actionBookingRequest){
         return ResponseEntity.ok(ApiResponses.success(bookingService.spamNotedBookingRequest(requestId, actionBookingRequest)));
     }
-//    @GetMapping("/booking-request/{bookingId}")
-//    public ResponseEntity<ApiResponse<List<TimeSlot>>> getListTimeSlotByBookingId(@PathVariable Integer bookingId){
-//        return ResponseEntity.ok(ApiResponses.success(bookingService.getListTimeSlotByBookingId(bookingId)));
-//    }
+
+    @PutMapping("/booking-request/{requestId}/contacted")
+    public ResponseEntity<ApiResponse<ActionBookingRespond>> contactedBookingRequest(@PathVariable Integer requestId, @RequestBody ActionBookingRequest actionBookingRequest){
+        return ResponseEntity.ok(ApiResponses.success(bookingService.contactedBookingRequest(requestId, actionBookingRequest)));
+    }
+
+    
 
 
 

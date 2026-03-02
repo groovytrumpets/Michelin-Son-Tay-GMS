@@ -56,7 +56,7 @@ public class BookingRequest {
     public void cancel(String reason, String userNote) {
 
         if (cantCancel()) {
-            throw new BookingStaffException("Booking này đã hủy rồi!", BookingStaffErrorCode.BOOKING_CANT_CANCEL);
+            throw new BookingStaffException("Booking này đã xử lý rồi!", BookingStaffErrorCode.BOOKING_CANT_CANCEL);
         }
 
         this.status = BookingRequestStatus.REJECTED;
@@ -68,10 +68,21 @@ public class BookingRequest {
     public void spam(String reason, String userNote) {
 
         if (cantCancel()) {
-            throw new BookingStaffException("Booking này đã hủy rồi!", BookingStaffErrorCode.BOOKING_CANT_CANCEL);
+            throw new BookingStaffException("Booking này đã xử lý rồi!", BookingStaffErrorCode.BOOKING_CANT_CANCEL);
         }
 
         this.status = BookingRequestStatus.SPAM;
+
+        this.note = buildCancelMessage(reason, userNote);
+    }
+
+    public void contacted(String reason, String userNote) {
+
+        if (cantCancel()) {
+            throw new BookingStaffException("Booking này đã xử lý rồi!", BookingStaffErrorCode.BOOKING_CANT_CANCEL);
+        }
+
+        this.status = BookingRequestStatus.CONTACTED;
 
         this.note = buildCancelMessage(reason, userNote);
     }

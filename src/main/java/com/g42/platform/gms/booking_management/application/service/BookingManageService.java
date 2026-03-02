@@ -112,4 +112,14 @@ return confirmed;
         bookingRepository.setRequestBooking(request);
         return new ActionBookingRespond("SUCCESS","SUCCESS");
     }
+
+    public ActionBookingRespond contactedBookingRequest(Integer requestId, ActionBookingRequest actionBookingRequest) {
+        BookingRequest request = bookingRepository.getBookingRequestById(requestId);
+        if (request==null){
+            throw new BookingStaffException("Không tìm thấy booking", BookingStaffErrorCode.INVALID_ID);
+        }
+        request.contacted(actionBookingRequest.getReason(), actionBookingRequest.getNote());
+        bookingRepository.setRequestBooking(request);
+        return new ActionBookingRespond("SUCCESS","SUCCESS");
+    }
 }
