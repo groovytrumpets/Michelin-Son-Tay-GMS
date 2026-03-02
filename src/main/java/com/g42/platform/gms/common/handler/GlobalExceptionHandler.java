@@ -7,6 +7,7 @@ import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.auth.exception.AuthException;
 import com.g42.platform.gms.marketing.service_catalog.domain.exception.ServiceException;
+import com.g42.platform.gms.staff.attendance.domain.exception.StaffAttendanceException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -78,6 +79,16 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<?>> handleBookingManagementException(BookingStaffException ex) {
 
         System.err.println("Booking Management Error: " + ex.getCode() + " - " + ex.getMessage());
+
+
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponses.error(ex.getCode().name(), ex.getMessage()));
+    }
+    @ExceptionHandler(StaffAttendanceException.class)
+    public ResponseEntity<ApiResponse<?>> handleBookingManagementException(StaffAttendanceException ex) {
+
+        System.err.println("Staff Attendance Error: " + ex.getCode() + " - " + ex.getMessage());
 
 
         return ResponseEntity
