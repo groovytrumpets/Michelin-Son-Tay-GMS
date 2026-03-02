@@ -23,7 +23,7 @@ public class BookingJpaEntity {
     private String bookingCode;
 
     @ManyToOne 
-    @JoinColumn(name = "customer_id", nullable = false)
+    @JoinColumn(name = "customer_id", nullable = true)
     private CustomerProfile customer;
 
     @Column(name = "scheduled_date", nullable = false)
