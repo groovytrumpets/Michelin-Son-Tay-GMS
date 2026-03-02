@@ -1,12 +1,9 @@
 package com.g42.platform.gms.booking_management.api.controller;
 
-import com.g42.platform.gms.booking.customer.api.dto.BookingResponse;
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedDetailResponse;
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedRespond;
-import com.g42.platform.gms.booking_management.api.dto.requesting.BookingRequestDetailRes;
-import com.g42.platform.gms.booking_management.api.dto.requesting.BookingRequestRes;
+import com.g42.platform.gms.booking_management.api.dto.requesting.*;
 import com.g42.platform.gms.booking_management.application.service.BookingManageService;
-import com.g42.platform.gms.booking_management.domain.entity.TimeSlot;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import lombok.AllArgsConstructor;
@@ -47,10 +44,26 @@ public class BookingManageController {
     public ResponseEntity<ApiResponse<Boolean>> confirmBookingRequest(@PathVariable Integer requestId){
          return ResponseEntity.ok(ApiResponses.success(bookingService.confirmBookingRequest(requestId)));
     }
-//    @GetMapping("/booking-request/{bookingId}")
-//    public ResponseEntity<ApiResponse<List<TimeSlot>>> getListTimeSlotByBookingId(@PathVariable Integer bookingId){
-//        return ResponseEntity.ok(ApiResponses.success(bookingService.getListTimeSlotByBookingId(bookingId)));
-//    }
+    @PutMapping("/booking-request/{requestId}/cancel")
+    public ResponseEntity<ApiResponse<ActionBookingRespond>> cancelBookingRequest(@PathVariable Integer requestId, @RequestBody ActionBookingRequest actionBookingRequest){
+        return ResponseEntity.ok(ApiResponses.success(bookingService.cancelBookingRequest(requestId, actionBookingRequest)));
+    }
+    @PutMapping("/booking-request/{requestId}/spam")
+    public ResponseEntity<ApiResponse<ActionBookingRespond>> spamNotedBookingRequest(@PathVariable Integer requestId, @RequestBody ActionBookingRequest actionBookingRequest){
+        return ResponseEntity.ok(ApiResponses.success(bookingService.spamNotedBookingRequest(requestId, actionBookingRequest)));
+    }
+
+    @PutMapping("/booking-request/{requestId}/contacted")
+    public ResponseEntity<ApiResponse<ActionBookingRespond>> contactedBookingRequest(@PathVariable Integer requestId, @RequestBody ActionBookingRequest actionBookingRequest){
+        return ResponseEntity.ok(ApiResponses.success(bookingService.contactedBookingRequest(requestId, actionBookingRequest)));
+    }
+
+    @PutMapping("/booking-request/{requestId}/update")
+    public ResponseEntity<ApiResponse<Boolean>> updateBookingRequest(@PathVariable Integer requestId, @RequestBody BookingRequestUpdateReq actionBookingRequest){
+        return ResponseEntity.ok(ApiResponses.success(bookingService.updateBookingRequest(requestId, actionBookingRequest)));
+    }
+
+
 
 
 

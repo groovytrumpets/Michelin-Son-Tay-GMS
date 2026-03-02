@@ -32,15 +32,24 @@ public class ServiceTicketService {
 
     /**
      * Create new service ticket with generated ticket code.
+     * Production-ready: Check for existing active tickets before creating.
      * 
      * @param bookingId Booking ID
      * @param vehicleId Vehicle ID
      * @param customerId Customer ID
      * @return Created ServiceTicket entity
+     * @throws RuntimeException if active ticket already exists for this booking
      */
     @Transactional
     public ServiceTicket createServiceTicket(Integer bookingId, Integer vehicleId, Integer customerId) {
         log.info("Creating service ticket for booking: {}, vehicle: {}, customer: {}", bookingId, vehicleId, customerId);
+        
+        // Production-ready check: Prevent duplicate tickets
+        long activeTicketCount = serviceTicketRepository.countActiveTicketsByBookingId(bookingId);
+        if (activeTicketCount > 0) {
+            log.error("Cannot create ticket: booking {} already has {} active ticket(s)", bookingId, activeTicketCount);
+            throw new RuntimeException("Booking đã có service ticket đang hoạt động. Không thể tạo ticket mới.");
+        }
         
         // Generate ticket code
         String ticketCode = ticketCodeGenerator.generateCode(

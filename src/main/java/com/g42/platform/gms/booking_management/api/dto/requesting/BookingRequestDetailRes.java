@@ -36,4 +36,6 @@ public class BookingRequestDetailRes {
     private LocalDateTime createdAt;
     private LocalDateTime expiresAt;
     private List<CatalogItemRes> services;
+    private String requestCode;
+    private String note;
 }

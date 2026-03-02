@@ -181,7 +181,7 @@ public class CheckInService {
             log.info("Created new vehicle: vehicleId={}, licensePlate={}", vehicle.getVehicleId(), vehicle.getLicensePlate());
         }
         
-        // 5. Check if Service Ticket already exists for this booking
+        // 5. Create or get Service Ticket
         ServiceTicket serviceTicket;
         Optional<ServiceTicketJpa> existingTicket = serviceTicketRepository.findByBookingId(request.getBookingId());
         
@@ -202,13 +202,25 @@ public class CheckInService {
                 serviceTicket.setVehicleId(vehicle.getVehicleId());
             }
         } else {
-            // Create new Service Ticket
-            serviceTicket = serviceTicketService.createServiceTicket(
-                request.getBookingId(),
-                vehicle.getVehicleId(),
-                request.getCustomerId()
-            );
-            log.info("Created new service ticket: ticketCode={}", serviceTicket.getTicketCode());
+            // Create new Service Ticket (with production-ready duplicate check)
+            try {
+                serviceTicket = serviceTicketService.createServiceTicket(
+                    request.getBookingId(),
+                    vehicle.getVehicleId(),
+                    request.getCustomerId()
+                );
+                log.info("Created new service ticket: ticketCode={}", serviceTicket.getTicketCode());
+            } catch (RuntimeException e) {
+                // If ticket creation fails due to duplicate check, try to find existing ticket
+                log.warn("Failed to create ticket (may be duplicate): {}", e.getMessage());
+                existingTicket = serviceTicketRepository.findByBookingId(request.getBookingId());
+                if (existingTicket.isPresent()) {
+                    serviceTicket = serviceTicketMapper.toDomain(existingTicket.get());
+                    log.info("Using existing ticket after creation failure: {}", serviceTicket.getTicketCode());
+                } else {
+                    throw new CheckInException("Không thể tạo service ticket: " + e.getMessage());
+                }
+            }
         }
         
         // 6. Map to VehicleResponse
