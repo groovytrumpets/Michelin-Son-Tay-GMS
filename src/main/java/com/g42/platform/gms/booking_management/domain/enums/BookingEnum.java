@@ -1,6 +1,7 @@
 package com.g42.platform.gms.booking_management.domain.enums;
 
 public enum BookingEnum {
+    DONE,
     NEW,
     DRAFT,        // Nháp
     PENDING,      // Chờ xác nhận
