@@ -3,6 +3,7 @@ package com.g42.platform.gms.booking_management.api.mapper;
 import com.g42.platform.gms.booking_management.api.dto.requesting.BookingRequestDetailRes;
 import com.g42.platform.gms.booking_management.api.dto.requesting.BookingRequestRes;
 import com.g42.platform.gms.booking_management.domain.entity.BookingRequest;
+import com.g42.platform.gms.booking_management.domain.entity.CatalogItem;
 import org.mapstruct.Mapper;
 
 import java.util.List;
