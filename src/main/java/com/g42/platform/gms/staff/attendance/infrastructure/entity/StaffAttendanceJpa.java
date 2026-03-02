@@ -18,7 +18,7 @@ public class StaffAttendanceJpa {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "idstaff_attendance", nullable = false)
-    private Integer id;
+    private Long id;
 
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -28,11 +28,11 @@ public class StaffAttendanceJpa {
     @Column(name = "attendance_date")
     private LocalDate attendanceDate;
 
-    @Lob
+    @Enumerated(EnumType.STRING)
     @Column(name = "morning_status")
     private AttendanceSlotEnum morningStatus;
 
-    @Lob
+    @Enumerated(EnumType.STRING)
     @Column(name = "afternoon_status")
     private AttendanceSlotEnum afternoonStatus;
 

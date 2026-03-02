@@ -1,6 +1,7 @@
 package com.g42.platform.gms.staff.attendance.domain.entity;
 
 import com.g42.platform.gms.auth.entity.StaffProfile;
+import com.g42.platform.gms.staff.attendance.domain.enums.AttendanceSlotEnum;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -17,11 +18,11 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class StaffAttendance {
 
-    private Integer id;
+    private Long id;
     private StaffProfile staff;
     private LocalDate attendanceDate;
-    private String morningStatus;
-    private String afternoonStatus;
+    private AttendanceSlotEnum morningStatus;
+    private AttendanceSlotEnum afternoonStatus;
     private Instant createdAt;
     private Instant updatedAt;
 
