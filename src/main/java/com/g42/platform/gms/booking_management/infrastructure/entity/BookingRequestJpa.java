@@ -4,6 +4,7 @@ import com.g42.platform.gms.auth.entity.CustomerProfile;
 import com.g42.platform.gms.auth.entity.StaffProfile;
 import com.g42.platform.gms.booking.customer.domain.enums.BookingRequestStatus;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.time.LocalDate;
@@ -81,6 +82,13 @@ public class BookingRequestJpa {
             inverseJoinColumns = @JoinColumn(name = "item_id")
     )
     private List<CatalogItemJpa> services;
+    @Size(max = 20)
+    @Column(name = "request_code", length = 20)
+    private String requestCode;
+    @Lob
+    @Column(name = "note")
+    private String note;
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) {
