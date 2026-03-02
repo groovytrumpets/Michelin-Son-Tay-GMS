@@ -4,14 +4,13 @@ import com.g42.platform.gms.auth.constant.AuthErrorCode;
 import com.g42.platform.gms.auth.dto.AuthResponse;
 import com.g42.platform.gms.auth.dto.LoginRequest;
 import com.g42.platform.gms.auth.dto.StaffAuthDto;
-import com.g42.platform.gms.auth.entity.CustomerStatus;
-import com.g42.platform.gms.auth.entity.StaffPrincipal;
-import com.g42.platform.gms.auth.entity.StaffAuth;
-import com.g42.platform.gms.auth.entity.StaffProfile;
+import com.g42.platform.gms.auth.dto.StaffAuthResponse;
+import com.g42.platform.gms.auth.entity.*;
 import com.g42.platform.gms.auth.exception.AuthException;
 import com.g42.platform.gms.auth.mapper.StaffAuthMapper;
 import com.g42.platform.gms.auth.repository.StaffAuthRepo;
 import com.g42.platform.gms.auth.repository.StaffProfileRepo;
+import com.g42.platform.gms.auth.repository.StaffRoleRepository;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +21,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Service
 @AllArgsConstructor
 public class StaffAuthService {
@@ -29,6 +30,7 @@ public class StaffAuthService {
     private StaffAuthRepo staffAuthRepo;
     @Autowired
     private StaffProfileRepo staffProfileRepo;
+    private StaffRoleRepository staffRoleRepo;
     @Autowired
     private AuthenticationManager authenticationManager;
     @Autowired
@@ -60,7 +62,7 @@ public class StaffAuthService {
         return null;
     }
     @Transactional(noRollbackFor = AuthException.class)
-    public AuthResponse verifyStaffAuth(LoginRequest loginRequest){
+    public StaffAuthResponse verifyStaffAuth(LoginRequest loginRequest){
 
         try{
         Authentication authentication = authenticationManager.authenticate(
@@ -79,7 +81,14 @@ public class StaffAuthService {
             staffAuth.setFailedLoginCount(0);
             staffAuthRepo.save(staffAuth);
             System.err.println("STAFF LOGIN SUCCESS: ATTEMPT = "+staffAuth.getFailedLoginCount());
-            return new AuthResponse("LOGIN_SUCCESS", "STAFF", token);
+            //todo: staff have lot of roles
+            StaffProfile staffProfile = staffProfileRepo.getStaffProfileByStaffauth_StaffAuthId(staffAuth.getStaffAuthId());
+            List<String> roles = staffRoleRepo
+                    .getStaffRoleByStaff_StaffId(staffProfile.getStaffId())
+                    .stream()
+                    .map(staffRole -> staffRole.getRole().getRoleCode())
+                    .toList();
+            return new StaffAuthResponse("LOGIN_SUCCESS", roles, token);
         }
         }catch (BadCredentialsException e){
             System.err.println(e.getMessage());
