@@ -7,9 +7,8 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Mappings;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
-import java.util.stream.Collectors;
 
 @Mapper(componentModel = "spring")
 public interface BookingMapper {
@@ -32,9 +31,15 @@ public interface BookingMapper {
         if (services == null) {
             return null;
         }
-        return services.stream()
-                .map(service -> service.getItemId())
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
+        
+        List<Integer> serviceIds = new ArrayList<>();
+        for (CatalogItemJpaEntity service : services) {
+            Integer itemId = service.getItemId();
+            if (itemId != null) {
+                serviceIds.add(itemId);
+            }
+        }
+        
+        return serviceIds;
     }
 }
