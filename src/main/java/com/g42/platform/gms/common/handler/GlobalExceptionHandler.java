@@ -13,6 +13,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+
+import java.util.Arrays;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -105,5 +108,30 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponses.error(ex.getCode().name(), ex.getMessage()));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResponse<Object>> handleEnumError(
+            MethodArgumentTypeMismatchException ex) {
+
+        if (ex.getRequiredType() != null &&
+                ex.getRequiredType().isEnum()) {
+
+            String validValues = Arrays.toString(
+                    ex.getRequiredType().getEnumConstants()
+            );
+
+            return ResponseEntity.badRequest().body(
+                    ApiResponses.error("FAIL",
+                            "Invalid value for parameter '"
+                                    + ex.getName() +
+                                    "'. Allowed values: " + validValues
+                    )
+            );
+        }
+
+        return ResponseEntity.badRequest().body(
+                ApiResponses.error("FAIL","Invalid request parameter")
+        );
     }
 }
