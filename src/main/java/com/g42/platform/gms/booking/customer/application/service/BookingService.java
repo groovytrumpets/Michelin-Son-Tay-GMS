@@ -390,36 +390,4 @@ public class BookingService {
             return LocalDateTime.now().isBefore(firstRequestTime.plusHours(1));
         }
     }
-    
-    private boolean checkRateLimit(String key, int maxRequests) {
-        RateLimitInfo info = rateLimitCache.get(key);
-        if (info == null || !info.isWithinWindow()) {
-            rateLimitCache.put(key, new RateLimitInfo(1));
-            return true;
-        }
-        if (info.getCount() >= maxRequests) {
-            return false;
-        }
-        info.increment();
-        return true;
-    }
-    
-    @lombok.Data
-    private static class RateLimitInfo {
-        private int count;
-        private LocalDateTime firstRequestTime;
-        
-        public RateLimitInfo(int count) {
-            this.count = count;
-            this.firstRequestTime = LocalDateTime.now();
-        }
-        
-        public void increment() {
-            this.count++;
-        }
-        
-        public boolean isWithinWindow() {
-            return LocalDateTime.now().isBefore(firstRequestTime.plusHours(1));
-        }
-    }
 }
