@@ -1,5 +1,6 @@
 package com.g42.platform.gms.booking.customer.application.service;
 
+import com.g42.platform.gms.booking.customer.api.dto.TimeSlotResponse;
 import com.g42.platform.gms.booking.customer.domain.entity.Booking;
 import com.g42.platform.gms.booking.customer.domain.entity.SlotReservation;
 import com.g42.platform.gms.booking.customer.domain.entity.TimeSlot;
@@ -91,10 +92,10 @@ public class SlotService {
         log.debug("Released slots for booking {}", bookingId);
     }
 
-    public List<com.g42.platform.gms.booking.customer.api.dto.AvailableSlotResponse> getAvailableSlotsForCustomer(
+    public List<TimeSlotResponse> getAvailableSlotsForCustomer(
             LocalDate date, int estimatedDurationMinutes) {
         
-        List<com.g42.platform.gms.booking.customer.api.dto.AvailableSlotResponse> result = new ArrayList<>();
+        List<TimeSlotResponse> result = new ArrayList<>();
         
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime minSlotTime = now.plusHours(MIN_BOOKING_LEAD_TIME_HOURS);
@@ -113,15 +114,16 @@ public class SlotService {
             boolean available = isSlotAvailable(date, slotTime, estimatedDurationMinutes, null);
             
             if (available) {
-                List<SlotReservation> reservations =
-                        reservationRepository.findByDateAndTime(date, slotTime);
+                List<SlotReservation> reservations = reservationRepository.findByDateAndTime(date, slotTime);
                 int count = reservations.size();
                 int remainingCapacity = slotConfig.getCapacity() - count;
                 
-                com.g42.platform.gms.booking.customer.api.dto.AvailableSlotResponse dto =
-                        new com.g42.platform.gms.booking.customer.api.dto.AvailableSlotResponse();
+                TimeSlotResponse dto = new TimeSlotResponse();
+                dto.setSlotId(slotConfig.getSlotId());
                 dto.setStartTime(slotTime);
                 dto.setPeriod(slotConfig.getPeriod());
+                dto.setCapacity(slotConfig.getCapacity());
+                dto.setIsActive(slotConfig.getIsActive());
                 dto.setRemainingCapacity(remainingCapacity);
                 dto.setIsAvailable(true);
                 dto.setStatus("Còn trống");
@@ -131,6 +133,30 @@ public class SlotService {
         }
         
         return result;
+    }
+
+    /**
+     * Get all time slots (for frontend to display all available time options)
+     */
+    public List<TimeSlot> getAllTimeSlots() {
+        log.debug("Fetching all time slots");
+        return timeSlotRepository.findAllOrderByStartTime();
+    }
+
+    /**
+     * Get only active time slots
+     */
+    public List<TimeSlot> getActiveTimeSlots() {
+        log.debug("Fetching active time slots");
+        return timeSlotRepository.findActiveOrderByStartTime();
+    }
+    
+    /**
+     * Get reservation count for a specific date and time
+     */
+    public int getReservationCount(LocalDate date, LocalTime startTime) {
+        List<SlotReservation> reservations = reservationRepository.findByDateAndTime(date, startTime);
+        return reservations.size();
     }
 
     private int calculateRequiredBlocks(int durationMinutes) {

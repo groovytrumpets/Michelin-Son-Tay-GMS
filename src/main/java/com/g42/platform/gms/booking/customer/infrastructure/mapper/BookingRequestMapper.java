@@ -31,7 +31,7 @@ public interface BookingRequestMapper {
     })
     BookingRequestJpaEntity toJpa(BookingRequest domain);
 
-    // ===== Helper methods cho MapStruct =====
+    // Helper methods for MapStruct
 
     default Integer mapConfirmedBy(StaffProfile staff) {
         if (staff == null) {

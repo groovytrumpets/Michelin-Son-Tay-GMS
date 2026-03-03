@@ -12,6 +12,7 @@ import java.util.List;
 @Data
 public class BookingRequest {
     private Integer requestId;
+    private String requestCode;
     private String phone;
     private String fullName;
     private LocalDate scheduledDate;

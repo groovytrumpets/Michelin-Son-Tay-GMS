@@ -12,6 +12,7 @@ import java.util.List;
 @Data
 public class Booking {
     private Integer bookingId;
+    private String bookingCode;
     private Integer customerId;
     private LocalDate scheduledDate;
     private LocalTime scheduledTime;
@@ -27,7 +28,7 @@ public class Booking {
             createdAt = LocalDateTime.now();
         }
         if (status == null) {
-            status = BookingStatus.PENDING;
+            status = BookingStatus.CONFIRMED;
         }
         if (isGuest == null) {
             isGuest = false;

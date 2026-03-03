@@ -9,6 +9,7 @@ import java.util.List;
 @Data
 public class BookingResponse {
     private Integer bookingId;
+    private String bookingCode;
     private Integer customerId;
     private String customerName;
     private String phone;

@@ -10,6 +10,8 @@ import java.util.Optional;
 public interface BookingRequestRepository {
     BookingRequest save(BookingRequest bookingRequest);
     Optional<BookingRequest> findById(Integer requestId);
+    Optional<BookingRequest> findByRequestCode(String requestCode);
+    boolean existsByRequestCode(String requestCode);
     Optional<BookingRequest> findByIdAndStatus(Integer requestId, BookingRequestStatus status);
     List<BookingRequest> findByStatus(BookingRequestStatus status);
     List<BookingRequest> findByPhone(String phone);

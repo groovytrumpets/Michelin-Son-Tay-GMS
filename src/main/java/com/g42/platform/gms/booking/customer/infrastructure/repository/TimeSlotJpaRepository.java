@@ -11,4 +11,6 @@ public interface TimeSlotJpaRepository extends JpaRepository<TimeSlotJpaEntity, 
     Optional<TimeSlotJpaEntity> findByStartTime(LocalTime startTime);
     
     List<TimeSlotJpaEntity> findByIsActiveTrueOrderByStartTimeAsc();
+    
+    List<TimeSlotJpaEntity> findAllByOrderByStartTimeAsc();
 }

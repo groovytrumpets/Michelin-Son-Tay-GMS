@@ -36,10 +36,12 @@ public class StaffJwtFilter extends OncePerRequestFilter {
         
         // bỏ qua các endpoint không cần parse staff token
         // - /api/auth/**: auth endpoints (login, register) - không cần token
+        // - /api/customer/**: customer endpoints - dùng customer token
         // - /api/booking/guest/**: guest booking - public endpoint
         // - /api/booking/customer/**: customer endpoints - dùng customer token
         // - swagger, home, error: public endpoints
         if (path.startsWith("/api/auth/")
+                || path.startsWith("/api/customer/")
                 || path.startsWith("/api/booking/guest/")
                 || path.startsWith("/api/booking/slots/")
                 || path.startsWith("/api/booking/customer/")

@@ -1,21 +1,22 @@
 package com.g42.platform.gms.booking_management.domain.repository;
 
-import com.g42.platform.gms.booking_management.domain.entity.Booking;
-import com.g42.platform.gms.booking_management.domain.entity.BookingRequest;
-import com.g42.platform.gms.booking_management.domain.entity.BookingSlotReservation;
-import com.g42.platform.gms.booking_management.domain.entity.TimeSlot;
+import com.g42.platform.gms.booking.customer.domain.enums.BookingRequestStatus;
+import com.g42.platform.gms.booking_management.domain.entity.*;
+import com.g42.platform.gms.booking_management.domain.enums.BookingEnum;
 import com.g42.platform.gms.booking_management.infrastructure.entity.BookingJpa;
 import com.g42.platform.gms.booking_management.infrastructure.entity.TimeSlotJpa;
+import org.springframework.data.domain.Page;
 
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 
 public interface BookingManageRepository {
-    List<Booking> getBookedList();
+    Page<Booking> getBookedList(int page, int size, LocalDate date, Boolean isGuest, BookingEnum status,String search);
 
     Booking getBookedDetailById(Integer bookingId);
 
-    List<BookingRequest> getBookingRequestList();
+    Page<BookingRequest> getBookingRequestList(int page, int size, LocalDate date, Boolean isGuest, BookingRequestStatus status, String search);
 
     BookingRequest getBookingRequestById(Integer bookingId);
 
@@ -23,9 +24,13 @@ public interface BookingManageRepository {
 
     int countReserverdBasedOnTime(LocalTime scheduledTime);
 
-    BookingJpa createBookingByRequest(BookingRequest request, int customerId);
+    BookingJpa createBookingByRequest(BookingRequest request);
 
     BookingSlotReservation createBookingSlotReservation(BookingRequest request, BookingJpa bookingId);
 
     void setConfirmStatus(BookingRequest request);
+
+    void setRequestBooking(BookingRequest request);
+
+    List<CatalogItem> getListOfCatalogById(List<Integer> services);
 }

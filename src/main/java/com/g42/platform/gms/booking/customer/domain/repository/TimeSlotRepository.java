@@ -9,4 +9,5 @@ import java.util.Optional;
 public interface TimeSlotRepository {
     Optional<TimeSlot> findByStartTime(LocalTime startTime);
     List<TimeSlot> findActiveOrderByStartTime();
+    List<TimeSlot> findAllOrderByStartTime();
 }

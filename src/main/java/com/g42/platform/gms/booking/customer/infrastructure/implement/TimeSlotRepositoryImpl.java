@@ -32,4 +32,12 @@ public class TimeSlotRepositoryImpl implements TimeSlotRepository {
                 .map(mapper::toDomain)
                 .collect(Collectors.toList());
     }
+
+    @Override
+    public List<TimeSlot> findAllOrderByStartTime() {
+        return jpaRepository.findAllByOrderByStartTimeAsc()
+                .stream()
+                .map(mapper::toDomain)
+                .collect(Collectors.toList());
+    }
 }
