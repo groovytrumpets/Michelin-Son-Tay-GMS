@@ -12,6 +12,7 @@ import java.util.List;
 @Setter
 @AllArgsConstructor
 public class StaffAuthResponse {
+    private String avatarUrl;
     private String message;
     private List<String> role;
     private String token;
