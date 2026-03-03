@@ -19,13 +19,9 @@ public class ServiceTicket {
     private Integer bookingId;
     private Integer vehicleId;
     private Integer customerId;
-    private Integer createdBy;
     private TicketStatus ticketStatus;
-    private LocalDateTime receivedAt;
-    private String customerRequest;
-    private String technicianNotes;
-    private LocalDateTime deliveredAt;
-    private Boolean isDeleted;
+    private Integer odometerReading;
+    private String licensePlatePhotoUrl;
     private String checkInNotes;
     private Boolean immutable;
     private LocalDateTime createdAt;
@@ -47,9 +43,6 @@ public class ServiceTicket {
         }
         if (immutable == null) {
             immutable = false;
-        }
-        if (isDeleted == null) {
-            isDeleted = false;
         }
     }
 }

@@ -7,7 +7,6 @@ import com.g42.platform.gms.booking.customer.domain.entity.TimeSlot;
 import com.g42.platform.gms.booking.customer.domain.repository.BookingRepository;
 import com.g42.platform.gms.booking.customer.domain.repository.SlotReservationRepository;
 import com.g42.platform.gms.booking.customer.domain.repository.TimeSlotRepository;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -18,56 +17,17 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Service xử lý nghiệp vụ quản lý slot (khung giờ) và reservation (đặt chỗ)
- * 
- * Chức năng chính:
- * - Check slot availability (kiểm tra slot còn trống không)
- * - Reserve slot cho booking (đặt chỗ)
- * - Release slot khi hủy/sửa booking (giải phóng chỗ)
- * - Lấy danh sách slots available cho customer (có filter 2 giờ)
- * - Lấy danh sách slots available cho staff (không filter 2 giờ)
- * 
- * Slot System:
- * - Mỗi slot có capacity (sức chứa)
- * - Mỗi booking chiếm 1 hoặc nhiều slots (tùy duration)
- * - Slot được chia theo BASE_SLOT_MINUTES (30 phút)
- * - Sử dụng Pessimistic Locking để tránh race condition
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class SlotService {
 
-    /** Độ dài cơ bản của 1 slot (30 phút) */
     private static final int BASE_SLOT_MINUTES = 30;
-    
-    /** Thời gian tối thiểu phải đặt trước (2 giờ) - chỉ áp dụng cho customer */
     private static final long MIN_BOOKING_LEAD_TIME_HOURS = 2L;
 
     private final TimeSlotRepository timeSlotRepository;
     private final SlotReservationRepository reservationRepository;
     private final BookingRepository bookingRepository;
-
-    /**
-     * Check xem slot có available không (có đủ chỗ trống không)
-     * 
-     * Logic:
-     * 1. Tính số blocks cần thiết dựa trên duration
-     * 2. Với mỗi block, check:
-     *    - Slot config có tồn tại và active không
-     *    - Số reservation hiện tại < capacity không
-     * 3. Nếu tất cả blocks đều OK => available
-     * 
-     * Sử dụng Pessimistic Locking (findByStartTimeWithLock) để tránh race condition
-     * khi 2 người cùng đặt slot cuối cùng
-     * 
-     * @param date Ngày đặt
-     * @param startTime Giờ bắt đầu
-     * @param estimatedDurationMinutes Thời lượng ước tính (phút)
-     * @param excludeBookingId ID của booking cần exclude (dùng khi modify booking)
-     * @return true nếu available, false nếu đã đầy
-     */
 
     public boolean isSlotAvailable(LocalDate date,
                                    LocalTime startTime,
@@ -105,14 +65,6 @@ public class SlotService {
         return true;
     }
 
-    /**
-     * Reserve (đặt chỗ) slots cho một booking
-     * 
-     * Tạo SlotReservation records cho tất cả blocks cần thiết
-     * 
-     * @param bookingId ID của booking
-     * @param estimatedDurationMinutes Thời lượng ước tính
-     */
     public void reserveForBooking(Integer bookingId, int estimatedDurationMinutes) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new RuntimeException("Booking not found: " + bookingId));
@@ -135,29 +87,11 @@ public class SlotService {
         log.debug("Reserved {} blocks for booking {}", blocks, bookingId);
     }
 
-    /**
-     * Release (giải phóng) slots của một booking
-     * Xóa tất cả SlotReservation records của booking đó
-     * 
-     * @param bookingId ID của booking
-     */
     public void releaseForBooking(Integer bookingId) {
         reservationRepository.deleteByBookingId(bookingId);
         log.debug("Released slots for booking {}", bookingId);
     }
 
-    /**
-     * Lấy danh sách slots available cho CUSTOMER
-     * 
-     * Business Rule:
-     * - Filter slots trong quá khứ
-     * - Filter slots quá gần (< 2 giờ từ hiện tại)
-     * - Chỉ trả về slots còn trống
-     * 
-     * @param date Ngày cần check
-     * @param estimatedDurationMinutes Thời lượng ước tính
-     * @return Danh sách slots available
-     */
     public List<TimeSlotResponse> getAvailableSlotsForCustomer(
             LocalDate date, int estimatedDurationMinutes) {
         
@@ -200,61 +134,6 @@ public class SlotService {
         
         return result;
     }
-    /**
-         * Lấy danh sách slots available cho STAFF/RECEPTIONIST
-         * 
-         * Business Rule:
-         * - Chỉ filter slots trong quá khứ
-         * - KHÔNG filter 2 giờ (staff có thể đặt ngay tức khắc)
-         * - Chỉ trả về slots còn trống
-         * 
-         * @param date Ngày cần check
-         * @param estimatedDurationMinutes Thời lượng ước tính
-         * @return Danh sách slots available
-         */
-        public List<TimeSlotResponse> getAvailableSlotsForStaff(
-                LocalDate date, int estimatedDurationMinutes) {
-
-            List<TimeSlotResponse> result = new ArrayList<>();
-
-            LocalDateTime now = LocalDateTime.now();
-
-            List<TimeSlot> allSlots = timeSlotRepository.findActiveOrderByStartTime();
-
-            for (TimeSlot slotConfig : allSlots) {
-                LocalTime slotTime = slotConfig.getStartTime();
-                LocalDateTime slotDateTime = LocalDateTime.of(date, slotTime);
-
-                // Staff chỉ cần check không được trong quá khứ (không check 2 giờ)
-                if (slotDateTime.isBefore(now)) {
-                    continue;
-                }
-
-                boolean available = isSlotAvailable(date, slotTime, estimatedDurationMinutes, null);
-
-                if (available) {
-                    List<SlotReservation> reservations = reservationRepository.findByDateAndTime(date, slotTime);
-                    int count = reservations.size();
-                    int remainingCapacity = slotConfig.getCapacity() - count;
-
-                    TimeSlotResponse dto = new TimeSlotResponse();
-                    dto.setSlotId(slotConfig.getSlotId());
-                    dto.setStartTime(slotTime);
-                    dto.setPeriod(slotConfig.getPeriod());
-                    dto.setCapacity(slotConfig.getCapacity());
-                    dto.setIsActive(slotConfig.getIsActive());
-                    dto.setRemainingCapacity(remainingCapacity);
-                    dto.setIsAvailable(true);
-                    dto.setStatus("Còn trống");
-
-                    result.add(dto);
-                }
-            }
-
-            return result;
-        }
-
-
 
     /**
      * Get all time slots (for frontend to display all available time options)
@@ -280,18 +159,6 @@ public class SlotService {
         return reservations.size();
     }
 
-    /**
-     * Tính số blocks (slots) cần thiết dựa trên duration
-     * 
-     * Ví dụ:
-     * - 30 phút => 1 block
-     * - 60 phút => 2 blocks
-     * - 90 phút => 3 blocks
-     * - 45 phút => 2 blocks (làm tròn lên)
-     * 
-     * @param durationMinutes Thời lượng (phút)
-     * @return Số blocks cần thiết
-     */
     private int calculateRequiredBlocks(int durationMinutes) {
         if (durationMinutes <= 0) {
             return 1;

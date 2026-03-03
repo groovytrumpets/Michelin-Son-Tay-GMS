@@ -6,7 +6,6 @@ package com.g42.platform.gms.service_ticket_management.domain.enums;
  * FRONT, BACK, LEFT, RIGHT: Standard side views (required)
  * TOP, BOTTOM: Additional angle views (optional)
  * OVERALL: General overview photo (optional)
- * LICENSE_PLATE: License plate photo (optional)
  * ODOMETER: Photo of odometer reading (required)
  * DAMAGE: Photo documenting pre-existing damage (optional, requires description)
  */
@@ -18,7 +17,6 @@ public enum PhotoCategory {
     TOP,
     BOTTOM,
     OVERALL,
-    LICENSE_PLATE,
     ODOMETER,
     DAMAGE
 }

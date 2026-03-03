@@ -29,37 +29,24 @@ public class ServiceTicketService {
     private final ServiceTicketRepository serviceTicketRepository;
     private final ServiceTicketMapper serviceTicketMapper;
     private final ServiceTicketCodeGenerator ticketCodeGenerator;
-    private final com.g42.platform.gms.booking.customer.domain.repository.BookingRepository bookingRepository;
 
     /**
-     * Create new service ticket using booking_code as ticket_code.
-     * KHÔNG generate mã mới - reuse booking_code để đảm bảo đồng bộ.
-     * Database constraint uk_booking_id ensures 1-to-1 relationship (1 booking = 1 service ticket).
-     * 
-     * Flow:
-     * 1. Query booking để lấy booking_code và description
-     * 2. Reuse booking_code làm ticket_code
-     * 3. Copy booking.description sang customer_request
-     * 4. Save ServiceTicket với status = DRAFT
+     * Create new service ticket with generated ticket code.
      * 
      * @param bookingId Booking ID
      * @param vehicleId Vehicle ID
      * @param customerId Customer ID
-     * @param createdBy Staff ID who creates the ticket
      * @return Created ServiceTicket entity
      */
     @Transactional
-    public ServiceTicket createServiceTicket(Integer bookingId, Integer vehicleId, Integer customerId, Integer createdBy) {
-        log.info("Creating service ticket for booking: {}, vehicle: {}, customer: {}, createdBy: {}", 
-            bookingId, vehicleId, customerId, createdBy);
+    public ServiceTicket createServiceTicket(Integer bookingId, Integer vehicleId, Integer customerId) {
+        log.info("Creating service ticket for booking: {}, vehicle: {}, customer: {}", bookingId, vehicleId, customerId);
         
-        // Fetch booking to get booking_code and customer_request
-        com.g42.platform.gms.booking.customer.domain.entity.Booking booking = bookingRepository.findById(bookingId)
-            .orElseThrow(() -> new RuntimeException("Booking not found: " + bookingId));
-        
-        // Use booking_code as ticket_code (no need to generate new code)
-        String ticketCode = booking.getBookingCode();
-        log.info("Using booking_code as ticket_code: {}", ticketCode);
+        // Generate ticket code
+        String ticketCode = ticketCodeGenerator.generateCode(
+            LocalDate.now(),
+            CodePrefix.SERVICE_TICKET
+        );
         
         // Create domain entity
         ServiceTicket ticket = new ServiceTicket();
@@ -67,23 +54,20 @@ public class ServiceTicketService {
         ticket.setBookingId(bookingId);
         ticket.setVehicleId(vehicleId);
         ticket.setCustomerId(customerId);
-        ticket.setCreatedBy(createdBy); // Set staff who creates the ticket
-        ticket.setCustomerRequest(booking.getDescription()); // Set customer request from booking
         ticket.initializeDefaults();
         
         // Convert to JPA and save
-        // Note: Database constraint uk_booking_id will prevent duplicate service tickets for same booking
         ServiceTicketJpa jpa = serviceTicketMapper.toJpa(ticket);
         ServiceTicketJpa saved = serviceTicketRepository.save(jpa);
         
-        log.info("Created service ticket with code: {}", ticketCode);
+        log.info("Created service ticket: {}", ticketCode);
         return serviceTicketMapper.toDomain(saved);
     }
 
     /**
      * Find service ticket by ticket code.
      * 
-     * @param ticketCode Ticket code (MST_XXXXXX)
+     * @param ticketCode Ticket code (ST_XXXXXX)
      * @return ServiceTicket entity
      */
     @Transactional(readOnly = true)
@@ -99,7 +83,7 @@ public class ServiceTicketService {
     /**
      * Find service ticket by ticket code (Optional).
      * 
-     * @param ticketCode Ticket code (MST_XXXXXX)
+     * @param ticketCode Ticket code (ST_XXXXXX)
      * @return Optional ServiceTicket entity
      */
     @Transactional(readOnly = true)
@@ -183,7 +167,7 @@ public class ServiceTicketService {
         log.info("Marking service ticket as immutable: {}", ticketCode);
         
         ServiceTicket ticket = findByTicketCode(ticketCode);
-        // Không set immutable flag - chỉ dùng status để kiểm soát quyền edit
+        ticket.setImmutable(true);
         ticket.setUpdatedAt(LocalDateTime.now());
         
         return updateServiceTicket(ticket);

@@ -12,7 +12,7 @@ import lombok.Data;
 public class BookingLookupRequest {
     
     @NotBlank(message = "Mã booking là bắt buộc")
-    @Pattern(regexp = "^MST_[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{6}$",
-             message = "Mã booking không hợp lệ (format: MST_XXXXXX)")
+    @Pattern(regexp = "^BK_[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{6}$", 
+             message = "Mã booking không hợp lệ (format: BK_XXXXXX)")
     private String bookingCode;
 }
