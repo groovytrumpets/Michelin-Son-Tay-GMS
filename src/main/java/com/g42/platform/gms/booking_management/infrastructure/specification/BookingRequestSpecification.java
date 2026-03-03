@@ -4,6 +4,8 @@ import com.g42.platform.gms.booking.customer.domain.enums.BookingRequestStatus;
 import com.g42.platform.gms.booking_management.domain.enums.BookingEnum;
 import com.g42.platform.gms.booking_management.infrastructure.entity.BookingJpa;
 import com.g42.platform.gms.booking_management.infrastructure.entity.BookingRequestJpa;
+import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.jpa.domain.Specification;
 
@@ -66,6 +68,44 @@ public class BookingRequestSpecification {
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));
+        };
+    }
+    public static Specification<BookingJpa> searchBooking(String keyword) {
+
+        return (root, query, cb) -> {
+
+            String like = "%" + keyword.toLowerCase() + "%";
+
+            List<Predicate> predicates = new ArrayList<>();
+
+            predicates.add(cb.like(cb.lower(root.get("serviceCategory")), like));
+            predicates.add(cb.like(cb.lower(root.get("description")), like));
+            predicates.add(cb.like(root.get("status").as(String.class), like));
+
+            Join<Object, Object> customer =
+                    root.join("customer", JoinType.LEFT);
+
+            predicates.add(cb.like(cb.lower(customer.get("fullName")), like));
+            predicates.add(cb.like(cb.lower(customer.get("phone")), like));
+
+            return cb.or(predicates.toArray(new Predicate[0]));
+        };
+    }
+    public static Specification<BookingRequestJpa> searchBookingRequest(String keyword) {
+
+        return (root, query, cb) -> {
+
+            String like = "%" + keyword.toLowerCase() + "%";
+
+            List<Predicate> predicates = new ArrayList<>();
+
+            predicates.add(cb.like(cb.lower(root.get("phone")), like));
+            predicates.add(cb.like(cb.lower(root.get("fullName")), like));
+            predicates.add(cb.like(cb.lower(root.get("description")), like));
+            predicates.add(cb.like(cb.lower(root.get("serviceCategory")), like));
+            predicates.add(cb.like(cb.lower(root.get("requestCode")), like));
+            predicates.add(cb.like(root.get("status").as(String.class), like));
+            return cb.or(predicates.toArray(new Predicate[0]));
         };
     }
 }

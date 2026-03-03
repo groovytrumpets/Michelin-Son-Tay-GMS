@@ -12,11 +12,11 @@ import java.time.LocalTime;
 import java.util.List;
 
 public interface BookingManageRepository {
-    Page<Booking> getBookedList(int page, int size, LocalDate date, Boolean isGuest, BookingEnum status);
+    Page<Booking> getBookedList(int page, int size, LocalDate date, Boolean isGuest, BookingEnum status,String search);
 
     Booking getBookedDetailById(Integer bookingId);
 
-    Page<BookingRequest> getBookingRequestList(int page, int size, LocalDate date, Boolean isGuest, BookingRequestStatus status);
+    Page<BookingRequest> getBookingRequestList(int page, int size, LocalDate date, Boolean isGuest, BookingRequestStatus status, String search);
 
     BookingRequest getBookingRequestById(Integer bookingId);
 

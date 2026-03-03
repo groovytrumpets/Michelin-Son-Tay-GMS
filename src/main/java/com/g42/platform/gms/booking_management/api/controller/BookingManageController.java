@@ -29,8 +29,9 @@ public class BookingManageController {
                                                                            @RequestParam(defaultValue = "10") int size,
                                                                            @RequestParam(required = false) LocalDate date,
                                                                            @RequestParam(required = false) Boolean isGuest,
-                                                                           @RequestParam(required = false) BookingEnum status){
-        Page<BookedRespond> apiResponse = bookingService.getListBooked(page,size,date,isGuest,status);
+                                                                           @RequestParam(required = false) BookingEnum status,
+                                                                           @RequestParam(required = false) String search){
+        Page<BookedRespond> apiResponse = bookingService.getListBooked(page,size,date,isGuest,status,search);
         return ResponseEntity.ok(ApiResponses.success(apiResponse));
     }
     @GetMapping("/booking/{bookingId}")
@@ -43,8 +44,9 @@ public class BookingManageController {
                                                                                      @RequestParam(defaultValue = "10") int size,
                                                                                      @RequestParam(required = false) LocalDate date,
                                                                                      @RequestParam(required = false) Boolean isGuest,
-                                                                                     @RequestParam(required = false) BookingRequestStatus status){
-        Page<BookingRequestRes> bookingRequestResList = bookingService.getListBookingRequest(page,size,date,isGuest,status);
+                                                                                     @RequestParam(required = false) BookingRequestStatus status,
+                                                                                     @RequestParam(required = false) String search){
+        Page<BookingRequestRes> bookingRequestResList = bookingService.getListBookingRequest(page,size,date,isGuest,status,search);
         return ResponseEntity.ok(ApiResponses.success(bookingRequestResList));
     }
 
