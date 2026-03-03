@@ -40,7 +40,7 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(request -> {
                     CorsConfiguration config = new CorsConfiguration();
                     config.setAllowedOrigins(List.of("http://localhost:5173",
-                            "https://michelinsontay.vn","https://api.michelinsontay.vn"));
+                            "https://api.michelinsontay.vn"));
                     config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
                     config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept"));
                     config.setAllowCredentials(true);
@@ -52,14 +52,9 @@ public class SecurityConfig {
                                 "/api/auth/**",
                                 "/api/booking/guest/**",
                                 "/api/booking/slots/**",
-                                "/api/catalog/**",
-                                "/api/vehicles/**",
-                                "/api/receptionist/**",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
-                                "/zalo/callback",
-                                "/zalo/login",
                                 "/home/**",
                                 "/error"
                         ).permitAll()
