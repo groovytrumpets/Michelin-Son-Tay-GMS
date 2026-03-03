@@ -34,9 +34,11 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
     private final BookingDraffManagerMapper bookingDraffManagerMapper;
     private final CatalogItemManageMapper catalogItemManageMapper;
     @Override
-    public List<Booking> getBookedList() {
-        List<BookingJpa> bookingJpaList = bookingManageJpaRepository.findAll();
-        return bookingManagerMapper.toBookingJpa(bookingJpaList);
+    public Page<Booking> getBookedList(int page, int size, LocalDate date, Boolean isGuest, BookingEnum status) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Specification<BookingJpa> specification = BookingRequestSpecification.filterBooking(date,isGuest,status);
+        Page<BookingJpa> bookingJpaList = bookingManageJpaRepository.findAll(specification,pageable);
+        return bookingJpaList.map(bookingManagerMapper::toDomain);
     }
 
     @Override

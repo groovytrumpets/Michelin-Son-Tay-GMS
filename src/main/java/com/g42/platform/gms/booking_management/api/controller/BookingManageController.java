@@ -6,6 +6,7 @@ import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedDetailRes
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedRespond;
 import com.g42.platform.gms.booking_management.api.dto.requesting.*;
 import com.g42.platform.gms.booking_management.application.service.BookingManageService;
+import com.g42.platform.gms.booking_management.domain.enums.BookingEnum;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import lombok.AllArgsConstructor;
@@ -24,8 +25,12 @@ public class BookingManageController {
     @Autowired
     private final BookingManageService bookingService;
     @GetMapping("/booking")
-    public ResponseEntity<ApiResponse<List<BookedRespond>>> getAllBookings(){
-        List<BookedRespond> apiResponse = bookingService.getListBooked();
+    public ResponseEntity<ApiResponse<Page<BookedRespond>>> getAllBookings(@RequestParam(defaultValue = "0") int page,
+                                                                           @RequestParam(defaultValue = "10") int size,
+                                                                           @RequestParam(required = false) LocalDate date,
+                                                                           @RequestParam(required = false) Boolean isGuest,
+                                                                           @RequestParam(required = false) BookingEnum status){
+        Page<BookedRespond> apiResponse = bookingService.getListBooked(page,size,date,isGuest,status);
         return ResponseEntity.ok(ApiResponses.success(apiResponse));
     }
     @GetMapping("/booking/{bookingId}")

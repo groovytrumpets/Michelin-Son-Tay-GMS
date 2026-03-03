@@ -10,10 +10,8 @@ import com.g42.platform.gms.booking_management.api.mapper.BookingMDetailDtoMappe
 import com.g42.platform.gms.booking_management.api.mapper.BookingMRequestDtoMapper;
 import com.g42.platform.gms.booking_management.api.mapper.BookingManageDtoMapper;
 import com.g42.platform.gms.booking_management.application.port.CustomerGateway;
-import com.g42.platform.gms.booking_management.domain.entity.BookingRequest;
-import com.g42.platform.gms.booking_management.domain.entity.BookingSlotReservation;
-import com.g42.platform.gms.booking_management.domain.entity.CatalogItem;
-import com.g42.platform.gms.booking_management.domain.entity.TimeSlot;
+import com.g42.platform.gms.booking_management.domain.entity.*;
+import com.g42.platform.gms.booking_management.domain.enums.BookingEnum;
 import com.g42.platform.gms.booking_management.domain.exception.BookingStaffErrorCode;
 import com.g42.platform.gms.booking_management.domain.exception.BookingStaffException;
 import com.g42.platform.gms.booking_management.domain.repository.BookingManageRepository;
@@ -38,9 +36,10 @@ public class BookingManageService {
     private final BookingMDetailDtoMapper  bookingMDetailDtoMapper;
     private final BookingMRequestDtoMapper  bookingMRequestDtoMapper;
 
-    public List<BookedRespond> getListBooked() {
-
-        return  bookingRepository.getBookedList().stream().map(bookingManageDtoMapper::toBookedRespond).toList();
+    public Page<BookedRespond> getListBooked(int page, int size, LocalDate date, Boolean isGuest, BookingEnum status) {
+        Page<Booking> bookingPage = bookingRepository.getBookedList(page,size,date,isGuest,status);
+//        return  bookingRepository.getBookedList().stream().map(bookingManageDtoMapper::toBookedRespond).toList();
+        return bookingPage.map(bookingManageDtoMapper::toBookedRespond);
     }
 
     public BookedDetailResponse getBookedDetailById(Integer bookingId) {
