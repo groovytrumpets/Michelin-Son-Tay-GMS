@@ -1,5 +1,5 @@
 package com.g42.platform.gms.booking.customer.api.controller;
-
+import jakarta.servlet.http.HttpServletRequest;
 import com.g42.platform.gms.auth.entity.CustomerPrincipal;
 import com.g42.platform.gms.booking.customer.api.dto.BookingResponse;
 import com.g42.platform.gms.booking.customer.api.dto.CustomerBookingRequest;
