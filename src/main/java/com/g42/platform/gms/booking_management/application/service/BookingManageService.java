@@ -2,6 +2,7 @@ package com.g42.platform.gms.booking_management.application.service;
 
 
 
+import com.g42.platform.gms.booking.customer.domain.enums.BookingRequestStatus;
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedDetailResponse;
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedRespond;
 import com.g42.platform.gms.booking_management.api.dto.requesting.*;
@@ -20,9 +21,12 @@ import com.g42.platform.gms.booking_management.infrastructure.entity.BookingJpa;
 import com.g42.platform.gms.booking_management.infrastructure.mapper.TimeSlotMMapper;
 import com.g42.platform.gms.marketing.service_catalog.domain.exception.ServiceException;
 import lombok.AllArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -44,9 +48,10 @@ public class BookingManageService {
         //todo: null handle exception
     }
 
-    public List<BookingRequestRes> getListBookingRequest() {
-        List<BookingRequest> bookingList = bookingRepository.getBookingRequestList();
-        return bookingMRequestDtoMapper.toBookingRequestRes(bookingList);
+    public Page<BookingRequestRes> getListBookingRequest(int page, int size, LocalDate date, Boolean isGuest, BookingRequestStatus status) {
+        Page<BookingRequest> bookingList = bookingRepository.getBookingRequestList(page,size,date,isGuest,status);
+        //return bookingMRequestDtoMapper.toBookingRequestResPage(bookingList);
+        return bookingList.map(bookingMRequestDtoMapper::toBookingRequestRes);
     }
 
     public BookingRequestDetailRes getBookingRequestById(Integer bookingId) {

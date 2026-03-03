@@ -5,6 +5,7 @@ import com.g42.platform.gms.booking_management.api.dto.requesting.BookingRequest
 import com.g42.platform.gms.booking_management.domain.entity.BookingRequest;
 import com.g42.platform.gms.booking_management.domain.entity.CatalogItem;
 import org.mapstruct.Mapper;
+import org.springframework.data.domain.Page;
 
 import java.util.List;
 

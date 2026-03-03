@@ -1,15 +1,24 @@
 package com.g42.platform.gms.booking_management.infrastructure;
 
 import com.g42.platform.gms.auth.repository.CustomerProfileRepository;
+import com.g42.platform.gms.booking.customer.domain.enums.BookingRequestStatus;
 import com.g42.platform.gms.booking_management.domain.entity.*;
 import com.g42.platform.gms.booking_management.domain.enums.BookingEnum;
 import com.g42.platform.gms.booking_management.domain.repository.BookingManageRepository;
 import com.g42.platform.gms.booking_management.infrastructure.entity.*;
 import com.g42.platform.gms.booking_management.infrastructure.mapper.*;
 import com.g42.platform.gms.booking_management.infrastructure.repository.*;
+import com.g42.platform.gms.booking_management.infrastructure.specification.BookingRequestSpecification;
 import lombok.AllArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
@@ -36,11 +45,12 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
         return bookingManagerMapper.toDomain(bookingJpa);
 
     }
-
     @Override
-    public List<BookingRequest> getBookingRequestList() {
-        List<BookingRequestJpa> bookingRequestJpaList = bookingMRequestJpaRepo.findAll();
-        return bookingDraffManagerMapper.toDomain(bookingRequestJpaList);
+    public Page<BookingRequest> getBookingRequestList(int page, int size, LocalDate date, Boolean isGuest, BookingRequestStatus status) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Specification<BookingRequestJpa> specification = BookingRequestSpecification.filter(date,isGuest,status);
+        Page<BookingRequestJpa> bookingRequestJpaList = bookingMRequestJpaRepo.findAll(specification, pageable);
+        return bookingRequestJpaList.map(bookingDraffManagerMapper::toDomain);
     }
 
     @Override

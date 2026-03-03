@@ -8,5 +8,4 @@ public enum BookingEnum {
     CONFIRMED,    // Đã xác nhận
     CANCELLED,    // Đã hủy
     NOT_ARRIVED,  // Khách không đến
-    DONE          // Đã hoàn tất check-in
 }
