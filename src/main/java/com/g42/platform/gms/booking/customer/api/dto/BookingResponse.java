@@ -19,4 +19,6 @@ public class BookingResponse {
     private String status;
     private Boolean isGuest;
     private List<Integer> serviceIds;
+    private List<ServiceItemDto> services;
+    private Integer totalEstimatedTime;
 }
