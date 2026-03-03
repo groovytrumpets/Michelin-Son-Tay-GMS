@@ -42,7 +42,7 @@ public class BookingService {
     private final IpBlacklistRepository ipBlacklistRepository;
     private final BookingCodeGenerator bookingCodeGenerator;
     private final com.g42.platform.gms.catalog.repository.ComboItemRepository comboItemRepository;
-    
+
     private final Map<String, RateLimitInfo> rateLimitCache = new ConcurrentHashMap<>();
     
     private static final int MAX_REQUESTS_PER_CUSTOMER_PER_HOUR = 3;
@@ -287,55 +287,55 @@ public class BookingService {
         }
         
         List<CatalogItemJpaEntity> items = catalogItemRepository.findAllById(serviceIds);
-        
+
         int totalMinutes = 0;
         for (CatalogItemJpaEntity item : items) {
             int itemDuration = calculateItemDuration(item);
             totalMinutes = totalMinutes + itemDuration;
         }
-        
+
         if (totalMinutes == 0) {
             return DEFAULT_DURATION_MINUTES;
         }
-        
+
         return totalMinutes;
     }
-    
+
     private int calculateItemDuration(CatalogItemJpaEntity item) {
         if (item == null) {
             return 0;
         }
-        
+
         String itemType = item.getItemType();
-        
+
         if ("SERVICE".equals(itemType)) {
             return getServiceDuration(item);
         }
-        
+
         if ("COMBO".equals(itemType)) {
             return getComboDuration(item.getItemId());
         }
-        
+
         return 0;
     }
-    
+
     private int getServiceDuration(CatalogItemJpaEntity item) {
         if (item.getServiceService() == null) {
             return 0;
         }
-        
+
         Integer estimateTime = item.getServiceService().getEstimateTime();
         if (estimateTime == null || estimateTime <= 0) {
             return 0;
         }
-        
+
         return estimateTime;
     }
-    
+
     private int getComboDuration(Integer comboId) {
-        List<com.g42.platform.gms.booking.customer.infrastructure.entity.ComboItemJpaEntity> comboItems = 
+        List<com.g42.platform.gms.booking.customer.infrastructure.entity.ComboItemJpaEntity> comboItems =
             comboItemRepository.findByComboId(comboId);
-        
+
         int totalDuration = 0;
         for (com.g42.platform.gms.booking.customer.infrastructure.entity.ComboItemJpaEntity comboItem : comboItems) {
             CatalogItemJpaEntity includedItem = comboItem.getIncludedItem();
@@ -343,15 +343,15 @@ public class BookingService {
             if (!isServiceItem) {
                 continue;
             }
-            
+
             int serviceDuration = getServiceDuration(includedItem);
             int quantity = getQuantityOrDefault(comboItem.getQuantity());
             totalDuration = totalDuration + (serviceDuration * quantity);
         }
-        
+
         return totalDuration;
     }
-    
+
     private int getQuantityOrDefault(Integer quantity) {
         if (quantity == null || quantity <= 0) {
             return 1;

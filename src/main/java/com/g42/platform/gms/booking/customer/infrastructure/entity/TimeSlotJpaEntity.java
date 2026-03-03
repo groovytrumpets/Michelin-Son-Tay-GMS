@@ -25,4 +25,7 @@ public class TimeSlotJpaEntity {
 
     @Column(name = "period", length = 20)
     private String period;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reservation_id")
+    private BookingSlotReservationJpaEntity reservation;
 }

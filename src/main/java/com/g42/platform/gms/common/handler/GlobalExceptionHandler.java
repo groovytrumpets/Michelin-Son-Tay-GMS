@@ -6,11 +6,16 @@ import com.g42.platform.gms.booking_management.domain.exception.BookingStaffExce
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.auth.exception.AuthException;
+import com.g42.platform.gms.customer.domain.exception.CustomerException;
 import com.g42.platform.gms.marketing.service_catalog.domain.exception.ServiceException;
+import com.g42.platform.gms.staff.attendance.domain.exception.StaffAttendanceException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+
+import java.util.Arrays;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -83,5 +88,50 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponses.error(ex.getCode().name(), ex.getMessage()));
+    }
+    @ExceptionHandler(StaffAttendanceException.class)
+    public ResponseEntity<ApiResponse<?>> handleBookingManagementException(StaffAttendanceException ex) {
+
+        System.err.println("Staff Attendance Error: " + ex.getCode() + " - " + ex.getMessage());
+
+
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponses.error(ex.getCode().name(), ex.getMessage()));
+    }
+    @ExceptionHandler(CustomerException.class)
+    public ResponseEntity<ApiResponse<?>> handleBookingManagementException(CustomerException ex) {
+
+        System.err.println("Customer Error: " + ex.getCode() + " - " + ex.getMessage());
+
+
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponses.error(ex.getCode().name(), ex.getMessage()));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResponse<Object>> handleEnumError(
+            MethodArgumentTypeMismatchException ex) {
+
+        if (ex.getRequiredType() != null &&
+                ex.getRequiredType().isEnum()) {
+
+            String validValues = Arrays.toString(
+                    ex.getRequiredType().getEnumConstants()
+            );
+
+            return ResponseEntity.badRequest().body(
+                    ApiResponses.error("FAIL",
+                            "Invalid value for parameter '"
+                                    + ex.getName() +
+                                    "'. Allowed values: " + validValues
+                    )
+            );
+        }
+
+        return ResponseEntity.badRequest().body(
+                ApiResponses.error("FAIL","Invalid request parameter")
+        );
     }
 }

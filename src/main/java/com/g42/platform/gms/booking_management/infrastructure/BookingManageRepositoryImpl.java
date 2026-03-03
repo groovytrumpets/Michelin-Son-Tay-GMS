@@ -1,18 +1,25 @@
 package com.g42.platform.gms.booking_management.infrastructure;
 
 import com.g42.platform.gms.auth.repository.CustomerProfileRepository;
+import com.g42.platform.gms.booking.customer.domain.enums.BookingRequestStatus;
 import com.g42.platform.gms.booking_management.domain.entity.*;
 import com.g42.platform.gms.booking_management.domain.enums.BookingEnum;
 import com.g42.platform.gms.booking_management.domain.repository.BookingManageRepository;
 import com.g42.platform.gms.booking_management.infrastructure.entity.*;
 import com.g42.platform.gms.booking_management.infrastructure.mapper.*;
 import com.g42.platform.gms.booking_management.infrastructure.repository.*;
+import com.g42.platform.gms.booking_management.infrastructure.specification.BookingRequestSpecification;
 import lombok.AllArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.ArrayList;
 import java.util.List;
 @Repository
 @AllArgsConstructor
@@ -25,9 +32,16 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
     private final BookingDraffManagerMapper bookingDraffManagerMapper;
     private final CatalogItemManageMapper catalogItemManageMapper;
     @Override
-    public List<Booking> getBookedList() {
-        List<BookingJpa> bookingJpaList = bookingManageJpaRepository.findAll();
-        return bookingManagerMapper.toBookingJpa(bookingJpaList);
+    public Page<Booking> getBookedList(int page, int size, LocalDate date, Boolean isGuest, BookingEnum status,String search) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Specification<BookingJpa> specification = Specification.unrestricted();
+        specification = specification.and(BookingRequestSpecification.filterBooking(date,isGuest,status));
+        if (search != null && !search.isBlank()) {
+        specification = specification.and(BookingRequestSpecification.searchBooking(search));
+        }
+
+        Page<BookingJpa> bookingJpaList = bookingManageJpaRepository.findAll(specification,pageable);
+        return bookingJpaList.map(bookingManagerMapper::toDomain);
     }
 
     @Override
@@ -36,11 +50,16 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
         return bookingManagerMapper.toDomain(bookingJpa);
 
     }
-
     @Override
-    public List<BookingRequest> getBookingRequestList() {
-        List<BookingRequestJpa> bookingRequestJpaList = bookingMRequestJpaRepo.findAll();
-        return bookingDraffManagerMapper.toDomain(bookingRequestJpaList);
+    public Page<BookingRequest> getBookingRequestList(int page, int size, LocalDate date, Boolean isGuest, BookingRequestStatus status, String search) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Specification<BookingRequestJpa> specification = specification = Specification.unrestricted();
+        specification = specification.and(BookingRequestSpecification.filter(date,isGuest,status));
+        if (search != null && !search.isBlank()) {
+            specification = specification.and(BookingRequestSpecification.searchBookingRequest(search));
+        }
+        Page<BookingRequestJpa> bookingRequestJpaList = bookingMRequestJpaRepo.findAll(specification, pageable);
+        return bookingRequestJpaList.map(bookingDraffManagerMapper::toDomain);
     }
 
     @Override
