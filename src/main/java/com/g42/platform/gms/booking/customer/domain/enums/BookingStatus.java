@@ -7,5 +7,5 @@ public enum BookingStatus {
     PENDING,      // Chờ xác nhận
     CONFIRMED,    // Đã xác nhận
     CANCELLED,    // Đã hủy
-    NOT_ARRIVED   // Khách không đến
+    NOT_ARRIVED,  // Khách không đến     // Đã hoàn tất check-in
 }

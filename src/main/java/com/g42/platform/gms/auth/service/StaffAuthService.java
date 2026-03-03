@@ -88,7 +88,7 @@ public class StaffAuthService {
                     .stream()
                     .map(staffRole -> staffRole.getRole().getRoleCode())
                     .toList();
-            return new StaffAuthResponse("LOGIN_SUCCESS", roles, token);
+            return new StaffAuthResponse(staffProfile.getStaffId(),staffProfile.getFullName(),staffProfile.getAvatar(),"LOGIN_SUCCESS", roles, token);
         }
         }catch (BadCredentialsException e){
             System.err.println(e.getMessage());

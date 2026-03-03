@@ -9,7 +9,6 @@ import com.g42.platform.gms.booking.customer.application.service.BookingService;
 import com.g42.platform.gms.booking.customer.domain.entity.Booking;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
