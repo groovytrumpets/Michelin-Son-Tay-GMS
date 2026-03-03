@@ -7,6 +7,7 @@ import com.g42.platform.gms.booking.customer.api.dto.ModifyBookingRequest;
 import com.g42.platform.gms.booking.customer.domain.entity.Booking;
 import com.g42.platform.gms.booking.customer.domain.enums.BookingStatus;
 import com.g42.platform.gms.booking.customer.domain.exception.BookingException;
+import com.g42.platform.gms.booking.customer.infrastructure.entity.CatalogItemJpaEntity;
 import com.g42.platform.gms.common.enums.CodePrefix;
 import com.g42.platform.gms.common.exception.CodeGenerationException;
 import com.g42.platform.gms.booking.customer.domain.repository.BookingRepository;
@@ -40,7 +41,8 @@ public class BookingService {
     private final SlotService slotService;
     private final IpBlacklistRepository ipBlacklistRepository;
     private final BookingCodeGenerator bookingCodeGenerator;
-    
+    private final com.g42.platform.gms.catalog.repository.ComboItemRepository comboItemRepository;
+
     private final Map<String, RateLimitInfo> rateLimitCache = new ConcurrentHashMap<>();
     
     private static final int MAX_REQUESTS_PER_CUSTOMER_PER_HOUR = 3;
@@ -284,9 +286,77 @@ public class BookingService {
             return DEFAULT_DURATION_MINUTES;
         }
         
-        // TODO: Tính duration từ catalog_item.estimated_duration_minutes
-        // Hiện tại tạm thời return default
-        return DEFAULT_DURATION_MINUTES;
+        List<CatalogItemJpaEntity> items = catalogItemRepository.findAllById(serviceIds);
+
+        int totalMinutes = 0;
+        for (CatalogItemJpaEntity item : items) {
+            int itemDuration = calculateItemDuration(item);
+            totalMinutes = totalMinutes + itemDuration;
+        }
+
+        if (totalMinutes == 0) {
+            return DEFAULT_DURATION_MINUTES;
+        }
+
+        return totalMinutes;
+    }
+
+    private int calculateItemDuration(CatalogItemJpaEntity item) {
+        if (item == null) {
+            return 0;
+        }
+
+        String itemType = item.getItemType();
+
+        if ("SERVICE".equals(itemType)) {
+            return getServiceDuration(item);
+        }
+
+        if ("COMBO".equals(itemType)) {
+            return getComboDuration(item.getItemId());
+        }
+
+        return 0;
+    }
+
+    private int getServiceDuration(CatalogItemJpaEntity item) {
+        if (item.getServiceService() == null) {
+            return 0;
+        }
+
+        Integer estimateTime = item.getServiceService().getEstimateTime();
+        if (estimateTime == null || estimateTime <= 0) {
+            return 0;
+        }
+
+        return estimateTime;
+    }
+
+    private int getComboDuration(Integer comboId) {
+        List<com.g42.platform.gms.booking.customer.infrastructure.entity.ComboItemJpaEntity> comboItems =
+            comboItemRepository.findByComboId(comboId);
+
+        int totalDuration = 0;
+        for (com.g42.platform.gms.booking.customer.infrastructure.entity.ComboItemJpaEntity comboItem : comboItems) {
+            CatalogItemJpaEntity includedItem = comboItem.getIncludedItem();
+            boolean isServiceItem = includedItem != null && "SERVICE".equals(includedItem.getItemType());
+            if (!isServiceItem) {
+                continue;
+            }
+
+            int serviceDuration = getServiceDuration(includedItem);
+            int quantity = getQuantityOrDefault(comboItem.getQuantity());
+            totalDuration = totalDuration + (serviceDuration * quantity);
+        }
+
+        return totalDuration;
+    }
+
+    private int getQuantityOrDefault(Integer quantity) {
+        if (quantity == null || quantity <= 0) {
+            return 1;
+        }
+        return quantity;
     }
     
     private boolean checkRateLimit(String key, int maxRequests) {
