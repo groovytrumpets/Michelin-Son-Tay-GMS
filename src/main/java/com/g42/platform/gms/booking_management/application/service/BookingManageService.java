@@ -36,8 +36,8 @@ public class BookingManageService {
     private final BookingMDetailDtoMapper  bookingMDetailDtoMapper;
     private final BookingMRequestDtoMapper  bookingMRequestDtoMapper;
 
-    public Page<BookedRespond> getListBooked(int page, int size, LocalDate date, Boolean isGuest, BookingEnum status) {
-        Page<Booking> bookingPage = bookingRepository.getBookedList(page,size,date,isGuest,status);
+    public Page<BookedRespond> getListBooked(int page, int size, LocalDate date, Boolean isGuest, BookingEnum status, String search) {
+        Page<Booking> bookingPage = bookingRepository.getBookedList(page,size,date,isGuest,status,search);
 //        return  bookingRepository.getBookedList().stream().map(bookingManageDtoMapper::toBookedRespond).toList();
         return bookingPage.map(bookingManageDtoMapper::toBookedRespond);
     }
@@ -47,8 +47,8 @@ public class BookingManageService {
         //todo: null handle exception
     }
 
-    public Page<BookingRequestRes> getListBookingRequest(int page, int size, LocalDate date, Boolean isGuest, BookingRequestStatus status) {
-        Page<BookingRequest> bookingList = bookingRepository.getBookingRequestList(page,size,date,isGuest,status);
+    public Page<BookingRequestRes> getListBookingRequest(int page, int size, LocalDate date, Boolean isGuest, BookingRequestStatus status, String search) {
+        Page<BookingRequest> bookingList = bookingRepository.getBookingRequestList(page,size,date,isGuest,status,search);
         //return bookingMRequestDtoMapper.toBookingRequestResPage(bookingList);
         return bookingList.map(bookingMRequestDtoMapper::toBookingRequestRes);
     }
