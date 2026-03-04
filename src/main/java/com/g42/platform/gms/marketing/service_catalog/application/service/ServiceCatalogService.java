@@ -37,4 +37,8 @@ public class ServiceCatalogService {
         }
         return serviceDtoMapper.toDetailDto(service);
     }
+
+    public Long[] getArrayOfCatalogId(Long[] serviceId) {
+        return serviceRepository.getCatalogIdByServiceId(serviceId);
+    }
 }
