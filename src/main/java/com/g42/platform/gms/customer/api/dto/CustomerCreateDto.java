@@ -1,5 +1,6 @@
 package com.g42.platform.gms.customer.api.dto;
 
+import com.g42.platform.gms.auth.entity.Gender;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -14,7 +15,7 @@ public class CustomerCreateDto {
     private String phone;
     private String email;
     private String pin;
-    private String gender;
+    private Gender gender;
     private String dob;
     private String avatar;
 }
