@@ -10,4 +10,5 @@ import java.util.List;
 public interface CustomerJpaMapper{
     CustomerProfile toDomain (CustomerProfileJpa customerProfileJpa);
     List<CustomerProfile> toDomain (List<CustomerProfileJpa> customerProfileJpaList);
+    CustomerProfileJpa toJpa (CustomerProfile customerProfile);
 }
