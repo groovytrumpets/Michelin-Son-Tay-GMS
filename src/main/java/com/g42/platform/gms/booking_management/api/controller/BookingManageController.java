@@ -5,6 +5,8 @@ import com.g42.platform.gms.booking.customer.domain.enums.BookingStatus;
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedDetailResponse;
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedRespond;
 import com.g42.platform.gms.booking_management.api.dto.requesting.*;
+import com.g42.platform.gms.booking_management.api.dto.timeslot.SlotBookedListResponse;
+import com.g42.platform.gms.booking_management.api.dto.timeslot.SlotBookedResponse;
 import com.g42.platform.gms.booking_management.application.service.BookingManageService;
 import com.g42.platform.gms.booking_management.domain.enums.BookingEnum;
 import com.g42.platform.gms.common.dto.ApiResponse;
@@ -12,6 +14,7 @@ import com.g42.platform.gms.common.dto.ApiResponses;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -77,13 +80,17 @@ public class BookingManageController {
     public ResponseEntity<ApiResponse<Boolean>> updateBookingRequest(@PathVariable String requestId, @RequestBody BookingRequestUpdateReq actionBookingRequest){
         return ResponseEntity.ok(ApiResponses.success(bookingService.updateBookingRequest(requestId, actionBookingRequest)));
     }
-//
-//    @GetMapping("/booking-request")
-//    public ResponseEntity<ApiResponse<Page<BookingRequestRes>>> getAllBookingSlot(@RequestParam(required = false) LocalDate date){
-////        Page<BookingRequestRes> bookingRequestResList = bookingService.getListBookingRequest(page,size,date,isGuest,status,search);
-////        return ResponseEntity.ok(ApiResponses.success(bookingRequestResList));
-//        return null;
-//    }
+
+    @GetMapping("/booking-request-slot")
+    public ResponseEntity<ApiResponse<SlotBookedListResponse>> getAllBookedSlot(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(defaultValue = "60") int durationMinutes){
+        List<SlotBookedResponse> slotBookedResponse = bookingService.getAvailableSlotsForBooking(date,durationMinutes);
+        SlotBookedListResponse slotBookedListResponse = new SlotBookedListResponse();
+        slotBookedListResponse.setDate(date);
+        slotBookedListResponse.setBookingRequestResList(slotBookedResponse);
+        return ResponseEntity.ok(ApiResponses.success(slotBookedListResponse));
+    }
 
 
 

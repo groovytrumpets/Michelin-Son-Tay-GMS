@@ -134,6 +134,48 @@ public class SlotService {
         
         return result;
     }
+    public List<TimeSlotResponse> getAvailableSlotsForBooking(
+            LocalDate date, int estimatedDurationMinutes) {
+
+        List<TimeSlotResponse> result = new ArrayList<>();
+
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime minSlotTime = now.plusHours(MIN_BOOKING_LEAD_TIME_HOURS);
+
+        List<TimeSlot> allSlots = timeSlotRepository.findActiveOrderByStartTime();
+
+        for (TimeSlot slotConfig : allSlots) {
+            LocalTime slotTime = slotConfig.getStartTime();
+            LocalDateTime slotDateTime = LocalDateTime.of(date, slotTime);
+
+            // Filter slot quá khứ hoặc quá gần (< 2h)
+            if (slotDateTime.isBefore(minSlotTime)) {
+                continue;
+            }
+
+            boolean available = isSlotAvailable(date, slotTime, estimatedDurationMinutes, null);
+
+            if (available) {
+                List<SlotReservation> reservations = reservationRepository.findByDateAndTime(date, slotTime);
+                int count = reservations.size();
+                int remainingCapacity = slotConfig.getCapacity() - count;
+
+                TimeSlotResponse dto = new TimeSlotResponse();
+                dto.setSlotId(slotConfig.getSlotId());
+                dto.setStartTime(slotTime);
+                dto.setPeriod(slotConfig.getPeriod());
+                dto.setCapacity(slotConfig.getCapacity());
+                dto.setIsActive(slotConfig.getIsActive());
+                dto.setRemainingCapacity(remainingCapacity);
+                dto.setIsAvailable(true);
+                dto.setStatus("Còn trống");
+
+                result.add(dto);
+            }
+        }
+
+        return result;
+    }
 
     /**
      * Get all time slots (for frontend to display all available time options)

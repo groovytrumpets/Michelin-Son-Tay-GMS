@@ -1,6 +1,7 @@
 package com.g42.platform.gms.booking_management.domain.repository;
 
 import com.g42.platform.gms.booking.customer.api.dto.BookingResponse;
+import com.g42.platform.gms.booking.customer.domain.entity.SlotReservation;
 import com.g42.platform.gms.booking.customer.domain.enums.BookingRequestStatus;
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedRespond;
 import com.g42.platform.gms.booking_management.domain.entity.*;
@@ -35,4 +36,6 @@ public interface BookingManageRepository {
     void setRequestBooking(BookingRequest request);
 
     List<CatalogItem> getListOfCatalogById(List<Integer> services);
+
+    List<TimeSlot> getAllSlotTime();
 }

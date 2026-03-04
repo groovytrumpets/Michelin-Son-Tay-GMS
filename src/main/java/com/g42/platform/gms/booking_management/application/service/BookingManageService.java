@@ -3,10 +3,13 @@ package com.g42.platform.gms.booking_management.application.service;
 
 
 import com.g42.platform.gms.booking.customer.api.dto.BookingResponse;
+import com.g42.platform.gms.booking.customer.api.dto.TimeSlotResponse;
+import com.g42.platform.gms.booking.customer.domain.entity.SlotReservation;
 import com.g42.platform.gms.booking.customer.domain.enums.BookingRequestStatus;
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedDetailResponse;
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedRespond;
 import com.g42.platform.gms.booking_management.api.dto.requesting.*;
+import com.g42.platform.gms.booking_management.api.dto.timeslot.SlotBookedResponse;
 import com.g42.platform.gms.booking_management.api.mapper.BookingMDetailDtoMapper;
 import com.g42.platform.gms.booking_management.api.mapper.BookingMRequestDtoMapper;
 import com.g42.platform.gms.booking_management.api.mapper.BookingManageDtoMapper;
@@ -27,12 +30,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 
 @AllArgsConstructor
 @Service
 public class BookingManageService {
+    private static final int BASE_SLOT_MINUTES = 30;
     private final BookingManageRepository bookingRepository;
     private final BookingManageDtoMapper bookingManageDtoMapper;
     private final BookingMDetailDtoMapper  bookingMDetailDtoMapper;
@@ -149,4 +154,31 @@ return confirmed;
         bookingRepository.setRequestBooking(request);
         return true;
     }
-}
+
+    public List<SlotBookedResponse> getAvailableSlotsForBooking(LocalDate date, int durationMinutes) {
+        List<SlotBookedResponse> slotBookedRes = new ArrayList<>();
+        List<TimeSlot> allSlot = bookingRepository.getAllSlotTime();
+        for (TimeSlot slotConfig : allSlot) {
+            LocalTime slotTime = slotConfig.getStartTime();
+            LocalDateTime slotDateTime = LocalDateTime.of(date, slotTime);
+
+
+                int remainingCapacity = slotConfig.getCapacity();
+
+                SlotBookedResponse dto = new SlotBookedResponse();
+                dto.setSlotId(slotConfig.getSlotId());
+                dto.setStartTime(slotTime);
+                dto.setPeriod(slotConfig.getPeriod());
+                dto.setCapacity(slotConfig.getCapacity());
+                dto.setIsActive(slotConfig.getIsActive());
+                dto.setRemainingCapacity(remainingCapacity);
+                dto.setIsAvailable(true);
+                dto.setStatus("Còn trống");
+
+                slotBookedRes.add(dto);
+            }
+        return  slotBookedRes;
+        }
+    }
+
+

@@ -3,7 +3,9 @@ package com.g42.platform.gms.booking_management.infrastructure;
 import com.g42.platform.gms.auth.entity.CustomerProfile;
 import com.g42.platform.gms.auth.repository.CustomerProfileRepository;
 import com.g42.platform.gms.booking.customer.api.dto.BookingResponse;
+import com.g42.platform.gms.booking.customer.domain.entity.SlotReservation;
 import com.g42.platform.gms.booking.customer.domain.enums.BookingRequestStatus;
+import com.g42.platform.gms.booking.customer.infrastructure.mapper.SlotReservationMapper;
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedRespond;
 import com.g42.platform.gms.booking_management.domain.entity.*;
 import com.g42.platform.gms.booking_management.domain.enums.BookingEnum;
@@ -24,6 +26,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.stream.Collectors;
+
 @Repository
 @AllArgsConstructor
 public class BookingManageRepositoryImpl implements BookingManageRepository {
@@ -34,6 +38,7 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
     private final BookingMRequestJpaRepo bookingMRequestJpaRepo;
     private final BookingDraffManagerMapper bookingDraffManagerMapper;
     private final CatalogItemManageMapper catalogItemManageMapper;
+    private final BookingMSlotReservationRepo bookingMSlotReservationRepo;
     @Override
     public Page<BookedRespond> getBookedList(int page, int size, LocalDate date, Boolean isGuest, BookingEnum status, String search) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
@@ -78,7 +83,6 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
         TimeSlotJpa timeSlot = timeSlotJpaRepo.getTimeSlotsByStartTime(scheduledTime);
         return timeSlotMMapper.toDomainTimeSlot(timeSlot);
     }
-    private final BookingMSlotReservationRepo bookingMSlotReservationRepo;
     private final BookingMSlotReservationMapper bookingMSlotReservationMapper;
     @Override
     public int countReserverdBasedOnTime(LocalTime scheduledTime) {
@@ -134,5 +138,9 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
     public List<CatalogItem> getListOfCatalogById(List<Integer> services) {
         List<CatalogItemJpa> catalogItems = catalogRepo.findAllById(services);
         return catalogItemManageMapper.getListOfCatalogItem(catalogItems);
+    }
+    @Override
+    public List<TimeSlot> getAllSlotTime() {
+        return timeSlotJpaRepo.findAll().stream().map(timeSlotMMapper::toDomainTimeSlot).toList();
     }
 }
