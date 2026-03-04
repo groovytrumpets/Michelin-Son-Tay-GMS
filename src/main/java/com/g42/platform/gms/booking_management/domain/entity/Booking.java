@@ -20,7 +20,8 @@ import java.util.List;
 public class Booking {
 
     private Integer bookingId;
-    private CustomerProfile customer;
+    private String bookingCode;
+    private Integer customerId;
     private LocalDate scheduledDate;
     private LocalTime scheduledTime;
     private String serviceCategory;
