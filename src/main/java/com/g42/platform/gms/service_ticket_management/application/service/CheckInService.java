@@ -443,19 +443,20 @@ public class CheckInService {
         }
         
         // 6. Create customer auth if needed
-        Optional<CustomerAuth> existingAuth = customerAuthRepository.findByCustomerId(booking.getCustomerId());
-        if (!existingAuth.isPresent()) {
-            CustomerAuth customerAuth = new CustomerAuth();
-            customerAuth.setCustomerId(booking.getCustomerId());
-            customerAuth.setStatus(CustomerStatus.INACTIVE);
-            customerAuth.setFailedAttemptCount(0);
-            customerAuth.setOtpAttemptCount(0);
-            customerAuth.setCreatedAt(LocalDateTime.now());
-            customerAuthRepository.save(customerAuth);
-            log.info("Created customer auth for customerId={}", booking.getCustomerId());
-            
-            // TODO: Send OTP for activation (will be implemented in Phase 2)
-        }
+        // TODO: TEMPORARILY DISABLED - Will create account when confirming booking instead of check-in
+        // Optional<CustomerAuth> existingAuth = customerAuthRepository.findByCustomerId(booking.getCustomerId());
+        // if (!existingAuth.isPresent()) {
+        //     CustomerAuth customerAuth = new CustomerAuth();
+        //     customerAuth.setCustomerId(booking.getCustomerId());
+        //     customerAuth.setStatus(CustomerStatus.INACTIVE);
+        //     customerAuth.setFailedAttemptCount(0);
+        //     customerAuth.setOtpAttemptCount(0);
+        //     customerAuth.setCreatedAt(LocalDateTime.now());
+        //     customerAuthRepository.save(customerAuth);
+        //     log.info("Created customer auth for customerId={}", booking.getCustomerId());
+        //     
+        //     // TODO: Send OTP for activation (will be implemented in Phase 2)
+        // }
         
         // 7. Return ServiceTicketResponse with warnings
         ServiceTicketResponse response = new ServiceTicketResponse();
@@ -855,17 +856,18 @@ public class CheckInService {
         }
         
         // 9. Create customer auth if needed
-        Optional<CustomerAuth> existingAuth = customerAuthRepository.findByCustomerId(request.getCustomerId());
-        if (!existingAuth.isPresent()) {
-            CustomerAuth customerAuth = new CustomerAuth();
-            customerAuth.setCustomerId(request.getCustomerId());
-            customerAuth.setStatus(CustomerStatus.INACTIVE);
-            customerAuth.setFailedAttemptCount(0);
-            customerAuth.setOtpAttemptCount(0);
-            customerAuth.setCreatedAt(LocalDateTime.now());
-            customerAuthRepository.save(customerAuth);
-            log.info("Created customer auth for customerId={}", request.getCustomerId());
-        }
+        // TODO: TEMPORARILY DISABLED - Will create account when confirming booking instead of check-in
+        // Optional<CustomerAuth> existingAuth = customerAuthRepository.findByCustomerId(request.getCustomerId());
+        // if (!existingAuth.isPresent()) {
+        //     CustomerAuth customerAuth = new CustomerAuth();
+        //     customerAuth.setCustomerId(request.getCustomerId());
+        //     customerAuth.setStatus(CustomerStatus.INACTIVE);
+        //     customerAuth.setFailedAttemptCount(0);
+        //     customerAuth.setOtpAttemptCount(0);
+        //     customerAuth.setCreatedAt(LocalDateTime.now());
+        //     customerAuthRepository.save(customerAuth);
+        //     log.info("Created customer auth for customerId={}", request.getCustomerId());
+        // }
         
         // 10. Build response using mapper (Clean Architecture pattern)
         // Step 1: JPA → Domain (Infrastructure Mapper)
