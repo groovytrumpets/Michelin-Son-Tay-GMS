@@ -6,4 +6,6 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 public interface BookingMRequestJpaRepo extends JpaRepository<BookingRequestJpa, Integer>, JpaSpecificationExecutor<BookingRequestJpa> {
     BookingRequestJpa searchBookingRequestJpaByRequestId(Integer requestId);
+
+    BookingRequestJpa searchBookingRequestJpaByRequestCode(String requestCode);
 }
