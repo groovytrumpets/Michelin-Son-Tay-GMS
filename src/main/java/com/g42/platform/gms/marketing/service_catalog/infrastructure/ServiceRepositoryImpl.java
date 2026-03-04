@@ -1,12 +1,11 @@
 package com.g42.platform.gms.marketing.service_catalog.infrastructure;
 
-import com.g42.platform.gms.marketing.service_catalog.api.dto.ServiceDetailRespond;
-import com.g42.platform.gms.marketing.service_catalog.api.dto.ServiceSumaryRespond;
 import com.g42.platform.gms.marketing.service_catalog.domain.entity.Service;
 import com.g42.platform.gms.marketing.service_catalog.domain.enums.ServiceStatus;
 import com.g42.platform.gms.marketing.service_catalog.domain.repository.ServiceRepository;
 import com.g42.platform.gms.marketing.service_catalog.infrastructure.entity.ServiceJpaEntity;
 import com.g42.platform.gms.marketing.service_catalog.infrastructure.mapper.ServiceMapper;
+import com.g42.platform.gms.marketing.service_catalog.infrastructure.repository.CatalogRepoJpa;
 import com.g42.platform.gms.marketing.service_catalog.infrastructure.repository.ServiceJpaRepository;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Repository;
@@ -17,6 +16,7 @@ import java.util.List;
 @AllArgsConstructor
 public class ServiceRepositoryImpl implements ServiceRepository {
     private final ServiceJpaRepository serviceJpaRepository;
+    private final CatalogRepoJpa catalogRepo;
     private final ServiceMapper serviceMapper;
 
     @Override
@@ -29,5 +29,13 @@ public class ServiceRepositoryImpl implements ServiceRepository {
     public Service findServiceDetailById(Long serviceId) {
         ServiceJpaEntity serviceDetailJpa = serviceJpaRepository.searchByServiceId(serviceId);
         return serviceMapper.toDomain(serviceDetailJpa);
+    }
+
+    @Override
+    public Long[] getCatalogIdByServiceId(Long[] serviceId) {
+        List<Long> catalogIds =
+                catalogRepo.findCatalogIdsByServiceIds(List.of(serviceId));
+
+        return catalogIds.toArray(new Long[0]);
     }
 }
