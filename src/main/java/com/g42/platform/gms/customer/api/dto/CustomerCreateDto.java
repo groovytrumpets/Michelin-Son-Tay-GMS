@@ -10,6 +10,11 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CustomerCreateDto {
-    private String firstName;
-
+    private String fullName;
+    private String phone;
+    private String email;
+    private String pin;
+    private String gender;
+    private String dob;
+    private String avatar;
 }
