@@ -20,7 +20,7 @@ public interface BookingManageRepository {
 
     Page<BookingRequest> getBookingRequestList(int page, int size, LocalDate date, Boolean isGuest, BookingRequestStatus status, String search);
 
-    BookingRequest getBookingRequestById(Integer bookingId);
+    BookingRequest getBookingRequestById(String bookingCode);
 
     TimeSlot getTimeSlotByTime(LocalTime scheduledTime);
 

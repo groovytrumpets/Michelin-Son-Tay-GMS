@@ -66,8 +66,8 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
     }
 
     @Override
-    public BookingRequest getBookingRequestById(Integer bookingId) {
-        BookingRequestJpa bookingRequestJpa = bookingMRequestJpaRepo.searchBookingRequestJpaByRequestId(bookingId);
+    public BookingRequest getBookingRequestById(String bookingId) {
+        BookingRequestJpa bookingRequestJpa = bookingMRequestJpaRepo.searchBookingRequestJpaByRequestCode(bookingId);
         return bookingDraffManagerMapper.toDomain(bookingRequestJpa);
     }
 

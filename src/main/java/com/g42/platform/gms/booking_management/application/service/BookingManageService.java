@@ -55,13 +55,13 @@ public class BookingManageService {
         return bookingList.map(bookingMRequestDtoMapper::toBookingRequestRes);
     }
 
-    public BookingRequestDetailRes getBookingRequestById(Integer bookingId) {
-        BookingRequest bookingRequest = bookingRepository.getBookingRequestById(bookingId);
+    public BookingRequestDetailRes getBookingRequestById(String bookingCode) {
+        BookingRequest bookingRequest = bookingRepository.getBookingRequestById(bookingCode);
         return bookingMRequestDtoMapper.toBookingRequestDetailRes(bookingRequest);
     }
     private final CustomerGateway customerGateway;
     @Transactional
-    public Boolean confirmBookingRequest(Integer requestId) {
+    public Boolean confirmBookingRequest(String requestId) {
         BookingRequest request = bookingRepository.getBookingRequestById(requestId);
         if (!request.isPending()){
             //todo: wrong status handle
@@ -98,7 +98,7 @@ return confirmed;
         return null;
     }
     @Transactional(noRollbackFor = BookingStaffException.class)
-    public ActionBookingRespond cancelBookingRequest(Integer requestId, ActionBookingRequest actionBookingRequest) {
+    public ActionBookingRespond cancelBookingRequest(String requestId, ActionBookingRequest actionBookingRequest) {
         BookingRequest request = bookingRepository.getBookingRequestById(requestId);
         if (request==null){
             throw new BookingStaffException("LOI", BookingStaffErrorCode.INVALID_ID);
@@ -108,7 +108,7 @@ return confirmed;
         return new ActionBookingRespond("SUCCESS","SUCCESS");
     }
     @Transactional(noRollbackFor = BookingStaffException.class)
-    public ActionBookingRespond spamNotedBookingRequest(Integer requestId, ActionBookingRequest actionBookingRequest) {
+    public ActionBookingRespond spamNotedBookingRequest(String requestId, ActionBookingRequest actionBookingRequest) {
         BookingRequest request = bookingRepository.getBookingRequestById(requestId);
         if (request==null){
             throw new BookingStaffException("Không tìm thấy booking", BookingStaffErrorCode.INVALID_ID);
@@ -118,7 +118,7 @@ return confirmed;
         return new ActionBookingRespond("SUCCESS","SUCCESS");
     }
 
-    public ActionBookingRespond contactedBookingRequest(Integer requestId, ActionBookingRequest actionBookingRequest) {
+    public ActionBookingRespond contactedBookingRequest(String requestId, ActionBookingRequest actionBookingRequest) {
         BookingRequest request = bookingRepository.getBookingRequestById(requestId);
         if (request==null){
             throw new BookingStaffException("Không tìm thấy booking", BookingStaffErrorCode.INVALID_ID);
@@ -128,7 +128,7 @@ return confirmed;
         return new ActionBookingRespond("SUCCESS","SUCCESS");
     }
 
-    public Boolean updateBookingRequest(Integer requestId, BookingRequestUpdateReq actionBookingRequest) {
+    public Boolean updateBookingRequest(String requestId, BookingRequestUpdateReq actionBookingRequest) {
         BookingRequest request = bookingRepository.getBookingRequestById(requestId);
         if (request==null){
             throw new BookingStaffException("Không tìm thấy booking", BookingStaffErrorCode.INVALID_ID);
