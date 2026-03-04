@@ -17,6 +17,7 @@ import java.time.LocalTime;
 @AllArgsConstructor
 public class BookedRespond {
     private Integer bookingId;
+    private String bookingCode;
     private CustomerDto customer;
     private LocalDate scheduledDate;
     private LocalTime scheduledTime;

@@ -17,7 +17,7 @@ public interface BookingManageJpaRepository extends JpaRepository<BookingJpa, In
 
     @Query("""
     SELECT new com.g42.platform.gms.booking_management.api.dto.confirmed.BookedRespond(
-        b.bookingId,
+        b.bookingId,b.bookingCode,
         new com.g42.platform.gms.booking_management.api.dto.CustomerDto(
             c.fullName,
             c.phone,
@@ -36,4 +36,6 @@ public interface BookingManageJpaRepository extends JpaRepository<BookingJpa, In
         ON b.customerId = c.customerId
 """)
     Page<BookedRespond> findAllBooked(Specification<BookingJpa> specification, Pageable pageable);
+
+    BookingJpa getBookingJpaByBookingCode(String bookingCode);
 }
