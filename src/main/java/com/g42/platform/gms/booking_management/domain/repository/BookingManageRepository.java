@@ -16,7 +16,7 @@ import java.util.List;
 public interface BookingManageRepository {
     Page<BookedRespond> getBookedList(int page, int size, LocalDate date, Boolean isGuest, BookingEnum status, String search);
 
-    Booking getBookedDetailById(Integer bookingId);
+    Booking getBookedDetailById(String bookingId);
 
     Page<BookingRequest> getBookingRequestList(int page, int size, LocalDate date, Boolean isGuest, BookingRequestStatus status, String search);
 

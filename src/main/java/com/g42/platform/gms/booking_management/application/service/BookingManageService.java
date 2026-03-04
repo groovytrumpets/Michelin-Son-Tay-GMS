@@ -44,7 +44,7 @@ public class BookingManageService {
         return bookingPage;
     }
 
-    public BookedDetailResponse getBookedDetailById(Integer bookingId) {
+    public BookedDetailResponse getBookedDetailById(String bookingId) {
         return bookingManageDtoMapper.toBookedDetailResponse(bookingRepository.getBookedDetailById(bookingId));
         //todo: null handle exception
     }

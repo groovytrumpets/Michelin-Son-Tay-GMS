@@ -34,9 +34,9 @@ public class BookingManageController {
         Page<BookedRespond> apiResponse = bookingService.getListBooked(page,size,date,isGuest,status,search);
         return ResponseEntity.ok(ApiResponses.success(apiResponse));
     }
-    @GetMapping("/booking/{bookingId}")
-    public ResponseEntity<ApiResponse<BookedDetailResponse>> getBookedDetailById(@PathVariable Integer bookingId){
-        BookedDetailResponse bookedDetailResponse = bookingService.getBookedDetailById(bookingId);
+    @GetMapping("/booking/{bookingCode}")
+    public ResponseEntity<ApiResponse<BookedDetailResponse>> getBookedDetailById(@PathVariable String bookingCode){
+        BookedDetailResponse bookedDetailResponse = bookingService.getBookedDetailById(bookingCode);
         return ResponseEntity.ok(ApiResponses.success(bookedDetailResponse));
     }
     @GetMapping("/booking-request")

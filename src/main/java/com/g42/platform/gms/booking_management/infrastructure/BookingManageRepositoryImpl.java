@@ -48,8 +48,8 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
     }
 
     @Override
-    public Booking getBookedDetailById(Integer bookingId) {
-        BookingJpa bookingJpa = bookingManageJpaRepository.getBookingJpaByBookingId(bookingId);
+    public Booking getBookedDetailById(String bookingId) {
+        BookingJpa bookingJpa = bookingManageJpaRepository.getBookingJpaByBookingCode(bookingId);
         return bookingManagerMapper.toDomain(bookingJpa);
 
     }
