@@ -44,7 +44,7 @@ public class BookingService {
     private final com.g42.platform.gms.catalog.repository.ComboItemRepository comboItemRepository;
 
     private final Map<String, RateLimitInfo> rateLimitCache = new ConcurrentHashMap<>();
-    
+
     private static final int MAX_REQUESTS_PER_CUSTOMER_PER_HOUR = 3;
 
     @Transactional
@@ -53,23 +53,23 @@ public class BookingService {
         if (ipBlacklistRepository.existsByIpAddressAndIsActiveTrue(clientIp)) {
             throw new BookingException("Địa chỉ IP này đã bị chặn.");
         }
-        
+
         // Rate limiting per customer
         String customerKey = "customer:" + customerId;
         if (!checkRateLimit(customerKey, MAX_REQUESTS_PER_CUSTOMER_PER_HOUR)) {
             throw new BookingException(
-                "Bạn đã đặt quá nhiều lịch trong thời gian ngắn. Vui lòng thử lại sau 1 giờ."
+                    "Bạn đã đặt quá nhiều lịch trong thời gian ngắn. Vui lòng thử lại sau 1 giờ."
             );
         }
-        
+
         CustomerProfile customer = customerRepository.findById(customerId)
-            .orElseThrow(() -> new BookingException("Không tìm thấy thông tin khách hàng."));
-        
+                .orElseThrow(() -> new BookingException("Không tìm thấy thông tin khách hàng."));
+
         Booking booking = new Booking();
         booking.setCustomerId(customerId);
         booking.setScheduledDate(request.getAppointmentDate());
         booking.setScheduledTime(request.getAppointmentTime());
-        
+
         String description = "";
         if (request.getUserNote() != null) {
             description = request.getUserNote();
@@ -77,33 +77,33 @@ public class BookingService {
         booking.setDescription(description);
         booking.setIsGuest(false);
         booking.setStatus(BookingStatus.CONFIRMED);
-        
+
         if (request.getSelectedServiceIds() != null && !request.getSelectedServiceIds().isEmpty()) {
             booking.setServiceIds(request.getSelectedServiceIds());
         } else {
             booking.setServiceIds(new ArrayList<>());
         }
-        
+
         // Validate thời gian đặt lịch
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime scheduledDateTime = LocalDateTime.of(
-            booking.getScheduledDate(),
-            booking.getScheduledTime()
+                booking.getScheduledDate(),
+                booking.getScheduledTime()
         );
-        
+
         // Check không được trong quá khứ
         if (scheduledDateTime.isBefore(now)) {
             throw new BookingException("Không thể đặt lịch trong quá khứ.");
         }
-        
+
         // Check phải cách hiện tại ít nhất 2 giờ
         LocalDateTime minBookingTime = now.plusHours(MIN_BOOKING_LEAD_TIME_HOURS);
         if (scheduledDateTime.isBefore(minBookingTime)) {
             throw new BookingException("Vui lòng đặt lịch trước ít nhất 2 giờ.");
         }
-        
+
         int estimatedDuration = calculateEstimatedDuration(booking.getServiceIds());
-        
+
         boolean slotAvailable = slotService.isSlotAvailable(
                 booking.getScheduledDate(),
                 booking.getScheduledTime(),
@@ -113,7 +113,7 @@ public class BookingService {
         if (!slotAvailable) {
             throw new BookingException("Khung giờ này đã đầy, vui lòng chọn giờ khác.");
         }
-        
+
         // Generate booking code
         try {
             String bookingCode = bookingCodeGenerator.generateCode(LocalDate.now(), CodePrefix.BOOKING);
@@ -123,36 +123,36 @@ public class BookingService {
             log.error("Failed to generate booking code: {}", e.getMessage());
             throw new BookingException("Không thể tạo mã booking: " + e.getMessage());
         }
-        
+
         booking.initializeDefaults();
         Booking savedBooking = bookingRepository.save(booking);
-        
+
         slotService.reserveForBooking(savedBooking.getBookingId(), estimatedDuration);
-        
-        log.info("Customer booking created: bookingId={}, bookingCode={}, customerId={}", 
-            savedBooking.getBookingId(), savedBooking.getBookingCode(), customerId);
-        
+
+        log.info("Customer booking created: bookingId={}, bookingCode={}, customerId={}",
+                savedBooking.getBookingId(), savedBooking.getBookingCode(), customerId);
+
         return savedBooking;
     }
 
     public List<Booking> getCustomerBookings(Integer customerId) {
         return bookingRepository.findByCustomerIdOrderByDateDesc(customerId);
     }
-    
+
     public Booking findByCode(String bookingCode) {
         return bookingRepository.findByBookingCode(bookingCode)
-            .orElseThrow(() -> new BookingException("Không tìm thấy booking với mã: " + bookingCode));
+                .orElseThrow(() -> new BookingException("Không tìm thấy booking với mã: " + bookingCode));
     }
-    
+
     public Booking findById(Integer bookingId) {
         return bookingRepository.findById(bookingId)
-            .orElseThrow(() -> new BookingException("Không tìm thấy booking với ID: " + bookingId));
+                .orElseThrow(() -> new BookingException("Không tìm thấy booking với ID: " + bookingId));
     }
 
     @Transactional
     public Booking modifyCustomerBooking(Integer bookingId, ModifyBookingRequest request, Integer customerId) {
         Booking booking = bookingRepository.findByIdAndCustomerId(bookingId, customerId)
-            .orElseThrow(() -> new BookingException("Không tìm thấy booking của bạn."));
+                .orElseThrow(() -> new BookingException("Không tìm thấy booking của bạn."));
 
         BookingStatus currentStatus = booking.getStatus();
         if (currentStatus == BookingStatus.CANCELLED || currentStatus == BookingStatus.NOT_ARRIVED) {
@@ -201,7 +201,7 @@ public class BookingService {
             finalServiceIds = request.getNewServiceIds();
         }
         int estimatedDuration = calculateEstimatedDuration(finalServiceIds);
-        
+
         if (timeChanged) {
             boolean slotAvailable = slotService.isSlotAvailable(
                     newDate, newTime, estimatedDuration, booking.getBookingId()
@@ -209,7 +209,7 @@ public class BookingService {
             if (!slotAvailable) {
                 throw new BookingException("Khung giờ mới đã đầy, vui lòng chọn giờ khác.");
             }
-            
+
             slotService.releaseForBooking(booking.getBookingId());
         }
 
@@ -235,11 +235,11 @@ public class BookingService {
 
         booking.initializeDefaults();
         Booking saved = bookingRepository.save(booking);
-        
+
         if (timeChanged) {
             slotService.reserveForBooking(saved.getBookingId(), estimatedDuration);
         }
-        
+
         log.info("Customer booking modified: bookingId={}, customerId={}", saved.getBookingId(), customerId);
         return saved;
     }
@@ -247,7 +247,7 @@ public class BookingService {
     @Transactional
     public void cancelCustomerBooking(Integer bookingId, Integer customerId) {
         Booking booking = bookingRepository.findByIdAndCustomerId(bookingId, customerId)
-            .orElseThrow(() -> new BookingException("Không tìm thấy booking của bạn."));
+                .orElseThrow(() -> new BookingException("Không tìm thấy booking của bạn."));
 
         BookingStatus status = booking.getStatus();
         if (status == BookingStatus.CANCELLED || status == BookingStatus.NOT_ARRIVED) {
@@ -259,8 +259,8 @@ public class BookingService {
 
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime scheduledDateTime = LocalDateTime.of(
-            booking.getScheduledDate(),
-            booking.getScheduledTime()
+                booking.getScheduledDate(),
+                booking.getScheduledTime()
         );
 
         if (scheduledDateTime.isBefore(now)) {
@@ -275,9 +275,9 @@ public class BookingService {
         booking.setStatus(BookingStatus.CANCELLED);
 
         bookingRepository.save(booking);
-        
+
         slotService.releaseForBooking(booking.getBookingId());
-        
+
         log.info("Customer booking cancelled: bookingId={}, customerId={}", booking.getBookingId(), customerId);
     }
 
@@ -285,7 +285,7 @@ public class BookingService {
         if (serviceIds == null || serviceIds.isEmpty()) {
             return DEFAULT_DURATION_MINUTES;
         }
-        
+
         List<CatalogItemJpaEntity> items = catalogItemRepository.findAllById(serviceIds);
 
         int totalMinutes = 0;
@@ -334,7 +334,7 @@ public class BookingService {
 
     private int getComboDuration(Integer comboId) {
         List<com.g42.platform.gms.booking.customer.infrastructure.entity.ComboItemJpaEntity> comboItems =
-            comboItemRepository.findByComboId(comboId);
+                comboItemRepository.findByComboId(comboId);
 
         int totalDuration = 0;
         for (com.g42.platform.gms.booking.customer.infrastructure.entity.ComboItemJpaEntity comboItem : comboItems) {
@@ -358,7 +358,7 @@ public class BookingService {
         }
         return quantity;
     }
-    
+
     private boolean checkRateLimit(String key, int maxRequests) {
         RateLimitInfo info = rateLimitCache.get(key);
         if (info == null || !info.isWithinWindow()) {
@@ -371,53 +371,21 @@ public class BookingService {
         info.increment();
         return true;
     }
-    
+
     @lombok.Data
     private static class RateLimitInfo {
         private int count;
         private LocalDateTime firstRequestTime;
-        
+
         public RateLimitInfo(int count) {
             this.count = count;
             this.firstRequestTime = LocalDateTime.now();
         }
-        
+
         public void increment() {
             this.count++;
         }
-        
-        public boolean isWithinWindow() {
-            return LocalDateTime.now().isBefore(firstRequestTime.plusHours(1));
-        }
-    }
-    
-    private boolean checkRateLimit(String key, int maxRequests) {
-        RateLimitInfo info = rateLimitCache.get(key);
-        if (info == null || !info.isWithinWindow()) {
-            rateLimitCache.put(key, new RateLimitInfo(1));
-            return true;
-        }
-        if (info.getCount() >= maxRequests) {
-            return false;
-        }
-        info.increment();
-        return true;
-    }
-    
-    @lombok.Data
-    private static class RateLimitInfo {
-        private int count;
-        private LocalDateTime firstRequestTime;
-        
-        public RateLimitInfo(int count) {
-            this.count = count;
-            this.firstRequestTime = LocalDateTime.now();
-        }
-        
-        public void increment() {
-            this.count++;
-        }
-        
+
         public boolean isWithinWindow() {
             return LocalDateTime.now().isBefore(firstRequestTime.plusHours(1));
         }

@@ -2,6 +2,7 @@ package com.g42.platform.gms.booking_management.application.service;
 
 
 
+import com.g42.platform.gms.booking.customer.api.dto.BookingResponse;
 import com.g42.platform.gms.booking.customer.domain.enums.BookingRequestStatus;
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedDetailResponse;
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedRespond;
@@ -9,6 +10,7 @@ import com.g42.platform.gms.booking_management.api.dto.requesting.*;
 import com.g42.platform.gms.booking_management.api.mapper.BookingMDetailDtoMapper;
 import com.g42.platform.gms.booking_management.api.mapper.BookingMRequestDtoMapper;
 import com.g42.platform.gms.booking_management.api.mapper.BookingManageDtoMapper;
+import com.g42.platform.gms.booking_management.application.command.CreateCustomerCommand;
 import com.g42.platform.gms.booking_management.application.port.CustomerGateway;
 import com.g42.platform.gms.booking_management.domain.entity.*;
 import com.g42.platform.gms.booking_management.domain.enums.BookingEnum;
@@ -37,9 +39,9 @@ public class BookingManageService {
     private final BookingMRequestDtoMapper  bookingMRequestDtoMapper;
 
     public Page<BookedRespond> getListBooked(int page, int size, LocalDate date, Boolean isGuest, BookingEnum status, String search) {
-        Page<Booking> bookingPage = bookingRepository.getBookedList(page,size,date,isGuest,status,search);
+        Page<BookedRespond> bookingPage = bookingRepository.getBookedList(page,size,date,isGuest,status,search);
 //        return  bookingRepository.getBookedList().stream().map(bookingManageDtoMapper::toBookedRespond).toList();
-        return bookingPage.map(bookingManageDtoMapper::toBookedRespond);
+        return bookingPage;
     }
 
     public BookedDetailResponse getBookedDetailById(Integer bookingId) {
@@ -73,13 +75,13 @@ public class BookingManageService {
         TimeSlot timeSlot = bookingRepository.getTimeSlotByTime(request.getScheduledTime());
         System.out.println("time slot: " + timeSlot);
         //todo: check acc available else create customer acc
-//        int customerId = customerGateway.getOrCreateCustomer(
-//                new CreateCustomerCommand(request.getFullName(),request.getPhone(),request.getCreatedAt())
-//        );
-//        System.out.println("customer id: " + customerId);
+        int customerId = customerGateway.getOrCreateCustomer(
+                new CreateCustomerCommand(request.getFullName(),request.getPhone(),request.getCreatedAt())
+        );
+        System.out.println("customer id: " + customerId);
         //todo: check if create account success
         //todo: create booking
-        BookingJpa booking = bookingRepository.createBookingByRequest(request);
+        BookingJpa booking = bookingRepository.createBookingByRequest(request, customerId);
         System.out.println("booking: " + booking.getBookingId());
         //todo: create Reservation
         BookingSlotReservation bookingSlotReservation = bookingRepository.createBookingSlotReservation(request, booking);
