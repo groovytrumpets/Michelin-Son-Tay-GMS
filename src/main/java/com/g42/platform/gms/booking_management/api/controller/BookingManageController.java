@@ -34,9 +34,9 @@ public class BookingManageController {
         Page<BookedRespond> apiResponse = bookingService.getListBooked(page,size,date,isGuest,status,search);
         return ResponseEntity.ok(ApiResponses.success(apiResponse));
     }
-    @GetMapping("/booking/{bookingId}")
-    public ResponseEntity<ApiResponse<BookedDetailResponse>> getBookedDetailById(@PathVariable Integer bookingId){
-        BookedDetailResponse bookedDetailResponse = bookingService.getBookedDetailById(bookingId);
+    @GetMapping("/booking/{bookingCode}")
+    public ResponseEntity<ApiResponse<BookedDetailResponse>> getBookedDetailById(@PathVariable String bookingCode){
+        BookedDetailResponse bookedDetailResponse = bookingService.getBookedDetailById(bookingCode);
         return ResponseEntity.ok(ApiResponses.success(bookedDetailResponse));
     }
     @GetMapping("/booking-request")
@@ -50,33 +50,40 @@ public class BookingManageController {
         return ResponseEntity.ok(ApiResponses.success(bookingRequestResList));
     }
 
-    @GetMapping("/booking-request/{bookingId}")
-    public ResponseEntity<ApiResponse<BookingRequestDetailRes>> geBookingRequestById(@PathVariable Integer bookingId){
-        BookingRequestDetailRes bookingRequestDetailRes = bookingService.getBookingRequestById(bookingId);
+    @GetMapping("/booking-request/{bookingCode}")
+    public ResponseEntity<ApiResponse<BookingRequestDetailRes>> geBookingRequestById(@PathVariable String bookingCode){
+        BookingRequestDetailRes bookingRequestDetailRes = bookingService.getBookingRequestById(bookingCode);
         return  ResponseEntity.ok(ApiResponses.success(bookingRequestDetailRes));
     }
     @PostMapping("/booking-request/{requestId}/confirm")
-    public ResponseEntity<ApiResponse<Boolean>> confirmBookingRequest(@PathVariable Integer requestId){
+    public ResponseEntity<ApiResponse<Boolean>> confirmBookingRequest(@PathVariable String requestId){
          return ResponseEntity.ok(ApiResponses.success(bookingService.confirmBookingRequest(requestId)));
     }
     @PutMapping("/booking-request/{requestId}/cancel")
-    public ResponseEntity<ApiResponse<ActionBookingRespond>> cancelBookingRequest(@PathVariable Integer requestId, @RequestBody ActionBookingRequest actionBookingRequest){
+    public ResponseEntity<ApiResponse<ActionBookingRespond>> cancelBookingRequest(@PathVariable String requestId, @RequestBody ActionBookingRequest actionBookingRequest){
         return ResponseEntity.ok(ApiResponses.success(bookingService.cancelBookingRequest(requestId, actionBookingRequest)));
     }
     @PutMapping("/booking-request/{requestId}/spam")
-    public ResponseEntity<ApiResponse<ActionBookingRespond>> spamNotedBookingRequest(@PathVariable Integer requestId, @RequestBody ActionBookingRequest actionBookingRequest){
+    public ResponseEntity<ApiResponse<ActionBookingRespond>> spamNotedBookingRequest(@PathVariable String requestId, @RequestBody ActionBookingRequest actionBookingRequest){
         return ResponseEntity.ok(ApiResponses.success(bookingService.spamNotedBookingRequest(requestId, actionBookingRequest)));
     }
 
     @PutMapping("/booking-request/{requestId}/contacted")
-    public ResponseEntity<ApiResponse<ActionBookingRespond>> contactedBookingRequest(@PathVariable Integer requestId, @RequestBody ActionBookingRequest actionBookingRequest){
+    public ResponseEntity<ApiResponse<ActionBookingRespond>> contactedBookingRequest(@PathVariable String requestId, @RequestBody ActionBookingRequest actionBookingRequest){
         return ResponseEntity.ok(ApiResponses.success(bookingService.contactedBookingRequest(requestId, actionBookingRequest)));
     }
 
     @PutMapping("/booking-request/{requestId}/update")
-    public ResponseEntity<ApiResponse<Boolean>> updateBookingRequest(@PathVariable Integer requestId, @RequestBody BookingRequestUpdateReq actionBookingRequest){
+    public ResponseEntity<ApiResponse<Boolean>> updateBookingRequest(@PathVariable String requestId, @RequestBody BookingRequestUpdateReq actionBookingRequest){
         return ResponseEntity.ok(ApiResponses.success(bookingService.updateBookingRequest(requestId, actionBookingRequest)));
     }
+//
+//    @GetMapping("/booking-request")
+//    public ResponseEntity<ApiResponse<Page<BookingRequestRes>>> getAllBookingSlot(@RequestParam(required = false) LocalDate date){
+////        Page<BookingRequestRes> bookingRequestResList = bookingService.getListBookingRequest(page,size,date,isGuest,status,search);
+////        return ResponseEntity.ok(ApiResponses.success(bookingRequestResList));
+//        return null;
+//    }
 
 
 
