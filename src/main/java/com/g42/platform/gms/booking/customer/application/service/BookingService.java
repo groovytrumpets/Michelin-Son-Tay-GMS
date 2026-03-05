@@ -4,6 +4,7 @@ import com.g42.platform.gms.auth.entity.CustomerProfile;
 import com.g42.platform.gms.auth.repository.CustomerProfileRepository;
 import com.g42.platform.gms.booking.customer.api.dto.CustomerBookingRequest;
 import com.g42.platform.gms.booking.customer.api.dto.ModifyBookingRequest;
+import com.g42.platform.gms.booking.customer.api.dto.StaffDirectBookingRequest;
 import com.g42.platform.gms.booking.customer.domain.entity.Booking;
 import com.g42.platform.gms.booking.customer.domain.enums.BookingStatus;
 import com.g42.platform.gms.booking.customer.domain.exception.BookingException;
@@ -26,15 +27,43 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Service xử lý nghiệp vụ đặt lịch (Booking) cho khách hàng
+ * 
+ * Chức năng chính:
+ * - Tạo booking mới (customer hoặc staff tạo)
+ * - Xem danh sách booking của customer
+ * - Sửa đổi booking (thay đổi thời gian, dịch vụ)
+ * - Hủy booking
+ * 
+ * Business Rules:
+ * - Customer phải đặt trước ít nhất 2 giờ
+ * - Staff/Receptionist có thể đặt ngay tức khắc (bypass 2 giờ)
+ * - Chỉ được sửa/hủy trước 2 giờ so với giờ hẹn
+ * - Rate limiting: tối đa 3 booking/giờ/customer
+ * - IP blacklist checking
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class BookingService {
 
+    // === CONSTANTS - Các hằng số cấu hình ===
+    
+    /** Thời hạn cho phép sửa/hủy booking (2 giờ trước giờ hẹn) */
     private static final long MODIFY_LIMIT_HOURS = 2L;
+    
+    /** Thời gian tối thiểu phải đặt trước (2 giờ) - chỉ áp dụng cho customer */
     private static final long MIN_BOOKING_LEAD_TIME_HOURS = 2L;
+    
+    /** Thời lượng mặc định nếu không có service nào được chọn (60 phút) */
     private static final int DEFAULT_DURATION_MINUTES = 60;
+    
+    /** Giới hạn số lần đặt lịch (3 lần/giờ/customer) */
+    private static final int MAX_REQUESTS_PER_CUSTOMER_PER_HOUR = 100;
 
+    // === DEPENDENCIES - Các dependency injection ===
+    
     private final BookingRepository bookingRepository;
     private final CustomerProfileRepository customerRepository;
     private final CatalogItemRepository catalogItemRepository;
@@ -43,18 +72,41 @@ public class BookingService {
     private final BookingCodeGenerator bookingCodeGenerator;
     private final com.g42.platform.gms.catalog.repository.ComboItemRepository comboItemRepository;
 
+    /** Cache để tracking rate limit (in-memory, sẽ reset khi restart server) */
     private final Map<String, RateLimitInfo> rateLimitCache = new ConcurrentHashMap<>();
 
-    private static final int MAX_REQUESTS_PER_CUSTOMER_PER_HOUR = 3;
+    // ========================================
+    // CREATE BOOKING - Tạo booking mới
+    // ========================================
 
+    /**
+     * Tạo booking cho customer (customer tự đặt qua app/web)
+     * 
+     * Flow:
+     * 1. Check IP blacklist
+     * 2. Check rate limiting (3 booking/giờ/customer)
+     * 3. Validate thời gian đặt lịch (phải trước ít nhất 2 giờ)
+     * 4. Check slot availability
+     * 5. Generate booking code (MST_XXXXXX)
+     * 6. Save booking
+     * 7. Reserve slot
+     * 
+     * @param request Thông tin booking
+     * @param customerId ID của khách hàng
+     * @param clientIp IP của client
+     * @return Booking đã được tạo
+     * @throws BookingException nếu vi phạm business rules
+     */
     @Transactional
     public Booking createCustomerBooking(CustomerBookingRequest request, Integer customerId, String clientIp) {
+        // === 1. CHECK IP BLACKLIST ===
         // Check IP blacklist
         if (ipBlacklistRepository.existsByIpAddressAndIsActiveTrue(clientIp)) {
             throw new BookingException("Địa chỉ IP này đã bị chặn.");
         }
 
-        // Rate limiting per customer
+        // === 2. RATE LIMITING ===
+        // Rate limiting per customer (tối đa 3 booking/giờ)
         String customerKey = "customer:" + customerId;
         if (!checkRateLimit(customerKey, MAX_REQUESTS_PER_CUSTOMER_PER_HOUR)) {
             throw new BookingException(
@@ -62,9 +114,11 @@ public class BookingService {
             );
         }
 
+        // === 3. VALIDATE CUSTOMER ===
         CustomerProfile customer = customerRepository.findById(customerId)
                 .orElseThrow(() -> new BookingException("Không tìm thấy thông tin khách hàng."));
 
+        // === 4. BUILD BOOKING OBJECT ===
         Booking booking = new Booking();
         booking.setCustomerId(customerId);
         booking.setScheduledDate(request.getAppointmentDate());
@@ -84,6 +138,7 @@ public class BookingService {
             booking.setServiceIds(new ArrayList<>());
         }
 
+        // === 5. VALIDATE THỜI GIAN ===
         // Validate thời gian đặt lịch
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime scheduledDateTime = LocalDateTime.of(
@@ -102,6 +157,7 @@ public class BookingService {
             throw new BookingException("Vui lòng đặt lịch trước ít nhất 2 giờ.");
         }
 
+        // === 6. CHECK SLOT AVAILABILITY ===
         int estimatedDuration = calculateEstimatedDuration(booking.getServiceIds());
 
         boolean slotAvailable = slotService.isSlotAvailable(
@@ -114,7 +170,8 @@ public class BookingService {
             throw new BookingException("Khung giờ này đã đầy, vui lòng chọn giờ khác.");
         }
 
-        // Generate booking code
+        // === 7. GENERATE BOOKING CODE ===
+        // Generate booking code (MST_XXXXXX format)
         try {
             String bookingCode = bookingCodeGenerator.generateCode(LocalDate.now(), CodePrefix.BOOKING);
             booking.setBookingCode(bookingCode);
@@ -124,9 +181,11 @@ public class BookingService {
             throw new BookingException("Không thể tạo mã booking: " + e.getMessage());
         }
 
+        // === 8. SAVE BOOKING ===
         booking.initializeDefaults();
         Booking savedBooking = bookingRepository.save(booking);
 
+        // === 9. RESERVE SLOT ===
         slotService.reserveForBooking(savedBooking.getBookingId(), estimatedDuration);
 
         log.info("Customer booking created: bookingId={}, bookingCode={}, customerId={}",
@@ -135,20 +194,165 @@ public class BookingService {
         return savedBooking;
     }
 
+    /**
+     * Tạo booking trực tiếp bởi Staff/Receptionist (không qua BookingRequest)
+     * 
+     * Đặc điểm:
+     * - Không bị ràng buộc thời gian 2 giờ (có thể đặt ngay)
+     * - Trạng thái CONFIRMED luôn (không qua PENDING)
+     * - Tự động tạo/tìm customer account từ phone
+     * - Check slot availability
+     * 
+     * Flow:
+     * 1. Tìm hoặc tạo customer account từ phone
+     * 2. Validate thời gian (chỉ check không được quá khứ)
+     * 3. Check slot availability
+     * 4. Generate booking code (MST_XXXXXX)
+     * 5. Save booking với status = CONFIRMED
+     * 6. Reserve slot
+     * 
+     * @param request Thông tin booking (phone, fullName, appointmentDate, appointmentTime, userNote, selectedServiceIds)
+     * @return Booking đã được tạo
+     * @throws BookingException nếu vi phạm business rules
+     */
+    @Transactional
+    public Booking createDirectBookingByStaff(StaffDirectBookingRequest request) {
+        
+        // === 1. TÌM HOẶC TẠO CUSTOMER ACCOUNT ===
+        CustomerProfile customer = customerRepository.findByPhone(request.getPhone()).orElse(null);
+        
+        Integer customerId;
+        if (customer == null) {
+            // Tạo customer account mới
+            CustomerProfile newCustomer = new CustomerProfile();
+            newCustomer.setPhone(request.getPhone());
+            newCustomer.setFullName(request.getFullName());
+            newCustomer.setCreatedAt(LocalDateTime.now());
+            
+            CustomerProfile savedCustomer = customerRepository.save(newCustomer);
+            customerId = savedCustomer.getCustomerId();
+            log.info("Created new customer account: customerId={}, phone={}", customerId, request.getPhone());
+        } else {
+            customerId = customer.getCustomerId();
+            
+            // Update tên nếu khác
+            if (!request.getFullName().equals(customer.getFullName())) {
+                customer.setFullName(request.getFullName());
+                customerRepository.save(customer);
+                log.info("Updated customer name: customerId={}, newName={}", customerId, request.getFullName());
+            }
+        }
+        
+        // === 2. BUILD BOOKING OBJECT ===
+        Booking booking = new Booking();
+        booking.setCustomerId(customerId);
+        booking.setScheduledDate(request.getAppointmentDate());
+        booking.setScheduledTime(request.getAppointmentTime());
+
+        String description = "";
+        if (request.getUserNote() != null) {
+            description = request.getUserNote();
+        }
+        booking.setDescription(description);
+        booking.setIsGuest(false);
+        booking.setStatus(BookingStatus.CONFIRMED);
+
+        if (request.getSelectedServiceIds() != null && !request.getSelectedServiceIds().isEmpty()) {
+            booking.setServiceIds(request.getSelectedServiceIds());
+        } else {
+            booking.setServiceIds(new ArrayList<>());
+        }
+        
+        // === 3. VALIDATE THỜI GIAN ===
+        // Validate thời gian đặt lịch
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime scheduledDateTime = LocalDateTime.of(request.getAppointmentDate(), request.getAppointmentTime());
+
+        // Staff chỉ cần check không được trong quá khứ (không check 2 giờ)
+        if (scheduledDateTime.isBefore(now)) {
+            throw new BookingException("Không thể đặt lịch trong quá khứ.");
+        }
+        
+        // === 4. CHECK SLOT AVAILABILITY ===
+        int estimatedDuration = calculateEstimatedDuration(booking.getServiceIds());
+        
+        boolean slotAvailable = slotService.isSlotAvailable(
+                booking.getScheduledDate(),
+                booking.getScheduledTime(),
+                estimatedDuration,
+                null
+        );
+        if (!slotAvailable) {
+            throw new BookingException("Khung giờ này đã đầy, vui lòng chọn giờ khác.");
+        }
+        
+        // === 5. GENERATE BOOKING CODE ===
+        try {
+            String bookingCode = bookingCodeGenerator.generateCode(LocalDate.now(), CodePrefix.BOOKING);
+            booking.setBookingCode(bookingCode);
+            log.info("Generated booking code: {}", bookingCode);
+        } catch (CodeGenerationException e) {
+            log.error("Failed to generate booking code: {}", e.getMessage());
+            throw new BookingException("Không thể tạo mã booking: " + e.getMessage());
+        }
+        
+        // === 6. SAVE BOOKING ===
+        booking.initializeDefaults();
+        Booking savedBooking = bookingRepository.save(booking);
+        
+        // === 7. RESERVE SLOT ===
+        slotService.reserveForBooking(savedBooking.getBookingId(), estimatedDuration);
+        
+        log.info("Direct booking created by staff: bookingId={}, bookingCode={}, customerId={}",
+                savedBooking.getBookingId(), savedBooking.getBookingCode(), customerId);
+        
+        return savedBooking;
+    }
+
+    // ========================================
+    // QUERY BOOKING - Truy vấn booking
+    // ========================================
+
+    /**
+     * Lấy danh sách booking của customer (sắp xếp theo ngày giảm dần)
+     */
     public List<Booking> getCustomerBookings(Integer customerId) {
         return bookingRepository.findByCustomerIdOrderByDateDesc(customerId);
     }
 
+    /**
+     * Tìm booking theo booking code
+     */
     public Booking findByCode(String bookingCode) {
         return bookingRepository.findByBookingCode(bookingCode)
                 .orElseThrow(() -> new BookingException("Không tìm thấy booking với mã: " + bookingCode));
     }
 
+    /**
+     * Tìm booking theo ID
+     */
     public Booking findById(Integer bookingId) {
         return bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new BookingException("Không tìm thấy booking với ID: " + bookingId));
     }
 
+    // ========================================
+    // MODIFY BOOKING - Sửa đổi booking
+    // ========================================
+
+    /**
+     * Sửa đổi booking (thay đổi thời gian, dịch vụ, ghi chú)
+     * 
+     * Business Rules:
+     * - Chỉ được sửa trước 2 giờ so với giờ hẹn
+     * - Thời gian mới phải trước ít nhất 2 giờ
+     * - Chỉ sửa được booking ở trạng thái PENDING hoặc CONFIRMED
+     * 
+     * @param bookingId ID của booking
+     * @param request Thông tin cần sửa
+     * @param customerId ID của customer (để verify ownership)
+     * @return Booking đã được sửa
+     */
     @Transactional
     public Booking modifyCustomerBooking(Integer bookingId, ModifyBookingRequest request, Integer customerId) {
         Booking booking = bookingRepository.findByIdAndCustomerId(bookingId, customerId)
@@ -244,6 +448,21 @@ public class BookingService {
         return saved;
     }
 
+    // ========================================
+    // CANCEL BOOKING - Hủy booking
+    // ========================================
+
+    /**
+     * Hủy booking
+     * 
+     * Business Rules:
+     * - Chỉ được hủy trước 2 giờ so với giờ hẹn
+     * - Chỉ hủy được booking ở trạng thái PENDING hoặc CONFIRMED
+     * - Không hủy được booking đã qua thời gian hẹn
+     * 
+     * @param bookingId ID của booking
+     * @param customerId ID của customer (để verify ownership)
+     */
     @Transactional
     public void cancelCustomerBooking(Integer bookingId, Integer customerId) {
         Booking booking = bookingRepository.findByIdAndCustomerId(bookingId, customerId)
@@ -281,6 +500,21 @@ public class BookingService {
         log.info("Customer booking cancelled: bookingId={}, customerId={}", booking.getBookingId(), customerId);
     }
 
+    // ========================================
+    // HELPER METHODS - Các method hỗ trợ
+    // ========================================
+
+    /**
+     * Tính tổng thời lượng ước tính dựa trên danh sách service IDs
+     * 
+     * Logic:
+     * - Nếu không có service nào => trả về DEFAULT_DURATION_MINUTES (60 phút)
+     * - Nếu có service => tính tổng duration của từng service
+     * - Nếu có combo => tính duration của tất cả service trong combo
+     * 
+     * @param serviceIds Danh sách ID của services/combos
+     * @return Tổng thời lượng (phút)
+     */
     private int calculateEstimatedDuration(List<Integer> serviceIds) {
         if (serviceIds == null || serviceIds.isEmpty()) {
             return DEFAULT_DURATION_MINUTES;
@@ -301,6 +535,9 @@ public class BookingService {
         return totalMinutes;
     }
 
+    /**
+     * Tính duration của một catalog item (có thể là SERVICE hoặc COMBO)
+     */
     private int calculateItemDuration(CatalogItemJpaEntity item) {
         if (item == null) {
             return 0;
@@ -319,6 +556,9 @@ public class BookingService {
         return 0;
     }
 
+    /**
+     * Lấy duration của một service
+     */
     private int getServiceDuration(CatalogItemJpaEntity item) {
         if (item.getServiceService() == null) {
             return 0;
@@ -332,6 +572,9 @@ public class BookingService {
         return estimateTime;
     }
 
+    /**
+     * Tính tổng duration của một combo (tổng duration của tất cả services trong combo)
+     */
     private int getComboDuration(Integer comboId) {
         List<com.g42.platform.gms.booking.customer.infrastructure.entity.ComboItemJpaEntity> comboItems =
                 comboItemRepository.findByComboId(comboId);
@@ -352,6 +595,9 @@ public class BookingService {
         return totalDuration;
     }
 
+    /**
+     * Lấy quantity, nếu null hoặc <= 0 thì trả về 1
+     */
     private int getQuantityOrDefault(Integer quantity) {
         if (quantity == null || quantity <= 0) {
             return 1;
@@ -359,6 +605,18 @@ public class BookingService {
         return quantity;
     }
 
+    /**
+     * Check rate limiting (in-memory cache)
+     * 
+     * Logic:
+     * - Nếu chưa có record hoặc đã hết window (1 giờ) => tạo mới, cho phép
+     * - Nếu đã đạt maxRequests => không cho phép
+     * - Nếu còn trong window và chưa đạt max => increment count, cho phép
+     * 
+     * @param key Key để tracking (vd: "customer:123")
+     * @param maxRequests Số request tối đa trong 1 giờ
+     * @return true nếu cho phép, false nếu vượt quá giới hạn
+     */
     private boolean checkRateLimit(String key, int maxRequests) {
         RateLimitInfo info = rateLimitCache.get(key);
         if (info == null || !info.isWithinWindow()) {
@@ -372,6 +630,10 @@ public class BookingService {
         return true;
     }
 
+    /**
+     * Inner class để tracking rate limit
+     * Lưu số lần request và thời điểm request đầu tiên
+     */
     @lombok.Data
     private static class RateLimitInfo {
         private int count;
