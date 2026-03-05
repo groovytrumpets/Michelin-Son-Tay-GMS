@@ -26,6 +26,7 @@ public class ServiceCatalogService {
 
         return serviceRepository.findAllActive().stream().filter(service -> service.isVisibleNow(now)).map(serviceDtoMapper::toDto).toList();
     }
+
     @Transactional(noRollbackFor = ServiceException.class)
     public ServiceDetailRespond getServiceDetailById(Long serviceId) {
         com.g42.platform.gms.marketing.service_catalog.domain.entity.Service service =serviceRepository.findServiceDetailById(serviceId);

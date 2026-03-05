@@ -1,5 +1,7 @@
 package com.g42.platform.gms.marketing.service_catalog.infrastructure.entity;
 
+import com.g42.platform.gms.booking.customer.infrastructure.entity.CatalogItemJpaEntity;
+import com.g42.platform.gms.booking_management.infrastructure.entity.CatalogItemJpa;
 import com.g42.platform.gms.marketing.service_catalog.domain.enums.ServiceStatus;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -9,7 +11,9 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @Getter
 @Setter
@@ -47,4 +51,6 @@ public class ServiceJpaEntity {
     private List<ServiceMediaJpaEntity> media = new ArrayList<>();
     @Column(name = "estimate_time")
     private Integer estimateTime;
+    @OneToMany(mappedBy = "serviceService")
+    private Set<CatalogItemJpa> catalogItems = new LinkedHashSet<>();
 }
