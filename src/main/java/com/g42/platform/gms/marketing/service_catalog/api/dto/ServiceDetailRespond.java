@@ -15,6 +15,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ServiceDetailRespond {
+    private int catalogItemId;
     private Long serviceId;
     private boolean showPrice;
     private String displayPrice;
