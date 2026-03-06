@@ -123,6 +123,53 @@ public class CheckInService {
     }
 
     /**
+     * Create a new vehicle for customer.
+     * Used when customer doesn't have a vehicle in the system yet.
+     * 
+     * @param request CreateVehicleRequest with vehicle data
+     * @return CreateVehicleResponse with created vehicle information
+     */
+    @Transactional
+    public CreateVehicleResponse createVehicle(CreateVehicleRequest request) {
+        log.info("Creating new vehicle for customer: {}, licensePlate: {}", 
+            request.getCustomerId(), request.getLicensePlate());
+        
+        // === 1. Validate customer exists ===
+        CustomerProfile customer = customerRepository.findById(request.getCustomerId())
+            .orElseThrow(() -> new CheckInException("Không tìm thấy khách hàng"));
+        
+        // === 2. Validate license plate uniqueness ===
+        Optional<Vehicle> existingVehicle = vehicleRepository.findByLicensePlate(request.getLicensePlate());
+        if (existingVehicle.isPresent()) {
+            throw new CheckInException("Biển số xe đã tồn tại: " + request.getLicensePlate());
+        }
+        
+        // === 3. Create new vehicle ===
+        Vehicle vehicle = new Vehicle();
+        vehicle.setLicensePlate(request.getLicensePlate());
+        vehicle.setBrand(request.getMake());
+        vehicle.setModel(request.getModel());
+        vehicle.setManufactureYear(request.getYear());
+        vehicle.setCustomer(customer);
+        
+        vehicle = vehicleRepository.save(vehicle);
+        log.info("Created new vehicle: vehicleId={}, licensePlate={}", 
+            vehicle.getVehicleId(), vehicle.getLicensePlate());
+        
+        // === 4. Map to CreateVehicleResponse ===
+        CreateVehicleResponse response = new CreateVehicleResponse();
+        response.setVehicleId(vehicle.getVehicleId());
+        response.setLicensePlate(vehicle.getLicensePlate());
+        response.setMake(vehicle.getBrand());
+        response.setModel(vehicle.getModel());
+        response.setYear(vehicle.getManufactureYear());
+        response.setCustomerId(customer.getCustomerId());
+        response.setMessage("Tạo xe mới thành công");
+        
+        return response;
+    }
+
+    /**
      * Save or select vehicle for check-in.
      * If vehicleId provided, validate and return existing vehicle.
      * If vehicleId null, create new vehicle.
@@ -403,7 +450,6 @@ public class CheckInService {
         
         // 2. Update ServiceTicket entity
         ticketJpa.setTicketStatus(TicketStatus.CREATED);
-        ticketJpa.setOdometerReading(odometerReading.get().getReading());
         ticketJpa.setCheckInNotes(request.getCheckInNotes());
         
         // 3. Set immutable flag
@@ -465,7 +511,6 @@ public class CheckInService {
         response.setBookingId(ticketJpa.getBookingId());
         response.setVehicleId(ticketJpa.getVehicleId());
         response.setTicketStatus(ticketJpa.getTicketStatus());
-        response.setOdometerReading(ticketJpa.getOdometerReading());
         response.setCheckInNotes(ticketJpa.getCheckInNotes());
         response.setImmutable(ticketJpa.getImmutable());
         response.setCreatedAt(ticketJpa.getCreatedAt());
@@ -577,7 +622,7 @@ public class CheckInService {
     /**
      * Complete check-in in single page form (all-in-one).
      * This method handles:
-     * 1. Select/create vehicle
+     * 1. Validate and get vehicle (must exist - created via /vehicles/create endpoint)
      * 2. Create service ticket
      * 3. Upload all photos
      * 4. Save odometer reading
@@ -592,52 +637,13 @@ public class CheckInService {
     public ServiceTicketResponse completeCheckInAll(CompleteCheckInAllRequest request) {
         log.info("Starting single-page check-in for booking: {}", request.getBookingId());
         
-        // 1. Select or create vehicle
-        Vehicle vehicle;
-        boolean isNewVehicle = false;
+        // === 1. Validate and get vehicle (must exist) ===
+        Vehicle vehicle = vehicleRepository.findById(request.getVehicleId())
+            .orElseThrow(() -> new CheckInException("Không tìm thấy xe với ID: " + request.getVehicleId()));
+        log.info("Using vehicle: vehicleId={}, licensePlate={}", 
+            vehicle.getVehicleId(), vehicle.getLicensePlate());
         
-        if (request.getVehicleId() != null) {
-            // Use existing vehicle
-            vehicle = vehicleRepository.findById(request.getVehicleId())
-                .orElseThrow(() -> new CheckInException("Không tìm thấy xe với ID: " + request.getVehicleId()));
-            log.info("Using existing vehicle: vehicleId={}", vehicle.getVehicleId());
-        } else {
-            // Create new vehicle
-            if (request.getLicensePlate() == null || request.getLicensePlate().trim().isEmpty()) {
-                throw new CheckInException("Biển số xe là bắt buộc khi tạo xe mới");
-            }
-            if (request.getMake() == null || request.getMake().trim().isEmpty()) {
-                throw new CheckInException("Hãng xe là bắt buộc khi tạo xe mới");
-            }
-            if (request.getModel() == null || request.getModel().trim().isEmpty()) {
-                throw new CheckInException("Model xe là bắt buộc khi tạo xe mới");
-            }
-            if (request.getYear() == null) {
-                throw new CheckInException("Năm sản xuất là bắt buộc khi tạo xe mới");
-            }
-            
-            // Validate license plate uniqueness
-            Optional<Vehicle> existingVehicle = vehicleRepository.findByLicensePlate(request.getLicensePlate());
-            if (existingVehicle.isPresent()) {
-                throw new CheckInException("Biển số xe đã tồn tại: " + request.getLicensePlate());
-            }
-            
-            vehicle = new Vehicle();
-            vehicle.setLicensePlate(request.getLicensePlate());
-            vehicle.setBrand(request.getMake());
-            vehicle.setModel(request.getModel());
-            vehicle.setManufactureYear(request.getYear());
-            
-            CustomerProfile customer = customerRepository.findById(request.getCustomerId())
-                .orElseThrow(() -> new CheckInException("Không tìm thấy khách hàng"));
-            vehicle.setCustomer(customer);
-            
-            vehicle = vehicleRepository.save(vehicle);
-            isNewVehicle = true;
-            log.info("Created new vehicle: vehicleId={}, licensePlate={}", vehicle.getVehicleId(), vehicle.getLicensePlate());
-        }
-        
-        // 2. Create Service Ticket (ONLY CREATED HERE - NO DUPLICATES!)
+        // === 2. Create Service Ticket ===
         ServiceTicket serviceTicket = serviceTicketService.createServiceTicket(
             request.getBookingId(),
             vehicle.getVehicleId(),
@@ -648,14 +654,24 @@ public class CheckInService {
         ServiceTicketJpa ticketJpa = serviceTicketRepository.findByTicketCode(serviceTicket.getTicketCode())
             .orElseThrow(() -> new CheckInException("Không tìm thấy service ticket vừa tạo"));
         
-        // 3. Upload license plate photo (optional)
+        // === 3. Upload license plate photo (optional) - save to vehicle_condition_photo table ===
         if (request.getLicensePlatePhoto() != null && !request.getLicensePlatePhoto().isEmpty()) {
             try {
                 String photoUrl = imageUploadService.uploadImage(
                     request.getLicensePlatePhoto(), 
                     FileUploadConstants.FOLDER_VEHICLE
                 );
-                ticketJpa.setLicensePlatePhotoUrl(photoUrl);
+                
+                // Save as LICENSE_PLATE category in vehicle_condition_photo
+                VehicleConditionPhotoJpa photoJpa = new VehicleConditionPhotoJpa();
+                photoJpa.setServiceTicketId(ticketJpa.getServiceTicketId());
+                photoJpa.setCategory(PhotoCategory.LICENSE_PLATE);
+                photoJpa.setPhotoUrl(photoUrl);
+                photoJpa.setDescription("Ảnh biển số xe");
+                photoJpa.setUploadedAt(LocalDateTime.now());
+                photoJpa.setUploadedBy(request.getStaffId());
+                photoRepository.save(photoJpa);
+                
                 log.info("Uploaded license plate photo: {}", photoUrl);
             } catch (IOException e) {
                 log.error("Failed to upload license plate photo", e);
@@ -806,7 +822,6 @@ public class CheckInService {
         
         // 6. Update Service Ticket to CREATED status
         ticketJpa.setTicketStatus(TicketStatus.CREATED);
-        ticketJpa.setOdometerReading(request.getOdometerReading());
         ticketJpa.setCheckInNotes(request.getCheckInNotes());
         ticketJpa.setImmutable(true);
         ticketJpa.setUpdatedAt(LocalDateTime.now());
