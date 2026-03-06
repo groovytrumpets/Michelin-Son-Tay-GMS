@@ -2,17 +2,18 @@ package com.g42.platform.gms.booking_management.application.service;
 
 
 
+import com.g42.platform.gms.booking.customer.api.dto.BookingResponse;
+import com.g42.platform.gms.booking.customer.domain.enums.BookingRequestStatus;
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedDetailResponse;
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedRespond;
 import com.g42.platform.gms.booking_management.api.dto.requesting.*;
 import com.g42.platform.gms.booking_management.api.mapper.BookingMDetailDtoMapper;
 import com.g42.platform.gms.booking_management.api.mapper.BookingMRequestDtoMapper;
 import com.g42.platform.gms.booking_management.api.mapper.BookingManageDtoMapper;
+import com.g42.platform.gms.booking_management.application.command.CreateCustomerCommand;
 import com.g42.platform.gms.booking_management.application.port.CustomerGateway;
-import com.g42.platform.gms.booking_management.domain.entity.BookingRequest;
-import com.g42.platform.gms.booking_management.domain.entity.BookingSlotReservation;
-import com.g42.platform.gms.booking_management.domain.entity.CatalogItem;
-import com.g42.platform.gms.booking_management.domain.entity.TimeSlot;
+import com.g42.platform.gms.booking_management.domain.entity.*;
+import com.g42.platform.gms.booking_management.domain.enums.BookingEnum;
 import com.g42.platform.gms.booking_management.domain.exception.BookingStaffErrorCode;
 import com.g42.platform.gms.booking_management.domain.exception.BookingStaffException;
 import com.g42.platform.gms.booking_management.domain.repository.BookingManageRepository;
@@ -20,9 +21,12 @@ import com.g42.platform.gms.booking_management.infrastructure.entity.BookingJpa;
 import com.g42.platform.gms.booking_management.infrastructure.mapper.TimeSlotMMapper;
 import com.g42.platform.gms.marketing.service_catalog.domain.exception.ServiceException;
 import lombok.AllArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -34,28 +38,30 @@ public class BookingManageService {
     private final BookingMDetailDtoMapper  bookingMDetailDtoMapper;
     private final BookingMRequestDtoMapper  bookingMRequestDtoMapper;
 
-    public List<BookedRespond> getListBooked() {
-
-        return  bookingRepository.getBookedList().stream().map(bookingManageDtoMapper::toBookedRespond).toList();
+    public Page<BookedRespond> getListBooked(int page, int size, LocalDate date, Boolean isGuest, BookingEnum status, String search) {
+        Page<BookedRespond> bookingPage = bookingRepository.getBookedList(page,size,date,isGuest,status,search);
+//        return  bookingRepository.getBookedList().stream().map(bookingManageDtoMapper::toBookedRespond).toList();
+        return bookingPage;
     }
 
-    public BookedDetailResponse getBookedDetailById(Integer bookingId) {
+    public BookedDetailResponse getBookedDetailById(String bookingId) {
         return bookingManageDtoMapper.toBookedDetailResponse(bookingRepository.getBookedDetailById(bookingId));
         //todo: null handle exception
     }
 
-    public List<BookingRequestRes> getListBookingRequest() {
-        List<BookingRequest> bookingList = bookingRepository.getBookingRequestList();
-        return bookingMRequestDtoMapper.toBookingRequestRes(bookingList);
+    public Page<BookingRequestRes> getListBookingRequest(int page, int size, LocalDate date, Boolean isGuest, BookingRequestStatus status, String search) {
+        Page<BookingRequest> bookingList = bookingRepository.getBookingRequestList(page,size,date,isGuest,status,search);
+        //return bookingMRequestDtoMapper.toBookingRequestResPage(bookingList);
+        return bookingList.map(bookingMRequestDtoMapper::toBookingRequestRes);
     }
 
-    public BookingRequestDetailRes getBookingRequestById(Integer bookingId) {
-        BookingRequest bookingRequest = bookingRepository.getBookingRequestById(bookingId);
+    public BookingRequestDetailRes getBookingRequestById(String bookingCode) {
+        BookingRequest bookingRequest = bookingRepository.getBookingRequestById(bookingCode);
         return bookingMRequestDtoMapper.toBookingRequestDetailRes(bookingRequest);
     }
     private final CustomerGateway customerGateway;
     @Transactional
-    public Boolean confirmBookingRequest(Integer requestId) {
+    public Boolean confirmBookingRequest(String requestId) {
         BookingRequest request = bookingRepository.getBookingRequestById(requestId);
         if (!request.isPending()){
             //todo: wrong status handle
@@ -69,13 +75,13 @@ public class BookingManageService {
         TimeSlot timeSlot = bookingRepository.getTimeSlotByTime(request.getScheduledTime());
         System.out.println("time slot: " + timeSlot);
         //todo: check acc available else create customer acc
-//        int customerId = customerGateway.getOrCreateCustomer(
-//                new CreateCustomerCommand(request.getFullName(),request.getPhone(),request.getCreatedAt())
-//        );
-//        System.out.println("customer id: " + customerId);
+        int customerId = customerGateway.getOrCreateCustomer(
+                new CreateCustomerCommand(request.getFullName(),request.getPhone(),request.getCreatedAt())
+        );
+        System.out.println("customer id: " + customerId);
         //todo: check if create account success
         //todo: create booking
-        BookingJpa booking = bookingRepository.createBookingByRequest(request);
+        BookingJpa booking = bookingRepository.createBookingByRequest(request, customerId);
         System.out.println("booking: " + booking.getBookingId());
         //todo: create Reservation
         BookingSlotReservation bookingSlotReservation = bookingRepository.createBookingSlotReservation(request, booking);
@@ -92,7 +98,7 @@ return confirmed;
         return null;
     }
     @Transactional(noRollbackFor = BookingStaffException.class)
-    public ActionBookingRespond cancelBookingRequest(Integer requestId, ActionBookingRequest actionBookingRequest) {
+    public ActionBookingRespond cancelBookingRequest(String requestId, ActionBookingRequest actionBookingRequest) {
         BookingRequest request = bookingRepository.getBookingRequestById(requestId);
         if (request==null){
             throw new BookingStaffException("LOI", BookingStaffErrorCode.INVALID_ID);
@@ -102,7 +108,7 @@ return confirmed;
         return new ActionBookingRespond("SUCCESS","SUCCESS");
     }
     @Transactional(noRollbackFor = BookingStaffException.class)
-    public ActionBookingRespond spamNotedBookingRequest(Integer requestId, ActionBookingRequest actionBookingRequest) {
+    public ActionBookingRespond spamNotedBookingRequest(String requestId, ActionBookingRequest actionBookingRequest) {
         BookingRequest request = bookingRepository.getBookingRequestById(requestId);
         if (request==null){
             throw new BookingStaffException("Không tìm thấy booking", BookingStaffErrorCode.INVALID_ID);
@@ -112,7 +118,7 @@ return confirmed;
         return new ActionBookingRespond("SUCCESS","SUCCESS");
     }
 
-    public ActionBookingRespond contactedBookingRequest(Integer requestId, ActionBookingRequest actionBookingRequest) {
+    public ActionBookingRespond contactedBookingRequest(String requestId, ActionBookingRequest actionBookingRequest) {
         BookingRequest request = bookingRepository.getBookingRequestById(requestId);
         if (request==null){
             throw new BookingStaffException("Không tìm thấy booking", BookingStaffErrorCode.INVALID_ID);
@@ -122,7 +128,7 @@ return confirmed;
         return new ActionBookingRespond("SUCCESS","SUCCESS");
     }
 
-    public Boolean updateBookingRequest(Integer requestId, BookingRequestUpdateReq actionBookingRequest) {
+    public Boolean updateBookingRequest(String requestId, BookingRequestUpdateReq actionBookingRequest) {
         BookingRequest request = bookingRepository.getBookingRequestById(requestId);
         if (request==null){
             throw new BookingStaffException("Không tìm thấy booking", BookingStaffErrorCode.INVALID_ID);

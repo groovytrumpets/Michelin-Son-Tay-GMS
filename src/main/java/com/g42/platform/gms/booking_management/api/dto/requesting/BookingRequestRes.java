@@ -16,6 +16,7 @@ import java.time.LocalTime;
 @AllArgsConstructor
 public class BookingRequestRes {
     private Integer requestId;
+    private String requestCode;
     private String phone;
     private String fullName;
     private LocalDate scheduledDate;

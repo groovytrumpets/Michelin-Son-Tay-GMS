@@ -6,6 +6,8 @@ import com.g42.platform.gms.booking_management.domain.entity.BookingRequestDetai
 import com.g42.platform.gms.booking_management.infrastructure.entity.BookingRequestDetailJpa;
 import com.g42.platform.gms.booking_management.infrastructure.entity.BookingRequestJpa;
 import org.mapstruct.Mapper;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 

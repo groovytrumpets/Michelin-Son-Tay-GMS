@@ -5,10 +5,12 @@ import lombok.Data;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
 
 @Data
 public class BookingRequestResponse {
     private Integer requestId;
+    private String requestCode;
     private String phone;
     private String fullName;
     private LocalDate scheduledDate;
@@ -17,4 +19,6 @@ public class BookingRequestResponse {
     private String status;
     private LocalDateTime createdAt;
     private LocalDateTime expiresAt;
+    private List<ServiceItemDto> services;
+    private Integer totalEstimatedTime;
 }

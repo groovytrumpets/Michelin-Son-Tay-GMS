@@ -29,33 +29,29 @@ public class ServiceTicketService {
     private final ServiceTicketRepository serviceTicketRepository;
     private final ServiceTicketMapper serviceTicketMapper;
     private final ServiceTicketCodeGenerator ticketCodeGenerator;
+    private final com.g42.platform.gms.booking.customer.domain.repository.BookingRepository bookingRepository;
 
     /**
-     * Create new service ticket with generated ticket code.
-     * Production-ready: Check for existing active tickets before creating.
+     * Create new service ticket with ticket code from booking.
+     * OPTIMIZATION: Use booking_code as ticket_code (1 booking = 1 service ticket).
+     * Database constraint uk_booking_id ensures 1-to-1 relationship.
      * 
      * @param bookingId Booking ID
      * @param vehicleId Vehicle ID
      * @param customerId Customer ID
      * @return Created ServiceTicket entity
-     * @throws RuntimeException if active ticket already exists for this booking
      */
     @Transactional
     public ServiceTicket createServiceTicket(Integer bookingId, Integer vehicleId, Integer customerId) {
         log.info("Creating service ticket for booking: {}, vehicle: {}, customer: {}", bookingId, vehicleId, customerId);
         
-        // Production-ready check: Prevent duplicate tickets
-        long activeTicketCount = serviceTicketRepository.countActiveTicketsByBookingId(bookingId);
-        if (activeTicketCount > 0) {
-            log.error("Cannot create ticket: booking {} already has {} active ticket(s)", bookingId, activeTicketCount);
-            throw new RuntimeException("Booking đã có service ticket đang hoạt động. Không thể tạo ticket mới.");
-        }
+        // Fetch booking to get booking_code
+        com.g42.platform.gms.booking.customer.domain.entity.Booking booking = bookingRepository.findById(bookingId)
+            .orElseThrow(() -> new RuntimeException("Booking not found: " + bookingId));
         
-        // Generate ticket code
-        String ticketCode = ticketCodeGenerator.generateCode(
-            LocalDate.now(),
-            CodePrefix.SERVICE_TICKET
-        );
+        // Use booking_code as ticket_code (no need to generate new code)
+        String ticketCode = booking.getBookingCode();
+        log.info("Using booking_code as ticket_code: {}", ticketCode);
         
         // Create domain entity
         ServiceTicket ticket = new ServiceTicket();
@@ -66,10 +62,11 @@ public class ServiceTicketService {
         ticket.initializeDefaults();
         
         // Convert to JPA and save
+        // Note: Database constraint uk_booking_id will prevent duplicate service tickets for same booking
         ServiceTicketJpa jpa = serviceTicketMapper.toJpa(ticket);
         ServiceTicketJpa saved = serviceTicketRepository.save(jpa);
         
-        log.info("Created service ticket: {}", ticketCode);
+        log.info("Created service ticket with code: {}", ticketCode);
         return serviceTicketMapper.toDomain(saved);
     }
 

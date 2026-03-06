@@ -181,7 +181,7 @@ public class CheckInService {
             log.info("Created new vehicle: vehicleId={}, licensePlate={}", vehicle.getVehicleId(), vehicle.getLicensePlate());
         }
         
-        // 5. Create or get Service Ticket
+        // 5. Check if Service Ticket already exists for this booking
         ServiceTicket serviceTicket;
         Optional<ServiceTicketJpa> existingTicket = serviceTicketRepository.findByBookingId(request.getBookingId());
         
@@ -202,25 +202,13 @@ public class CheckInService {
                 serviceTicket.setVehicleId(vehicle.getVehicleId());
             }
         } else {
-            // Create new Service Ticket (with production-ready duplicate check)
-            try {
-                serviceTicket = serviceTicketService.createServiceTicket(
-                    request.getBookingId(),
-                    vehicle.getVehicleId(),
-                    request.getCustomerId()
-                );
-                log.info("Created new service ticket: ticketCode={}", serviceTicket.getTicketCode());
-            } catch (RuntimeException e) {
-                // If ticket creation fails due to duplicate check, try to find existing ticket
-                log.warn("Failed to create ticket (may be duplicate): {}", e.getMessage());
-                existingTicket = serviceTicketRepository.findByBookingId(request.getBookingId());
-                if (existingTicket.isPresent()) {
-                    serviceTicket = serviceTicketMapper.toDomain(existingTicket.get());
-                    log.info("Using existing ticket after creation failure: {}", serviceTicket.getTicketCode());
-                } else {
-                    throw new CheckInException("Không thể tạo service ticket: " + e.getMessage());
-                }
-            }
+            // Create new Service Ticket
+            serviceTicket = serviceTicketService.createServiceTicket(
+                request.getBookingId(),
+                vehicle.getVehicleId(),
+                request.getCustomerId()
+            );
+            log.info("Created new service ticket: ticketCode={}", serviceTicket.getTicketCode());
         }
         
         // 6. Map to VehicleResponse
@@ -455,19 +443,20 @@ public class CheckInService {
         }
         
         // 6. Create customer auth if needed
-        Optional<CustomerAuth> existingAuth = customerAuthRepository.findByCustomerId(booking.getCustomerId());
-        if (!existingAuth.isPresent()) {
-            CustomerAuth customerAuth = new CustomerAuth();
-            customerAuth.setCustomerId(booking.getCustomerId());
-            customerAuth.setStatus(CustomerStatus.INACTIVE);
-            customerAuth.setFailedAttemptCount(0);
-            customerAuth.setOtpAttemptCount(0);
-            customerAuth.setCreatedAt(LocalDateTime.now());
-            customerAuthRepository.save(customerAuth);
-            log.info("Created customer auth for customerId={}", booking.getCustomerId());
-            
-            // TODO: Send OTP for activation (will be implemented in Phase 2)
-        }
+        // TODO: TEMPORARILY DISABLED - Will create account when confirming booking instead of check-in
+        // Optional<CustomerAuth> existingAuth = customerAuthRepository.findByCustomerId(booking.getCustomerId());
+        // if (!existingAuth.isPresent()) {
+        //     CustomerAuth customerAuth = new CustomerAuth();
+        //     customerAuth.setCustomerId(booking.getCustomerId());
+        //     customerAuth.setStatus(CustomerStatus.INACTIVE);
+        //     customerAuth.setFailedAttemptCount(0);
+        //     customerAuth.setOtpAttemptCount(0);
+        //     customerAuth.setCreatedAt(LocalDateTime.now());
+        //     customerAuthRepository.save(customerAuth);
+        //     log.info("Created customer auth for customerId={}", booking.getCustomerId());
+        //     
+        //     // TODO: Send OTP for activation (will be implemented in Phase 2)
+        // }
         
         // 7. Return ServiceTicketResponse with warnings
         ServiceTicketResponse response = new ServiceTicketResponse();
@@ -867,17 +856,18 @@ public class CheckInService {
         }
         
         // 9. Create customer auth if needed
-        Optional<CustomerAuth> existingAuth = customerAuthRepository.findByCustomerId(request.getCustomerId());
-        if (!existingAuth.isPresent()) {
-            CustomerAuth customerAuth = new CustomerAuth();
-            customerAuth.setCustomerId(request.getCustomerId());
-            customerAuth.setStatus(CustomerStatus.INACTIVE);
-            customerAuth.setFailedAttemptCount(0);
-            customerAuth.setOtpAttemptCount(0);
-            customerAuth.setCreatedAt(LocalDateTime.now());
-            customerAuthRepository.save(customerAuth);
-            log.info("Created customer auth for customerId={}", request.getCustomerId());
-        }
+        // TODO: TEMPORARILY DISABLED - Will create account when confirming booking instead of check-in
+        // Optional<CustomerAuth> existingAuth = customerAuthRepository.findByCustomerId(request.getCustomerId());
+        // if (!existingAuth.isPresent()) {
+        //     CustomerAuth customerAuth = new CustomerAuth();
+        //     customerAuth.setCustomerId(request.getCustomerId());
+        //     customerAuth.setStatus(CustomerStatus.INACTIVE);
+        //     customerAuth.setFailedAttemptCount(0);
+        //     customerAuth.setOtpAttemptCount(0);
+        //     customerAuth.setCreatedAt(LocalDateTime.now());
+        //     customerAuthRepository.save(customerAuth);
+        //     log.info("Created customer auth for customerId={}", request.getCustomerId());
+        // }
         
         // 10. Build response using mapper (Clean Architecture pattern)
         // Step 1: JPA → Domain (Infrastructure Mapper)

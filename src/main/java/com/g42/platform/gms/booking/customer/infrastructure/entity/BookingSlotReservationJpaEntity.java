@@ -15,7 +15,7 @@ public class BookingSlotReservationJpaEntity {
     @Column(name = "reservation_id")
     private Integer reservationId;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "booking_id", nullable = false)
     private BookingJpaEntity booking;
 
