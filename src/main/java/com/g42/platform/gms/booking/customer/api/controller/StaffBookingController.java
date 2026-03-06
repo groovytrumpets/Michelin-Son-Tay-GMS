@@ -1,6 +1,9 @@
 package com.g42.platform.gms.booking.customer.api.controller;
 
+import com.g42.platform.gms.auth.dto.CustomerLookupResponse;
+import com.g42.platform.gms.auth.entity.CustomerProfile;
 import com.g42.platform.gms.auth.entity.StaffPrincipal;
+import com.g42.platform.gms.auth.repository.CustomerProfileRepository;
 import com.g42.platform.gms.booking.customer.api.dto.BookingResponse;
 import com.g42.platform.gms.booking.customer.api.dto.StaffDirectBookingRequest;
 import com.g42.platform.gms.booking.customer.api.mapper.BookingDtoMapper;
@@ -33,6 +36,44 @@ public class StaffBookingController {
 
     private final BookingService bookingService;
     private final BookingDtoMapper dtoMapper;
+    private final CustomerProfileRepository customerRepository;
+
+    /**
+     * Lookup customer info bằng số điện thoại
+     * 
+     * Use case: Khi receptionist nhập số điện thoại, tự động điền tên nếu customer đã tồn tại
+     * 
+     * @param phone Số điện thoại cần tra cứu
+     * @return Thông tin customer (nếu có) hoặc empty response
+     */
+    @GetMapping("/customer-lookup")
+    // @PreAuthorize("hasAnyRole('STAFF', 'RECEPTIONIST', 'ADMIN')")
+    public ResponseEntity<ApiResponse<CustomerLookupResponse>> lookupCustomer(
+            @RequestParam String phone
+    ) {
+        CustomerProfile customer = customerRepository.findByPhone(phone).orElse(null);
+        
+        CustomerLookupResponse response;
+        if (customer != null) {
+            response = new CustomerLookupResponse(
+                    customer.getCustomerId(),
+                    customer.getPhone(),
+                    customer.getFullName(),
+                    customer.getEmail(),
+                    true
+            );
+        } else {
+            response = new CustomerLookupResponse(
+                    null,
+                    phone,
+                    null,
+                    null,
+                    false
+            );
+        }
+        
+        return ResponseEntity.ok(ApiResponses.success(response));
+    }
 
     /**
      * Tạo booking trực tiếp cho khách hàng (bởi staff/receptionist)
@@ -47,7 +88,7 @@ public class StaffBookingController {
      * @return Booking đã được tạo
      */
     @PostMapping("/create-direct")
-//    @PreAuthorize("hasAnyRole('STAFF', 'RECEPTIONIST', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('STAFF', 'RECEPTIONIST', 'ADMIN')")
     public ResponseEntity<ApiResponse<BookingResponse>> createDirectBooking(
             @RequestBody @Valid StaffDirectBookingRequest request
     ) {
