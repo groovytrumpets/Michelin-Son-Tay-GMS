@@ -45,8 +45,23 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Service layer for Check-in process.
- * Handles business logic for vehicle check-in (first step of service ticket lifecycle).
+ * Service layer cho quy trình Check-in.
+ * Xử lý business logic cho việc check-in xe (bước đầu tiên của service ticket lifecycle).
+ * 
+ * Chức năng chính:
+ * - Lookup booking theo mã booking
+ * - Tạo xe mới cho customer
+ * - Lưu/chọn xe cho check-in
+ * - Upload ảnh biển số và ảnh tình trạng xe
+ * - Lưu số công tơ mét với phát hiện rollback
+ * - Hoàn tất check-in (chuyển status từ DRAFT → CREATED)
+ * 
+ * Business Rules:
+ * - Service Ticket được tạo tự động khi chọn xe (lazy creation)
+ * - Service Ticket reuse booking_code làm ticket_code (đảm bảo đồng bộ mã)
+ * - Phải có ít nhất 1 ảnh xe và số công tơ mét trước khi complete check-in
+ * - Phát hiện odometer rollback và cảnh báo
+ * - Phát hiện khách đến sai ngày/giờ hẹn và cảnh báo
  */
 @Slf4j
 @Service
@@ -71,24 +86,24 @@ public class CheckInService {
     private final com.g42.platform.gms.service_ticket_management.api.mapper.ServiceTicketDtoMapper serviceTicketDtoMapper;
 
     /**
-     * Lookup booking by booking code.
-     * Returns booking information with customer details and vehicle suggestions.
+     * Lookup booking theo mã booking.
+     * Trả về thông tin booking với thông tin customer và danh sách dịch vụ.
      * 
-     * @param request BookingLookupRequest containing booking code
-     * @return BookingLookupResponse with booking and customer information
+     * @param request BookingLookupRequest chứa booking code
+     * @return BookingLookupResponse với thông tin booking và customer
      */
     @Transactional(readOnly = true)
     public BookingLookupResponse lookupBooking(BookingLookupRequest request) {
         log.info("Looking up booking: {}", request.getBookingCode());
         
-        // 1. Query booking using BookingService (reuse existing logic)
+        // === 1. Query booking sử dụng BookingService (reuse logic có sẵn) ===
         Booking booking = bookingService.findByCode(request.getBookingCode());
         
-        // 2. Fetch customer information
+        // === 2. Lấy thông tin customer ===
         CustomerProfile customer = customerRepository.findById(booking.getCustomerId())
             .orElseThrow(() -> new CheckInException("Không tìm thấy thông tin khách hàng"));
         
-        // 3. Fetch services information
+        // === 3. Lấy thông tin các dịch vụ từ booking ===
         List<BookingLookupResponse.ServiceInfo> services = new ArrayList<>();
         if (booking.getServiceIds() != null && !booking.getServiceIds().isEmpty()) {
             for (Integer serviceId : booking.getServiceIds()) {
@@ -104,7 +119,7 @@ public class CheckInService {
             }
         }
         
-        // 4. Map to BookingLookupResponse (without vehicleSuggestions)
+        // === 4. Map sang BookingLookupResponse ===
         BookingLookupResponse response = new BookingLookupResponse();
         response.setBookingId(booking.getBookingId());
         response.setBookingCode(booking.getBookingCode());
@@ -123,11 +138,11 @@ public class CheckInService {
     }
 
     /**
-     * Create a new vehicle for customer.
-     * Used when customer doesn't have a vehicle in the system yet.
+     * Tạo xe mới cho customer.
+     * Sử dụng khi customer chưa có xe trong hệ thống.
      * 
-     * @param request CreateVehicleRequest with vehicle data
-     * @return CreateVehicleResponse with created vehicle information
+     * @param request CreateVehicleRequest với thông tin xe
+     * @return CreateVehicleResponse với thông tin xe đã tạo
      */
     @Transactional
     public CreateVehicleResponse createVehicle(CreateVehicleRequest request) {
@@ -170,13 +185,13 @@ public class CheckInService {
     }
 
     /**
-     * Save or select vehicle for check-in.
-     * If vehicleId provided, validate and return existing vehicle.
-     * If vehicleId null, create new vehicle.
-     * Automatically creates Service Ticket if not exists for this booking.
+     * Lưu hoặc chọn xe cho check-in.
+     * Nếu có vehicleId: validate và trả về xe có sẵn.
+     * Nếu vehicleId null: tạo xe mới.
+     * Tự động tạo Service Ticket nếu chưa tồn tại cho booking này (lazy creation).
      * 
-     * @param request VehicleRequest with vehicle data
-     * @return VehicleResponse with vehicle information and ticket code
+     * @param request VehicleRequest với thông tin xe
+     * @return VehicleResponse với thông tin xe và ticket code
      */
     @Transactional
     public VehicleResponse saveVehicle(VehicleRequest request) {
@@ -185,14 +200,14 @@ public class CheckInService {
         Vehicle vehicle;
         boolean isNewVehicle = false;
         
-        // 1. If vehicleId provided, validate and return existing
+        // === 1. Nếu có vehicleId, validate và trả về xe có sẵn ===
         if (request.getVehicleId() != null) {
             vehicle = vehicleRepository.findById(request.getVehicleId())
                 .orElseThrow(() -> new CheckInException("Không tìm thấy xe với ID: " + request.getVehicleId()));
             log.info("Using existing vehicle: vehicleId={}", vehicle.getVehicleId());
         } else {
-            // 2. If vehicleId null, create new vehicle
-            // Validate required fields for new vehicle
+            // === 2. Nếu vehicleId null, tạo xe mới ===
+            // Validate các trường bắt buộc khi tạo xe mới
             if (request.getLicensePlate() == null || request.getLicensePlate().trim().isEmpty()) {
                 throw new CheckInException("Biển số xe là bắt buộc khi tạo xe mới");
             }
@@ -206,7 +221,7 @@ public class CheckInService {
                 throw new CheckInException("Năm sản xuất là bắt buộc khi tạo xe mới");
             }
             
-            // 3. Validate license plate uniqueness
+            // === 3. Validate biển số xe không trùng ===
             Optional<Vehicle> existingVehicle = vehicleRepository.findByLicensePlate(request.getLicensePlate());
             if (existingVehicle.isPresent()) {
                 throw new CheckInException("Biển số xe đã tồn tại: " + request.getLicensePlate());
@@ -218,7 +233,7 @@ public class CheckInService {
             vehicle.setModel(request.getModel());
             vehicle.setManufactureYear(request.getYear());
             
-            // 4. Link vehicle to customer
+            // === 4. Liên kết xe với customer ===
             CustomerProfile customer = customerRepository.findById(request.getCustomerId())
                 .orElseThrow(() -> new CheckInException("Không tìm thấy khách hàng"));
             vehicle.setCustomer(customer);
@@ -228,17 +243,17 @@ public class CheckInService {
             log.info("Created new vehicle: vehicleId={}, licensePlate={}", vehicle.getVehicleId(), vehicle.getLicensePlate());
         }
         
-        // 5. Check if Service Ticket already exists for this booking
+        // === 5. Kiểm tra Service Ticket đã tồn tại cho booking này chưa ===
         ServiceTicket serviceTicket;
         Optional<ServiceTicketJpa> existingTicket = serviceTicketRepository.findByBookingId(request.getBookingId());
         
         if (existingTicket.isPresent()) {
-            // Ticket already exists - return existing ticket
+            // Ticket đã tồn tại - trả về ticket có sẵn
             serviceTicket = serviceTicketMapper.toDomain(existingTicket.get());
             log.info("Service ticket already exists for booking: {}, ticketCode: {}", 
                 request.getBookingId(), serviceTicket.getTicketCode());
             
-            // Update vehicle_id if changed
+            // Cập nhật vehicle_id nếu thay đổi
             if (!serviceTicket.getVehicleId().equals(vehicle.getVehicleId())) {
                 ServiceTicketJpa ticketJpa = existingTicket.get();
                 ticketJpa.setVehicleId(vehicle.getVehicleId());
@@ -249,16 +264,19 @@ public class CheckInService {
                 serviceTicket.setVehicleId(vehicle.getVehicleId());
             }
         } else {
-            // Create new Service Ticket
+            // Tạo Service Ticket mới (lazy creation)
+            // Note: staffId nên được truyền trong VehicleRequest để audit trail đúng
+            Integer staffId = request.getStaffId() != null ? request.getStaffId() : 0; // Default to 0 if not provided
             serviceTicket = serviceTicketService.createServiceTicket(
                 request.getBookingId(),
                 vehicle.getVehicleId(),
-                request.getCustomerId()
+                request.getCustomerId(),
+                staffId
             );
             log.info("Created new service ticket: ticketCode={}", serviceTicket.getTicketCode());
         }
         
-        // 6. Map to VehicleResponse
+        // === 6. Map sang VehicleResponse ===
         VehicleResponse response = new VehicleResponse();
         response.setVehicleId(vehicle.getVehicleId());
         response.setLicensePlate(vehicle.getLicensePlate());
@@ -451,6 +469,7 @@ public class CheckInService {
         // 2. Update ServiceTicket entity
         ticketJpa.setTicketStatus(TicketStatus.CREATED);
         ticketJpa.setCheckInNotes(request.getCheckInNotes());
+        ticketJpa.setReceivedAt(LocalDateTime.now()); // Set thời điểm khách hàng đến garage
         
         // 3. Set immutable flag
         ticketJpa.setImmutable(true);
@@ -540,18 +559,19 @@ public class CheckInService {
      * @param bookingId Booking ID
      * @param vehicleId Vehicle ID
      * @param customerId Customer ID
+     * @param createdBy Staff ID who creates the ticket
      * @return Created ServiceTicket entity
      */
     @Transactional
-    public ServiceTicket createServiceTicket(Integer bookingId, Integer vehicleId, Integer customerId) {
-        return serviceTicketService.createServiceTicket(bookingId, vehicleId, customerId);
+    public ServiceTicket createServiceTicket(Integer bookingId, Integer vehicleId, Integer customerId, Integer createdBy) {
+        return serviceTicketService.createServiceTicket(bookingId, vehicleId, customerId, createdBy);
     }
 
     /**
      * Find service ticket by ticket code.
      * Delegates to ServiceTicketService.
      * 
-     * @param ticketCode Ticket code (ST_XXXXXX)
+     * @param ticketCode Ticket code (MST_XXXXXX)
      * @return ServiceTicket entity
      */
     @Transactional(readOnly = true)
@@ -647,7 +667,8 @@ public class CheckInService {
         ServiceTicket serviceTicket = serviceTicketService.createServiceTicket(
             request.getBookingId(),
             vehicle.getVehicleId(),
-            request.getCustomerId()
+            request.getCustomerId(),
+            request.getStaffId() // Pass staffId as createdBy
         );
         log.info("Created service ticket: ticketCode={}", serviceTicket.getTicketCode());
         
@@ -823,6 +844,7 @@ public class CheckInService {
         // 6. Update Service Ticket to CREATED status
         ticketJpa.setTicketStatus(TicketStatus.CREATED);
         ticketJpa.setCheckInNotes(request.getCheckInNotes());
+        ticketJpa.setReceivedAt(LocalDateTime.now()); // Set thời điểm khách hàng đến garage
         ticketJpa.setImmutable(true);
         ticketJpa.setUpdatedAt(LocalDateTime.now());
         ticketJpa = serviceTicketRepository.save(ticketJpa);
