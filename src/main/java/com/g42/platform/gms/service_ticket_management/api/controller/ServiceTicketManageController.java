@@ -4,6 +4,7 @@ import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceTicketDetailResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceTicketListResponse;
+import com.g42.platform.gms.service_ticket_management.api.dto.manage.UpdateServiceTicketRequest;
 import com.g42.platform.gms.service_ticket_management.application.service.ServiceTicketManageService;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import lombok.RequiredArgsConstructor;
@@ -72,5 +73,22 @@ public class ServiceTicketManageController {
         ServiceTicketDetailResponse detail = serviceTicketManageService.getServiceTicketDetail(ticketCode);
         
         return ResponseEntity.ok(ApiResponses.success(detail));
+    }
+    
+    /**
+     * Update service ticket (customer request and services).
+     * 
+     * @param ticketCode Ticket code (ST_XXXXXX or MST_XXXXXX)
+     * @param request Update request with customerRequest and serviceIds
+     * @return Updated ServiceTicketDetailResponse
+     */
+    @PutMapping("/tickets/{ticketCode}")
+    public ResponseEntity<ApiResponse<ServiceTicketDetailResponse>> updateServiceTicket(
+            @PathVariable String ticketCode,
+            @RequestBody @jakarta.validation.Valid UpdateServiceTicketRequest request) {
+        
+        ServiceTicketDetailResponse updated = serviceTicketManageService.updateServiceTicket(ticketCode, request);
+        
+        return ResponseEntity.ok(ApiResponses.success(updated));
     }
 }

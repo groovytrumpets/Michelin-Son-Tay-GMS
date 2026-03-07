@@ -183,7 +183,7 @@ public class ServiceTicketService {
         log.info("Marking service ticket as immutable: {}", ticketCode);
         
         ServiceTicket ticket = findByTicketCode(ticketCode);
-        ticket.setImmutable(true);
+        // Không set immutable flag - chỉ dùng status để kiểm soát quyền edit
         ticket.setUpdatedAt(LocalDateTime.now());
         
         return updateServiceTicket(ticket);

@@ -471,8 +471,8 @@ public class CheckInService {
         ticketJpa.setCheckInNotes(request.getCheckInNotes());
         ticketJpa.setReceivedAt(LocalDateTime.now()); // Set thời điểm khách hàng đến garage
         
-        // 3. Set immutable flag
-        ticketJpa.setImmutable(true);
+        // 3. Không set immutable flag - chỉ dùng status để kiểm soát quyền edit
+        // immutable sẽ được set khi ticket chuyển sang COMPLETED
         ticketJpa.setUpdatedAt(LocalDateTime.now());
         ticketJpa = serviceTicketRepository.save(ticketJpa);
         
@@ -845,7 +845,9 @@ public class CheckInService {
         ticketJpa.setTicketStatus(TicketStatus.CREATED);
         ticketJpa.setCheckInNotes(request.getCheckInNotes());
         ticketJpa.setReceivedAt(LocalDateTime.now()); // Set thời điểm khách hàng đến garage
-        ticketJpa.setImmutable(true);
+        
+        // Không set immutable flag - chỉ dùng status để kiểm soát quyền edit
+        // immutable sẽ được set khi ticket chuyển sang COMPLETED
         ticketJpa.setUpdatedAt(LocalDateTime.now());
         ticketJpa = serviceTicketRepository.save(ticketJpa);
         

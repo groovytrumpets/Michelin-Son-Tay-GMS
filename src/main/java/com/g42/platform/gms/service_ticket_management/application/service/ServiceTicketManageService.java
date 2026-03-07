@@ -9,6 +9,7 @@ import com.g42.platform.gms.booking.customer.domain.repository.BookingRepository
 import com.g42.platform.gms.catalog.repository.CatalogItemRepository;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceTicketDetailResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceTicketListResponse;
+import com.g42.platform.gms.service_ticket_management.api.dto.manage.UpdateServiceTicketRequest;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import com.g42.platform.gms.service_ticket_management.domain.exception.CheckInException;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.OdometerHistoryJpa;
@@ -259,5 +260,57 @@ public class ServiceTicketManageService {
         
         log.info("Service ticket detail retrieved: {}", ticketCode);
         return response;
+    }
+    
+    /**
+     * Update service ticket (customer request and services).
+     * Chỉ cho phép update khi ticket chưa COMPLETED hoặc CANCELLED.
+     * 
+     * @param ticketCode Ticket code
+     * @param request Update request
+     * @return Updated ServiceTicketDetailResponse
+     */
+    @Transactional
+    public ServiceTicketDetailResponse updateServiceTicket(String ticketCode, UpdateServiceTicketRequest request) {
+        log.info("Updating service ticket: {}", ticketCode);
+        
+        // === 1. TÌM SERVICE TICKET ===
+        ServiceTicketJpa ticket = serviceTicketRepository.findByTicketCode(ticketCode)
+            .orElseThrow(() -> new CheckInException("Không tìm thấy service ticket: " + ticketCode));
+        
+        // === 2. KIỂM TRA STATUS ===
+        // Chỉ cho phép edit khi ticket ở trạng thái DRAFT, CREATED, hoặc IN_PROGRESS
+        // Không cho phép edit khi COMPLETED hoặc CANCELLED
+        if (ticket.getTicketStatus() == TicketStatus.COMPLETED) {
+            throw new CheckInException("Không thể chỉnh sửa service ticket đã hoàn thành");
+        }
+        
+        if (ticket.getTicketStatus() == TicketStatus.CANCELLED) {
+            throw new CheckInException("Không thể chỉnh sửa service ticket đã hủy");
+        }
+        
+        // === 3. UPDATE CUSTOMER REQUEST ===
+        if (request.getCustomerRequest() != null) {
+            ticket.setCustomerRequest(request.getCustomerRequest());
+        }
+        
+        // === 4. UPDATE SERVICE IDS VÀO BOOKING ===
+        if (ticket.getBookingId() != null && request.getServiceIds() != null) {
+            Booking booking = bookingRepository.findById(ticket.getBookingId())
+                .orElseThrow(() -> new CheckInException("Không tìm thấy booking"));
+            
+            booking.setServiceIds(request.getServiceIds());
+            bookingRepository.save(booking);
+            
+            log.info("Updated services for booking {}: {}", booking.getBookingId(), request.getServiceIds());
+        }
+        
+        // === 5. SAVE SERVICE TICKET ===
+        serviceTicketRepository.save(ticket);
+        
+        log.info("Service ticket updated successfully: {}", ticketCode);
+        
+        // === 6. RETURN UPDATED DETAIL ===
+        return getServiceTicketDetail(ticketCode);
     }
 }
