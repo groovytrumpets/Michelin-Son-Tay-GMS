@@ -22,6 +22,9 @@ import com.g42.platform.gms.service_ticket_management.domain.exception.CheckInEx
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.OdometerHistoryJpa;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.VehicleConditionPhotoJpa;
+import com.g42.platform.gms.service_ticket_management.api.mapper.BookingLookupMapper;
+import com.g42.platform.gms.service_ticket_management.api.mapper.PhotoResponseMapper;
+import com.g42.platform.gms.service_ticket_management.api.mapper.VehicleMapper;
 import com.g42.platform.gms.service_ticket_management.infrastructure.mapper.OdometerReadingMapper;
 import com.g42.platform.gms.service_ticket_management.infrastructure.mapper.ServiceTicketMapper;
 import com.g42.platform.gms.service_ticket_management.infrastructure.mapper.VehicleConditionPhotoMapper;
@@ -84,6 +87,9 @@ public class CheckInService {
     private final VehicleConditionPhotoMapper photoMapper;
     private final OdometerReadingMapper odometerMapper;
     private final com.g42.platform.gms.service_ticket_management.api.mapper.ServiceTicketDtoMapper serviceTicketDtoMapper;
+    private final BookingLookupMapper bookingLookupMapper;
+    private final VehicleMapper vehicleMapper;
+    private final PhotoResponseMapper photoResponseMapper;
 
     /**
      * Lookup booking theo mã booking.
@@ -96,42 +102,28 @@ public class CheckInService {
     public BookingLookupResponse lookupBooking(BookingLookupRequest request) {
         log.info("Looking up booking: {}", request.getBookingCode());
         
-        // === 1. Query booking sử dụng BookingService (reuse logic có sẵn) ===
+        // Query booking sử dụng BookingService
         Booking booking = bookingService.findByCode(request.getBookingCode());
         
-        // === 2. Lấy thông tin customer ===
+        // Lấy thông tin customer
         CustomerProfile customer = customerRepository.findById(booking.getCustomerId())
             .orElseThrow(() -> new CheckInException("Không tìm thấy thông tin khách hàng"));
         
-        // === 3. Lấy thông tin các dịch vụ từ booking ===
-        List<BookingLookupResponse.ServiceInfo> services = new ArrayList<>();
+        // Lấy thông tin các dịch vụ từ booking
+        List<com.g42.platform.gms.booking.customer.infrastructure.entity.CatalogItemJpaEntity> catalogItems = new ArrayList<>();
         if (booking.getServiceIds() != null && !booking.getServiceIds().isEmpty()) {
             for (Integer serviceId : booking.getServiceIds()) {
                 Optional<com.g42.platform.gms.booking.customer.infrastructure.entity.CatalogItemJpaEntity> catalogItem = 
                     catalogRepository.findById(serviceId);
                 if (catalogItem.isPresent()) {
-                    BookingLookupResponse.ServiceInfo serviceInfo = new BookingLookupResponse.ServiceInfo();
-                    serviceInfo.setServiceId(catalogItem.get().getItemId());
-                    serviceInfo.setServiceName(catalogItem.get().getItemName());
-                    serviceInfo.setCategory(catalogItem.get().getItemType()); // Use itemType instead of category
-                    services.add(serviceInfo);
+                    catalogItems.add(catalogItem.get());
                 }
             }
         }
         
-        // === 4. Map sang BookingLookupResponse ===
-        BookingLookupResponse response = new BookingLookupResponse();
-        response.setBookingId(booking.getBookingId());
-        response.setBookingCode(booking.getBookingCode());
-        response.setScheduledDate(booking.getScheduledDate());
-        response.setScheduledTime(booking.getScheduledTime());
-        response.setServiceCategory(booking.getServiceCategory());
-        response.setDescription(booking.getDescription());
-        response.setCustomerId(customer.getCustomerId());
-        response.setCustomerName(customer.getFullName());
-        response.setCustomerPhone(customer.getPhone());
-        response.setCustomerEmail(customer.getEmail());
-        response.setServices(services);
+        // Map sang BookingLookupResponse sử dụng mapper
+        BookingLookupResponse response = bookingLookupMapper.toResponse(booking, customer);
+        response.setServices(bookingLookupMapper.toServiceInfoList(catalogItems));
         
         log.info("Booking lookup successful: bookingId={}, customerId={}", booking.getBookingId(), customer.getCustomerId());
         return response;
@@ -149,17 +141,17 @@ public class CheckInService {
         log.info("Creating new vehicle for customer: {}, licensePlate: {}", 
             request.getCustomerId(), request.getLicensePlate());
         
-        // === 1. Validate customer exists ===
+        // Validate customer exists
         CustomerProfile customer = customerRepository.findById(request.getCustomerId())
             .orElseThrow(() -> new CheckInException("Không tìm thấy khách hàng"));
         
-        // === 2. Validate license plate uniqueness ===
+        // Validate license plate uniqueness
         Optional<Vehicle> existingVehicle = vehicleRepository.findByLicensePlate(request.getLicensePlate());
         if (existingVehicle.isPresent()) {
             throw new CheckInException("Biển số xe đã tồn tại: " + request.getLicensePlate());
         }
         
-        // === 3. Create new vehicle ===
+        // Create new vehicle
         Vehicle vehicle = new Vehicle();
         vehicle.setLicensePlate(request.getLicensePlate());
         vehicle.setBrand(request.getMake());
@@ -171,17 +163,8 @@ public class CheckInService {
         log.info("Created new vehicle: vehicleId={}, licensePlate={}", 
             vehicle.getVehicleId(), vehicle.getLicensePlate());
         
-        // === 4. Map to CreateVehicleResponse ===
-        CreateVehicleResponse response = new CreateVehicleResponse();
-        response.setVehicleId(vehicle.getVehicleId());
-        response.setLicensePlate(vehicle.getLicensePlate());
-        response.setMake(vehicle.getBrand());
-        response.setModel(vehicle.getModel());
-        response.setYear(vehicle.getManufactureYear());
-        response.setCustomerId(customer.getCustomerId());
-        response.setMessage("Tạo xe mới thành công");
-        
-        return response;
+        // Map to CreateVehicleResponse sử dụng mapper
+        return vehicleMapper.toCreateResponse(vehicle);
     }
 
     /**
@@ -200,13 +183,13 @@ public class CheckInService {
         Vehicle vehicle;
         boolean isNewVehicle = false;
         
-        // === 1. Nếu có vehicleId, validate và trả về xe có sẵn ===
+        // Nếu có vehicleId, validate và trả về xe có sẵn
         if (request.getVehicleId() != null) {
             vehicle = vehicleRepository.findById(request.getVehicleId())
                 .orElseThrow(() -> new CheckInException("Không tìm thấy xe với ID: " + request.getVehicleId()));
             log.info("Using existing vehicle: vehicleId={}", vehicle.getVehicleId());
         } else {
-            // === 2. Nếu vehicleId null, tạo xe mới ===
+            // Nếu vehicleId null, tạo xe mới
             // Validate các trường bắt buộc khi tạo xe mới
             if (request.getLicensePlate() == null || request.getLicensePlate().trim().isEmpty()) {
                 throw new CheckInException("Biển số xe là bắt buộc khi tạo xe mới");
@@ -221,7 +204,7 @@ public class CheckInService {
                 throw new CheckInException("Năm sản xuất là bắt buộc khi tạo xe mới");
             }
             
-            // === 3. Validate biển số xe không trùng ===
+            // Validate biển số xe không trùng
             Optional<Vehicle> existingVehicle = vehicleRepository.findByLicensePlate(request.getLicensePlate());
             if (existingVehicle.isPresent()) {
                 throw new CheckInException("Biển số xe đã tồn tại: " + request.getLicensePlate());
@@ -233,7 +216,7 @@ public class CheckInService {
             vehicle.setModel(request.getModel());
             vehicle.setManufactureYear(request.getYear());
             
-            // === 4. Liên kết xe với customer ===
+            // Liên kết xe với customer
             CustomerProfile customer = customerRepository.findById(request.getCustomerId())
                 .orElseThrow(() -> new CheckInException("Không tìm thấy khách hàng"));
             vehicle.setCustomer(customer);
@@ -243,7 +226,7 @@ public class CheckInService {
             log.info("Created new vehicle: vehicleId={}, licensePlate={}", vehicle.getVehicleId(), vehicle.getLicensePlate());
         }
         
-        // === 5. Kiểm tra Service Ticket đã tồn tại cho booking này chưa ===
+        // Kiểm tra Service Ticket đã tồn tại cho booking này chưa
         ServiceTicket serviceTicket;
         Optional<ServiceTicketJpa> existingTicket = serviceTicketRepository.findByBookingId(request.getBookingId());
         
@@ -265,8 +248,7 @@ public class CheckInService {
             }
         } else {
             // Tạo Service Ticket mới (lazy creation)
-            // Note: staffId nên được truyền trong VehicleRequest để audit trail đúng
-            Integer staffId = request.getStaffId() != null ? request.getStaffId() : 0; // Default to 0 if not provided
+            Integer staffId = request.getStaffId() != null ? request.getStaffId() : 0;
             serviceTicket = serviceTicketService.createServiceTicket(
                 request.getBookingId(),
                 vehicle.getVehicleId(),
@@ -276,14 +258,8 @@ public class CheckInService {
             log.info("Created new service ticket: ticketCode={}", serviceTicket.getTicketCode());
         }
         
-        // === 6. Map sang VehicleResponse ===
-        VehicleResponse response = new VehicleResponse();
-        response.setVehicleId(vehicle.getVehicleId());
-        response.setLicensePlate(vehicle.getLicensePlate());
-        response.setMake(vehicle.getBrand());
-        response.setModel(vehicle.getModel());
-        response.setYear(vehicle.getManufactureYear());
-        response.setCustomerId(vehicle.getCustomer() != null ? vehicle.getCustomer().getCustomerId() : null);
+        // Map sang VehicleResponse sử dụng mapper
+        VehicleResponse response = vehicleMapper.toVehicleResponse(vehicle);
         response.setIsNewVehicle(isNewVehicle);
         response.setTicketCode(serviceTicket.getTicketCode());
         
@@ -336,7 +312,7 @@ public class CheckInService {
         log.info("Uploading condition photo: category={}, ticketCode={}", 
                  request.getCategory(), request.getTicketCode());
         
-        // 1. Upload to Cloudinary
+        // Upload to Cloudinary
         String photoUrl;
         try {
             photoUrl = imageUploadService.uploadImage(file, FileUploadConstants.FOLDER_VEHICLE);
@@ -345,31 +321,25 @@ public class CheckInService {
             throw new CheckInException("Không thể upload ảnh: " + e.getMessage());
         }
         
-        // 2. Find service ticket
+        // Find service ticket
         ServiceTicket ticket = serviceTicketService.findByTicketCode(request.getTicketCode());
         ServiceTicketJpa ticketJpa = serviceTicketRepository.findByTicketCode(request.getTicketCode())
             .orElseThrow(() -> new CheckInException("Không tìm thấy service ticket"));
         
-        // 3. Create VehicleConditionPhotoJpa entity
+        // Create VehicleConditionPhotoJpa entity
         VehicleConditionPhotoJpa photoJpa = new VehicleConditionPhotoJpa();
-        photoJpa.setServiceTicketId(ticketJpa.getServiceTicketId()); // Use ID instead of object
+        photoJpa.setServiceTicketId(ticketJpa.getServiceTicketId());
         photoJpa.setCategory(request.getCategory());
         photoJpa.setPhotoUrl(photoUrl);
         photoJpa.setDescription(request.getDescription());
         photoJpa.setUploadedAt(LocalDateTime.now());
         photoJpa.setUploadedBy(request.getUploadedBy());
         
-        // 4. Save to database
+        // Save to database
         photoJpa = photoRepository.save(photoJpa);
         
-        // 5. Return PhotoUploadResponse
-        PhotoUploadResponse response = new PhotoUploadResponse();
-        response.setPhotoId(photoJpa.getPhotoId());
-        response.setPhotoUrl(photoJpa.getPhotoUrl());
-        response.setCategory(photoJpa.getCategory());
-        response.setDescription(photoJpa.getDescription());
-        response.setUploadedAt(photoJpa.getUploadedAt());
-        response.setMessage("Upload ảnh thành công");
+        // Map to PhotoUploadResponse sử dụng mapper
+        PhotoUploadResponse response = photoResponseMapper.toUploadResponse(photoJpa);
         
         log.info("Condition photo uploaded successfully: photoId={}, category={}", photoJpa.getPhotoId(), photoJpa.getCategory());
         return response;
@@ -535,16 +505,8 @@ public class CheckInService {
         response.setCreatedAt(ticketJpa.getCreatedAt());
         response.setUpdatedAt(ticketJpa.getUpdatedAt());
         
-        // Map photos
-        List<ServiceTicketResponse.PhotoInfo> photoInfos = new ArrayList<>();
-        for (VehicleConditionPhotoJpa photo : ticketPhotos) {
-            ServiceTicketResponse.PhotoInfo photoInfo = new ServiceTicketResponse.PhotoInfo();
-            photoInfo.setPhotoId(photo.getPhotoId());
-            photoInfo.setCategory(photo.getCategory().name());
-            photoInfo.setPhotoUrl(photo.getPhotoUrl());
-            photoInfo.setDescription(photo.getDescription());
-            photoInfos.add(photoInfo);
-        }
+        // Map photos sử dụng mapper
+        List<ServiceTicketResponse.PhotoInfo> photoInfos = photoResponseMapper.toPhotoInfoList(ticketPhotos);
         response.setPhotos(photoInfos);
         response.setWarnings(warnings);
         
@@ -590,25 +552,20 @@ public class CheckInService {
     public CustomerVehiclesResponse getCustomerVehicles(Integer customerId) {
         log.info("Getting vehicles for customer: {}", customerId);
         
-        // 1. Validate customer exists
+        // Validate customer exists
         CustomerProfile customer = customerRepository.findById(customerId)
             .orElseThrow(() -> new CheckInException("Không tìm thấy khách hàng"));
         
-        // 2. Get all vehicles
+        // Get all vehicles
         List<Vehicle> vehicles = vehicleRepository.findByCustomer_CustomerId(customerId);
         
-        // 3. Map to response
-        CustomerVehiclesResponse response = new CustomerVehiclesResponse();
-        response.setCustomerId(customerId);
+        // Map to VehicleInfo sử dụng mapper
+        List<CustomerVehiclesResponse.VehicleInfo> vehicleInfos = vehicleMapper.toVehicleInfoList(vehicles);
         
-        List<CustomerVehiclesResponse.VehicleInfo> vehicleInfos = new ArrayList<>();
-        for (Vehicle vehicle : vehicles) {
-            CustomerVehiclesResponse.VehicleInfo info = new CustomerVehiclesResponse.VehicleInfo();
-            info.setVehicleId(vehicle.getVehicleId());
-            info.setLicensePlate(vehicle.getLicensePlate());
-            info.setMake(vehicle.getBrand());
-            info.setModel(vehicle.getModel());
-            info.setYear(vehicle.getManufactureYear());
+        // Set business logic fields (odometer và last service date)
+        for (int i = 0; i < vehicles.size(); i++) {
+            Vehicle vehicle = vehicles.get(i);
+            CustomerVehiclesResponse.VehicleInfo info = vehicleInfos.get(i);
             
             // Get last odometer reading
             Optional<OdometerHistoryJpa> lastReading = odometerRepository.findLatestByVehicleId(vehicle.getVehicleId());
@@ -629,10 +586,11 @@ public class CheckInService {
             if (lastTicket != null) {
                 info.setLastServiceDate(lastTicket.getCreatedAt().toLocalDate());
             }
-            
-            vehicleInfos.add(info);
         }
         
+        // Build response
+        CustomerVehiclesResponse response = new CustomerVehiclesResponse();
+        response.setCustomerId(customerId);
         response.setVehicles(vehicleInfos);
         
         log.info("Found {} vehicles for customer: {}", vehicleInfos.size(), customerId);
@@ -915,19 +873,15 @@ public class CheckInService {
         // Step 2: Domain → DTO (API Mapper)
         ServiceTicketResponse response = serviceTicketDtoMapper.toResponse(serviceTicketDomain);
         
-        // Step 3: Map photos (business logic - photos not in Domain entity)
+        // Map photos sử dụng mapper (business logic - photos not in Domain entity)
         List<VehicleConditionPhotoJpa> allPhotos = photoRepository.findAll();
-        List<ServiceTicketResponse.PhotoInfo> photoInfos = new ArrayList<>();
+        List<VehicleConditionPhotoJpa> ticketPhotos = new ArrayList<>();
         for (VehicleConditionPhotoJpa photo : allPhotos) {
             if (photo.getServiceTicketId().equals(ticketJpa.getServiceTicketId())) {
-                ServiceTicketResponse.PhotoInfo photoInfo = new ServiceTicketResponse.PhotoInfo();
-                photoInfo.setPhotoId(photo.getPhotoId());
-                photoInfo.setCategory(photo.getCategory().name());
-                photoInfo.setPhotoUrl(photo.getPhotoUrl());
-                photoInfo.setDescription(photo.getDescription());
-                photoInfos.add(photoInfo);
+                ticketPhotos.add(photo);
             }
         }
+        List<ServiceTicketResponse.PhotoInfo> photoInfos = photoResponseMapper.toPhotoInfoList(ticketPhotos);
         response.setPhotos(photoInfos);
         
         // Step 4: Set warnings (business logic)

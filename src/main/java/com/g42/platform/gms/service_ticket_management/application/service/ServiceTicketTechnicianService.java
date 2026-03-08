@@ -7,9 +7,9 @@ import com.g42.platform.gms.auth.repository.StaffProfileRepo;
 import com.g42.platform.gms.booking.customer.domain.entity.Booking;
 import com.g42.platform.gms.booking.customer.domain.repository.BookingRepository;
 import com.g42.platform.gms.catalog.repository.CatalogItemRepository;
-import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceTicketDetailResponse;
-import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceTicketListResponse;
-import com.g42.platform.gms.service_ticket_management.api.dto.manage.UpdateServiceTicketRequest;
+import com.g42.platform.gms.service_ticket_management.api.dto.technician.TechnicianTicketDetailResponse;
+import com.g42.platform.gms.service_ticket_management.api.dto.technician.TechnicianTicketListResponse;
+import com.g42.platform.gms.service_ticket_management.api.dto.technician.UpdateTechnicianNotesRequest;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import com.g42.platform.gms.service_ticket_management.domain.exception.CheckInException;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.OdometerHistoryJpa;
@@ -39,13 +39,13 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Service for managing service tickets (receptionist view).
- * Tương tự BookingManageService trong booking_management package.
+ * Service for technician service ticket management.
+ * Quản lý phiếu dịch vụ cho kỹ thuật viên.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class ServiceTicketManageService {
+public class ServiceTicketTechnicianService {
     
     private final ServiceTicketRepository serviceTicketRepository;
     private final CustomerProfileRepository customerRepository;
@@ -59,24 +59,24 @@ public class ServiceTicketManageService {
     private final ServiceTicketDetailMapper detailMapper;
     
     /**
-     * Get paginated list of service tickets with filters.
+     * Get paginated list of service tickets for technician.
      * 
      * @param page Page number (0-indexed)
      * @param size Page size
      * @param date Filter by received date
      * @param status Filter by ticket status
      * @param search Search by ticket code, customer name, phone, or license plate
-     * @return Page of ServiceTicketListResponse
+     * @return Page of TechnicianTicketListResponse
      */
     @Transactional(readOnly = true)
-    public Page<ServiceTicketListResponse> getServiceTicketList(
+    public Page<TechnicianTicketListResponse> getTechnicianTicketList(
             int page, 
             int size, 
             LocalDate date, 
             TicketStatus status, 
             String search) {
         
-        log.info("Getting service ticket list: page={}, size={}, date={}, status={}, search={}", 
+        log.info("Getting technician ticket list: page={}, size={}, date={}, status={}, search={}", 
             page, size, date, status, search);
         
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "receivedAt"));
@@ -93,9 +93,9 @@ public class ServiceTicketManageService {
     }
     
     /**
-     * Map ServiceTicketJpa to ServiceTicketListResponse using MapStruct.
+     * Map ServiceTicketJpa to TechnicianTicketListResponse using MapStruct.
      */
-    private ServiceTicketListResponse mapToListResponse(ServiceTicketJpa ticket) {
+    private TechnicianTicketListResponse mapToListResponse(ServiceTicketJpa ticket) {
         CustomerProfile customer = customerRepository.findById(ticket.getCustomerId()).orElse(null);
         Vehicle vehicle = vehicleRepository.findById(ticket.getVehicleId()).orElse(null);
         
@@ -104,53 +104,58 @@ public class ServiceTicketManageService {
             booking = bookingRepository.findById(ticket.getBookingId()).orElse(null);
         }
         
-        return listMapper.toManageListResponse(ticket, customer, vehicle, booking);
+        return listMapper.toTechnicianListResponse(ticket, customer, vehicle, booking);
     }
     
+    /**
+     * Get service ticket detail for technician.
+     * 
+     * @param ticketCode Ticket code (ST_XXXXXX or MST_XXXXXX)
+     * @return TechnicianTicketDetailResponse with full information
+     */
     @Transactional(readOnly = true)
-    public ServiceTicketDetailResponse getServiceTicketDetail(String ticketCode) {
-        log.info("Getting service ticket detail: {}", ticketCode);
+    public TechnicianTicketDetailResponse getTechnicianTicketDetail(String ticketCode) {
+        log.info("Getting technician ticket detail: {}", ticketCode);
         
         ServiceTicketJpa ticket = serviceTicketRepository.findByTicketCode(ticketCode)
             .orElseThrow(() -> new CheckInException("Không tìm thấy service ticket: " + ticketCode));
         
-        ServiceTicketDetailResponse response = new ServiceTicketDetailResponse();
+        TechnicianTicketDetailResponse response = new TechnicianTicketDetailResponse();
         
         // Basic ticket info
         response.setServiceTicketId(ticket.getServiceTicketId());
         response.setTicketCode(ticket.getTicketCode());
         response.setTicketStatus(ticket.getTicketStatus());
         response.setCustomerRequest(ticket.getCustomerRequest());
+        response.setTechnicianNotes(ticket.getTechnicianNotes());
         response.setCheckInNotes(ticket.getCheckInNotes());
         response.setReceivedAt(ticket.getReceivedAt());
         response.setDeliveredAt(ticket.getDeliveredAt());
         response.setCreatedAt(ticket.getCreatedAt());
         response.setUpdatedAt(ticket.getUpdatedAt());
-        response.setImmutable(ticket.getImmutable());
         
         // Customer info
         CustomerProfile customer = customerRepository.findById(ticket.getCustomerId())
             .orElseThrow(() -> new CheckInException("Không tìm thấy khách hàng"));
-        response.setCustomer(detailMapper.toManageCustomerInfo(customer));
+        response.setCustomer(detailMapper.toTechnicianCustomerInfo(customer));
         
         // Vehicle info
         Vehicle vehicle = vehicleRepository.findById(ticket.getVehicleId())
             .orElseThrow(() -> new CheckInException("Không tìm thấy xe"));
-        response.setVehicle(detailMapper.toManageVehicleInfo(vehicle));
+        response.setVehicle(detailMapper.toTechnicianVehicleInfo(vehicle));
         
         // Booking info
         if (ticket.getBookingId() != null) {
             Booking booking = bookingRepository.findById(ticket.getBookingId()).orElse(null);
             if (booking != null) {
-                response.setBooking(detailMapper.toManageBookingInfo(booking));
+                response.setBooking(detailMapper.toTechnicianBookingInfo(booking));
                 response.setServiceCategory(booking.getServiceCategory());
-                response.setIsGuest(booking.getIsGuest());
                 
                 // Services
                 if (booking.getServiceIds() != null) {
                     List<com.g42.platform.gms.booking.customer.infrastructure.entity.CatalogItemJpaEntity> catalogItems = 
                         catalogRepository.findAllById(booking.getServiceIds());
-                    response.setServices(detailMapper.toManageServiceInfoList(catalogItems));
+                    response.setServices(detailMapper.toTechnicianServiceInfoList(catalogItems));
                 }
             }
         }
@@ -165,7 +170,7 @@ public class ServiceTicketManageService {
         List<VehicleConditionPhotoJpa> photos = photoRepository.findAll().stream()
             .filter(photo -> photo.getServiceTicketId().equals(ticket.getServiceTicketId()))
             .toList();
-        response.setPhotos(detailMapper.toManagePhotoInfoList(photos));
+        response.setPhotos(detailMapper.toTechnicianPhotoInfoList(photos));
         
         // Staff info
         if (ticket.getCreatedBy() != null) {
@@ -176,21 +181,21 @@ public class ServiceTicketManageService {
             }
         }
         
-        log.info("Service ticket detail retrieved: {}", ticketCode);
+        log.info("Technician ticket detail retrieved: {}", ticketCode);
         return response;
     }
     
     /**
-     * Update service ticket (customer request and services).
+     * Update technician notes.
      * Chỉ cho phép update khi ticket chưa COMPLETED hoặc CANCELLED.
      * 
      * @param ticketCode Ticket code
      * @param request Update request
-     * @return Updated ServiceTicketDetailResponse
+     * @return Updated TechnicianTicketDetailResponse
      */
     @Transactional
-    public ServiceTicketDetailResponse updateServiceTicket(String ticketCode, UpdateServiceTicketRequest request) {
-        log.info("Updating service ticket: {}", ticketCode);
+    public TechnicianTicketDetailResponse updateTechnicianNotes(String ticketCode, UpdateTechnicianNotesRequest request) {
+        log.info("Updating technician notes for ticket: {}", ticketCode);
         
         ServiceTicketJpa ticket = serviceTicketRepository.findByTicketCode(ticketCode)
             .orElseThrow(() -> new CheckInException("Không tìm thấy service ticket: " + ticketCode));
@@ -203,23 +208,10 @@ public class ServiceTicketManageService {
             throw new CheckInException("Không thể chỉnh sửa service ticket đã hủy");
         }
         
-        if (request.getCustomerRequest() != null) {
-            ticket.setCustomerRequest(request.getCustomerRequest());
-        }
-        
-        if (ticket.getBookingId() != null && request.getServiceIds() != null) {
-            Booking booking = bookingRepository.findById(ticket.getBookingId())
-                .orElseThrow(() -> new CheckInException("Không tìm thấy booking"));
-            
-            booking.setServiceIds(request.getServiceIds());
-            bookingRepository.save(booking);
-            
-            log.info("Updated services for booking {}: {}", booking.getBookingId(), request.getServiceIds());
-        }
-        
+        ticket.setTechnicianNotes(request.getTechnicianNotes());
         serviceTicketRepository.save(ticket);
         
-        log.info("Service ticket updated successfully: {}", ticketCode);
-        return getServiceTicketDetail(ticketCode);
+        log.info("Technician notes updated successfully: {}", ticketCode);
+        return getTechnicianTicketDetail(ticketCode);
     }
 }
