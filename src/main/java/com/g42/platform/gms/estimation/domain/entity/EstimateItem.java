@@ -25,7 +25,7 @@ public class EstimateItem {
 
     private Integer id;
     private Integer estimate;
-    private String itemName;
+    private String estimateId;
     private Integer itemId;
     private Integer quantity;
     private BigDecimal unitPrice;

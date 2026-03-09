@@ -1,5 +1,7 @@
 package com.g42.platform.gms.estimation.infrastructure.entity;
 
+import com.g42.platform.gms.common.enums.EstimateEnum;
+import com.g42.platform.gms.estimation.domain.enums.EstimateTypeEnum;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
@@ -23,17 +25,18 @@ public class EstimateJpa {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "service_ticket_id", nullable = false)
     private ServiceTicketJpa serviceTicket;
-
+    @Enumerated(EnumType.STRING)
     @NotNull
     @Lob
     @Column(name = "estimate_type", nullable = false)
-    private String estimateType;
+    private EstimateTypeEnum estimateType;
 
+    @Enumerated(EnumType.STRING)
     @NotNull
     @ColumnDefault("'DRAFT'")
     @Lob
     @Column(name = "status", nullable = false)
-    private String status;
+    private EstimateEnum status;
 
     @ColumnDefault("CURRENT_TIMESTAMP")
     @Column(name = "created_at")

@@ -22,7 +22,7 @@ public class EstimateItemJpa {
 
     @NotNull
     @Column(name = "estimate_id", nullable = false)
-    private Integer estimate;
+    private Integer estimateId;
 
     @Size(max = 255)
     @Column(name = "item_name")

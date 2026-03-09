@@ -1,5 +1,7 @@
 package com.g42.platform.gms.estimation.domain.entity;
 
+import com.g42.platform.gms.common.enums.EstimateEnum;
+import com.g42.platform.gms.estimation.domain.enums.EstimateTypeEnum;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
@@ -19,8 +21,8 @@ public class Estimate {
 
     private Integer id;
     private ServiceTicketJpa serviceTicket;
-    private String estimateType;
-    private String status;
+    private EstimateTypeEnum estimateType;
+    private EstimateEnum status;
     private Instant createdAt;
     private Instant approvedAt;
     private Integer version;

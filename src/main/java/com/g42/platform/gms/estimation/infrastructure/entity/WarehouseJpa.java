@@ -1,6 +1,7 @@
 package com.g42.platform.gms.estimation.infrastructure.entity;
 
 import com.g42.platform.gms.auth.entity.StaffProfile;
+import com.g42.platform.gms.common.enums.WarehouseTypeEnum;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -29,11 +30,11 @@ public class WarehouseJpa {
     @NotNull
     @Column(name = "warehouse_name", nullable = false, length = 100)
     private String warehouseName;
-
+    @Enumerated(EnumType.STRING)
     @NotNull
     @Lob
     @Column(name = "warehouse_type", nullable = false)
-    private String warehouseType;
+    private WarehouseTypeEnum warehouseType;
 
     @Column(name = "parent_warehouse_id", nullable = false)
     private Integer parentWarehouseId;
