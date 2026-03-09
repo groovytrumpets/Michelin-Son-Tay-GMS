@@ -46,14 +46,20 @@ public class ServiceTicketJpa {
     @Column(name = "received_at")
     private LocalDateTime receivedAt;
     
-    @Column(name = "odometer_reading")
-    private Integer odometerReading;
-    
-    @Column(name = "license_plate_photo_url", length = 500)
-    private String licensePlatePhotoUrl;
-    
     @Column(name = "immutable")
     private Boolean immutable = false;
+    
+    @Column(name = "customer_request", columnDefinition = "TINYTEXT")
+    private String customerRequest;
+    
+    @Column(name = "technician_notes", columnDefinition = "TINYTEXT")
+    private String technicianNotes;
+    
+    @Column(name = "delivered_at")
+    private LocalDateTime deliveredAt;
+    
+    @Column(name = "is_deleted")
+    private Boolean isDeleted = false;
     
     @Column(name = "check_in_notes", columnDefinition = "TEXT")
     private String checkInNotes;
