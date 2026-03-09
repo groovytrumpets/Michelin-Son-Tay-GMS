@@ -9,6 +9,7 @@ import lombok.Setter;
 @Setter
 @AllArgsConstructor
 public class ServiceSumaryRespond {
+    private int catalogItemId;
     private Long serviceId;
     private String title;
     private String shortDescription;

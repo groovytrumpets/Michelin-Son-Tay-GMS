@@ -37,11 +37,11 @@ import java.util.concurrent.ConcurrentHashMap;
  * - Hủy booking
  * 
  * Business Rules:
- * - Customer phải đặt trước ít nhất 2 giờ
+ * - Customer đã login phải đặt trước ít nhất 2 giờ
  * - Staff/Receptionist có thể đặt ngay tức khắc (bypass 2 giờ)
  * - Chỉ được sửa/hủy trước 2 giờ so với giờ hẹn
- * - Rate limiting: tối đa 3 booking/giờ/customer
- * - IP blacklist checking
+ * - Rate limiting: tối đa 100 booking/giờ/customer (giá trị cao để tránh block nhầm)
+ * - IP blacklist checking (chỉ áp dụng cho customer đã login)
  */
 @Slf4j
 @Service
@@ -59,7 +59,7 @@ public class BookingService {
     /** Thời lượng mặc định nếu không có service nào được chọn (60 phút) */
     private static final int DEFAULT_DURATION_MINUTES = 60;
     
-    /** Giới hạn số lần đặt lịch (3 lần/giờ/customer) */
+    /** Giới hạn số lần đặt lịch (100 lần/giờ/customer - giá trị cao để tránh block nhầm) */
     private static final int MAX_REQUESTS_PER_CUSTOMER_PER_HOUR = 100;
 
     // === DEPENDENCIES - Các dependency injection ===
@@ -80,21 +80,32 @@ public class BookingService {
     // ========================================
 
     /**
-     * Tạo booking cho customer (customer tự đặt qua app/web)
+     * Tạo booking cho customer đã login (customer tự đặt qua app/web)
+     * 
+     * Đặc điểm:
+     * - Customer phải đăng nhập trước
+     * - Phải đặt trước ít nhất 2 giờ (MIN_BOOKING_LEAD_TIME_HOURS)
+     * - Trạng thái CONFIRMED ngay (không qua PENDING)
+     * - Generate mã booking mới (MST_XXXXXX)
+     * - Check slot availability trước khi tạo
+     * - Áp dụng rate limiting (100 booking/giờ/customer)
+     * - Áp dụng IP blacklist checking
      * 
      * Flow:
      * 1. Check IP blacklist
-     * 2. Check rate limiting (3 booking/giờ/customer)
-     * 3. Validate thời gian đặt lịch (phải trước ít nhất 2 giờ)
-     * 4. Check slot availability
-     * 5. Generate booking code (MST_XXXXXX)
-     * 6. Save booking
-     * 7. Reserve slot
+     * 2. Check rate limiting (100 booking/giờ/customer)
+     * 3. Validate customer exists
+     * 4. Build booking object với status = CONFIRMED
+     * 5. Validate thời gian đặt lịch (phải trước ít nhất 2 giờ)
+     * 6. Check slot availability
+     * 7. Generate booking code (MST_XXXXXX)
+     * 8. Save booking vào database
+     * 9. Reserve slot cho booking này
      * 
-     * @param request Thông tin booking
-     * @param customerId ID của khách hàng
-     * @param clientIp IP của client
-     * @return Booking đã được tạo
+     * @param request Thông tin booking (appointmentDate, appointmentTime, userNote, selectedServiceIds)
+     * @param customerId ID của khách hàng (từ JWT token)
+     * @param clientIp IP của client (để check blacklist)
+     * @return Booking đã được tạo với status = CONFIRMED
      * @throws BookingException nếu vi phạm business rules
      */
     @Transactional
@@ -106,7 +117,7 @@ public class BookingService {
         }
 
         // === 2. RATE LIMITING ===
-        // Rate limiting per customer (tối đa 3 booking/giờ)
+        // Rate limiting per customer (tối đa 100 booking/giờ - giá trị cao để tránh block nhầm)
         String customerKey = "customer:" + customerId;
         if (!checkRateLimit(customerKey, MAX_REQUESTS_PER_CUSTOMER_PER_HOUR)) {
             throw new BookingException(
@@ -118,7 +129,7 @@ public class BookingService {
         CustomerProfile customer = customerRepository.findById(customerId)
                 .orElseThrow(() -> new BookingException("Không tìm thấy thông tin khách hàng."));
 
-        // === 4. BUILD BOOKING OBJECT ===
+        // === 4. BUILD BOOKING OBJECT VỚI STATUS = CONFIRMED ===
         Booking booking = new Booking();
         booking.setCustomerId(customerId);
         booking.setScheduledDate(request.getAppointmentDate());
@@ -138,8 +149,7 @@ public class BookingService {
             booking.setServiceIds(new ArrayList<>());
         }
 
-        // === 5. VALIDATE THỜI GIAN ===
-        // Validate thời gian đặt lịch
+        // === 5. VALIDATE THỜI GIAN (PHẢI TRƯỚC ÍT NHẤT 2 GIỜ) ===
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime scheduledDateTime = LocalDateTime.of(
                 booking.getScheduledDate(),
@@ -151,7 +161,7 @@ public class BookingService {
             throw new BookingException("Không thể đặt lịch trong quá khứ.");
         }
 
-        // Check phải cách hiện tại ít nhất 2 giờ
+        // Check phải cách hiện tại ít nhất 2 giờ (MIN_BOOKING_LEAD_TIME_HOURS)
         LocalDateTime minBookingTime = now.plusHours(MIN_BOOKING_LEAD_TIME_HOURS);
         if (scheduledDateTime.isBefore(minBookingTime)) {
             throw new BookingException("Vui lòng đặt lịch trước ít nhất 2 giờ.");
@@ -170,8 +180,7 @@ public class BookingService {
             throw new BookingException("Khung giờ này đã đầy, vui lòng chọn giờ khác.");
         }
 
-        // === 7. GENERATE BOOKING CODE ===
-        // Generate booking code (MST_XXXXXX format)
+        // === 7. GENERATE BOOKING CODE (MST_XXXXXX) ===
         try {
             String bookingCode = bookingCodeGenerator.generateCode(LocalDate.now(), CodePrefix.BOOKING);
             booking.setBookingCode(bookingCode);
@@ -181,11 +190,11 @@ public class BookingService {
             throw new BookingException("Không thể tạo mã booking: " + e.getMessage());
         }
 
-        // === 8. SAVE BOOKING ===
+        // === 8. SAVE BOOKING VÀO DATABASE ===
         booking.initializeDefaults();
         Booking savedBooking = bookingRepository.save(booking);
 
-        // === 9. RESERVE SLOT ===
+        // === 9. RESERVE SLOT CHO BOOKING NÀY ===
         slotService.reserveForBooking(savedBooking.getBookingId(), estimatedDuration);
 
         log.info("Customer booking created: bookingId={}, bookingCode={}, customerId={}",
@@ -198,21 +207,24 @@ public class BookingService {
      * Tạo booking trực tiếp bởi Staff/Receptionist (không qua BookingRequest)
      * 
      * Đặc điểm:
-     * - Không bị ràng buộc thời gian 2 giờ (có thể đặt ngay)
+     * - KHÔNG bị ràng buộc thời gian 2 giờ (có thể đặt ngay tức khắc)
      * - Trạng thái CONFIRMED luôn (không qua PENDING)
-     * - Tự động tạo/tìm customer account từ phone
-     * - Check slot availability
+     * - Tự động tạo/tìm customer account từ phone number
+     * - Check slot availability trước khi tạo
+     * - KHÔNG áp dụng rate limiting
+     * - KHÔNG áp dụng IP blacklist checking
      * 
      * Flow:
-     * 1. Tìm hoặc tạo customer account từ phone
-     * 2. Validate thời gian (chỉ check không được quá khứ)
-     * 3. Check slot availability
-     * 4. Generate booking code (MST_XXXXXX)
-     * 5. Save booking với status = CONFIRMED
-     * 6. Reserve slot
+     * 1. Tìm customer account theo phone, nếu không có thì tạo mới
+     * 2. Build booking object với status = CONFIRMED
+     * 3. Validate thời gian (chỉ check không được quá khứ, KHÔNG check 2 giờ)
+     * 4. Check slot availability
+     * 5. Generate booking code (MST_XXXXXX)
+     * 6. Save booking vào database
+     * 7. Reserve slot cho booking này
      * 
      * @param request Thông tin booking (phone, fullName, appointmentDate, appointmentTime, userNote, selectedServiceIds)
-     * @return Booking đã được tạo
+     * @return Booking đã được tạo với status = CONFIRMED
      * @throws BookingException nếu vi phạm business rules
      */
     @Transactional
@@ -243,7 +255,7 @@ public class BookingService {
             }
         }
         
-        // === 2. BUILD BOOKING OBJECT ===
+        // === 2. BUILD BOOKING OBJECT VỚI STATUS = CONFIRMED ===
         Booking booking = new Booking();
         booking.setCustomerId(customerId);
         booking.setScheduledDate(request.getAppointmentDate());
@@ -263,12 +275,11 @@ public class BookingService {
             booking.setServiceIds(new ArrayList<>());
         }
         
-        // === 3. VALIDATE THỜI GIAN ===
-        // Validate thời gian đặt lịch
+        // === 3. VALIDATE THỜI GIAN (CHỈ CHECK KHÔNG ĐƯỢC QUÁ KHỨ) ===
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime scheduledDateTime = LocalDateTime.of(request.getAppointmentDate(), request.getAppointmentTime());
 
-        // Staff chỉ cần check không được trong quá khứ (không check 2 giờ)
+        // Staff chỉ cần check không được trong quá khứ (KHÔNG check 2 giờ)
         if (scheduledDateTime.isBefore(now)) {
             throw new BookingException("Không thể đặt lịch trong quá khứ.");
         }
@@ -286,7 +297,7 @@ public class BookingService {
             throw new BookingException("Khung giờ này đã đầy, vui lòng chọn giờ khác.");
         }
         
-        // === 5. GENERATE BOOKING CODE ===
+        // === 5. GENERATE BOOKING CODE (MST_XXXXXX) ===
         try {
             String bookingCode = bookingCodeGenerator.generateCode(LocalDate.now(), CodePrefix.BOOKING);
             booking.setBookingCode(bookingCode);
@@ -296,11 +307,11 @@ public class BookingService {
             throw new BookingException("Không thể tạo mã booking: " + e.getMessage());
         }
         
-        // === 6. SAVE BOOKING ===
+        // === 6. SAVE BOOKING VÀO DATABASE ===
         booking.initializeDefaults();
         Booking savedBooking = bookingRepository.save(booking);
         
-        // === 7. RESERVE SLOT ===
+        // === 7. RESERVE SLOT CHO BOOKING NÀY ===
         slotService.reserveForBooking(savedBooking.getBookingId(), estimatedDuration);
         
         log.info("Direct booking created by staff: bookingId={}, bookingCode={}, customerId={}",

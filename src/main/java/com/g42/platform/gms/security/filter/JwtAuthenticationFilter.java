@@ -50,6 +50,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 || path.startsWith("/swagger-ui")
                 || path.startsWith("/swagger-ui.html")
                 || path.startsWith("/home")
+                || path.startsWith("/zalo/callback")
+                || path.startsWith("/zalo/login")
                 || path.startsWith("/error")) {
             filterChain.doFilter(request, response);
             return;

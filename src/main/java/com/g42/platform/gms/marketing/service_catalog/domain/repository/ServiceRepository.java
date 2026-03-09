@@ -10,4 +10,6 @@ public interface ServiceRepository {
     List<Service> findAllActive();
 
     Service findServiceDetailById(Long serviceId);
+
+    Long[] getCatalogIdByServiceId(Long[] serviceId);
 }
