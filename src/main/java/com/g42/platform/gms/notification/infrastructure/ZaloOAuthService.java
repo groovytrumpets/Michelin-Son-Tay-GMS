@@ -27,7 +27,7 @@ public class ZaloOAuthService {
 
         // TODO: lưu verifier (redis/db)
         ZaloToken zaloToken = new ZaloToken();
-        zaloToken.setAccessToken(verifier);
+        zaloToken.setCodeVerifier(verifier);
         zaloToken.setState("verified");
         zaloTokenRepo.save(zaloToken);
         return "https://oauth.zaloapp.com/v4/oa/permission"
@@ -41,9 +41,9 @@ public class ZaloOAuthService {
         RestTemplate restTemplate = new RestTemplate();
 
         MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+        body.add("code", code);
         body.add("app_id", "1162973287649757116");
         body.add("grant_type", "authorization_code");
-        body.add("code", code);
         body.add("code_verifier", codeVerifier);
 
         HttpHeaders headers = new HttpHeaders();
