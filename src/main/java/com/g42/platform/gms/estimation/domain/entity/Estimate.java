@@ -24,6 +24,5 @@ public class Estimate {
     private Instant createdAt;
     private Instant approvedAt;
     private Integer version;
-    private Integer parentEstimateId;
-    private Boolean isFinal;
+    private Integer revisedFromId;
 }
