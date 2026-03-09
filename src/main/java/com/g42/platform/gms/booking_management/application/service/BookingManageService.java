@@ -20,6 +20,7 @@ import com.g42.platform.gms.booking_management.domain.repository.BookingManageRe
 import com.g42.platform.gms.booking_management.infrastructure.entity.BookingJpa;
 import com.g42.platform.gms.booking_management.infrastructure.mapper.TimeSlotMMapper;
 import com.g42.platform.gms.marketing.service_catalog.domain.exception.ServiceException;
+import com.g42.platform.gms.notification.infrastructure.ZaloNotificationSender;
 import lombok.AllArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
@@ -89,6 +90,9 @@ public class BookingManageService {
         //todo: update booking request status
         boolean confirmed = request.confirm();
         bookingRepository.setConfirmStatus(request);
+        //todo: Zalo notify
+        ZaloNotificationSender zaloNotificationSender = new ZaloNotificationSender();
+        zaloNotificationSender.sendBookingConfirm(request.getPhone(),request.getFullName(),request.getServices().stream().map(CatalogItem::getItemName).toList(),request.getRequestCode(),request.getLocalDateTime(),"Michelin Sơn Tây");
 return confirmed;
     }
     private final TimeSlotMMapper  timeSlotMMapper;
