@@ -152,9 +152,9 @@ public class ServiceTicketTechnicianService {
                 response.setServiceCategory(booking.getServiceCategory());
                 
                 // Services
-                if (booking.getServiceIds() != null) {
+                if (booking.getCatalogItemIds() != null) {
                     List<com.g42.platform.gms.booking.customer.infrastructure.entity.CatalogItemJpaEntity> catalogItems = 
-                        catalogRepository.findAllById(booking.getServiceIds());
+                        catalogRepository.findAllById(booking.getCatalogItemIds());
                     response.setServices(detailMapper.toTechnicianServiceInfoList(catalogItems));
                 }
             }
