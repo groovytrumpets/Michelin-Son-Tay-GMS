@@ -28,4 +28,8 @@ public class ServiceController {
         ServiceDetailRespond serviceDetailRespond = serviceCatalogService.getServiceDetailById(serviceId);
         return ResponseEntity.ok(ApiResponses.success(serviceDetailRespond));
     }
+    @GetMapping("/catalog")
+    public Long [] getCatalogId(@RequestParam Long[] serviceId) {
+        return serviceCatalogService.getArrayOfCatalogId(serviceId);
+    }
 }

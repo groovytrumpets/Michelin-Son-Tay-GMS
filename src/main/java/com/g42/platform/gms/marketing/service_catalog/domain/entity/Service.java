@@ -25,6 +25,7 @@ public class Service {
     private String title;
     private ServiceStatus status;
     private List<ServiceMedia> media;
+    private List<CatalogItem> catalogItems;
 
     public boolean isVisibleNow(LocalDateTime now) {
         if (status != ServiceStatus.ACTIVE) return false;

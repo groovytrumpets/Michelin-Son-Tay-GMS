@@ -53,9 +53,13 @@ public class SecurityConfig {
                                 "/api/booking/guest/**",
                                 "/api/booking/slots/**",
                                 "/api/catalog/**",
+                                "/api/vehicles/**",
+                                "/api/receptionist/**",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
+                                "/zalo/callback",
+                                "/zalo/login",
                                 "/home/**",
                                 "/error"
                         ).permitAll()

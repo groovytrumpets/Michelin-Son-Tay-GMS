@@ -1,7 +1,10 @@
 package com.g42.platform.gms.booking_management.infrastructure;
 
+import com.g42.platform.gms.auth.entity.CustomerProfile;
 import com.g42.platform.gms.auth.repository.CustomerProfileRepository;
+import com.g42.platform.gms.booking.customer.api.dto.BookingResponse;
 import com.g42.platform.gms.booking.customer.domain.enums.BookingRequestStatus;
+import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedRespond;
 import com.g42.platform.gms.booking_management.domain.entity.*;
 import com.g42.platform.gms.booking_management.domain.enums.BookingEnum;
 import com.g42.platform.gms.booking_management.domain.repository.BookingManageRepository;
@@ -32,7 +35,7 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
     private final BookingDraffManagerMapper bookingDraffManagerMapper;
     private final CatalogItemManageMapper catalogItemManageMapper;
     @Override
-    public Page<Booking> getBookedList(int page, int size, LocalDate date, Boolean isGuest, BookingEnum status,String search) {
+    public Page<BookedRespond> getBookedList(int page, int size, LocalDate date, Boolean isGuest, BookingEnum status, String search) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         Specification<BookingJpa> specification = Specification.unrestricted();
         specification = specification.and(BookingRequestSpecification.filterBooking(date,isGuest,status));
@@ -40,20 +43,20 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
         specification = specification.and(BookingRequestSpecification.searchBooking(search));
         }
 
-        Page<BookingJpa> bookingJpaList = bookingManageJpaRepository.findAll(specification,pageable);
-        return bookingJpaList.map(bookingManagerMapper::toDomain);
+        Page<BookedRespond> bookingResponses = bookingManageJpaRepository.findAllBooked(specification,pageable);
+        return bookingResponses;
     }
 
     @Override
-    public Booking getBookedDetailById(Integer bookingId) {
-        BookingJpa bookingJpa = bookingManageJpaRepository.getBookingJpaByBookingId(bookingId);
+    public Booking getBookedDetailById(String bookingId) {
+        BookingJpa bookingJpa = bookingManageJpaRepository.getBookingJpaByBookingCode(bookingId);
         return bookingManagerMapper.toDomain(bookingJpa);
 
     }
     @Override
     public Page<BookingRequest> getBookingRequestList(int page, int size, LocalDate date, Boolean isGuest, BookingRequestStatus status, String search) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        Specification<BookingRequestJpa> specification = specification = Specification.unrestricted();
+        Specification<BookingRequestJpa> specification = Specification.unrestricted();
         specification = specification.and(BookingRequestSpecification.filter(date,isGuest,status));
         if (search != null && !search.isBlank()) {
             specification = specification.and(BookingRequestSpecification.searchBookingRequest(search));
@@ -63,8 +66,8 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
     }
 
     @Override
-    public BookingRequest getBookingRequestById(Integer bookingId) {
-        BookingRequestJpa bookingRequestJpa = bookingMRequestJpaRepo.searchBookingRequestJpaByRequestId(bookingId);
+    public BookingRequest getBookingRequestById(String bookingId) {
+        BookingRequestJpa bookingRequestJpa = bookingMRequestJpaRepo.searchBookingRequestJpaByRequestCode(bookingId);
         return bookingDraffManagerMapper.toDomain(bookingRequestJpa);
     }
 
@@ -85,11 +88,15 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
 
        private final CustomerProfileRepository customerProfileRepository;
     @Override
-    public BookingJpa createBookingByRequest(BookingRequest request) {
+    public BookingJpa createBookingByRequest(BookingRequest request, int customerId) {
         //todo: fixing architect, not call customer another module repo
         Booking booking = new Booking();
         booking.setCreatedAt(LocalDateTime.now());
-        booking.setCustomer(null);
+        booking.setBookingCode(request.getRequestCode());
+        System.out.println("booking code: " + booking.getBookingCode());
+        System.out.println("booking request code: " + request.getRequestCode());
+
+        booking.setCustomerId(customerId);
         booking.setDescription(request.getDescription());
         booking.setIsGuest(request.getIsGuest());
         booking.setStatus(BookingEnum.CONFIRMED);

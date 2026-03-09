@@ -2,6 +2,7 @@ package com.g42.platform.gms.service_ticket_management.infrastructure.repository
 
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
@@ -10,14 +11,15 @@ import java.util.Optional;
  * JPA Repository for ServiceTicket entity.
  * 
  * Provides CRUD operations and custom query methods for service tickets.
+ * Extends JpaSpecificationExecutor để hỗ trợ filter và search với Specification.
  */
 @Repository
-public interface ServiceTicketRepository extends JpaRepository<ServiceTicketJpa, Integer> {
+public interface ServiceTicketRepository extends JpaRepository<ServiceTicketJpa, Integer>, JpaSpecificationExecutor<ServiceTicketJpa> {
     
     /**
      * Find a service ticket by its unique ticket code.
      * 
-     * @param ticketCode the ticket code (format: ST_XXXXXX)
+     * @param ticketCode the ticket code (format: MST_XXXXXX)
      * @return Optional containing the service ticket if found
      */
     Optional<ServiceTicketJpa> findByTicketCode(String ticketCode);

@@ -19,8 +19,6 @@ public class ServiceTicketResponse {
     private Integer bookingId;
     private Integer vehicleId;
     private TicketStatus ticketStatus;
-    private Integer odometerReading;
-    private String licensePlatePhotoUrl;
     private String checkInNotes;
     private Boolean immutable;
     private LocalDateTime createdAt;

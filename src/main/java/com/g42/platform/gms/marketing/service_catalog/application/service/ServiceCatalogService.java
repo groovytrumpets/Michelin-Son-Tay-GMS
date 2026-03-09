@@ -26,6 +26,7 @@ public class ServiceCatalogService {
 
         return serviceRepository.findAllActive().stream().filter(service -> service.isVisibleNow(now)).map(serviceDtoMapper::toDto).toList();
     }
+
     @Transactional(noRollbackFor = ServiceException.class)
     public ServiceDetailRespond getServiceDetailById(Long serviceId) {
         com.g42.platform.gms.marketing.service_catalog.domain.entity.Service service =serviceRepository.findServiceDetailById(serviceId);
@@ -36,5 +37,9 @@ public class ServiceCatalogService {
             throw new ServiceException("Service expired", ServiceErrorCode.SERVICE_EXPIRED);
         }
         return serviceDtoMapper.toDetailDto(service);
+    }
+
+    public Long[] getArrayOfCatalogId(Long[] serviceId) {
+        return serviceRepository.getCatalogIdByServiceId(serviceId);
     }
 }
