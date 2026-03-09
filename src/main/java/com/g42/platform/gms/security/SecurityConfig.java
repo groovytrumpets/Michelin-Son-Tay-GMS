@@ -58,6 +58,8 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
+                                "/zalo/callback",
+                                "/zalo/login",
                                 "/home/**",
                                 "/error"
                         ).permitAll()

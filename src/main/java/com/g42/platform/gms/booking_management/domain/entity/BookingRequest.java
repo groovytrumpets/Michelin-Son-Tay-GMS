@@ -106,4 +106,8 @@ public class BookingRequest {
 
         return sb.toString();
     }
+    public LocalDateTime getLocalDateTime(){
+
+        return this.scheduledDate.atTime(this.scheduledTime);
+    }
 }
