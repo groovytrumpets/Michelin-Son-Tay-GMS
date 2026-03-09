@@ -1,9 +1,6 @@
 package com.g42.platform.gms.notification.infrastructure.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
@@ -14,24 +11,33 @@ import java.time.Instant;
 @Setter
 @Entity
 @Table(name = "zalo_token", schema = "michelin_garage")
-public class ZaloTokenJpa {
+public class ZaloToken {
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "idzalo_token", nullable = false)
     private Long id;
 
     @Size(max = 255)
-    @Column(name = "accessToken")
+    @Column(name = "access_token")
     private String accessToken;
 
     @Size(max = 255)
-    @Column(name = "refreshToken")
+    @Column(name = "refresh_token")
     private String refreshToken;
 
-    @Column(name = "expiresAt")
+    @Column(name = "expires_at")
     private Instant expiresAt;
 
-    @Column(name = "createdAt")
+    @Column(name = "created_at")
     private Instant createdAt;
+
+    @Size(max = 255)
+    @Column(name = "code_verifier")
+    private String codeVerifier;
+
+    @Size(max = 40)
+    @Column(name = "state", length = 40)
+    private String state;
 
 
 }
