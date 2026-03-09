@@ -20,9 +20,9 @@ public class UpdateServiceTicketRequest {
     private String customerRequest;
     
     /**
-     * Danh sách service IDs đã chọn.
-     * Update vào booking.service_ids.
+     * Danh sách catalog item IDs đã chọn.
+     * Update vào booking thông qua bảng booking_details.
      */
     @NotNull(message = "Danh sách dịch vụ không được null")
-    private List<Integer> serviceIds;
+    private List<Integer> catalogItemIds;
 }

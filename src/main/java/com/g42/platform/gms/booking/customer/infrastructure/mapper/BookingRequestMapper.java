@@ -19,8 +19,8 @@ public interface BookingRequestMapper {
             @Mapping(target = "customerId", source = "customer.customerId"),
             @Mapping(target = "confirmedBy",
                     expression = "java(mapConfirmedBy(jpa.getConfirmedBy()))"),
-            @Mapping(target = "serviceIds",
-                    expression = "java(mapServiceIds(jpa.getDetails()))")
+            @Mapping(target = "catalogItemIds",
+                    expression = "java(mapCatalogItemIds(jpa.getDetails()))")
     })
     BookingRequest toDomain(BookingRequestJpaEntity jpa);
 
@@ -40,7 +40,7 @@ public interface BookingRequestMapper {
         return (int) staff.getStaffId();
     }
 
-    default List<Integer> mapServiceIds(List<BookingRequestDetailJpaEntity> details) {
+    default List<Integer> mapCatalogItemIds(List<BookingRequestDetailJpaEntity> details) {
         if (details == null) {
             return null;
         }

@@ -19,7 +19,8 @@ public interface ServiceTicketMapper {
     ServiceTicket toDomain(ServiceTicketJpa jpa);
 
     @Mappings({
-            @Mapping(target = "conditionPhotos", ignore = true)
+            @Mapping(target = "conditionPhotos", ignore = true),
+            @Mapping(target = "createdBy", source = "createdBy")
     })
     ServiceTicketJpa toJpa(ServiceTicket domain);
 
