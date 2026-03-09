@@ -8,4 +8,6 @@ import org.springframework.stereotype.Repository;
 public interface ZaloTokenRepo extends JpaRepository<ZaloToken, String> {
 
     ZaloToken findByState(String state);
+
+    ZaloToken getZaloTokenByState(String state);
 }
