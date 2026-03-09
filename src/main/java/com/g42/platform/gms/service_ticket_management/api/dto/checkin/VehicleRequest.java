@@ -38,4 +38,6 @@ public class VehicleRequest {
     
     @NotNull(message = "Booking ID là bắt buộc")
     private Integer bookingId;
+    
+    private Integer staffId; // Staff who performs the check-in (for audit trail)
 }

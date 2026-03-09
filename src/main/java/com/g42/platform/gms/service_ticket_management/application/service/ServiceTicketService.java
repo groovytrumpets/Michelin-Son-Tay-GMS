@@ -32,20 +32,28 @@ public class ServiceTicketService {
     private final com.g42.platform.gms.booking.customer.domain.repository.BookingRepository bookingRepository;
 
     /**
-     * Create new service ticket with ticket code from booking.
-     * OPTIMIZATION: Use booking_code as ticket_code (1 booking = 1 service ticket).
-     * Database constraint uk_booking_id ensures 1-to-1 relationship.
+     * Create new service ticket using booking_code as ticket_code.
+     * KHÔNG generate mã mới - reuse booking_code để đảm bảo đồng bộ.
+     * Database constraint uk_booking_id ensures 1-to-1 relationship (1 booking = 1 service ticket).
+     * 
+     * Flow:
+     * 1. Query booking để lấy booking_code và description
+     * 2. Reuse booking_code làm ticket_code
+     * 3. Copy booking.description sang customer_request
+     * 4. Save ServiceTicket với status = DRAFT
      * 
      * @param bookingId Booking ID
      * @param vehicleId Vehicle ID
      * @param customerId Customer ID
+     * @param createdBy Staff ID who creates the ticket
      * @return Created ServiceTicket entity
      */
     @Transactional
-    public ServiceTicket createServiceTicket(Integer bookingId, Integer vehicleId, Integer customerId) {
-        log.info("Creating service ticket for booking: {}, vehicle: {}, customer: {}", bookingId, vehicleId, customerId);
+    public ServiceTicket createServiceTicket(Integer bookingId, Integer vehicleId, Integer customerId, Integer createdBy) {
+        log.info("Creating service ticket for booking: {}, vehicle: {}, customer: {}, createdBy: {}", 
+            bookingId, vehicleId, customerId, createdBy);
         
-        // Fetch booking to get booking_code
+        // Fetch booking to get booking_code and customer_request
         com.g42.platform.gms.booking.customer.domain.entity.Booking booking = bookingRepository.findById(bookingId)
             .orElseThrow(() -> new RuntimeException("Booking not found: " + bookingId));
         
@@ -59,6 +67,8 @@ public class ServiceTicketService {
         ticket.setBookingId(bookingId);
         ticket.setVehicleId(vehicleId);
         ticket.setCustomerId(customerId);
+        ticket.setCreatedBy(createdBy); // Set staff who creates the ticket
+        ticket.setCustomerRequest(booking.getDescription()); // Set customer request from booking
         ticket.initializeDefaults();
         
         // Convert to JPA and save
@@ -73,7 +83,7 @@ public class ServiceTicketService {
     /**
      * Find service ticket by ticket code.
      * 
-     * @param ticketCode Ticket code (ST_XXXXXX)
+     * @param ticketCode Ticket code (MST_XXXXXX)
      * @return ServiceTicket entity
      */
     @Transactional(readOnly = true)
@@ -89,7 +99,7 @@ public class ServiceTicketService {
     /**
      * Find service ticket by ticket code (Optional).
      * 
-     * @param ticketCode Ticket code (ST_XXXXXX)
+     * @param ticketCode Ticket code (MST_XXXXXX)
      * @return Optional ServiceTicket entity
      */
     @Transactional(readOnly = true)
@@ -173,7 +183,7 @@ public class ServiceTicketService {
         log.info("Marking service ticket as immutable: {}", ticketCode);
         
         ServiceTicket ticket = findByTicketCode(ticketCode);
-        ticket.setImmutable(true);
+        // Không set immutable flag - chỉ dùng status để kiểm soát quyền edit
         ticket.setUpdatedAt(LocalDateTime.now());
         
         return updateServiceTicket(ticket);
