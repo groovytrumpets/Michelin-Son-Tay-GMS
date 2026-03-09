@@ -1,0 +1,27 @@
+package com.g42.platform.gms.estimation.domain.entity;
+
+import com.g42.platform.gms.booking_management.infrastructure.entity.CatalogItemJpa;
+import com.g42.platform.gms.estimation.infrastructure.entity.EstimateJpa;
+import com.g42.platform.gms.estimation.infrastructure.entity.WarehouseJpa;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+import java.math.BigDecimal;
+
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+public class EstimateItem {
+    private Integer id;
+    private EstimateJpa estimate;
+    private String itemName;
+    private CatalogItemJpa item;
+    private Integer quantity;
+    private BigDecimal unitPrice;
+    private Boolean isOverridden;
+    private String overrideReason;
+    private Integer warehouseId;
+}
