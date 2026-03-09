@@ -111,10 +111,10 @@ public class CheckInService {
         
         // Lấy thông tin các dịch vụ từ booking
         List<com.g42.platform.gms.booking.customer.infrastructure.entity.CatalogItemJpaEntity> catalogItems = new ArrayList<>();
-        if (booking.getServiceIds() != null && !booking.getServiceIds().isEmpty()) {
-            for (Integer serviceId : booking.getServiceIds()) {
+        if (booking.getCatalogItemIds() != null && !booking.getCatalogItemIds().isEmpty()) {
+            for (Integer catalogItemId : booking.getCatalogItemIds()) {
                 Optional<com.g42.platform.gms.booking.customer.infrastructure.entity.CatalogItemJpaEntity> catalogItem = 
-                    catalogRepository.findById(serviceId);
+                    catalogRepository.findById(catalogItemId);
                 if (catalogItem.isPresent()) {
                     catalogItems.add(catalogItem.get());
                 }
@@ -614,18 +614,23 @@ public class CheckInService {
     public ServiceTicketResponse completeCheckInAll(CompleteCheckInAllRequest request) {
         log.info("Starting single-page check-in for booking: {}", request.getBookingId());
         
-        // === 1. Validate and get vehicle (must exist) ===
+        // Validate staffId field
+        if (request.getStaffId() == null) {
+            throw new CheckInException("Thiếu thông tin nhân viên thực hiện check-in (staffId)");
+        }
+        
+        // Validate and get vehicle (must exist)
         Vehicle vehicle = vehicleRepository.findById(request.getVehicleId())
             .orElseThrow(() -> new CheckInException("Không tìm thấy xe với ID: " + request.getVehicleId()));
         log.info("Using vehicle: vehicleId={}, licensePlate={}", 
             vehicle.getVehicleId(), vehicle.getLicensePlate());
         
-        // === 2. Create Service Ticket ===
+        // Create Service Ticket
         ServiceTicket serviceTicket = serviceTicketService.createServiceTicket(
             request.getBookingId(),
             vehicle.getVehicleId(),
             request.getCustomerId(),
-            request.getStaffId() // Pass staffId as createdBy
+            request.getStaffId()
         );
         log.info("Created service ticket: ticketCode={}", serviceTicket.getTicketCode());
         

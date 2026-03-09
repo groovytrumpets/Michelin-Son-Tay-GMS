@@ -67,12 +67,11 @@ public class ServiceTicketService {
         ticket.setBookingId(bookingId);
         ticket.setVehicleId(vehicleId);
         ticket.setCustomerId(customerId);
-        ticket.setCreatedBy(createdBy); // Set staff who creates the ticket
-        ticket.setCustomerRequest(booking.getDescription()); // Set customer request from booking
+        ticket.setCreatedBy(createdBy);
+        ticket.setCustomerRequest(booking.getDescription());
         ticket.initializeDefaults();
         
         // Convert to JPA and save
-        // Note: Database constraint uk_booking_id will prevent duplicate service tickets for same booking
         ServiceTicketJpa jpa = serviceTicketMapper.toJpa(ticket);
         ServiceTicketJpa saved = serviceTicketRepository.save(jpa);
         

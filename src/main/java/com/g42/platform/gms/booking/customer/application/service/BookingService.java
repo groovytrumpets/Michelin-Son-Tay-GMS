@@ -144,9 +144,9 @@ public class BookingService {
         booking.setStatus(BookingStatus.CONFIRMED);
 
         if (request.getSelectedServiceIds() != null && !request.getSelectedServiceIds().isEmpty()) {
-            booking.setServiceIds(request.getSelectedServiceIds());
+            booking.setCatalogItemIds(request.getSelectedServiceIds());
         } else {
-            booking.setServiceIds(new ArrayList<>());
+            booking.setCatalogItemIds(new ArrayList<>());
         }
 
         // === 5. VALIDATE THỜI GIAN (PHẢI TRƯỚC ÍT NHẤT 2 GIỜ) ===
@@ -168,7 +168,7 @@ public class BookingService {
         }
 
         // === 6. CHECK SLOT AVAILABILITY ===
-        int estimatedDuration = calculateEstimatedDuration(booking.getServiceIds());
+        int estimatedDuration = calculateEstimatedDuration(booking.getCatalogItemIds());
 
         boolean slotAvailable = slotService.isSlotAvailable(
                 booking.getScheduledDate(),
@@ -270,9 +270,9 @@ public class BookingService {
         booking.setStatus(BookingStatus.CONFIRMED);
 
         if (request.getSelectedServiceIds() != null && !request.getSelectedServiceIds().isEmpty()) {
-            booking.setServiceIds(request.getSelectedServiceIds());
+            booking.setCatalogItemIds(request.getSelectedServiceIds());
         } else {
-            booking.setServiceIds(new ArrayList<>());
+            booking.setCatalogItemIds(new ArrayList<>());
         }
         
         // === 3. VALIDATE THỜI GIAN (CHỈ CHECK KHÔNG ĐƯỢC QUÁ KHỨ) ===
@@ -285,7 +285,7 @@ public class BookingService {
         }
         
         // === 4. CHECK SLOT AVAILABILITY ===
-        int estimatedDuration = calculateEstimatedDuration(booking.getServiceIds());
+        int estimatedDuration = calculateEstimatedDuration(booking.getCatalogItemIds());
         
         boolean slotAvailable = slotService.isSlotAvailable(
                 booking.getScheduledDate(),
@@ -410,12 +410,12 @@ public class BookingService {
         LocalTime oldTime = booking.getScheduledTime();
         boolean timeChanged = !oldDate.equals(newDate) || !oldTime.equals(newTime);
 
-        // Tính duration từ serviceIds CUỐI CÙNG (sau khi update)
-        List<Integer> finalServiceIds = booking.getServiceIds();
+        // Tính duration từ catalogItemIds CUỐI CÙNG (sau khi update)
+        List<Integer> finalCatalogItemIds = booking.getCatalogItemIds();
         if (request.getNewServiceIds() != null && !request.getNewServiceIds().isEmpty()) {
-            finalServiceIds = request.getNewServiceIds();
+            finalCatalogItemIds = request.getNewServiceIds();
         }
-        int estimatedDuration = calculateEstimatedDuration(finalServiceIds);
+        int estimatedDuration = calculateEstimatedDuration(finalCatalogItemIds);
 
         if (timeChanged) {
             boolean slotAvailable = slotService.isSlotAvailable(
@@ -445,7 +445,7 @@ public class BookingService {
         }
 
         if (request.getNewServiceIds() != null && !request.getNewServiceIds().isEmpty()) {
-            booking.setServiceIds(request.getNewServiceIds());
+            booking.setCatalogItemIds(request.getNewServiceIds());
         }
 
         booking.initializeDefaults();
@@ -516,22 +516,22 @@ public class BookingService {
     // ========================================
 
     /**
-     * Tính tổng thời lượng ước tính dựa trên danh sách service IDs
+     * Tính tổng thời lượng ước tính dựa trên danh sách catalog item IDs
      * 
      * Logic:
      * - Nếu không có service nào => trả về DEFAULT_DURATION_MINUTES (60 phút)
      * - Nếu có service => tính tổng duration của từng service
      * - Nếu có combo => tính duration của tất cả service trong combo
      * 
-     * @param serviceIds Danh sách ID của services/combos
+     * @param catalogItemIds Danh sách ID của catalog items (services/combos)
      * @return Tổng thời lượng (phút)
      */
-    private int calculateEstimatedDuration(List<Integer> serviceIds) {
-        if (serviceIds == null || serviceIds.isEmpty()) {
+    private int calculateEstimatedDuration(List<Integer> catalogItemIds) {
+        if (catalogItemIds == null || catalogItemIds.isEmpty()) {
             return DEFAULT_DURATION_MINUTES;
         }
 
-        List<CatalogItemJpaEntity> items = catalogItemRepository.findAllById(serviceIds);
+        List<CatalogItemJpaEntity> items = catalogItemRepository.findAllById(catalogItemIds);
 
         int totalMinutes = 0;
         for (CatalogItemJpaEntity item : items) {
