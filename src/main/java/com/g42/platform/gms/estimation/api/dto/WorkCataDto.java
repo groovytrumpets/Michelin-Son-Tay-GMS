@@ -11,4 +11,5 @@ public class WorkCataDto {
     private String categoryCode;
     private String categoryName;
     private Integer displayOrder;
+    private Boolean isDefault;
 }

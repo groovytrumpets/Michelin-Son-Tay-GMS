@@ -21,5 +21,19 @@ public class EstimateRepositoryImpl implements EstimateRepository {
         List<EstimateJpa> estimateList = estimateRepositoryJpa.getEstimateJpaByServiceTicketId(serviceTicketId);
         return estimateList.stream().map(estimateJpaMapper::toDomain).toList();
     }
+
+    @Override
+    public Estimate save(Estimate estimate) {
+        EstimateJpa estimateJpa = estimateJpaMapper.toJpa(estimate);
+        estimateRepositoryJpa.save(estimateJpa);
+
+        return estimateRepositoryJpa.findById(estimateJpa.getId()).map(estimateJpaMapper::toDomain).orElse(null);
+    }
+
+    @Override
+    public Estimate findEstimateById(Integer estimateId) {
+
+        return estimateRepositoryJpa.findById(estimateId).map(estimateJpaMapper::toDomain).orElse(null);
+    }
 }
 

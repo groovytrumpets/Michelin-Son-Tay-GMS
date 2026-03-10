@@ -7,4 +7,6 @@ import org.mapstruct.Mapper;
 @Mapper(componentModel = "spring")
 public interface WorkCategoryJpaMapper {
     WorkCategory toDomain(WorkCategoryJpa workCategoryJpa);
+
+    WorkCategoryJpa toJpa(WorkCategory newCategory);
 }
