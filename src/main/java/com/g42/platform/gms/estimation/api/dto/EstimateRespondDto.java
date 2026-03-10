@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
@@ -23,5 +24,6 @@ public class EstimateRespondDto {
     private Instant approvedAt;
     private Integer version;
     private Integer revisedFromId;
+    private BigDecimal totalPrice;
     List<EstimateItemDto> items;
 }

@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -54,7 +55,7 @@ public class EstimateService {
                 EstimateItemDto itemDto = estimateDtoMapper.toEstimateItemDto(item);
                 // inject work category to ech items
                 WorkCategory wc = categoryMap.get(item.getWorkCategoryId());
-                itemDto.setWorkCategory(estimateDtoMapper.toDto(wc));
+                itemDto.setWorkCategory(estimateDtoMapper.toWorkCateDto(wc));
                 return itemDto;
             }).toList();
 
@@ -69,15 +70,27 @@ public class EstimateService {
         estimate.setEstimateType(request.getEstimateType());
         estimate.setStatus(EstimateEnum.DRAFT);
         estimate.setVersion(1);
+        estimate.setTotalPrice(estimate.getTotalPrices());
         Estimate saved = estimateRepository.save(estimate);
 
         List<EstimateItem> items = resolveItems(request.getItems(), saved.getId());
         estimateItemRepository.saveAll(items);
 
+        //todo: update total_price
+        BigDecimal totalPrice = items.stream()
+                .map(item -> item.getSubTotal() != null ? item.getSubTotal() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        saved.setTotalPrice(totalPrice);
+        System.out.println("Total_price: "+saved.getTotalPrices());
+        estimateRepository.save(saved);
+
         return getEstimateRespondDto(saved.getId());
     }
 
-    public EstimateRespondDto updateEstimate(Integer estimateId, EstimateRequestDto request) {return null;
+    public EstimateRespondDto updateEstimate(Integer estimateId, EstimateRequestDto request) {
+
+        return null;
     }
     private List<EstimateItem> resolveItems(List<EstimateItemReqDto> itemRequests,
                                             Integer estimateId) {
@@ -127,7 +140,7 @@ public class EstimateService {
         dto.setItems(items.stream().map(item -> {
             EstimateItemDto itemDto = estimateDtoMapper.toEstimateItemDto(item);
             itemDto.setWorkCategory(
-                    estimateDtoMapper.toDto(categoryMap.get(item.getWorkCategoryId()))
+                    estimateDtoMapper.toWorkCateDto(categoryMap.get(item.getWorkCategoryId()))
             );
             return itemDto;
         }).toList());

@@ -9,6 +9,7 @@
     import lombok.Setter;
     import org.hibernate.annotations.ColumnDefault;
 
+    import java.math.BigDecimal;
     import java.time.Instant;
 
     @Getter
@@ -51,6 +52,8 @@
 
         @Column(name = "revised_from_id")
         private Integer revisedFromId;
+        @Column(name = "total_price", precision = 12, scale = 2)
+        private BigDecimal totalPrice;
 
 
     }
