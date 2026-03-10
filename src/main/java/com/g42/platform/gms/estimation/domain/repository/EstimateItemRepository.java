@@ -8,4 +8,8 @@ import java.util.List;
 public interface EstimateItemRepository {
 
     List<EstimateItem> findByEstimateIds(List<Integer> estimateIds);
+
+    void saveAll(List<EstimateItem> items);
+
+    List<EstimateItem> findByEstimateId(Integer estimateId);
 }

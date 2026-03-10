@@ -13,4 +13,6 @@ public interface EstimateItemRepositoryJpa extends JpaRepository<EstimateItemJpa
     @Query("SELECT ei FROM EstimateItemJpa ei " +
             "WHERE ei.estimateId IN :estimateIds")
     List<EstimateItemJpa> findByEstimateIds(@Param("estimateIds")List<Integer> estimateIds);
+
+    List<EstimateItemJpa> findByEstimateId(Integer estimateId);
 }
