@@ -58,7 +58,7 @@ class CustomerBookingIntegrationTest {
         CustomerBookingRequest request = baseRequest();
 
         CustomerPrincipal principal =
-                new CustomerPrincipal(1, "test@gmail.com", "ROLE_CUSTOMER");
+                new CustomerPrincipal(1, "0966720776", "HDTVux");
 
         UsernamePasswordAuthenticationToken auth =
                 new UsernamePasswordAuthenticationToken(
@@ -112,7 +112,7 @@ class CustomerBookingIntegrationTest {
         CustomerPrincipal principal =
                 new CustomerPrincipal(1, "0123456789", "Test Customer");
 
-        mockMvc.perform(put("/api/booking/customer/27/modify")
+        mockMvc.perform(put("/api/booking/customer/37/modify")
                         .with(authentication(
                                 new UsernamePasswordAuthenticationToken(
                                         principal,
@@ -133,7 +133,7 @@ class CustomerBookingIntegrationTest {
     void cancelBooking() throws Exception {
 
         CustomerPrincipal principal =
-                new CustomerPrincipal(1, "Test User", "0123456789");
+                new CustomerPrincipal(1, "0966720776", "HDTVux");
 
         Authentication auth =
                 new UsernamePasswordAuthenticationToken(
@@ -142,7 +142,7 @@ class CustomerBookingIntegrationTest {
                         List.of(new SimpleGrantedAuthority("ROLE_CUSTOMER"))
                 );
 
-        mockMvc.perform(post("/api/booking/customer/27/cancel")
+        mockMvc.perform(post("/api/booking/customer/42/cancel")
                         .with(authentication(auth))).andDo(print())
                 .andExpect(status().isOk());
     }
