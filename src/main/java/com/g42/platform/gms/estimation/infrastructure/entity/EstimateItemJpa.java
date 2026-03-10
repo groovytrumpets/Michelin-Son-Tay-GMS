@@ -49,6 +49,9 @@ public class EstimateItemJpa {
 
     @Column(name = "warehouse_id")
     private Integer warehouseId;
+    @NotNull
+    @Column(name = "work_category_idwork_category", nullable = false)
+    private Integer workCategoryId;
 
 
 }

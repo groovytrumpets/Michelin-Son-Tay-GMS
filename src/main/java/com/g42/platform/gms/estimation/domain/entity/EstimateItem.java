@@ -24,12 +24,13 @@ import java.math.BigDecimal;
 public class EstimateItem {
 
     private Integer id;
-    private Integer estimate;
-    private String estimateId;
+    private Integer estimateId;
+    private String itemName;
     private Integer itemId;
     private Integer quantity;
     private BigDecimal unitPrice;
     private Boolean isOverridden;
     private String overrideReason;
     private Integer warehouseId;
+    private Integer workCategoryId;
 }

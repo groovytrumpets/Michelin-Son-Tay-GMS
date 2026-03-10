@@ -1,24 +1,20 @@
-package com.g42.platform.gms.estimation.domain.entity;
+package com.g42.platform.gms.estimation.api.dto;
 
 import com.g42.platform.gms.common.enums.EstimateEnum;
 import com.g42.platform.gms.estimation.domain.enums.EstimateTypeEnum;
-import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
-import jakarta.persistence.*;
-import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.annotations.ColumnDefault;
 
 import java.time.Instant;
+import java.util.List;
 
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class Estimate {
-
+public class EstimateRespondDto {
     private Integer id;
     private Integer serviceTicketId;
     private EstimateTypeEnum estimateType;
@@ -27,4 +23,5 @@ public class Estimate {
     private Instant approvedAt;
     private Integer version;
     private Integer revisedFromId;
+    List<EstimateItemDto> items;
 }
