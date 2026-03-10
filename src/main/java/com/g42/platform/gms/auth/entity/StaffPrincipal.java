@@ -20,6 +20,10 @@ public class StaffPrincipal implements UserDetails {
         return staffAuth.getStaffAuthId();
     }
 
+    public Integer getStaffId() {
+        return staffAuth.getStaffProfile() != null ? staffAuth.getStaffProfile().getStaffId() : null;
+    }
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         // trả về role của staff, cần có prefix "ROLE_" để @PreAuthorize("hasRole('STAFF')") hoạt động
