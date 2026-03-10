@@ -8,4 +8,6 @@ import java.util.List;
 
 public interface WorkCategoryRepository {
     List<WorkCategory> findAllById(Iterable<Integer> workCategoryId);
+
+    WorkCategory save(WorkCategory newCategory);
 }
