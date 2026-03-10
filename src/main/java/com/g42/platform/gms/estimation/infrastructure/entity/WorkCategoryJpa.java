@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.ColumnDefault;
 
 @Getter
 @Setter
@@ -29,9 +30,9 @@ public class WorkCategoryJpa {
 
     @Column(name = "is_active")
     private Boolean isActive;
-
-    @Column(name = "estimate_item_estimate_item_id", nullable = false)
-    private Integer estimateItemEstimateItem;
+    @ColumnDefault("0")
+    @Column(name = "is_default")
+    private Boolean isDefault;
 
 
 }

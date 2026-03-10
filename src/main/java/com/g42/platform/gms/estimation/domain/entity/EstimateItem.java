@@ -24,12 +24,18 @@ import java.math.BigDecimal;
 public class EstimateItem {
 
     private Integer id;
-    private Integer estimate;
-    private String estimateId;
+    private Integer estimateId;
+    private String itemName;
     private Integer itemId;
     private Integer quantity;
     private BigDecimal unitPrice;
     private Boolean isOverridden;
     private String overrideReason;
     private Integer warehouseId;
+    private Integer workCategoryId;
+
+    public BigDecimal getSubTotal() {
+        if (unitPrice == null || quantity == null) return BigDecimal.ZERO;
+        return unitPrice.multiply(BigDecimal.valueOf(quantity));
+    }
 }

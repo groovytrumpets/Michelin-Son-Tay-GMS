@@ -21,4 +21,5 @@ public class WorkCategory {
     private Integer displayOrder;
     private Boolean isActive;
     private Integer estimateItemEstimateItem;
+    private Boolean isDefault;
 }
