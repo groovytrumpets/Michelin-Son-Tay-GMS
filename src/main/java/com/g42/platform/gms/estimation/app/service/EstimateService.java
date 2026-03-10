@@ -17,9 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -89,8 +87,45 @@ public class EstimateService {
     }
 
     public EstimateRespondDto updateEstimate(Integer estimateId, EstimateRequestDto request) {
+        Estimate estimate = estimateRepository.findEstimateById(estimateId);
+        if (estimate == null) throw new RuntimeException("Estimate not found");
 
-        return null;
+        List<EstimateItem> estimateItems = estimateItemRepository.findByEstimateId(estimateId);
+        Map<Integer, EstimateItem> existingMap = estimateItems.stream()
+                .filter(i -> i.getId() != null)
+                .collect(Collectors.toMap(EstimateItem::getId, i -> i));
+        List<EstimateItem> toSave = new ArrayList<>();
+        Set<Integer> incomingIds = new HashSet<>();
+        for (EstimateItemReqDto req : request.getItems()) {
+            if (req.getItemId() != null && existingMap.containsKey(req.getItemId())) {
+                // update old items
+                EstimateItem existing = existingMap.get(req.getItemId());
+                existing.setItemName(req.getItemName());
+                existing.setQuantity(req.getQuantity());
+                existing.setUnitPrice(req.getUnitPrice());
+                existing.setWorkCategoryId(req.getWorkCategoryId());
+                toSave.add(existing);
+                incomingIds.add(req.getItemId());
+            } else {
+                toSave.addAll(resolveItems(List.of(req), estimateId));
+            }
+        }
+        estimateItems.stream()
+                .filter(i -> !incomingIds.contains(i.getId()))
+                .forEach(estimateItemRepository::delete);
+
+        estimateItemRepository.saveAll(toSave);
+        BigDecimal totalPrice = toSave.stream()
+                .map(item -> item.getUnitPrice() == null || item.getQuantity() == null
+                        ? BigDecimal.ZERO
+                        : item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        estimate.setEstimateType(request.getEstimateType());
+        estimate.setTotalPrice(totalPrice);
+        estimateRepository.save(estimate);
+
+        return getEstimateRespondDto(estimateId);
     }
     private List<EstimateItem> resolveItems(List<EstimateItemReqDto> itemRequests,
                                             Integer estimateId) {

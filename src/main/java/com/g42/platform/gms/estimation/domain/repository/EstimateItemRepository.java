@@ -12,4 +12,6 @@ public interface EstimateItemRepository {
     void saveAll(List<EstimateItem> items);
 
     List<EstimateItem> findByEstimateId(Integer estimateId);
+
+    void delete(EstimateItem estimateItem);
 }
