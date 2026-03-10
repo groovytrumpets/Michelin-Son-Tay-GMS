@@ -21,7 +21,7 @@ public class Booking {
     private String description;
     private Boolean isGuest = false;
     private LocalDateTime createdAt;
-    private List<Integer> serviceIds = new ArrayList<>();
+    private List<Integer> catalogItemIds = new ArrayList<>();
     
     public void initializeDefaults() {
         if (createdAt == null) {

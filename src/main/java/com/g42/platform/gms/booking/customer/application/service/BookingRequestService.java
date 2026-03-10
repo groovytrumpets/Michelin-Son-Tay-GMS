@@ -129,10 +129,10 @@ public class BookingRequestService {
             if (!details.isEmpty()) {
                 bookingRequestDetailRepository.saveAll(details);
                 
-                List<Integer> savedServiceIds = details.stream()
+                 List<Integer> savedCatalogItemIds = details.stream()
                     .map(BookingRequestDetail::getItemId)
                     .collect(Collectors.toList());
-                savedRequest.setServiceIds(savedServiceIds);
+                savedRequest.setCatalogItemIds(savedCatalogItemIds);
             }
         }
         

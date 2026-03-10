@@ -147,9 +147,9 @@ public class ServiceTicketManageService {
                 response.setIsGuest(booking.getIsGuest());
                 
                 // Services
-                if (booking.getServiceIds() != null) {
+                if (booking.getCatalogItemIds() != null) {
                     List<com.g42.platform.gms.booking.customer.infrastructure.entity.CatalogItemJpaEntity> catalogItems = 
-                        catalogRepository.findAllById(booking.getServiceIds());
+                        catalogRepository.findAllById(booking.getCatalogItemIds());
                     response.setServices(detailMapper.toManageServiceInfoList(catalogItems));
                 }
             }
@@ -207,14 +207,14 @@ public class ServiceTicketManageService {
             ticket.setCustomerRequest(request.getCustomerRequest());
         }
         
-        if (ticket.getBookingId() != null && request.getServiceIds() != null) {
+        if (ticket.getBookingId() != null && request.getCatalogItemIds() != null) {
             Booking booking = bookingRepository.findById(ticket.getBookingId())
                 .orElseThrow(() -> new CheckInException("Không tìm thấy booking"));
             
-            booking.setServiceIds(request.getServiceIds());
+            booking.setCatalogItemIds(request.getCatalogItemIds());
             bookingRepository.save(booking);
             
-            log.info("Updated services for booking {}: {}", booking.getBookingId(), request.getServiceIds());
+            log.info("Updated services for booking {}: {}", booking.getBookingId(), request.getCatalogItemIds());
         }
         
         serviceTicketRepository.save(ticket);

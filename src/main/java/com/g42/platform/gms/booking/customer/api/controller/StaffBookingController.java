@@ -88,7 +88,7 @@ public class StaffBookingController {
      * @return Booking đã được tạo
      */
     @PostMapping("/create-direct")
-    @PreAuthorize("hasAnyRole('STAFF', 'RECEPTIONIST', 'ADMIN')")
+//    @PreAuthorize("hasAnyRole('STAFF', 'RECEPTIONIST', 'ADMIN')")
     public ResponseEntity<ApiResponse<BookingResponse>> createDirectBooking(
             @RequestBody @Valid StaffDirectBookingRequest request
     ) {
