@@ -1,5 +1,6 @@
 package com.g42.platform.gms.service_ticket_management.infrastructure.repository;
 
+import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicket;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -39,4 +40,6 @@ public interface ServiceTicketRepository extends JpaRepository<ServiceTicketJpa,
      * @return Optional containing the service ticket if found
      */
     Optional<ServiceTicketJpa> findByBookingId(Integer bookingId);
+
+    ServiceTicketJpa findByServiceTicketId(Integer serviceTicketId);
 }
