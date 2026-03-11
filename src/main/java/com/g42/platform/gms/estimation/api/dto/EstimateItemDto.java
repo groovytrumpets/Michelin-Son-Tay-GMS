@@ -11,7 +11,7 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @AllArgsConstructor
 public class EstimateItemDto {
-    private Integer id;
+    private Integer estimateItemId;
     private String itemName;
     private WorkCataDto workCategory;
     private Integer itemId;

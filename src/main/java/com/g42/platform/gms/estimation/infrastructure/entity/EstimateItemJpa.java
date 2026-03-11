@@ -32,7 +32,7 @@ public class EstimateItemJpa {
     @Column(name = "item_id")
     private Integer itemId;
 
-    @NotNull
+
     @Column(name = "quantity", nullable = false)
     private Integer quantity;
 
