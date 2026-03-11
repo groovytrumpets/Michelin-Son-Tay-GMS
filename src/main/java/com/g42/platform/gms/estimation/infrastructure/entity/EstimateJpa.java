@@ -45,7 +45,6 @@
         @Column(name = "approved_at")
         private Instant approvedAt;
 
-        @NotNull
         @ColumnDefault("1")
         @Column(name = "version", nullable = false)
         private Integer version;

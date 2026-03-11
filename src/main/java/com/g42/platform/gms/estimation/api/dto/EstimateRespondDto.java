@@ -16,7 +16,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class EstimateRespondDto {
-    private Integer id;
+    private Integer estimateId;
     private Integer serviceTicketId;
     private EstimateTypeEnum estimateType;
     private EstimateEnum status;
