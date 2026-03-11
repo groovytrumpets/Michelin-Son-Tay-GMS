@@ -7,7 +7,7 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 public class WorkCataDto {
-    private Integer id;
+    private Integer workCateId;
     private String categoryCode;
     private String categoryName;
     private Integer displayOrder;

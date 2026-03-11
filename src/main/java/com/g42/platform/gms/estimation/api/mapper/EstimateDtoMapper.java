@@ -14,9 +14,12 @@ import java.util.List;
 @Mapper(componentModel = "spring")
 public interface EstimateDtoMapper {
     @Mapping(target = "subTotal", expression = "java(estimateItem.getSubTotal())")
+    @Mapping(target = "estimateItemId", source = "id")
     EstimateItemDto toEstimateItemDto(EstimateItem estimateItem);
     @Mapping(target = "subTotal", expression = "java(estimateItem.getSubTotal())")
     List<EstimateItemDto> toEstimateItemDto(List<EstimateItem> estimateItems);
+    @Mapping(target = "estimateId", source = "id")
     EstimateRespondDto toEstimateDto(Estimate estimate);
+    @Mapping(target = "workCateId", source = "id")
     WorkCataDto toWorkCateDto(WorkCategory workCataDto);
 }
