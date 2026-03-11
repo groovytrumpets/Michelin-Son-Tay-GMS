@@ -9,6 +9,7 @@ import com.g42.platform.gms.service_ticket_management.api.dto.safety.WorkCategor
 import com.g42.platform.gms.service_ticket_management.application.service.SafetyInspectionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,7 +25,9 @@ public class SafetyInspectionController {
     /**
      * Enable safety inspection for a service ticket
      * Technician ID is extracted from JWT token
+     * Only TECHNICIAN role can access this endpoint
      */
+    @PreAuthorize("hasRole('TECHNICIAN')")
     @PostMapping("/{ticketCode}/enable")
     public ResponseEntity<ApiResponse<SafetyInspectionResponse>> enableInspection(
             @PathVariable String ticketCode,
@@ -65,7 +68,9 @@ public class SafetyInspectionController {
     /**
      * Save safety inspection data (create or update COMPLETED record)
      * Technician ID is extracted from JWT token
+     * Only TECHNICIAN role can access this endpoint
      */
+    @PreAuthorize("hasRole('TECHNICIAN')")
     @PostMapping
     public ResponseEntity<ApiResponse<SafetyInspectionResponse>> saveInspectionData(
             @RequestBody SafetyInspectionRequest request,
@@ -106,6 +111,8 @@ public class SafetyInspectionController {
     /**
      * Get available safety inspection categories from work_category table
      */
+    @PreAuthorize("hasRole('TECHNICIAN')")
+
     @GetMapping("/categories")
     public ResponseEntity<ApiResponse<List<WorkCategoryResponse>>> getSafetyInspectionCategories() {
         

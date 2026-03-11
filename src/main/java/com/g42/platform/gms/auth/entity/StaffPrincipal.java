@@ -26,8 +26,15 @@ public class StaffPrincipal implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        // trả về role của staff, cần có prefix "ROLE_" để @PreAuthorize("hasRole('STAFF')") hoạt động
-        return Collections.singleton(new SimpleGrantedAuthority("ROLE_STAFF"));
+        // Trả về tất cả roles của staff từ database
+        // Cần có prefix "ROLE_" để @PreAuthorize("hasRole('TECHNICIAN')") hoạt động
+        if (staffAuth.getStaffProfile() == null || staffAuth.getStaffProfile().getStaffRoles() == null) {
+            return Collections.emptyList();
+        }
+        
+        return staffAuth.getStaffProfile().getStaffRoles().stream()
+            .map(staffRole -> new SimpleGrantedAuthority("ROLE_" + staffRole.getRole().getRoleName()))
+            .toList();
     }
 
     @Override
