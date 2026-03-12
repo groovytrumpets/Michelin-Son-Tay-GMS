@@ -78,7 +78,7 @@ class CustomerBookingIntegrationTest {
     // ================= GET BOOKINGS =================
 
     @Test
-    @DisplayName("CB_003 - Get my bookings")
+    @DisplayName("CB_002 - Get my bookings")
     void getMyBookings() throws Exception {
 
         CustomerPrincipal principal =
@@ -100,7 +100,7 @@ class CustomerBookingIntegrationTest {
     // ================= MODIFY BOOKING =================
 
     @Test
-    @DisplayName("CB_004 - Modify booking")
+    @DisplayName("CB_003 - Modify booking")
     void modifyBooking() throws Exception {
 
         ModifyBookingRequest request = new ModifyBookingRequest();
@@ -129,7 +129,7 @@ class CustomerBookingIntegrationTest {
     // ================= CANCEL BOOKING =================
 
     @Test
-    @DisplayName("CB_005 - Cancel booking")
+    @DisplayName("CB_004 - Cancel booking")
     void cancelBooking() throws Exception {
 
         CustomerPrincipal principal =
