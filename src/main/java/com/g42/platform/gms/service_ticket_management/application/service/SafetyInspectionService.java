@@ -392,6 +392,21 @@ public class SafetyInspectionService {
     }
 
     /**
+     * Get only default safety inspection categories (13 fixed items with is_default = 1)
+     * These are the standard safety inspection items
+     */
+    @Transactional(readOnly = true)
+    public List<WorkCategoryResponse> getDefaultSafetyInspectionCategories() {
+        List<SafetyWorkCategoryJpa> workCategoryJpas = workCategoryRepository.findActiveCategories();
+        // Filter only default categories
+        List<SafetyWorkCategoryJpa> defaultCategories = workCategoryJpas.stream()
+            .filter(cat -> cat.getIsDefault() != null && cat.getIsDefault())
+            .toList();
+        List<WorkCategory> workCategories = workCategoryInfraMapper.toDomainList(defaultCategories);
+        return workCategoryApiMapper.toResponseList(workCategories);
+    }
+
+    /**
      * Validate inspection data
      */
     private void validateInspectionData(SafetyInspectionRequest request) {

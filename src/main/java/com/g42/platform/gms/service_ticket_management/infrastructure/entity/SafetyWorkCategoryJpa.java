@@ -27,5 +27,11 @@ public class SafetyWorkCategoryJpa {
     private Integer displayOrder;
     
     @Column(name = "is_active")
+    @Convert(converter = org.hibernate.type.NumericBooleanConverter.class)
     private Boolean isActive;
+    
+    @Column(name = "is_default")
+    @Convert(converter = org.hibernate.type.NumericBooleanConverter.class)
+    private Boolean isDefault;
+
 }

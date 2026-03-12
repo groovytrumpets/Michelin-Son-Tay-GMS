@@ -111,13 +111,23 @@ public class SafetyInspectionController {
     /**
      * Get available safety inspection categories from work_category table
      */
-    @PreAuthorize("hasRole('TECHNICIAN')")
+//    @PreAuthorize("hasRole('TECHNICIAN')")
 
     @GetMapping("/categories")
     public ResponseEntity<ApiResponse<List<WorkCategoryResponse>>> getSafetyInspectionCategories() {
         
         List<WorkCategoryResponse> categories = safetyInspectionService.getSafetyInspectionCategories();
         return ResponseEntity.ok(ApiResponses.success(categories, "Danh sách hạng mục kiểm tra an toàn"));
+    }
+
+    /**
+     * Get only default safety inspection categories (13 fixed items with is_default = 1)
+     */
+    @GetMapping("/categories/default")
+    public ResponseEntity<ApiResponse<List<WorkCategoryResponse>>> getDefaultSafetyInspectionCategories() {
+        
+        List<WorkCategoryResponse> categories = safetyInspectionService.getDefaultSafetyInspectionCategories();
+        return ResponseEntity.ok(ApiResponses.success(categories, "Danh sách 13 hạng mục kiểm tra an toàn mặc định"));
     }
 
 }

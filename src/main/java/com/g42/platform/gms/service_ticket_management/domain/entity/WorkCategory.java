@@ -9,10 +9,14 @@ public class WorkCategory {
     private String categoryName;
     private Integer displayOrder;
     private Boolean isActive;
+    private Boolean isDefault;
     
     public void initializeDefaults() {
         if (this.isActive == null) {
             this.isActive = true;
+        }
+        if (this.isDefault == null) {
+            this.isDefault = false;
         }
     }
 }

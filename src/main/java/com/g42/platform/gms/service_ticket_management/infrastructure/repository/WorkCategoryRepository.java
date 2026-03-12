@@ -29,4 +29,13 @@ public interface WorkCategoryRepository extends JpaRepository<SafetyWorkCategory
      */
     @Query("SELECT w FROM SafetyWorkCategoryJpa w WHERE w.isActive = true ORDER BY w.displayOrder ASC")
     List<SafetyWorkCategoryJpa> findActiveWorkCategoriesOrderByDisplayOrder();
+    
+    /**
+     * Lấy danh sách tên của 13 hạng mục kiểm tra an toàn default.
+     * Chỉ lấy các work_category có is_default = 1 (13 hạng mục cố định).
+     * 
+     * @return List of default work category names (ordered by display_order)
+     */
+    @Query("SELECT w.categoryName FROM SafetyWorkCategoryJpa w WHERE w.isActive = true AND w.isDefault = true ORDER BY w.displayOrder ASC")
+    List<String> findDefaultWorkCategoryNames();
 }

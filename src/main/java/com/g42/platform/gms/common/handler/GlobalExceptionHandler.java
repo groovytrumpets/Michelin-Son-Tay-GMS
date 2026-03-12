@@ -11,6 +11,7 @@ import com.g42.platform.gms.marketing.service_catalog.domain.exception.ServiceEx
 import com.g42.platform.gms.staff.attendance.domain.exception.StaffAttendanceException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -133,5 +134,38 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(
                 ApiResponses.error("FAIL","Invalid request parameter")
         );
+    }
+
+    /**
+     * Xử lý lỗi IllegalArgumentException (ví dụ: date range validation - ER021)
+     */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiResponse<?>> handleIllegalArgumentException(IllegalArgumentException ex) {
+        System.err.println("Validation Error: " + ex.getMessage());
+        
+        // Extract error code if present in message (e.g., "Invalid Date Range (ER021): ...")
+        String errorCode = "VALIDATION_ERROR";
+        String message = ex.getMessage();
+        
+        if (message != null && message.contains("ER021")) {
+            errorCode = "ER021";
+            message = "Invalid Date Range";
+        }
+        
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponses.error(errorCode, message));
+    }
+
+    /**
+     * Xử lý lỗi AccessDeniedException (ví dụ: non-technician access - ER034)
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiResponse<?>> handleAccessDeniedException(AccessDeniedException ex) {
+        System.err.println("Access Denied: " + ex.getMessage());
+        
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(ApiResponses.error("ER034", "Access Denied"));
     }
 }

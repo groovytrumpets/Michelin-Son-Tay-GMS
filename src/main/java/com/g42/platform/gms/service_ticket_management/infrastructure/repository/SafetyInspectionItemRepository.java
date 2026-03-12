@@ -37,4 +37,23 @@ public interface SafetyInspectionItemRepository extends JpaRepository<SafetyInsp
     @Modifying
     @Query("DELETE FROM SafetyInspectionItemJpa i WHERE i.inspectionId = :inspectionId")
     void deleteByInspectionId(@Param("inspectionId") Integer inspectionId);
+    
+    /**
+     * Lấy danh sách work category names đã thực hiện cho một service ticket.
+     * Query từ safety_inspection JOIN safety_inspection_item JOIN work_category.
+     * Chỉ lấy các work_category có is_active = 1.
+     * 
+     * @param serviceTicketId ID của service ticket
+     * @return List of work category names (ordered by display_order)
+     */
+    @Query(value = """
+        SELECT DISTINCT wc.category_name
+        FROM safety_inspection si
+        INNER JOIN safety_inspection_item sii ON sii.inspection_id = si.inspection_id
+        INNER JOIN work_category wc ON wc.idwork_category = sii.work_category_id
+        WHERE si.service_ticket_id = :serviceTicketId
+          AND wc.is_active = 1
+        ORDER BY wc.display_order
+        """, nativeQuery = true)
+    List<String> findWorkCategoryNamesByServiceTicketId(@Param("serviceTicketId") Integer serviceTicketId);
 }
