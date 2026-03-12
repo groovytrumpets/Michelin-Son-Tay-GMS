@@ -58,6 +58,9 @@ public class ServiceTicketJpa {
     @Column(name = "delivered_at")
     private LocalDateTime deliveredAt;
     
+    @Column(name = "completed_at")
+    private LocalDateTime completedAt;
+    
     @Column(name = "is_deleted")
     private Boolean isDeleted = false;
     
@@ -70,10 +73,12 @@ public class ServiceTicketJpa {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
     
-    // Note: assigned_to, started_at, completed_at will be added in Phase 2 (Technician Assignment)
-    
+    // Relationships
     @OneToMany(mappedBy = "serviceTicketId", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<VehicleConditionPhotoJpa> conditionPhotos = new ArrayList<>();
+    
+    @OneToMany(mappedBy = "serviceTicketId", fetch = FetchType.LAZY)
+    private List<ServiceTicketAssignmentJpa> assignments = new ArrayList<>();
     
     @PrePersist
     protected void onCreate() {
