@@ -141,7 +141,7 @@ public class EstimateService {
                 );
                 newCategory.setIsDefault(false);
                 newCategory.setIsActive(true);
-                int nextOrder = workCategoryRepo.findMaxDisplayOrder();
+                int nextOrder = workCategoryRepo.findMaxDisplayOrder()+1;
                 newCategory.setDisplayOrder(nextOrder);
                 WorkCategory saved = workCategoryRepo.save(newCategory);
                 categoryId = saved.getId();
