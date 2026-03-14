@@ -19,6 +19,4 @@ public class CreateWorkCategoryRequest {
     private String categoryCode;
 
     private Integer displayOrder;
-
-    private String advisorNote;
 }

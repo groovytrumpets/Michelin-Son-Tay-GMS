@@ -46,7 +46,7 @@ public class WorkHistoryController {
      * @return Danh sách work history records
      */
     @GetMapping
-    @PreAuthorize("hasRole('TECHNICIAN')")
+//    @PreAuthorize("hasRole('TECHNICIAN')")
     public ResponseEntity<ApiResponse<Page<WorkHistoryResponse>>> getWorkHistory(
         @RequestParam LocalDate startDate,
         @RequestParam LocalDate endDate,

@@ -8,5 +8,4 @@ public class InspectionItemRequest {
     
     private Integer workCategoryId;  // Foreign key to work_category table
     private ItemStatus itemStatus;
-    private String notes;
 }

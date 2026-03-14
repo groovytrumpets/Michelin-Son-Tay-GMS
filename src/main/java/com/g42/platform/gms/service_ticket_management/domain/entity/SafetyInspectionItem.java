@@ -14,5 +14,5 @@ public class SafetyInspectionItem {
     private Integer workCategoryId;  // Foreign key to work_category table
     private String categoryName;     // Vietnamese display name from work_category (for response only)
     private ItemStatus itemStatus;
-    private String notes;
+    private String advisorNote;
 }

@@ -28,6 +28,6 @@ public class SafetyInspectionItemJpa {
     @Column(name = "item_status", length = 20)
     private ItemStatus itemStatus;
     
-    @Column(name = "notes", columnDefinition = "TEXT")
-    private String notes;
+    @Column(name = "advisor_note", columnDefinition = "TEXT")
+    private String advisorNote;
 }

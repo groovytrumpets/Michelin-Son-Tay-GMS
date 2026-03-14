@@ -37,9 +37,6 @@ public interface SafetyInspectionMapper {
     SafetyInspectionItem toDomain(InspectionItemRequest request);
 
     // Response mappings (Domain -> DTO)
-    @Mappings({
-            @Mapping(target = "technicianName", ignore = true)
-    })
     SafetyInspectionResponse toResponse(SafetyInspection domain);
 
     TireDataResponse toResponse(SafetyInspectionTire domain);

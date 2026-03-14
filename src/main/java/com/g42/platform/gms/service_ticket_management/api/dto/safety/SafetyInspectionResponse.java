@@ -12,7 +12,6 @@ public class SafetyInspectionResponse {
     private Integer inspectionId;
     private Integer serviceTicketId;
     private Integer technicianId;
-    private String technicianName;
     private String generalNotes;
     private String technicianNotes;
     private InspectionStatus inspectionStatus;

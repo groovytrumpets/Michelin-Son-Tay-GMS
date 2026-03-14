@@ -35,7 +35,4 @@ public class SafetyWorkCategoryJpa {
     @Convert(converter = org.hibernate.type.NumericBooleanConverter.class)
     private Boolean isDefault;
 
-    @Column(name = "advisor_note", columnDefinition = "TEXT")
-    private String advisorNote;
-
 }

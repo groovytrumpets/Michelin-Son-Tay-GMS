@@ -10,6 +10,6 @@ public interface SafetyInspectionItemWithCategory {
     Integer getInspectionId();
     Integer getWorkCategoryId();
     ItemStatus getItemStatus();
-    String getNotes();
+    String getAdvisorNote();
     String getCategoryName();  // From work_category.category_name
 }

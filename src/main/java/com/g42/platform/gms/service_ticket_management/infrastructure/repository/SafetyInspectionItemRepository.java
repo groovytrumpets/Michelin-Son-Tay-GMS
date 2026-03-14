@@ -25,7 +25,7 @@ public interface SafetyInspectionItemRepository extends JpaRepository<SafetyInsp
             i.inspection_id AS inspectionId,
             i.work_category_id AS workCategoryId,
             i.item_status AS itemStatus,
-            i.notes AS notes,
+            i.advisor_note AS advisorNote,
             wc.category_name AS categoryName
         FROM safety_inspection_item i
         INNER JOIN work_category wc ON i.work_category_id = wc.idwork_category
