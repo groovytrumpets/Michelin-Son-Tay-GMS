@@ -38,8 +38,8 @@ public class BookingRepositoryImpl implements BookingRepository {
             jpa.setCustomer(customer);
         }
         
-        if (domain.getServiceIds() != null && !domain.getServiceIds().isEmpty()) {
-            List<CatalogItemJpaEntity> services = catalogItemRepository.findAllById(domain.getServiceIds());
+        if (domain.getCatalogItemIds() != null && !domain.getCatalogItemIds().isEmpty()) {
+            List<CatalogItemJpaEntity> services = catalogItemRepository.findAllById(domain.getCatalogItemIds());
             jpa.setServices(services);
         }
         

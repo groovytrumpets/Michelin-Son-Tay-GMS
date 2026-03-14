@@ -1,0 +1,18 @@
+package com.g42.platform.gms.booking.customer.api.dto;
+
+import jakarta.validation.constraints.*;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@Data
+@EqualsAndHashCode(callSuper = true)
+public class StaffDirectBookingRequest extends BaseBookingRequest {
+    
+    @NotBlank(message = "Số điện thoại là bắt buộc")
+    @Pattern(regexp = "^0[0-9]{9,10}$", message = "Số điện thoại phải bắt đầu bằng 0 và có 10-11 chữ số")
+    private String phone;
+    
+    @NotBlank(message = "Tên khách hàng là bắt buộc")
+    @Size(min = 2, max = 100, message = "Tên khách hàng phải từ 2 đến 100 ký tự")
+    private String fullName;
+}

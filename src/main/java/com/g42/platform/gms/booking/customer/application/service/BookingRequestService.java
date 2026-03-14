@@ -40,7 +40,7 @@ public class BookingRequestService {
     
     private final Map<String, RateLimitInfo> rateLimitCache = new ConcurrentHashMap<>();
     
-    private static final int MAX_REQUESTS_PER_IP_PER_HOUR = 3;
+    private static final int MAX_REQUESTS_PER_IP_PER_HOUR = 100;
     private static final Duration RATE_LIMIT_WINDOW = Duration.ofHours(1);
     
     @Transactional
@@ -100,7 +100,7 @@ public class BookingRequestService {
         bookingRequest.setCreatedAt(LocalDateTime.now());
         bookingRequest.setExpiresAt(LocalDateTime.now().plusHours(24));
         
-        // Generate unique request code: RQ_XXXXXX
+        // Generate unique request code
         String requestCode = bookingCodeGenerator.generateCode(
             request.getAppointmentDate(),
             com.g42.platform.gms.common.enums.CodePrefix.REQUEST
@@ -129,10 +129,10 @@ public class BookingRequestService {
             if (!details.isEmpty()) {
                 bookingRequestDetailRepository.saveAll(details);
                 
-                List<Integer> savedServiceIds = details.stream()
+                 List<Integer> savedCatalogItemIds = details.stream()
                     .map(BookingRequestDetail::getItemId)
                     .collect(Collectors.toList());
-                savedRequest.setServiceIds(savedServiceIds);
+                savedRequest.setCatalogItemIds(savedCatalogItemIds);
             }
         }
         

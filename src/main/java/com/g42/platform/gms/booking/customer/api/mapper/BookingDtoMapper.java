@@ -22,21 +22,22 @@ public abstract class BookingDtoMapper {
 
     @Mapping(target = "customerName", ignore = true)
     @Mapping(target = "phone", ignore = true)
+    @Mapping(target = "serviceIds", source = "catalogItemIds")
     @Mapping(target = "services", ignore = true)
     @Mapping(target = "totalEstimatedTime", ignore = true)
     public abstract BookingResponse toResponse(Booking domain);
     
     @AfterMapping
     protected void populateServices(@MappingTarget BookingResponse response, Booking domain) {
-        List<Integer> serviceIds = domain.getServiceIds();
+        List<Integer> catalogItemIds = domain.getCatalogItemIds();
         
-        if (serviceIds == null || serviceIds.isEmpty()) {
+        if (catalogItemIds == null || catalogItemIds.isEmpty()) {
             response.setServices(new ArrayList<>());
             response.setTotalEstimatedTime(0);
             return;
         }
         
-        List<CatalogItemJpaEntity> items = catalogItemRepository.findAllById(serviceIds);
+        List<CatalogItemJpaEntity> items = catalogItemRepository.findAllById(catalogItemIds);
         
         List<ServiceItemDto> serviceDtos = new ArrayList<>();
         int totalTime = 0;
