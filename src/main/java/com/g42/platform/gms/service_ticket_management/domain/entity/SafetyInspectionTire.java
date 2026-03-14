@@ -15,7 +15,11 @@ public class SafetyInspectionTire {
     private Integer tireId;
     private Integer inspectionId;
     private TirePosition tirePosition;
-    private BigDecimal treadDepth;  // in millimeters
-    private BigDecimal pressure;     // in PSI or BAR
+    private BigDecimal treadDepth;           // in millimeters
+    private BigDecimal pressure;             // in PSI or BAR
     private PressureUnit pressureUnit;
+    private String tireSpecification;        // e.g. "225/65R17"
+    private String recommendedTireSize;      // recommended size
+    private BigDecimal recommendedPressure;  // recommended pressure
+    private PressureUnit recommendedPressureUnit;
 }

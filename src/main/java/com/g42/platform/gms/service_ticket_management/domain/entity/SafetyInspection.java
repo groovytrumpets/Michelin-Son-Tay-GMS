@@ -18,6 +18,7 @@ public class SafetyInspection {
     private Integer serviceTicketId;
     private Integer technicianId;
     private String generalNotes;
+    private String technicianNotes;
     private InspectionStatus inspectionStatus;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

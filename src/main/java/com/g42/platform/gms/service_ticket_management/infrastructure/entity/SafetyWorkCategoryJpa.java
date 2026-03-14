@@ -14,6 +14,7 @@ import jakarta.persistence.*;
 public class SafetyWorkCategoryJpa {
     
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "idwork_category")
     private Integer id;
     
@@ -33,5 +34,8 @@ public class SafetyWorkCategoryJpa {
     @Column(name = "is_default")
     @Convert(converter = org.hibernate.type.NumericBooleanConverter.class)
     private Boolean isDefault;
+
+    @Column(name = "advisor_note", columnDefinition = "TEXT")
+    private String advisorNote;
 
 }

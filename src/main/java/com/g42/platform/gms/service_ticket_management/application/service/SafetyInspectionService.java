@@ -5,6 +5,7 @@ import com.g42.platform.gms.service_ticket_management.api.dto.safety.SafetyInspe
 import com.g42.platform.gms.service_ticket_management.api.dto.safety.TireDataRequest;
 import com.g42.platform.gms.service_ticket_management.api.dto.safety.InspectionItemRequest;
 import com.g42.platform.gms.service_ticket_management.api.dto.safety.WorkCategoryResponse;
+import com.g42.platform.gms.service_ticket_management.api.dto.safety.CreateWorkCategoryRequest;
 import com.g42.platform.gms.service_ticket_management.api.mapper.SafetyInspectionMapper;
 import com.g42.platform.gms.service_ticket_management.api.mapper.WorkCategoryApiMapper;
 import com.g42.platform.gms.service_ticket_management.domain.entity.SafetyInspection;
@@ -116,6 +117,12 @@ public class SafetyInspectionService {
         SafetyInspectionJpa jpa = infraMapper.toJpa(domain);
         SafetyInspectionJpa saved = inspectionRepository.save(jpa);
 
+        // Update safety_inspection_enabled flag on service ticket
+        ServiceTicketJpa ticket = serviceTicketRepository.findById(serviceTicketId)
+                .orElseThrow(() -> new IllegalArgumentException("Service ticket not found: " + serviceTicketId));
+        ticket.setSafetyInspectionEnabled(true);
+        serviceTicketRepository.save(ticket);
+
         SafetyInspection savedDomain = infraMapper.toDomain(saved);
         return apiMapper.toResponse(savedDomain);
     }
@@ -142,6 +149,8 @@ public class SafetyInspectionService {
         SafetyInspectionJpa jpa = infraMapper.toJpa(domain);
         SafetyInspectionJpa saved = inspectionRepository.save(jpa);
 
+        // Không set safetyInspectionEnabled khi skip - flag chỉ set khi enable (PENDING/COMPLETED)
+
         SafetyInspection savedDomain = infraMapper.toDomain(saved);
         return apiMapper.toResponse(savedDomain);
     }
@@ -164,6 +173,7 @@ public class SafetyInspectionService {
             // Update existing
             SafetyInspectionJpa existingJpa = existing.get();
             existingJpa.setGeneralNotes(request.getGeneralNotes());
+            existingJpa.setTechnicianNotes(request.getTechnicianNotes());
             existingJpa.setInspectionStatus(InspectionStatus.COMPLETED);
             existingJpa.setUpdatedAt(LocalDateTime.now());
 
@@ -257,6 +267,7 @@ public class SafetyInspectionService {
 
         // Update main inspection
         inspection.setGeneralNotes(request.getGeneralNotes());
+        inspection.setTechnicianNotes(request.getTechnicianNotes());
         inspection.setInspectionStatus(InspectionStatus.COMPLETED);
         inspection.setUpdatedAt(LocalDateTime.now());
 
@@ -310,6 +321,10 @@ public class SafetyInspectionService {
                 existingTire.setTreadDepth(newTire.getTreadDepth());
                 existingTire.setPressure(newTire.getPressure());
                 existingTire.setPressureUnit(newTire.getPressureUnit());
+                existingTire.setTireSpecification(newTire.getTireSpecification());
+                existingTire.setRecommendedTireSize(newTire.getRecommendedTireSize());
+                existingTire.setRecommendedPressure(newTire.getRecommendedPressure());
+                existingTire.setRecommendedPressureUnit(newTire.getRecommendedPressureUnit());
                 tireRepository.save(existingTire);
             } else {
                 // INSERT new tire
@@ -407,6 +422,42 @@ public class SafetyInspectionService {
     }
 
     /**
+     * Tạo mới một hạng mục kiểm tra an toàn (work_category) với is_default = false.
+     * Dùng khi KTV muốn thêm hạng mục ngoài 13 hạng mục mặc định.
+     */
+    public WorkCategoryResponse createWorkCategory(CreateWorkCategoryRequest request) {
+        // Validate trùng tên
+        if (workCategoryRepository.existsByCategoryName(request.getCategoryName())) {
+            throw new IllegalArgumentException("Tên hạng mục đã tồn tại: " + request.getCategoryName());
+        }
+
+        // Tự generate categoryCode nếu không truyền
+        String categoryCode = request.getCategoryCode();
+        if (categoryCode == null || categoryCode.isBlank()) {
+            categoryCode = request.getCategoryName().toUpperCase()
+                    .replace(" ", "_")
+                    .replaceAll("[^A-Z0-9_]", "");
+        }
+
+        // Validate trùng code
+        if (workCategoryRepository.existsByCategoryCode(categoryCode)) {
+            throw new IllegalArgumentException("Mã hạng mục đã tồn tại: " + categoryCode);
+        }
+
+        SafetyWorkCategoryJpa jpa = new SafetyWorkCategoryJpa();
+        jpa.setCategoryName(request.getCategoryName());
+        jpa.setCategoryCode(categoryCode);
+        jpa.setDisplayOrder(request.getDisplayOrder());
+        jpa.setIsActive(true);
+        jpa.setIsDefault(false);
+        jpa.setAdvisorNote(request.getAdvisorNote());
+
+        SafetyWorkCategoryJpa saved = workCategoryRepository.save(jpa);
+        WorkCategory domain = workCategoryInfraMapper.toDomain(saved);
+        return workCategoryApiMapper.toResponse(domain);
+    }
+
+    /**
      * Validate inspection data
      */
     private void validateInspectionData(SafetyInspectionRequest request) {
@@ -416,16 +467,29 @@ public class SafetyInspectionService {
 
         // Validate tire data
         if (request.getTires() != null) {
-            if (request.getTires().size() > 4) {
-                throw new IllegalArgumentException("Maximum 4 tire records allowed");
+            if (request.getTires().size() > 5) {
+                throw new IllegalArgumentException("Maximum 5 tire records allowed");
             }
 
+            java.util.Set<com.g42.platform.gms.service_ticket_management.domain.enums.TirePosition> positions = new java.util.HashSet<>();
             for (TireDataRequest tire : request.getTires()) {
+                if (tire.getTirePosition() != null && !positions.add(tire.getTirePosition())) {
+                    throw new IllegalArgumentException("Duplicate tire position: " + tire.getTirePosition());
+                }
                 if (tire.getTreadDepth() != null && tire.getTreadDepth().compareTo(BigDecimal.ZERO) < 0) {
                     throw new IllegalArgumentException("Tire tread depth must be non-negative");
                 }
                 if (tire.getPressure() != null && tire.getPressure().compareTo(BigDecimal.ZERO) < 0) {
                     throw new IllegalArgumentException("Tire pressure must be non-negative");
+                }
+                if (tire.getRecommendedPressure() != null && tire.getRecommendedPressure().compareTo(BigDecimal.ZERO) < 0) {
+                    throw new IllegalArgumentException("Recommended tire pressure must be non-negative");
+                }
+                if (tire.getTireSpecification() != null && tire.getTireSpecification().length() > 50) {
+                    throw new IllegalArgumentException("Tire specification too long (max 50 characters)");
+                }
+                if (tire.getRecommendedTireSize() != null && tire.getRecommendedTireSize().length() > 50) {
+                    throw new IllegalArgumentException("Recommended tire size too long (max 50 characters)");
                 }
             }
         }

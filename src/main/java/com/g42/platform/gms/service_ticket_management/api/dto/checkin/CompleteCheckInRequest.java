@@ -13,8 +13,6 @@ import lombok.Data;
 public class CompleteCheckInRequest {
     
     @NotBlank(message = "Mã service ticket là bắt buộc")
-    @Pattern(regexp = "^ST_[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{6}$", 
-             message = "Mã service ticket không hợp lệ (format: ST_XXXXXX)")
     private String ticketCode;
     
     @Size(max = 1000, message = "Ghi chú không được quá 1000 ký tự")

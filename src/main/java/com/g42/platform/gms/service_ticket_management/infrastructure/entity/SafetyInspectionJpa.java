@@ -29,7 +29,10 @@ public class SafetyInspectionJpa {
     
     @Column(name = "general_notes", columnDefinition = "TEXT")
     private String generalNotes;
-    
+
+    @Column(name = "technician_notes", columnDefinition = "TEXT")
+    private String technicianNotes;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "inspection_status", length = 20)
     private InspectionStatus inspectionStatus;

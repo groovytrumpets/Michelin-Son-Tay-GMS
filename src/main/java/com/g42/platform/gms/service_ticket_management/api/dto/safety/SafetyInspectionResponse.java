@@ -14,6 +14,7 @@ public class SafetyInspectionResponse {
     private Integer technicianId;
     private String technicianName;
     private String generalNotes;
+    private String technicianNotes;
     private InspectionStatus inspectionStatus;
     private List<TireDataResponse> tires;
     private List<InspectionItemResponse> items;

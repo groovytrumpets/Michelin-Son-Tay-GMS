@@ -14,4 +14,8 @@ public class TireDataResponse {
     private BigDecimal treadDepth;
     private BigDecimal pressure;
     private PressureUnit pressureUnit;
+    private String tireSpecification;
+    private String recommendedTireSize;
+    private BigDecimal recommendedPressure;
+    private PressureUnit recommendedPressureUnit;
 }

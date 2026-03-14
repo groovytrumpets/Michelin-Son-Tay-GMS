@@ -38,4 +38,8 @@ public interface WorkCategoryRepository extends JpaRepository<SafetyWorkCategory
      */
     @Query("SELECT w.categoryName FROM SafetyWorkCategoryJpa w WHERE w.isActive = true AND w.isDefault = true ORDER BY w.displayOrder ASC")
     List<String> findDefaultWorkCategoryNames();
+
+    boolean existsByCategoryName(String categoryName);
+
+    boolean existsByCategoryCode(String categoryCode);
 }

@@ -66,6 +66,9 @@ public class ServiceTicketJpa {
     
     @Column(name = "check_in_notes", columnDefinition = "TEXT")
     private String checkInNotes;
+
+    @Column(name = "safety_inspection_enabled")
+    private Boolean safetyInspectionEnabled = false;
     
     @Column(name = "created_at")
     private LocalDateTime createdAt;

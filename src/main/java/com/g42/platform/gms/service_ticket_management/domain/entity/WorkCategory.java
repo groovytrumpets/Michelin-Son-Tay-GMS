@@ -10,6 +10,7 @@ public class WorkCategory {
     private Integer displayOrder;
     private Boolean isActive;
     private Boolean isDefault;
+    private String advisorNote;
     
     public void initializeDefaults() {
         if (this.isActive == null) {

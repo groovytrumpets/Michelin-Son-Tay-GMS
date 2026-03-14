@@ -37,4 +37,17 @@ public class SafetyInspectionTireJpa {
     @Enumerated(EnumType.STRING)
     @Column(name = "pressure_unit", length = 10)
     private PressureUnit pressureUnit;
+
+    @Column(name = "tire_specification", length = 50)
+    private String tireSpecification;
+
+    @Column(name = "recommended_tire_size", length = 50)
+    private String recommendedTireSize;
+
+    @Column(name = "recommended_pressure", precision = 5, scale = 2)
+    private BigDecimal recommendedPressure;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "recommended_pressure_unit", length = 10)
+    private PressureUnit recommendedPressureUnit;
 }

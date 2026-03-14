@@ -3,11 +3,14 @@ package com.g42.platform.gms.service_ticket_management.api.controller;
 import com.g42.platform.gms.auth.entity.StaffPrincipal;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
+import com.g42.platform.gms.service_ticket_management.api.dto.safety.CreateWorkCategoryRequest;
 import com.g42.platform.gms.service_ticket_management.api.dto.safety.SafetyInspectionRequest;
 import com.g42.platform.gms.service_ticket_management.api.dto.safety.SafetyInspectionResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.safety.WorkCategoryResponse;
 import com.g42.platform.gms.service_ticket_management.application.service.SafetyInspectionService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -128,6 +131,19 @@ public class SafetyInspectionController {
         
         List<WorkCategoryResponse> categories = safetyInspectionService.getDefaultSafetyInspectionCategories();
         return ResponseEntity.ok(ApiResponses.success(categories, "Danh sách 13 hạng mục kiểm tra an toàn mặc định"));
+    }
+
+    /**
+     * Tạo mới một hạng mục kiểm tra an toàn (ngoài 13 hạng mục mặc định).
+     * is_default = false, is_active = true.
+     */
+    @PostMapping("/categories")
+    public ResponseEntity<ApiResponse<WorkCategoryResponse>> createWorkCategory(
+            @Valid @RequestBody CreateWorkCategoryRequest request) {
+
+        WorkCategoryResponse response = safetyInspectionService.createWorkCategory(request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponses.success(response, "Tạo mới hạng mục kiểm tra thành công"));
     }
 
 }

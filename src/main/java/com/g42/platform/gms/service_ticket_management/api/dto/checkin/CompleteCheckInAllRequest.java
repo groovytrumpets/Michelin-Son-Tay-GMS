@@ -57,9 +57,7 @@ public class CompleteCheckInAllRequest {
     @Size(max = 500, message = "Mô tả ảnh không được quá 500 ký tự")
     private String photoDamageDescription;
     
-    // Odometer reading (required)
-    @NotNull(message = "Số km là bắt buộc")
-    @Positive(message = "Số km phải là số dương")
+    // Odometer reading (optional)
     @Max(value = 9999999, message = "Số km không hợp lệ")
     private Integer odometerReading;
     

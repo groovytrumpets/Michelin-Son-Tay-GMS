@@ -10,4 +10,5 @@ public class WorkCategoryResponse {
     private Integer displayOrder;
     private Boolean isActive;
     private Boolean isDefault;
+    private String advisorNote;
 }
