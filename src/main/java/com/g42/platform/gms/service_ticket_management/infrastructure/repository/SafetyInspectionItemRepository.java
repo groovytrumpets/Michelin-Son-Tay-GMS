@@ -14,6 +14,8 @@ import java.util.List;
 public interface SafetyInspectionItemRepository extends JpaRepository<SafetyInspectionItemJpa, Integer> {
     
     List<SafetyInspectionItemJpa> findByInspectionId(Integer inspectionId);
+
+    java.util.Optional<SafetyInspectionItemJpa> findByInspectionIdAndWorkCategoryId(Integer inspectionId, Integer workCategoryId);
     
     /**
      * Find inspection items with category names using JOIN query.

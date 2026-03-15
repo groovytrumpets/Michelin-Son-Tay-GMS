@@ -27,6 +27,7 @@ import com.g42.platform.gms.service_ticket_management.infrastructure.repository.
 import com.g42.platform.gms.service_ticket_management.infrastructure.repository.SafetyInspectionTireRepository;
 import com.g42.platform.gms.service_ticket_management.infrastructure.repository.ServiceTicketRepository;
 import com.g42.platform.gms.service_ticket_management.infrastructure.repository.WorkCategoryRepository;
+import com.g42.platform.gms.service_ticket_management.infrastructure.projection.SafetyInspectionItemWithCategory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -76,11 +77,11 @@ public class SafetyInspectionService {
     /**
      * Skip inspection by ticket code (create SKIPPED record)
      */
-    public SafetyInspectionResponse skipInspectionByCode(String ticketCode, String reason) {
+    public SafetyInspectionResponse skipInspectionByCode(String ticketCode) {
         ServiceTicketJpa serviceTicket = serviceTicketRepository.findByTicketCode(ticketCode)
                 .orElseThrow(() -> new IllegalArgumentException("Service ticket not found with code: " + ticketCode));
 
-        return skipInspection(serviceTicket.getServiceTicketId(), reason);
+        return skipInspection(serviceTicket.getServiceTicketId());
     }
 
     /**
@@ -95,7 +96,7 @@ public class SafetyInspectionService {
     }
 
     /**
-     * Enable inspection (create PENDING record)
+     * Enable inspection (create PENDING record + tạo 13 items mặc định)
      */
     public SafetyInspectionResponse enableInspection(Integer serviceTicketId, Integer technicianId) {
         // Check if inspection already exists
@@ -109,7 +110,7 @@ public class SafetyInspectionService {
             throw new IllegalArgumentException("Technician ID is required to enable inspection");
         }
 
-        // Create new PENDING inspection (no default items - technician will add them when saving)
+        // Create new PENDING inspection
         SafetyInspection domain = new SafetyInspection();
         domain.setServiceTicketId(serviceTicketId);
         domain.setTechnicianId(technicianId);
@@ -119,20 +120,15 @@ public class SafetyInspectionService {
         SafetyInspectionJpa jpa = infraMapper.toJpa(domain);
         SafetyInspectionJpa saved = inspectionRepository.save(jpa);
 
-        // Auto-tạo items cho 13 hạng mục mặc định (is_default = true) để advisor có thể ghi note ngay
-        List<SafetyWorkCategoryJpa> activeCategories = workCategoryRepository.findActiveCategories().stream()
-                .filter(cat -> Boolean.TRUE.equals(cat.getIsDefault()))
+        // Tạo 13 items mặc định (itemStatus = null, advisorNote = null)
+        List<SafetyWorkCategoryJpa> defaultCategories = workCategoryRepository.findActiveCategories().stream()
+                .filter(cat -> cat.getIsDefault() != null && cat.getIsDefault())
                 .toList();
-        if (!activeCategories.isEmpty()) {
-            List<SafetyInspectionItemJpa> items = activeCategories.stream().map(cat -> {
-                SafetyInspectionItemJpa item = new SafetyInspectionItemJpa();
-                item.setInspectionId(saved.getInspectionId());
-                item.setWorkCategoryId(cat.getId());
-                item.setItemStatus(null);
-                item.setAdvisorNote(null);
-                return item;
-            }).toList();
-            itemRepository.saveAll(items);
+        for (SafetyWorkCategoryJpa cat : defaultCategories) {
+            SafetyInspectionItemJpa item = new SafetyInspectionItemJpa();
+            item.setInspectionId(saved.getInspectionId());
+            item.setWorkCategoryId(cat.getId());
+            itemRepository.save(item);
         }
 
         // Update safety_inspection_enabled flag on service ticket
@@ -141,33 +137,27 @@ public class SafetyInspectionService {
         ticket.setSafetyInspectionEnabled(true);
         serviceTicketRepository.save(ticket);
 
-        SafetyInspection savedDomain = infraMapper.toDomain(saved);
-        return apiMapper.toResponse(savedDomain);
+        return getInspectionByServiceTicket(serviceTicketId);
     }
 
 
     /**
-     * Skip inspection (create SKIPPED record)
+     * Skip inspection (create SKIPPED record, không có items)
      */
-    public SafetyInspectionResponse skipInspection(Integer serviceTicketId, String reason) {
-        // Check if inspection already exists
+    public SafetyInspectionResponse skipInspection(Integer serviceTicketId) {
         Optional<SafetyInspectionJpa> existing = inspectionRepository.findByServiceTicketId(serviceTicketId);
         if (existing.isPresent()) {
             throw new IllegalStateException("Inspection already exists for service ticket: " + serviceTicketId);
         }
 
-        // Create new SKIPPED inspection
         SafetyInspection domain = new SafetyInspection();
         domain.setServiceTicketId(serviceTicketId);
         domain.setTechnicianId(null);
         domain.setInspectionStatus(InspectionStatus.SKIPPED);
-        domain.setGeneralNotes(reason);
         domain.initializeDefaults();
 
         SafetyInspectionJpa jpa = infraMapper.toJpa(domain);
         SafetyInspectionJpa saved = inspectionRepository.save(jpa);
-
-        // Không set safetyInspectionEnabled khi skip - flag chỉ set khi enable (PENDING/COMPLETED)
 
         SafetyInspection savedDomain = infraMapper.toDomain(saved);
         return apiMapper.toResponse(savedDomain);
@@ -197,10 +187,6 @@ public class SafetyInspectionService {
             existingJpa.setUpdatedAt(LocalDateTime.now());
 
             saved = inspectionRepository.save(existingJpa);
-
-            // Delete existing tires and items
-            tireRepository.deleteByInspectionId(saved.getInspectionId());
-            itemRepository.deleteByInspectionId(saved.getInspectionId());
         } else {
             // Create new
             domain.initializeDefaults();
@@ -208,25 +194,11 @@ public class SafetyInspectionService {
             saved = inspectionRepository.save(jpa);
         }
 
-        // Save tires
-        if (request.getTires() != null && !request.getTires().isEmpty()) {
-            List<SafetyInspectionTire> tires = apiMapper.tiresToDomain(request.getTires());
-            for (SafetyInspectionTire tire : tires) {
-                tire.setInspectionId(saved.getInspectionId());
-            }
-            List<SafetyInspectionTireJpa> tireJpas = infraMapper.tiresToJpa(tires);
-            tireRepository.saveAll(tireJpas);
-        }
+        // Smart update tires (giữ nguyên tireId nếu đã có)
+        updateTires(saved.getInspectionId(), request.getTires());
 
-        // Save items
-        if (request.getItems() != null && !request.getItems().isEmpty()) {
-            List<SafetyInspectionItem> items = apiMapper.itemsToDomain(request.getItems());
-            for (SafetyInspectionItem item : items) {
-                item.setInspectionId(saved.getInspectionId());
-            }
-            List<SafetyInspectionItemJpa> itemJpas = infraMapper.itemsToJpa(items);
-            itemRepository.saveAll(itemJpas);
-        }
+        // Smart update items (giữ nguyên itemId nếu đã có, bảo toàn advisorNote)
+        updateItems(saved.getInspectionId(), request.getItems());
 
         return getInspectionByServiceTicket(request.getServiceTicketId());
     }
@@ -415,6 +387,54 @@ public class SafetyInspectionService {
     }
 
     /**
+     * Upsert một item lẻ theo workCategoryId.
+     * Nếu item đã tồn tại → update itemStatus.
+     * Nếu chưa → tạo mới.
+     */
+    @Transactional
+    public InspectionItemResponse upsertItem(Integer inspectionId, InspectionItemRequest request) {
+        if (request.getWorkCategoryId() == null) {
+            throw new IllegalArgumentException("workCategoryId là bắt buộc");
+        }
+
+        SafetyInspectionItemJpa item = itemRepository
+                .findByInspectionIdAndWorkCategoryId(inspectionId, request.getWorkCategoryId())
+                .orElseGet(() -> {
+                    SafetyInspectionItemJpa newItem = new SafetyInspectionItemJpa();
+                    newItem.setInspectionId(inspectionId);
+                    newItem.setWorkCategoryId(request.getWorkCategoryId());
+                    return newItem;
+                });
+
+        item.setItemStatus(request.getItemStatus());
+        SafetyInspectionItemJpa saved = itemRepository.save(item);
+
+        // Build response with categoryName
+        List<SafetyInspectionItemWithCategory> withCategory =
+                itemRepository.findByInspectionIdWithCategory(inspectionId);
+        return withCategory.stream()
+                .filter(p -> p.getItemId().equals(saved.getItemId()))
+                .findFirst()
+                .map(p -> {
+                    InspectionItemResponse resp = new InspectionItemResponse();
+                    resp.setItemId(p.getItemId());
+                    resp.setWorkCategoryId(p.getWorkCategoryId());
+                    resp.setCategoryName(p.getCategoryName());
+                    resp.setItemStatus(saved.getItemStatus());
+                    resp.setAdvisorNote(saved.getAdvisorNote());
+                    return resp;
+                })
+                .orElseGet(() -> {
+                    InspectionItemResponse resp = new InspectionItemResponse();
+                    resp.setItemId(saved.getItemId());
+                    resp.setWorkCategoryId(saved.getWorkCategoryId());
+                    resp.setItemStatus(saved.getItemStatus());
+                    resp.setAdvisorNote(saved.getAdvisorNote());
+                    return resp;
+                });
+    }
+
+    /**
      * Get available safety inspection categories from work_category table
      * Note: All categories in work_category table (IDs 9001-9013) are safety inspection items
      */
@@ -476,27 +496,51 @@ public class SafetyInspectionService {
     }
 
     /**
-     * Advisor cập nhật ghi chú cho nhiều hạng mục kiểm tra cùng lúc.
-     * Chỉ advisor mới được gọi endpoint này.
+     * Advisor cập nhật ghi chú cho nhiều hạng mục kiểm tra cùng lúc (upsert theo workCategoryId).
+     * - Enable: item đã có sẵn → update advisorNote
+     * - Skip: item chưa có → tạo mới item với advisorNote
      */
     public List<InspectionItemResponse> updateAdvisorNotes(Integer inspectionId, List<AdvisorNoteItemRequest> noteItems) {
         return noteItems.stream().map(noteItem -> {
-            SafetyInspectionItemJpa item = itemRepository.findById(noteItem.getItemId())
-                    .orElseThrow(() -> new IllegalArgumentException("Inspection item not found: " + noteItem.getItemId()));
-
-            if (!item.getInspectionId().equals(inspectionId)) {
-                throw new IllegalArgumentException("Item " + noteItem.getItemId() + " does not belong to inspection " + inspectionId);
+            if (noteItem.getWorkCategoryId() == null) {
+                throw new IllegalArgumentException("workCategoryId là bắt buộc");
             }
+
+            SafetyInspectionItemJpa item = itemRepository
+                    .findByInspectionIdAndWorkCategoryId(inspectionId, noteItem.getWorkCategoryId())
+                    .orElseGet(() -> {
+                        SafetyInspectionItemJpa newItem = new SafetyInspectionItemJpa();
+                        newItem.setInspectionId(inspectionId);
+                        newItem.setWorkCategoryId(noteItem.getWorkCategoryId());
+                        return newItem;
+                    });
 
             item.setAdvisorNote(noteItem.getAdvisorNote());
             SafetyInspectionItemJpa saved = itemRepository.save(item);
 
-            InspectionItemResponse response = new InspectionItemResponse();
-            response.setItemId(saved.getItemId());
-            response.setWorkCategoryId(saved.getWorkCategoryId());
-            response.setItemStatus(saved.getItemStatus());
-            response.setAdvisorNote(saved.getAdvisorNote());
-            return response;
+            List<SafetyInspectionItemWithCategory> withCategory =
+                    itemRepository.findByInspectionIdWithCategory(inspectionId);
+
+            return withCategory.stream()
+                    .filter(p -> p.getItemId().equals(saved.getItemId()))
+                    .findFirst()
+                    .map(p -> {
+                        InspectionItemResponse resp = new InspectionItemResponse();
+                        resp.setItemId(p.getItemId());
+                        resp.setWorkCategoryId(p.getWorkCategoryId());
+                        resp.setCategoryName(p.getCategoryName());
+                        resp.setItemStatus(saved.getItemStatus());
+                        resp.setAdvisorNote(saved.getAdvisorNote());
+                        return resp;
+                    })
+                    .orElseGet(() -> {
+                        InspectionItemResponse resp = new InspectionItemResponse();
+                        resp.setItemId(saved.getItemId());
+                        resp.setWorkCategoryId(saved.getWorkCategoryId());
+                        resp.setItemStatus(saved.getItemStatus());
+                        resp.setAdvisorNote(saved.getAdvisorNote());
+                        return resp;
+                    });
         }).toList();
     }
 

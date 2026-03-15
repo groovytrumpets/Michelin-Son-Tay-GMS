@@ -5,6 +5,7 @@ import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.service_ticket_management.api.dto.safety.AdvisorNoteRequest;
 import com.g42.platform.gms.service_ticket_management.api.dto.safety.CreateWorkCategoryRequest;
+import com.g42.platform.gms.service_ticket_management.api.dto.safety.InspectionItemRequest;
 import com.g42.platform.gms.service_ticket_management.api.dto.safety.InspectionItemResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.safety.SafetyInspectionRequest;
 import com.g42.platform.gms.service_ticket_management.api.dto.safety.SafetyInspectionResponse;
@@ -52,11 +53,10 @@ public class SafetyInspectionController {
      */
     @PostMapping("/{ticketCode}/skip")
     public ResponseEntity<ApiResponse<SafetyInspectionResponse>> skipInspection(
-            @PathVariable String ticketCode,
-            @RequestParam(required = false) String reason) {
-        
-        SafetyInspectionResponse response = safetyInspectionService.skipInspectionByCode(ticketCode, reason);
-        return ResponseEntity.ok(ApiResponses.success(response, "Safety inspection skipped successfully"));
+            @PathVariable String ticketCode) {
+
+        SafetyInspectionResponse response = safetyInspectionService.skipInspectionByCode(ticketCode);
+        return ResponseEntity.ok(ApiResponses.success(response, "Đã bỏ qua kiểm tra an toàn"));
     }
 
     /**
@@ -146,6 +146,20 @@ public class SafetyInspectionController {
         WorkCategoryResponse response = safetyInspectionService.createWorkCategory(request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponses.success(response, "Tạo mới hạng mục kiểm tra thành công"));
+    }
+
+    /**
+     * PATCH /{inspectionId}/items
+     * Upsert một hạng mục lẻ: tạo mới nếu chưa có, update nếu đã có.
+     * Frontend gửi workCategoryId + itemStatus.
+     */
+    @PatchMapping("/{inspectionId}/items")
+    public ResponseEntity<ApiResponse<InspectionItemResponse>> upsertItem(
+            @PathVariable Integer inspectionId,
+            @RequestBody InspectionItemRequest request) {
+
+        InspectionItemResponse response = safetyInspectionService.upsertItem(inspectionId, request);
+        return ResponseEntity.ok(ApiResponses.success(response, "Đã cập nhật hạng mục kiểm tra"));
     }
 
     /**

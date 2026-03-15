@@ -5,6 +5,6 @@ import lombok.Data;
 @Data
 public class AdvisorNoteItemRequest {
 
-    private Integer itemId;
+    private Integer workCategoryId;
     private String advisorNote;
 }
