@@ -20,8 +20,4 @@ public class StaffRoleJpa {
     private StaffProfile staff;
 
 
-    @Column(name = "role_id", nullable = false)
-    private Integer roleId;
-
-
 }

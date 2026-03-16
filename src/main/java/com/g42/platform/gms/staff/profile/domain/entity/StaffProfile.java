@@ -12,6 +12,8 @@ import java.util.List;
 public class StaffProfile {
     private Integer staffId;
     private String fullName;
+    private String email;
+    private String status;
     private String phone;
     private String position;
     private String gender;

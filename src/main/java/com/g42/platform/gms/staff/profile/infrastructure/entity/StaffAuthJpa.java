@@ -21,7 +21,8 @@ public class StaffAuthJpa {
   private java.sql.Timestamp createdAt;
   private String google_id;
 
-  @Column(name = "staff_id")
-  private Integer staffProfileId;
+  @OneToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "staff_id")
+  private StaffProfileJpa staffProfile;
 
 }
