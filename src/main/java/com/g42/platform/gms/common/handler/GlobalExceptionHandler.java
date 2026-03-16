@@ -9,6 +9,7 @@ import com.g42.platform.gms.auth.exception.AuthException;
 import com.g42.platform.gms.customer.domain.exception.CustomerException;
 import com.g42.platform.gms.marketing.service_catalog.domain.exception.ServiceException;
 import com.g42.platform.gms.staff.attendance.domain.exception.StaffAttendanceException;
+import com.g42.platform.gms.staff.profile.domain.exception.StaffException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -101,6 +102,16 @@ public class GlobalExceptionHandler {
     }
     @ExceptionHandler(CustomerException.class)
     public ResponseEntity<ApiResponse<?>> handleBookingManagementException(CustomerException ex) {
+
+        System.err.println("Customer Error: " + ex.getCode() + " - " + ex.getMessage());
+
+
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponses.error(ex.getCode().name(), ex.getMessage()));
+    }
+    @ExceptionHandler(StaffException.class)
+    public ResponseEntity<ApiResponse<?>> handleBookingManagementException(StaffException ex) {
 
         System.err.println("Customer Error: " + ex.getCode() + " - " + ex.getMessage());
 
