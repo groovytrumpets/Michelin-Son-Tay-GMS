@@ -85,7 +85,12 @@ public class CustomerRepoImpl implements CustomerRepo {
             specification = specification.and(CustomerProfileSpecification.searchProfiles(search));
         }
         Page<CustomerProfileJpa> customerProfileJpas = customerProfileJpaRepo.findAll(specification, pageable);
-        return customerProfileJpas.map(customerJpaMapper::toDomain);
+        return customerProfileJpas.map(jpa -> {
+            CustomerProfile profile = customerJpaMapper.toDomain(jpa);
+            CustomerAuthJpa auth = customerAuthJpaRepo.findByCustomerId(jpa.getCustomerId());
+            if (auth != null) profile.setStatus(auth.getStatus());
+            return profile;
+        });
     }
 
     @Override
@@ -113,6 +118,10 @@ public class CustomerRepoImpl implements CustomerRepo {
 
     @Override
     public CustomerProfile findCustomerById(Integer customerId) {
-        return customerJpaMapper.toDomain(customerProfileJpaRepo.findByCustomerId(customerId));
+        CustomerProfileJpa jpa = customerProfileJpaRepo.findByCustomerId(customerId);
+        CustomerProfile profile = customerJpaMapper.toDomain(jpa);
+        CustomerAuthJpa auth = customerAuthJpaRepo.findByCustomerId(customerId);
+        if (auth != null) profile.setStatus(auth.getStatus());
+        return profile;
     }
 }
