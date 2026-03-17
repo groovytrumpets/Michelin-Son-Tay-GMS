@@ -24,4 +24,10 @@ public class StaffRepoImpl implements StaffRepo {
                 search, status, roleIds, pageable);
         return result.map(staffProfileJpaMapper::toDomain);
     }
+
+    @Override
+    public StaffProfile findById(Integer staffId) {
+        StaffProfileJpa staffProfileJpa = staffProfileJpaRepo.findByStaffId(staffId);
+        return  staffProfileJpaMapper.toDomain(staffProfileJpa);
+    }
 }

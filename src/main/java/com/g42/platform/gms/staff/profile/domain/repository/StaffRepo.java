@@ -10,4 +10,6 @@ import java.util.List;
 @Repository
 public interface StaffRepo {
     Page<StaffProfile> findAllWithFilter(String search, String status, List<Integer> roleIds, Pageable pageable);
+
+    StaffProfile findById(Integer staffId);
 }
