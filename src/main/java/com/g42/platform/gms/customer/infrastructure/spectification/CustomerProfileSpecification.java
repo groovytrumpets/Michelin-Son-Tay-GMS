@@ -15,8 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class CustomerProfileSpecification {
-    public static Specification<CustomerProfileJpa> filter(LocalDate date,
-                                                           Boolean isGuest) {
+    public static Specification<CustomerProfileJpa> filter(LocalDate date) {
         return (root, query, cb) -> {
 
             List<Predicate> predicates = new ArrayList<>();
@@ -24,12 +23,6 @@ public class CustomerProfileSpecification {
             if (date != null) {
                 predicates.add(
                         cb.equal(root.get("dob"), date)
-                );
-            }
-
-            if (isGuest != null) {
-                predicates.add(
-                        cb.equal(root.get("isGuest"), isGuest)
                 );
             }
 
@@ -44,7 +37,7 @@ public class CustomerProfileSpecification {
 
             List<Predicate> predicates = new ArrayList<>();
 
-            predicates.add(cb.like(cb.lower(root.get("customerId")), like));
+            predicates.add(cb.like(root.get("customerId").as(String.class), like));
             predicates.add(cb.like(cb.lower(root.get("fullName")), like));
             predicates.add(cb.like(root.get("phone").as(String.class), like));
             predicates.add(cb.like(root.get("email").as(String.class), like));

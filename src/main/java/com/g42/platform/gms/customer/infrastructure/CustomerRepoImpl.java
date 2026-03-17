@@ -80,7 +80,7 @@ public class CustomerRepoImpl implements CustomerRepo {
     public Page<CustomerProfile> getListOfCustomers(int page,int size, LocalDate date, Boolean isGuest, String search) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         Specification<CustomerProfileJpa> specification = Specification.unrestricted();
-        specification = specification.and(CustomerProfileSpecification.filter(date,isGuest));
+        specification = specification.and(CustomerProfileSpecification.filter(date));
         if (search != null && !search.isBlank()) {
             specification = specification.and(CustomerProfileSpecification.searchProfiles(search));
         }
