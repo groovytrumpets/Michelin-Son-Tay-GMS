@@ -24,7 +24,7 @@ public class StaffService {
     StaffProfileDtoMapper staffProfileDtoMapper;
 
 
-    public Page<StaffProfileDto> getListOfAllStaffProfile(int page, int size, LocalDate date, Boolean isActive, String search, List<Integer> roleIds) {
+    public Page<StaffProfileDto> getListOfAllStaffProfile(int page, int size, Boolean isActive, String search, List<Integer> roleIds) {
         String status = isActive == null ? null : (isActive ? "ACTIVE" : "INACTIVE");
 
         Pageable pageable = PageRequest.of(page, size);

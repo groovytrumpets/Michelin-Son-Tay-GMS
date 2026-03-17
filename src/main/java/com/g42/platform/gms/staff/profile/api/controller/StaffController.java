@@ -26,10 +26,9 @@ public class StaffController {
     @GetMapping("all-staff")
     public ResponseEntity<ApiResponse<Page<StaffProfileDto>>> getAllCustomerProfile(@RequestParam(defaultValue = "0") int page,
                                                                                     @RequestParam(defaultValue = "10") int size,
-                                                                                    @RequestParam(required = false) LocalDate date,
                                                                                     @RequestParam(required = false) Boolean isActive,
                                                                                     @RequestParam(required = false) String search,
                                                                                     @RequestParam(required = false) List<Integer> roleIds) {
-        return ResponseEntity.ok(ApiResponses.success(staffService.getListOfAllStaffProfile(page, size, date, isActive, search, roleIds)));
+        return ResponseEntity.ok(ApiResponses.success(staffService.getListOfAllStaffProfile(page, size, isActive, search, roleIds)));
     }
 }
