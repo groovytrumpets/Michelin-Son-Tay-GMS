@@ -26,8 +26,9 @@ public class StaffController {
                                                                                     @RequestParam(defaultValue = "10") int size,
                                                                                     @RequestParam(required = false) Boolean isActive,
                                                                                     @RequestParam(required = false) String search,
-                                                                                    @RequestParam(required = false) List<Integer> roleIds) {
-        return ResponseEntity.ok(ApiResponses.success(staffService.getListOfAllStaffProfile(page, size, isActive, search, roleIds)));
+                                                                                    @RequestParam(required = false) List<Integer> roleIds,
+                                                                                    @RequestParam(required = false) String status) {
+        return ResponseEntity.ok(ApiResponses.success(staffService.getListOfAllStaffProfile(page, size, isActive, search, roleIds, status)));
     }
     @GetMapping("{staff-Id}")
     public ResponseEntity<ApiResponse<StaffProfileDto>> getStaffProfile(@PathVariable("staff-Id") Integer staffId) {

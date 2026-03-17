@@ -30,8 +30,10 @@ public class CustomerController {
                                                                                     @RequestParam(defaultValue = "10") int size,
                                                                                     @RequestParam(required = false) LocalDate date,
                                                                                     @RequestParam(required = false) Boolean isGuest,
-                                                                                    @RequestParam(required = false) String search) {
-        return ResponseEntity.ok(ApiResponses.success(customerService.getListOfAllCustomerProfile(page, size, date, isGuest, search)));
+                                                                                    @RequestParam(required = false) String search,
+                                                                                    @RequestParam(required = false) String status
+    ) {
+        return ResponseEntity.ok(ApiResponses.success(customerService.getListOfAllCustomerProfile(page, size, date, isGuest, search, status)));
     }
     @PutMapping("{customerId}/update")
     public ResponseEntity<ApiResponse<CustomerCreateDto>> updateProfile(@PathVariable Integer customerId,@RequestBody CustomerUpdateDto customerUpdateDto) {
