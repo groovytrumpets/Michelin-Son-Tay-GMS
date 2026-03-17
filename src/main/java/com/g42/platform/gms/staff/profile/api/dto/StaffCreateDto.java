@@ -10,14 +10,16 @@ import java.util.List;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class StaffProfileDto {
-    private Integer staffId;
+public class StaffCreateDto {
     private String fullName;
     private String phone;
     private String position;
+    private String password;
     private String avatar;
     private String email;
     private String status;
     private java.sql.Date dob;
     private List<RoleDto> roles;
+    private String googleId;
+    private String authProvider;
 }
