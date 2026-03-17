@@ -18,11 +18,12 @@ public interface StaffScheduleRepository extends JpaRepository<StaffScheduleJpa,
     List<StaffScheduleJpa> findByStaffIdAndWorkDateBetweenOrderByWorkDateAsc(
             Integer staffId, LocalDate from, LocalDate to);
 
-    @Query("SELECT COALESCE(SUM(TIMESTAMPDIFF(HOUR, s.shift.startTime, s.shift.endTime)), 0) " +
-           "FROM StaffScheduleJpa s " +
-           "WHERE s.staffId = :staffId " +
-           "AND YEAR(s.workDate) = :year AND MONTH(s.workDate) = :month " +
-           "AND s.status != 'CANCELLED'")
+    @Query(value = "SELECT COALESCE(SUM(TIMESTAMPDIFF(HOUR, ws.start_time, ws.end_time)), 0) " +
+           "FROM staff_schedule ss " +
+           "JOIN work_shift ws ON ss.shift_id = ws.shift_id " +
+           "WHERE ss.staff_id = :staffId " +
+           "AND YEAR(ss.work_date) = :year AND MONTH(ss.work_date) = :month " +
+           "AND ss.status != 'CANCELLED'", nativeQuery = true)
     Double sumMonthlyHours(@Param("staffId") Integer staffId,
                            @Param("year") int year,
                            @Param("month") int month);

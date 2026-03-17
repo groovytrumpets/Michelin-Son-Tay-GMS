@@ -33,7 +33,7 @@ public class StaffPrincipal implements UserDetails {
         }
         
         return staffAuth.getStaffProfile().getStaffRoles().stream()
-            .map(staffRole -> new SimpleGrantedAuthority("ROLE_" + staffRole.getRole().getRoleName()))
+            .map(staffRole -> new SimpleGrantedAuthority("ROLE_" + staffRole.getRole().getRoleCode()))
             .toList();
     }
 

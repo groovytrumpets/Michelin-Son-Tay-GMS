@@ -4,16 +4,17 @@ import com.g42.platform.gms.auth.entity.StaffProfile;
 import com.g42.platform.gms.auth.repository.StaffProfileRepo;
 import com.g42.platform.gms.dashboard.api.dto.DashboardOverviewResponse;
 import com.g42.platform.gms.dashboard.api.dto.DashboardOverviewResponse.*;
-import com.g42.platform.gms.dashboard.infrastructure.entity.AttendanceCheckinJpa;
 import com.g42.platform.gms.dashboard.infrastructure.entity.StaffNotificationJpa;
 import com.g42.platform.gms.dashboard.infrastructure.entity.StaffScheduleJpa;
-import com.g42.platform.gms.dashboard.infrastructure.repository.AttendanceCheckinRepository;
 import com.g42.platform.gms.dashboard.infrastructure.repository.StaffNotificationRepository;
 import com.g42.platform.gms.dashboard.infrastructure.repository.StaffScheduleRepository;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketAssignmentJpa;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
 import com.g42.platform.gms.service_ticket_management.infrastructure.repository.ServiceTicketAssignmentRepository;
 import com.g42.platform.gms.service_ticket_management.infrastructure.repository.ServiceTicketRepository;
+import com.g42.platform.gms.staff.attendance.infrastructure.entity.StaffAttendanceJpa;
+import com.g42.platform.gms.staff.attendance.infrastructure.repository.StaffAttendanceJpaRepo;
+import com.g42.platform.gms.staff.attendance.domain.enums.AttendanceSlotEnum;
 import com.g42.platform.gms.vehicle.entity.Vehicle;
 import com.g42.platform.gms.vehicle.repository.VehicleRepository;
 import com.g42.platform.gms.auth.entity.CustomerProfile;
@@ -26,6 +27,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,7 +43,7 @@ public class StaffDashboardService {
 
     private final StaffProfileRepo staffProfileRepo;
     private final StaffScheduleRepository scheduleRepository;
-    private final AttendanceCheckinRepository attendanceRepository;
+    private final StaffAttendanceJpaRepo attendanceRepository;
     private final StaffNotificationRepository notificationRepository;
     private final ServiceTicketAssignmentRepository assignmentRepository;
     private final ServiceTicketRepository serviceTicketRepository;
@@ -140,17 +143,8 @@ public class StaffDashboardService {
 
     @Transactional(readOnly = true)
     public List<AttendanceRecordDto> getAttendanceHistory(Integer staffId, int month, int year) {
-        List<AttendanceCheckinJpa> records = attendanceRepository.findByStaffIdAndMonth(staffId, year, month);
-        return records.stream().map(r -> {
-            AttendanceRecordDto dto = new AttendanceRecordDto();
-            dto.setDate(r.getAttendanceDate().format(DATE_FMT));
-            dto.setDayOfWeek(getDayOfWeek(r.getAttendanceDate()));
-            dto.setShiftType(r.getShiftType());
-            dto.setCheckInTime(r.getCheckInTime() != null ? r.getCheckInTime().format(TIME_FMT) : null);
-            dto.setCheckOutTime(r.getCheckOutTime() != null ? r.getCheckOutTime().format(TIME_FMT) : null);
-            dto.setStatus(r.getStatus());
-            return dto;
-        }).collect(Collectors.toList());
+        List<StaffAttendanceJpa> records = attendanceRepository.findByStaffIdAndMonth(staffId, year, month);
+        return records.stream().map(this::toAttendanceRecordDto).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
@@ -307,19 +301,40 @@ public class StaffDashboardService {
     }
 
     private List<AttendanceRecordDto> buildRecentAttendance(Integer staffId) {
-        List<AttendanceCheckinJpa> records = attendanceRepository
-            .findByStaffIdOrderByAttendanceDateDesc(staffId, PageRequest.of(0, 5));
+        List<StaffAttendanceJpa> records = attendanceRepository
+            .findRecentByStaffId(staffId, PageRequest.of(0, 5));
+        return records.stream().map(this::toAttendanceRecordDto).collect(Collectors.toList());
+    }
 
-        return records.stream().map(r -> {
-            AttendanceRecordDto dto = new AttendanceRecordDto();
-            dto.setDate(r.getAttendanceDate().format(DATE_FMT));
-            dto.setDayOfWeek(getDayOfWeek(r.getAttendanceDate()));
-            dto.setShiftType(r.getShiftType());
-            dto.setCheckInTime(r.getCheckInTime() != null ? r.getCheckInTime().format(TIME_FMT) : null);
-            dto.setCheckOutTime(r.getCheckOutTime() != null ? r.getCheckOutTime().format(TIME_FMT) : null);
-            dto.setStatus(r.getStatus());
-            return dto;
-        }).collect(Collectors.toList());
+    private AttendanceRecordDto toAttendanceRecordDto(StaffAttendanceJpa r) {
+        AttendanceRecordDto dto = new AttendanceRecordDto();
+        dto.setDate(r.getAttendanceDate().format(DATE_FMT));
+        dto.setDayOfWeek(getDayOfWeek(r.getAttendanceDate()));
+
+        // Xác định ca dựa trên morningStatus/afternoonStatus
+        if (r.getMorningStatus() != null && r.getAfternoonStatus() != null) {
+            dto.setShiftType("FULL_DAY");
+        } else if (r.getMorningStatus() != null) {
+            dto.setShiftType("MORNING");
+        } else {
+            dto.setShiftType("AFTERNOON");
+        }
+
+        // created_at = giờ check-in, updated_at = giờ check-out
+        ZoneId zone = ZoneId.systemDefault();
+        if (r.getCreatedAt() != null) {
+            LocalTime checkIn = r.getCreatedAt().atZone(zone).toLocalTime();
+            dto.setCheckInTime(checkIn.format(TIME_FMT));
+        }
+        if (r.getUpdatedAt() != null) {
+            LocalTime checkOut = r.getUpdatedAt().atZone(zone).toLocalTime();
+            dto.setCheckOutTime(checkOut.format(TIME_FMT));
+        }
+
+        // Status: lấy từ morning hoặc afternoon (ưu tiên morning)
+        AttendanceSlotEnum slot = r.getMorningStatus() != null ? r.getMorningStatus() : r.getAfternoonStatus();
+        dto.setStatus(slot != null ? slot.name() : "NOT_YET");
+        return dto;
     }
 
     private List<NotificationSummaryDto> buildNotifications(Integer staffId) {
