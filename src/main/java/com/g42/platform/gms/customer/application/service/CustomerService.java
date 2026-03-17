@@ -32,8 +32,8 @@ public class CustomerService {
         return customerDtoMapper.toCusCreateDto(customerProfile,customerAuth);
     }
 
-    public Page<CustomerProfile> getListOfAllCustomerProfile(int page, int size, LocalDate date, Boolean isGuest, String search) {
-        return customerRepo.getListOfCustomers(page,size,date,isGuest,search);
+    public Page<CustomerProfile> getListOfAllCustomerProfile(int page, int size, LocalDate date, Boolean isGuest, String search, String status) {
+        return customerRepo.getListOfCustomers(page,size,date,isGuest,search,status);
     }
     @Transactional
     public CustomerCreateDto updateCustomer(Integer customerId, CustomerUpdateDto customerUpdateDto) {
