@@ -12,4 +12,6 @@ public interface StaffAuthJpaRepo extends JpaRepository<StaffAuthJpa, Integer> {
     boolean existsByGoogleId(String googleId);
 
     StaffAuthJpa findByStaffAuthId(Integer staffAuthId);
+
+    StaffAuthJpa findByStaffProfile_StaffId(Integer staffProfileStaffId);
 }
