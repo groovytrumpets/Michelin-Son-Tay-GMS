@@ -122,7 +122,7 @@ public class StaffRepoImpl implements StaffRepo {
 
     @Override
     public StaffProfile deleteStaff(Integer staffId) {
-        StaffAuthJpa auth = staffAuthJpaRepo.findByStaffAuthId(staffId);
+        StaffAuthJpa auth = staffAuthJpaRepo.findByStaffProfile_StaffId(staffId);
         if (auth != null) {
             auth.setStatus("DELETED");
             staffAuthJpaRepo.save(auth);
@@ -132,7 +132,7 @@ public class StaffRepoImpl implements StaffRepo {
 
     @Override
     public StaffProfile lockStaff(Integer staffId) {
-        StaffAuthJpa auth = staffAuthJpaRepo.findByStaffAuthId(staffId);
+        StaffAuthJpa auth = staffAuthJpaRepo.findByStaffProfile_StaffId(staffId);
         if (auth != null) {
             auth.setStatus("LOCKED");
             staffAuthJpaRepo.save(auth);
