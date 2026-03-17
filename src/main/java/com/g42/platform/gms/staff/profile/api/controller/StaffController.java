@@ -3,6 +3,7 @@ package com.g42.platform.gms.staff.profile.api.controller;
 import com.g42.platform.gms.auth.entity.StaffProfile;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
+import com.g42.platform.gms.staff.profile.api.dto.RoleDto;
 import com.g42.platform.gms.staff.profile.api.dto.StaffProfileDto;
 import com.g42.platform.gms.staff.profile.app.service.StaffService;
 import lombok.AllArgsConstructor;
@@ -31,5 +32,9 @@ public class StaffController {
     @GetMapping("{staff-Id}")
     public ResponseEntity<ApiResponse<StaffProfileDto>> getStaffProfile(@PathVariable("staff-Id") Integer staffId) {
         return ResponseEntity.ok(ApiResponses.success(staffService.getStaffProfileById(staffId)));
+    }
+    @GetMapping("all-roles")
+    public ResponseEntity<ApiResponse<List<RoleDto>>> getAllRoles() {
+        return ResponseEntity.ok(ApiResponses.success(staffService.getListOfRoles()));
     }
 }
