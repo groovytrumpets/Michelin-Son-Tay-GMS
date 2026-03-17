@@ -1,9 +1,13 @@
 package com.g42.platform.gms.staff.profile.infrastructure;
 
+import com.g42.platform.gms.staff.profile.api.dto.RoleDto;
+import com.g42.platform.gms.staff.profile.domain.entity.Role;
 import com.g42.platform.gms.staff.profile.domain.entity.StaffProfile;
 import com.g42.platform.gms.staff.profile.domain.repository.StaffRepo;
+import com.g42.platform.gms.staff.profile.infrastructure.entity.RoleJpa;
 import com.g42.platform.gms.staff.profile.infrastructure.entity.StaffProfileJpa;
 import com.g42.platform.gms.staff.profile.infrastructure.mapper.StaffProfileJpaMapper;
+import com.g42.platform.gms.staff.profile.infrastructure.repository.RoleJpaRepo;
 import com.g42.platform.gms.staff.profile.infrastructure.repository.StaffAuthJpaRepo;
 import com.g42.platform.gms.staff.profile.infrastructure.repository.StaffProileJpaRepo;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +22,7 @@ public class StaffRepoImpl implements StaffRepo {
     private final StaffProileJpaRepo staffProfileJpaRepo;
     private final StaffAuthJpaRepo staffAuthJpaRepo;
     private final StaffProfileJpaMapper staffProfileJpaMapper;
+    private final RoleJpaRepo roleJpaRepo;
     @Override
     public Page<StaffProfile> findAllWithFilter(String search, String status, List<Integer> roleIds, Pageable pageable) {
         Page<StaffProfileJpa> result = staffProfileJpaRepo.findAllWithFilter(
@@ -29,5 +34,11 @@ public class StaffRepoImpl implements StaffRepo {
     public StaffProfile findById(Integer staffId) {
         StaffProfileJpa staffProfileJpa = staffProfileJpaRepo.findByStaffId(staffId);
         return  staffProfileJpaMapper.toDomain(staffProfileJpa);
+    }
+
+    @Override
+    public List<Role> getAllRoles() {
+        List<RoleJpa> roleJpas = roleJpaRepo.findAll();
+        return roleJpas.stream().map(staffProfileJpaMapper::toRoleDomain).toList();
     }
 }
