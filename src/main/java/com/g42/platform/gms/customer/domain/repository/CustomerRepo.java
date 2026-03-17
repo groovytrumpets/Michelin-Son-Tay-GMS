@@ -22,4 +22,6 @@ public interface CustomerRepo {
     CustomerAuth findAuthById(Integer customerId);
 
     boolean updateCustomer(Integer customerId, CustomerProfile customerProfile, CustomerAuth customerAuth);
+
+    CustomerProfile findCustomerById(Integer customerId);
 }
