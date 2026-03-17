@@ -1,6 +1,7 @@
 package com.g42.platform.gms.staff.profile.app.service;
 
 import com.g42.platform.gms.staff.profile.api.dto.RoleDto;
+import com.g42.platform.gms.staff.profile.api.dto.StaffCreateDto;
 import com.g42.platform.gms.staff.profile.api.dto.StaffProfileDto;
 import com.g42.platform.gms.staff.profile.api.mapper.StaffAuthDtoMapper;
 import com.g42.platform.gms.staff.profile.api.mapper.StaffProfileDtoMapper;
@@ -40,5 +41,10 @@ public class StaffService {
 
     public List<RoleDto> getListOfRoles() {
         return staffRepo.getAllRoles().stream().map(staffProfileDtoMapper::toDto).toList();
+    }
+
+    public StaffProfileDto createStaff(StaffCreateDto staffCreateDto) {
+        StaffProfile staffProfile = staffRepo.createStaff(staffCreateDto);
+        return  staffProfileDtoMapper.toStaffProfileDto(staffProfile);
     }
 }

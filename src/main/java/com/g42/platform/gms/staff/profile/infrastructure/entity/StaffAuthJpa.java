@@ -19,7 +19,8 @@ public class StaffAuthJpa {
   private java.sql.Timestamp lockedUntil;
   private java.sql.Timestamp lastLoginAt;
   private java.sql.Timestamp createdAt;
-  private String google_id;
+  @Column(name = "google_id")
+  private String googleId;
 
   @OneToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "staff_id")

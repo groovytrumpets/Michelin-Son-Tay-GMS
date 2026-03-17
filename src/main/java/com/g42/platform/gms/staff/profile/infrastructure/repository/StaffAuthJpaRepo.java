@@ -7,4 +7,7 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface StaffAuthJpaRepo extends JpaRepository<StaffAuthJpa, Integer> {
+    boolean existsByEmail(String email);
+
+    boolean existsByGoogleId(String googleId);
 }

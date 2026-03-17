@@ -30,4 +30,6 @@ public interface StaffProileJpaRepo extends JpaRepository<StaffProfileJpa, Integ
     );
 
     StaffProfileJpa findByStaffId(Integer staffId);
+
+    boolean existsByPhone(String phone);
 }

@@ -6,4 +6,6 @@ public enum StaffErrorCode {
     INVALID_PHONE,
     INVALID_DOB,
     INVALID_CUSTOMER_PROFILE,
+    DUPLICATE_PHONE,
+    DUPLICATE_EMAIL,
 }
