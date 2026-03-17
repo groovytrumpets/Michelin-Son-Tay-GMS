@@ -119,4 +119,24 @@ public class StaffRepoImpl implements StaffRepo {
         }
         return staffProfileJpaMapper.toDomain(staffProfileJpaRepo.save(profile));
     }
+
+    @Override
+    public StaffProfile deleteStaff(Integer staffId) {
+        StaffAuthJpa auth = staffAuthJpaRepo.findByStaffProfile_StaffId(staffId);
+        if (auth != null) {
+            auth.setStatus("DELETED");
+            staffAuthJpaRepo.save(auth);
+        }
+        return staffProfileJpaMapper.toDomain(staffProfileJpaRepo.findByStaffId(staffId));
+    }
+
+    @Override
+    public StaffProfile lockStaff(Integer staffId) {
+        StaffAuthJpa auth = staffAuthJpaRepo.findByStaffProfile_StaffId(staffId);
+        if (auth != null) {
+            auth.setStatus("LOCKED");
+            staffAuthJpaRepo.save(auth);
+        }
+        return staffProfileJpaMapper.toDomain(staffProfileJpaRepo.findByStaffId(staffId));
+    }
 }

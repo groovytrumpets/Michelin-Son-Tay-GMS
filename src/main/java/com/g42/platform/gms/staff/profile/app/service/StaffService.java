@@ -53,4 +53,14 @@ public class StaffService {
         StaffProfile staffProfile = staffRepo.updateStaff(staffId,staffProfileDto);
         return  staffProfileDtoMapper.toStaffProfileDto(staffProfile);
     }
+
+    public StaffProfileDto deleteStaff(Integer staffId) {
+        StaffProfile staffProfile = staffRepo.deleteStaff(staffId);
+        return  staffProfileDtoMapper.toStaffProfileDto(staffProfile);
+    }
+
+    public StaffProfileDto lockStaff(Integer staffId) {
+        StaffProfile staffProfile = staffRepo.lockStaff(staffId);
+        return  staffProfileDtoMapper.toStaffProfileDto(staffProfile);
+    }
 }
