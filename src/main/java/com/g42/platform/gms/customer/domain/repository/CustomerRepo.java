@@ -15,7 +15,7 @@ public interface CustomerRepo {
 
     CustomerAuth createNewCustomerAuth(CustomerCreateDto customerCreateDto,CustomerProfile customerProfile);
 
-    Page<CustomerProfile> getListOfCustomers(int page,int size, LocalDate date, Boolean isGuest, String search);
+    Page<CustomerProfile> getListOfCustomers(int page,int size, LocalDate date, Boolean isGuest, String search, String status);
 
     CustomerProfile findProflieById(Integer customerId);
 
