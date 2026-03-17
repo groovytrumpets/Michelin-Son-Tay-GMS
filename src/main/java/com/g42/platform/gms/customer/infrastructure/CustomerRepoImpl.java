@@ -118,6 +118,10 @@ public class CustomerRepoImpl implements CustomerRepo {
 
     @Override
     public CustomerProfile findCustomerById(Integer customerId) {
-        return customerJpaMapper.toDomain(customerProfileJpaRepo.findByCustomerId(customerId));
+        CustomerProfileJpa jpa = customerProfileJpaRepo.findByCustomerId(customerId);
+        CustomerProfile profile = customerJpaMapper.toDomain(jpa);
+        CustomerAuthJpa auth = customerAuthJpaRepo.findByCustomerId(customerId);
+        if (auth != null) profile.setStatus(auth.getStatus());
+        return profile;
     }
 }
