@@ -110,4 +110,9 @@ public class CustomerRepoImpl implements CustomerRepo {
         return (customerAuthJpa!=null && customerProfileJpa!=null);
 
     }
+
+    @Override
+    public CustomerProfile findCustomerById(Integer customerId) {
+        return customerJpaMapper.toDomain(customerProfileJpaRepo.findByCustomerId(customerId));
+    }
 }
