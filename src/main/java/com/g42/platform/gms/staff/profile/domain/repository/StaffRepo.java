@@ -23,4 +23,8 @@ public interface StaffRepo {
     StaffProfile createStaff(StaffCreateDto staffCreateDto);
 
     StaffProfile updateStaff(Integer staffId, StaffUpdateDto staffProfileDto);
+
+    StaffProfile deleteStaff(Integer staffId);
+
+    StaffProfile lockStaff(Integer staffId);
 }

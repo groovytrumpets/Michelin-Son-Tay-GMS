@@ -49,4 +49,12 @@ public class StaffController {
                                                                            @RequestBody StaffUpdateDto staffProfileDto) {
         return ResponseEntity.ok(ApiResponses.success(staffService.updateStaff(staffId, staffProfileDto)));
     }
+    @PutMapping("{staffId}/delete")
+    public ResponseEntity<ApiResponse<StaffProfileDto>> deleteStaffProfile(@PathVariable Integer staffId) {
+        return ResponseEntity.ok(ApiResponses.success(staffService.deleteStaff(staffId)));
+    }
+    @PutMapping("{staffId}/lock")
+    public ResponseEntity<ApiResponse<StaffProfileDto>> lockStaffProfile(@PathVariable Integer staffId) {
+        return ResponseEntity.ok(ApiResponses.success(staffService.lockStaff(staffId)));
+    }
 }
