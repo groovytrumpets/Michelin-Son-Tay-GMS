@@ -9,10 +9,7 @@ import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -30,5 +27,9 @@ public class StaffController {
                                                                                     @RequestParam(required = false) String search,
                                                                                     @RequestParam(required = false) List<Integer> roleIds) {
         return ResponseEntity.ok(ApiResponses.success(staffService.getListOfAllStaffProfile(page, size, isActive, search, roleIds)));
+    }
+    @GetMapping("{staff-Id}")
+    public ResponseEntity<ApiResponse<StaffProfileDto>> getStaffProfile(@PathVariable("staff-Id") Integer staffId) {
+        return ResponseEntity.ok(ApiResponses.success(staffService.getStaffProfileById(staffId)));
     }
 }
