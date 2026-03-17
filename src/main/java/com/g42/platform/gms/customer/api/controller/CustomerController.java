@@ -41,4 +41,12 @@ public class CustomerController {
     public ResponseEntity<ApiResponse<CustomerProfile>> getCustomerProfile(@PathVariable Integer customerId) {
         return ResponseEntity.ok(ApiResponses.success(customerService.findByCustomerId(customerId)));
     }
+    @PutMapping("{customerId}/delete")
+    public ResponseEntity<ApiResponse<CustomerProfile>> deleteProfile(@PathVariable Integer customerId) {
+        return ResponseEntity.ok(ApiResponses.success(customerService.deleteCustomer(customerId)));
+    }
+    @PutMapping("{customerId}/locked")
+    public ResponseEntity<ApiResponse<CustomerProfile>> lockedProfile(@PathVariable Integer customerId) {
+        return ResponseEntity.ok(ApiResponses.success(customerService.lockedCustomer(customerId)));
+    }
 }

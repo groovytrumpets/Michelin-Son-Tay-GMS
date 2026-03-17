@@ -1,6 +1,7 @@
 package com.g42.platform.gms.customer.application.service;
 
 
+import com.g42.platform.gms.auth.entity.CustomerStatus;
 import com.g42.platform.gms.customer.api.dto.CustomerCreateDto;
 import com.g42.platform.gms.customer.api.dto.CustomerUpdateDto;
 import com.g42.platform.gms.customer.api.mapper.CustomerDtoMapper;
@@ -53,5 +54,24 @@ public class CustomerService {
 
     public CustomerProfile findByCustomerId(Integer customerId) {
         return customerRepo.findCustomerById(customerId);
+    }
+
+    public CustomerProfile deleteCustomer(Integer customerId) {
+        CustomerProfile customerProfile = customerRepo.findProflieById(customerId);
+        CustomerAuth customerAuth = customerRepo.findAuthById(customerId);
+        customerAuth.setStatus(CustomerStatus.DELETED);
+        if (!customerRepo.updateCustomer(customerId,customerProfile,customerAuth)){
+            throw new CustomerException("Update fail!", CustomerErrorCode.INVALID_CUSTOMER_PROFILE);
+        }
+        return findByCustomerId(customerId);
+    }
+    public CustomerProfile lockedCustomer(Integer customerId) {
+        CustomerProfile customerProfile = customerRepo.findProflieById(customerId);
+        CustomerAuth customerAuth = customerRepo.findAuthById(customerId);
+        customerAuth.setStatus(CustomerStatus.LOCKED);
+        if (!customerRepo.updateCustomer(customerId,customerProfile,customerAuth)){
+            throw new CustomerException("Update fail!", CustomerErrorCode.INVALID_CUSTOMER_PROFILE);
+        }
+        return findByCustomerId(customerId);
     }
 }
