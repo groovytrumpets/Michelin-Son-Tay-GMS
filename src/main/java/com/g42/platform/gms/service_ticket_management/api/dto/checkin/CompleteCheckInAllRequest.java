@@ -64,7 +64,13 @@ public class CompleteCheckInAllRequest {
     // Check-in notes (optional)
     @Size(max = 1000, message = "Ghi chú không được quá 1000 ký tự")
     private String checkInNotes;
-    
+
+    /**
+     * true  = kích hoạt kiểm tra an toàn
+     * false / null = bỏ qua kiểm tra an toàn
+     */
+    private Boolean safetyInspection;
+
     // Staff ID who performs check-in (receptionist/staff)
     // This will be used for both uploadedBy (photos) and recordedBy (odometer)
     @NotNull(message = "Staff ID là bắt buộc")

@@ -4,7 +4,9 @@ import com.g42.platform.gms.service_ticket_management.api.dto.safety.AdvisorNote
 import com.g42.platform.gms.service_ticket_management.api.dto.safety.SafetyInspectionRequest;
 import com.g42.platform.gms.service_ticket_management.api.dto.safety.SafetyInspectionResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.safety.TireDataRequest;
+import com.g42.platform.gms.service_ticket_management.api.dto.safety.TireInputRequest;
 import com.g42.platform.gms.service_ticket_management.api.dto.safety.InspectionItemRequest;
+import com.g42.platform.gms.service_ticket_management.domain.enums.TirePosition;
 import com.g42.platform.gms.service_ticket_management.api.dto.safety.InspectionItemResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.safety.WorkCategoryResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.safety.CreateWorkCategoryRequest;
@@ -195,7 +197,7 @@ public class SafetyInspectionService {
         }
 
         // Smart update tires (giữ nguyên tireId nếu đã có)
-        updateTires(saved.getInspectionId(), request.getTires());
+        updateTires(saved.getInspectionId(), expandTires(request.getTires()));
 
         // Smart update items (giữ nguyên itemId nếu đã có, bảo toàn advisorNote)
         updateItems(saved.getInspectionId(), request.getItems());
@@ -265,7 +267,7 @@ public class SafetyInspectionService {
         SafetyInspectionJpa saved = inspectionRepository.save(inspection);
 
         // Smart update tires: UPDATE existing, DELETE removed, INSERT new
-        updateTires(inspectionId, request.getTires());
+        updateTires(inspectionId, expandTires(request.getTires()));
 
         // Smart update items: UPDATE existing, DELETE removed, INSERT new
         updateItems(inspectionId, request.getItems());
@@ -552,33 +554,14 @@ public class SafetyInspectionService {
             throw new IllegalArgumentException("Service ticket ID is required");
         }
 
-        // Validate tire data
+        // Validate tire data (new structured format)
         if (request.getTires() != null) {
-            if (request.getTires().size() > 5) {
-                throw new IllegalArgumentException("Maximum 5 tire records allowed");
-            }
-
-            java.util.Set<com.g42.platform.gms.service_ticket_management.domain.enums.TirePosition> positions = new java.util.HashSet<>();
-            for (TireDataRequest tire : request.getTires()) {
-                if (tire.getTirePosition() != null && !positions.add(tire.getTirePosition())) {
-                    throw new IllegalArgumentException("Duplicate tire position: " + tire.getTirePosition());
-                }
-                if (tire.getTreadDepth() != null && tire.getTreadDepth().compareTo(BigDecimal.ZERO) < 0) {
-                    throw new IllegalArgumentException("Tire tread depth must be non-negative");
-                }
-                if (tire.getPressure() != null && tire.getPressure().compareTo(BigDecimal.ZERO) < 0) {
-                    throw new IllegalArgumentException("Tire pressure must be non-negative");
-                }
-                if (tire.getRecommendedPressure() != null && tire.getRecommendedPressure().compareTo(BigDecimal.ZERO) < 0) {
-                    throw new IllegalArgumentException("Recommended tire pressure must be non-negative");
-                }
-                if (tire.getTireSpecification() != null && tire.getTireSpecification().length() > 50) {
-                    throw new IllegalArgumentException("Tire specification too long (max 50 characters)");
-                }
-                if (tire.getRecommendedTireSize() != null && tire.getRecommendedTireSize().length() > 50) {
-                    throw new IllegalArgumentException("Recommended tire size too long (max 50 characters)");
-                }
-            }
+            TireInputRequest t = request.getTires();
+            validateActualTire("frontLeft",  t.getFrontLeft());
+            validateActualTire("frontRight", t.getFrontRight());
+            validateActualTire("rearLeft",   t.getRearLeft());
+            validateActualTire("rearRight",  t.getRearRight());
+            validateActualTire("spare",      t.getSpare());
         }
 
         // Validate inspection items against database using work_category_id
@@ -601,5 +584,66 @@ public class SafetyInspectionService {
                 }
             }
         }
+    }
+
+    private void validateActualTire(String label, TireInputRequest.TireActualData tire) {
+        if (tire == null) return;
+        if (tire.getTreadDepth() != null && tire.getTreadDepth().compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException(label + " tread depth must be non-negative");
+        }
+        if (tire.getPressure() != null && tire.getPressure().compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException(label + " pressure must be non-negative");
+        }
+    }
+
+    /**
+     * Expand structured TireInputRequest into 5 flat TireDataRequest records.
+     *
+     * tireSpecification (size thực tế, theo trục):
+     *   FRONT_LEFT + FRONT_RIGHT → frontTireSpecification
+     *   REAR_LEFT  + REAR_RIGHT  → rearTireSpecification
+     *   SPARE                    → null
+     *
+     * recommendedTireSize: nhập 1 lần, áp cho FRONT_LEFT, FRONT_RIGHT, REAR_LEFT, REAR_RIGHT (SPARE = null)
+     *
+     * recommendedPressure (theo trục):
+     *   FRONT_LEFT + FRONT_RIGHT → frontRecommendedPressure
+     *   REAR_LEFT  + REAR_RIGHT + SPARE → rearRecommendedPressure
+     */
+    private List<TireDataRequest> expandTires(TireInputRequest input) {
+        if (input == null) return List.of();
+
+        String frontSpec   = input.getFrontTireSpecification();
+        String rearSpec    = input.getRearTireSpecification();
+        String recSize     = input.getRecommendedTireSize();
+        BigDecimal frontRec = input.getFrontRecommendedPressure();
+        BigDecimal rearRec  = input.getRearRecommendedPressure();
+        BigDecimal spareRec = input.getSpareRecommendedPressure();
+
+        List<TireDataRequest> result = new java.util.ArrayList<>();
+        result.add(buildTire(TirePosition.FRONT_LEFT,  input.getFrontLeft(),  frontSpec, recSize,  frontRec));
+        result.add(buildTire(TirePosition.FRONT_RIGHT, input.getFrontRight(), frontSpec, recSize,  frontRec));
+        result.add(buildTire(TirePosition.REAR_LEFT,   input.getRearLeft(),   rearSpec,  recSize,  rearRec));
+        result.add(buildTire(TirePosition.REAR_RIGHT,  input.getRearRight(),  rearSpec,  recSize,  rearRec));
+        result.add(buildTire(TirePosition.SPARE,       input.getSpare(),      null,      null,     spareRec));
+        return result;
+    }
+
+    private TireDataRequest buildTire(TirePosition position,
+                                      TireInputRequest.TireActualData actual,
+                                      String tireSpecification,
+                                      String recommendedTireSize,
+                                      BigDecimal recommendedPressure) {
+        TireDataRequest req = new TireDataRequest();
+        req.setTirePosition(position);
+        if (actual != null) {
+            req.setTreadDepth(actual.getTreadDepth());
+            req.setPressure(actual.getPressure());
+            req.setPressureUnit(actual.getPressureUnit());
+        }
+        req.setTireSpecification(tireSpecification);
+        req.setRecommendedTireSize(recommendedTireSize);
+        req.setRecommendedPressure(recommendedPressure);
+        return req;
     }
 }

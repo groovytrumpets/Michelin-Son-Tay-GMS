@@ -19,7 +19,8 @@ public interface SafetyInspectionMapper {
             @Mapping(target = "technicianId", ignore = true),
             @Mapping(target = "inspectionStatus", ignore = true),
             @Mapping(target = "createdAt", ignore = true),
-            @Mapping(target = "updatedAt", ignore = true)
+            @Mapping(target = "updatedAt", ignore = true),
+            @Mapping(target = "tires", ignore = true)
     })
     SafetyInspection toDomain(SafetyInspectionRequest request);
 

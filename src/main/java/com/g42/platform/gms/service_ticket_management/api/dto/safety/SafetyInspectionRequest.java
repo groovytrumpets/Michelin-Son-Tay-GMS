@@ -10,6 +10,6 @@ public class SafetyInspectionRequest {
     private Integer serviceTicketId;
     private String generalNotes;
     private String technicianNotes;
-    private List<TireDataRequest> tires;
+    private TireInputRequest tires;
     private List<InspectionItemRequest> items;
 }
