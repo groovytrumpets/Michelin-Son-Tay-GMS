@@ -50,4 +50,8 @@ public class CustomerService {
         }
         return customerDtoMapper.toCusCreateDto(customerProfile,customerAuth);
     }
+
+    public CustomerProfile findByCustomerId(Integer customerId) {
+        return customerRepo.findCustomerById(customerId);
+    }
 }

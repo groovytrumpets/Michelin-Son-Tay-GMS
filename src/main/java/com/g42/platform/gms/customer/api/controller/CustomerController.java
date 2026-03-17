@@ -39,4 +39,8 @@ public class CustomerController {
     public ResponseEntity<ApiResponse<CustomerCreateDto>> updateProfile(@PathVariable Integer customerId,@RequestBody CustomerUpdateDto customerUpdateDto) {
         return ResponseEntity.ok(ApiResponses.success(customerService.updateCustomer(customerId, customerUpdateDto)));
     }
+    @GetMapping("{customerId}")
+    public ResponseEntity<ApiResponse<CustomerProfile>> getCustomerProfile(@PathVariable Integer customerId) {
+        return ResponseEntity.ok(ApiResponses.success(customerService.findByCustomerId(customerId)));
+    }
 }
