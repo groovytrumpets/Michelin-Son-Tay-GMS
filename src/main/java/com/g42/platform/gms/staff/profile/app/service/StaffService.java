@@ -1,6 +1,9 @@
 package com.g42.platform.gms.staff.profile.app.service;
 
+import com.g42.platform.gms.staff.profile.api.dto.RoleDto;
+import com.g42.platform.gms.staff.profile.api.dto.StaffCreateDto;
 import com.g42.platform.gms.staff.profile.api.dto.StaffProfileDto;
+import com.g42.platform.gms.staff.profile.api.dto.StaffUpdateDto;
 import com.g42.platform.gms.staff.profile.api.mapper.StaffAuthDtoMapper;
 import com.g42.platform.gms.staff.profile.api.mapper.StaffProfileDtoMapper;
 import com.g42.platform.gms.staff.profile.domain.entity.StaffProfile;
@@ -24,8 +27,7 @@ public class StaffService {
     StaffProfileDtoMapper staffProfileDtoMapper;
 
 
-    public Page<StaffProfileDto> getListOfAllStaffProfile(int page, int size, Boolean isActive, String search, List<Integer> roleIds) {
-        String status = isActive == null ? null : (isActive ? "ACTIVE" : "INACTIVE");
+    public Page<StaffProfileDto> getListOfAllStaffProfile(int page, int size, Boolean isActive, String search, List<Integer> roleIds, String status) {
         Pageable pageable = PageRequest.of(page, size);
         Page<StaffProfile> result = staffRepo.findAllWithFilter(
                 search, status, roleIds, pageable
@@ -36,5 +38,19 @@ public class StaffService {
     public StaffProfileDto getStaffProfileById(Integer staffId) {
         StaffProfile staffProfile = staffRepo.findById(staffId);
         return staffProfileDtoMapper.toStaffProfileDto(staffProfile);
+    }
+
+    public List<RoleDto> getListOfRoles() {
+        return staffRepo.getAllRoles().stream().map(staffProfileDtoMapper::toDto).toList();
+    }
+
+    public StaffProfileDto createStaff(StaffCreateDto staffCreateDto) {
+        StaffProfile staffProfile = staffRepo.createStaff(staffCreateDto);
+        return  staffProfileDtoMapper.toStaffProfileDto(staffProfile);
+    }
+
+    public StaffProfileDto updateStaff(Integer staffId,StaffUpdateDto staffProfileDto) {
+        StaffProfile staffProfile = staffRepo.updateStaff(staffId,staffProfileDto);
+        return  staffProfileDtoMapper.toStaffProfileDto(staffProfile);
     }
 }

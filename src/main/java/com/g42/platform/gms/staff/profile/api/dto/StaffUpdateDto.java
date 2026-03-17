@@ -10,13 +10,11 @@ import java.util.List;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class StaffProfileDto {
-    private Integer staffId;
+public class StaffUpdateDto {
     private String fullName;
     private String phone;
     private String position;
     private String avatar;
-    private String email;
     private String status;
     private java.sql.Date dob;
     private List<RoleDto> roles;
