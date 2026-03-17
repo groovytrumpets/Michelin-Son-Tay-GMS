@@ -3,6 +3,7 @@ package com.g42.platform.gms.staff.profile.infrastructure;
 import com.g42.platform.gms.staff.profile.api.dto.RoleDto;
 import com.g42.platform.gms.staff.profile.api.dto.StaffCreateDto;
 import com.g42.platform.gms.staff.profile.api.dto.StaffProfileDto;
+import com.g42.platform.gms.staff.profile.api.dto.StaffUpdateDto;
 import com.g42.platform.gms.staff.profile.domain.entity.Role;
 import com.g42.platform.gms.staff.profile.domain.entity.StaffAuth;
 import com.g42.platform.gms.staff.profile.domain.entity.StaffProfile;
@@ -91,5 +92,31 @@ public class StaffRepoImpl implements StaffRepo {
         staffAuthJpa.setAuthProvider(staffCreateDto.getAuthProvider());
         StaffAuthJpa staffAuthSaved = staffAuthJpaRepo.save(staffAuthJpa);
         return  staffProfileJpaMapper.toDomain(savedProfile);
+    }
+
+    @Override
+    public StaffProfile updateStaff(Integer staffId, StaffUpdateDto dto) {
+        StaffProfileJpa profile = staffProfileJpaRepo.findByStaffId(staffId);
+        if (profile == null) {throw new StaffException("StaffId không đúng", StaffErrorCode.INVALID_STAFF_ID);}
+        if (dto.getFullName() != null) profile.setFullName(dto.getFullName());
+        if (dto.getPhone() != null) profile.setPhone(dto.getPhone());
+        if (dto.getPosition() != null) profile.setPosition(dto.getPosition());
+        if (dto.getAvatar() != null) profile.setAvatar(dto.getAvatar());
+        if (dto.getDob() != null) profile.setDob(dto.getDob());
+
+        if (dto.getRoles() != null && !dto.getRoles().isEmpty()) {
+            List<Integer> roleIds = dto.getRoles().stream().map(RoleDto::getRoleId).toList();
+            List<RoleJpa> roles = roleJpaRepo.findAllById(roleIds);
+            profile.setRoles(roles);
+        }
+
+        if (dto.getStatus() != null) {
+            StaffAuthJpa auth = staffAuthJpaRepo.findByStaffAuthId(staffId);
+            if (auth != null) {
+                auth.setStatus(dto.getStatus());
+                staffAuthJpaRepo.save(auth);
+            }
+        }
+        return staffProfileJpaMapper.toDomain(staffProfileJpaRepo.save(profile));
     }
 }
