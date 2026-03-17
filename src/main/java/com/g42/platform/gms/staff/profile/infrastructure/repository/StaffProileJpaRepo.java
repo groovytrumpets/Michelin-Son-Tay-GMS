@@ -28,4 +28,6 @@ public interface StaffProileJpaRepo extends JpaRepository<StaffProfileJpa, Integ
             @Param("roleIds") List<Integer> roleIds,
             Pageable pageable
     );
+
+    StaffProfileJpa findByStaffId(Integer staffId);
 }

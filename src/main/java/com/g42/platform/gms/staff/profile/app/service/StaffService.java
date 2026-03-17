@@ -26,13 +26,15 @@ public class StaffService {
 
     public Page<StaffProfileDto> getListOfAllStaffProfile(int page, int size, Boolean isActive, String search, List<Integer> roleIds) {
         String status = isActive == null ? null : (isActive ? "ACTIVE" : "INACTIVE");
-
         Pageable pageable = PageRequest.of(page, size);
-
         Page<StaffProfile> result = staffRepo.findAllWithFilter(
                 search, status, roleIds, pageable
         );
-
         return result.map(staffProfileDtoMapper::toStaffProfileDto);
+    }
+
+    public StaffProfileDto getStaffProfileById(Integer staffId) {
+        StaffProfile staffProfile = staffRepo.findById(staffId);
+        return staffProfileDtoMapper.toStaffProfileDto(staffProfile);
     }
 }
