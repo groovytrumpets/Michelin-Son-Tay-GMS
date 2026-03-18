@@ -44,6 +44,13 @@ public class EstimateService {
                 .findAllById(workCategoryId)
                 .stream()
                 .collect(Collectors.toMap(WorkCategory::getId, wc -> wc));
+        //todo:add tax rule
+        List<Integer> taxRuleIds = estimateItems.stream()
+                .map(EstimateItem::getTaxRuleId)
+                .filter(Objects::nonNull).distinct().toList();
+        Map<Integer, TaxRule> taxRuleMap = taxRuleRepository.findAllByIds(taxRuleIds)
+                .stream()
+                .collect(Collectors.toMap(TaxRule::getTaxRuleId, tr -> tr));
         //todo: group by estimateItem by estimateId
         Map<Integer, List<EstimateItem>> itemsByEstimateId = estimateItems.stream()
                 .collect(Collectors.groupingBy(EstimateItem::getEstimateId));
@@ -58,6 +65,12 @@ public class EstimateService {
                 // inject work category to ech items
                 WorkCategory wc = categoryMap.get(item.getWorkCategoryId());
                 itemDto.setWorkCategory(estimateDtoMapper.toWorkCateDto(wc));
+                //injection for tax rule
+                TaxRule taxRule = taxRuleMap.get(item.getTaxRuleId());
+                if (taxRule != null) {
+                    itemDto.setTaxCode(taxRule.getTaxCode());
+                    itemDto.setTaxRate(taxRule.getTaxRate());
+                }
                 return itemDto;
             }).toList();
 
@@ -108,6 +121,18 @@ public class EstimateService {
                 existing.setQuantity(req.getQuantity());
                 existing.setUnitPrice(req.getUnitPrice());
                 existing.setWorkCategoryId(req.getWorkCategoryId());
+                if (req.getTaxRuleId() != null) {
+                    existing.setTaxRuleId(req.getTaxRuleId());
+                    TaxRule taxRule = taxRuleRepository.findById(req.getTaxRuleId());
+                    if (taxRule != null && taxRule.getTaxRate() != null) {
+                        BigDecimal subTotal = existing.getSubTotal();
+                        BigDecimal vatAmount = subTotal.multiply(
+                                taxRule.getTaxRate().divide(BigDecimal.valueOf(100)));
+                        existing.setTotalPrice(subTotal.add(vatAmount));
+                    }
+                } else {
+                    existing.setTotalPrice(existing.getSubTotal());
+                }
                 toSave.add(existing);
                 incomingIds.add(req.getItemId());
             } else {
@@ -120,9 +145,7 @@ public class EstimateService {
 
         estimateItemRepository.saveAll(toSave);
         BigDecimal totalPrice = toSave.stream()
-                .map(item -> item.getUnitPrice() == null || item.getQuantity() == null
-                        ? BigDecimal.ZERO
-                        : item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
+                .map(item -> item.getTotalPrice() != null ? item.getTotalPrice() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         estimate.setEstimateType(request.getEstimateType());
@@ -192,12 +215,26 @@ public class EstimateService {
                 .findAllById(categoryIds).stream()
                 .collect(Collectors.toMap(WorkCategory::getId, wc -> wc));
 
+        List<Integer> taxRuleIds = items.stream()
+                .map(EstimateItem::getTaxRuleId)
+                .filter(Objects::nonNull).distinct().toList();
+        Map<Integer, TaxRule> taxRuleMap = taxRuleRepository.findAllByIds(taxRuleIds).stream()
+                .collect(Collectors.toMap(TaxRule::getTaxRuleId, tr -> tr));
+        System.out.println("taxRuleIds: " + taxRuleIds);
+        System.out.println("taxRuleMap size: " + taxRuleMap.size());
         EstimateRespondDto dto = estimateDtoMapper.toEstimateDto(estimate);
         dto.setItems(items.stream().map(item -> {
             EstimateItemDto itemDto = estimateDtoMapper.toEstimateItemDto(item);
             itemDto.setWorkCategory(
                     estimateDtoMapper.toWorkCateDto(categoryMap.get(item.getWorkCategoryId()))
             );
+                    //todo: add inject tax info
+            TaxRule taxRule = taxRuleMap.get(item.getTaxRuleId());
+            if (taxRule != null) {
+                itemDto.setTaxRuleId(taxRule.getTaxRuleId());
+                itemDto.setTaxCode(taxRule.getTaxCode());
+                itemDto.setTaxRate(taxRule.getTaxRate());
+            }
             return itemDto;
         }).toList());
         return dto;

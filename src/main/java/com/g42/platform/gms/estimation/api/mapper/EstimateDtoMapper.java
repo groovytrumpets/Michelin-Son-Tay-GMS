@@ -15,6 +15,9 @@ import java.util.List;
 public interface EstimateDtoMapper {
     @Mapping(target = "subTotal", expression = "java(estimateItem.getSubTotal())")
     @Mapping(target = "estimateItemId", source = "id")
+    @Mapping(target = "taxRuleId", source = "taxRuleId")
+    @Mapping(target = "taxCode", ignore = true)   // set thủ công trong service
+    @Mapping(target = "taxRate", ignore = true)
     EstimateItemDto toEstimateItemDto(EstimateItem estimateItem);
     @Mapping(target = "subTotal", expression = "java(estimateItem.getSubTotal())")
     List<EstimateItemDto> toEstimateItemDto(List<EstimateItem> estimateItems);
