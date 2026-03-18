@@ -21,4 +21,5 @@ public class EstimateItemDto {
     private Integer taxRuleId;
     private String taxCode;
     private BigDecimal taxRate;
+    private Boolean isChecked;
 }
