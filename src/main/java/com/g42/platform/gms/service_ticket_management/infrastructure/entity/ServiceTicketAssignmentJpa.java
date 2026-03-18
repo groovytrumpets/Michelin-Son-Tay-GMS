@@ -18,7 +18,7 @@ public class ServiceTicketAssignmentJpa {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "assignment_id", nullable = false)
-    private Integer id;
+    private Integer assignmentId;
 
     @NotNull
     @Column(name = "service_ticket_id", nullable = false)
