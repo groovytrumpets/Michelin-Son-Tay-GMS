@@ -1,5 +1,6 @@
 package com.g42.platform.gms.staff.profile.infrastructure.repository;
 
+import com.g42.platform.gms.service_ticket_management.api.dto.assign.RoleDto;
 import com.g42.platform.gms.staff.profile.domain.entity.StaffAuth;
 import com.g42.platform.gms.staff.profile.domain.entity.StaffProfile;
 import com.g42.platform.gms.staff.profile.infrastructure.entity.StaffProfileJpa;
@@ -32,4 +33,18 @@ public interface StaffProileJpaRepo extends JpaRepository<StaffProfileJpa, Integ
     StaffProfileJpa findByStaffId(Integer staffId);
 
     boolean existsByPhone(String phone);
+    @Query("""
+    SELECT DISTINCT sp FROM StaffProfileJpa sp
+    JOIN sp.roles r
+    WHERE sp.staffId NOT IN (
+        SELECT sta.staffId FROM ServiceTicketAssignmentJpa sta
+        WHERE sta.status = 'ACTIVE'
+        AND sta.serviceTicketId IN (
+            SELECT st.serviceTicketId FROM ServiceTicketManagement st
+            WHERE st.ticketStatus = 'IN_PROGRESS'
+        )
+    )
+    AND r.roleCode = :role
+""")
+    List<StaffProfileJpa> findAvailableStaffByRole(@Param("role") String role);
 }
