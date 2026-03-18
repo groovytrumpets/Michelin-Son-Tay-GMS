@@ -52,6 +52,12 @@ public class EstimateItemJpa {
     @NotNull
     @Column(name = "work_category_idwork_category", nullable = false)
     private Integer workCategoryId;
+    @NotNull
+
+    @Column(name = "tax_rule_idtax_rule", nullable = false)
+    private Integer taxRuleId;
+    @Column(name = "total_price", precision = 12, scale = 2)
+    private BigDecimal totalPrice;
 
 
 }

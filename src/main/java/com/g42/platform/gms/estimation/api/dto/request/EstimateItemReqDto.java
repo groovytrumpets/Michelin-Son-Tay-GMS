@@ -17,4 +17,5 @@ public class EstimateItemReqDto {
     private String itemName;
     private Integer quantity;
     private BigDecimal unitPrice;
+    private Integer taxRuleId;
 }
