@@ -21,4 +21,8 @@ public class TicketAssignmentService {
     public AssignStaffDto assignStaff(Integer ticketId, AssignStaffDto dto) {
         return ticketAssignmentRepo.assignStaff(ticketId, dto);
     }
+
+    public AssignStaffDto updateAssignment(Integer ticketId, Integer assignmentId, AssignStaffDto dto) {
+        return ticketAssignmentRepo.updateAssignment(ticketId, assignmentId, dto);
+    }
 }

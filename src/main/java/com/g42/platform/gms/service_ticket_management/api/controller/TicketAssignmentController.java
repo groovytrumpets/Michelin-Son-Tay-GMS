@@ -29,4 +29,11 @@ public class TicketAssignmentController {
             @RequestBody AssignStaffDto dto) {
         return ResponseEntity.ok(ApiResponses.success(ticketAssignmentService.assignStaff(ticketId, dto)));
     }
+    @PutMapping("{ticketId}/assign/{assignmentId}")
+    public ResponseEntity<ApiResponse<AssignStaffDto>> updateAssignment(
+            @PathVariable Integer ticketId,
+            @PathVariable Integer assignmentId,
+            @RequestBody AssignStaffDto dto) {
+        return ResponseEntity.ok(ApiResponses.success(ticketAssignmentService.updateAssignment(ticketId, assignmentId, dto)));
+    }
 }
