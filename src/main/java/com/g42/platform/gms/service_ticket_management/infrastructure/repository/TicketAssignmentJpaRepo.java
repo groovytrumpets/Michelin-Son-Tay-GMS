@@ -7,4 +7,6 @@ public interface TicketAssignmentJpaRepo extends JpaRepository<ServiceTicketAssi
     boolean existsByServiceTicketId(Integer serviceTicketId);
 
     boolean existsByIsPrimaryAndServiceTicketId(Boolean isPrimary, Integer serviceTicketId);
+
+    ServiceTicketAssignmentJpa findByAssignmentId(Integer assignmentId);
 }

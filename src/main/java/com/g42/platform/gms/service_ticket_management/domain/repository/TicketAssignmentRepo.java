@@ -13,4 +13,6 @@ public interface TicketAssignmentRepo {
     List<AvailableStaffDto> getAvailableStaff(Integer ticketId, String role);
 
     AssignStaffDto assignStaff(Integer ticketId, AssignStaffDto dto);
+
+    AssignStaffDto updateAssignment(Integer ticketId, Integer assignmentId, AssignStaffDto dto);
 }
