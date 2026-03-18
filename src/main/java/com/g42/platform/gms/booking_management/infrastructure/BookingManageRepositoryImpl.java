@@ -6,6 +6,8 @@ import com.g42.platform.gms.booking.customer.api.dto.BookingResponse;
 import com.g42.platform.gms.booking.customer.domain.enums.BookingRequestStatus;
 import com.g42.platform.gms.booking_management.api.dto.CustomerDto;
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedRespond;
+import com.g42.platform.gms.booking_management.api.dto.requesting.QueueOrderItem;
+import com.g42.platform.gms.booking_management.api.dto.requesting.ReorderQueueRequest;
 import com.g42.platform.gms.booking_management.domain.entity.*;
 import com.g42.platform.gms.booking_management.domain.enums.BookingEnum;
 import com.g42.platform.gms.booking_management.domain.repository.BookingManageRepository;
@@ -178,5 +180,24 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
     public List<CatalogItem> getListOfCatalogById(List<Integer> services) {
         List<CatalogItemJpa> catalogItems = catalogRepo.findAllById(services);
         return catalogItemManageMapper.getListOfCatalogItem(catalogItems);
+    }
+
+    @Override
+    public Boolean reorderQueue(ReorderQueueRequest request) {
+        //validate
+        List<Integer> orders = request.getOrders().stream()
+                .map(QueueOrderItem::getQueueOrder)
+                .toList();
+        if (orders.size() != orders.stream().distinct().count()) {
+            throw new RuntimeException("Thứ tự không được trùng nhau!");
+        }
+
+        request.getOrders().forEach(item -> {
+            BookingJpa booking = bookingManageJpaRepository.findById(item.getBookingId())
+                    .orElseThrow(() -> new RuntimeException("Booking not found"));
+            booking.setQueueOrder(item.getQueueOrder());
+            bookingManageJpaRepository.save(booking);
+        });
+        return true;
     }
 }
