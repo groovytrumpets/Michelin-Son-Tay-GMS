@@ -57,16 +57,20 @@ public class CompleteCheckInAllRequest {
     @Size(max = 500, message = "Mô tả ảnh không được quá 500 ký tự")
     private String photoDamageDescription;
     
-    // Odometer reading (required)
-    @NotNull(message = "Số km là bắt buộc")
-    @Positive(message = "Số km phải là số dương")
+    // Odometer reading (optional)
     @Max(value = 9999999, message = "Số km không hợp lệ")
     private Integer odometerReading;
     
     // Check-in notes (optional)
     @Size(max = 1000, message = "Ghi chú không được quá 1000 ký tự")
     private String checkInNotes;
-    
+
+    /**
+     * true  = kích hoạt kiểm tra an toàn
+     * false / null = bỏ qua kiểm tra an toàn
+     */
+    private Boolean safetyInspection;
+
     // Staff ID who performs check-in (receptionist/staff)
     // This will be used for both uploadedBy (photos) and recordedBy (odometer)
     @NotNull(message = "Staff ID là bắt buộc")
