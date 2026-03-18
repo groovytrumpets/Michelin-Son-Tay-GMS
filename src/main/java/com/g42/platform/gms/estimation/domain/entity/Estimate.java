@@ -32,10 +32,10 @@ public class Estimate {
     private BigDecimal totalPrice;
     private List<EstimateItem> items;
 
-    public BigDecimal getTotalPrices() {
-        if (items == null || items.isEmpty()) return BigDecimal.ZERO;
-        return items.stream()
-                .map(EstimateItem::getSubTotal)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
+//    public BigDecimal getTotalPrices() {
+//        if (items == null || items.isEmpty()) return BigDecimal.ZERO;
+//        return items.stream()
+//                .map(EstimateItem::getSubTotal)
+//                .reduce(BigDecimal.ZERO, BigDecimal::add);
+//    }
 }
