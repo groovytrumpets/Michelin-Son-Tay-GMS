@@ -18,4 +18,7 @@ public class EstimateItemDto {
     private Integer quantity;
     private BigDecimal unitPrice;
     private BigDecimal subTotal;
+    private Integer taxRuleId;
+    private String taxCode;
+    private BigDecimal taxRate;
 }
