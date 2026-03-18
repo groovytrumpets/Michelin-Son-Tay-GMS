@@ -4,6 +4,7 @@ import com.g42.platform.gms.auth.entity.CustomerProfile;
 import com.g42.platform.gms.auth.repository.CustomerProfileRepository;
 import com.g42.platform.gms.booking.customer.api.dto.BookingResponse;
 import com.g42.platform.gms.booking.customer.domain.enums.BookingRequestStatus;
+import com.g42.platform.gms.booking_management.api.dto.CustomerDto;
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedRespond;
 import com.g42.platform.gms.booking_management.domain.entity.*;
 import com.g42.platform.gms.booking_management.domain.enums.BookingEnum;
@@ -12,6 +13,8 @@ import com.g42.platform.gms.booking_management.infrastructure.entity.*;
 import com.g42.platform.gms.booking_management.infrastructure.mapper.*;
 import com.g42.platform.gms.booking_management.infrastructure.repository.*;
 import com.g42.platform.gms.booking_management.infrastructure.specification.BookingRequestSpecification;
+import com.g42.platform.gms.customer.infrastructure.entity.CustomerProfileJpa;
+import com.g42.platform.gms.customer.infrastructure.repository.CustomerProfileJpaRepo;
 import lombok.AllArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -24,6 +27,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
 @Repository
 @AllArgsConstructor
 public class BookingManageRepositoryImpl implements BookingManageRepository {
@@ -34,17 +41,49 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
     private final BookingMRequestJpaRepo bookingMRequestJpaRepo;
     private final BookingDraffManagerMapper bookingDraffManagerMapper;
     private final CatalogItemManageMapper catalogItemManageMapper;
+    private final CustomerProfileJpaRepo customerProfileJpaRepo;
+
     @Override
     public Page<BookedRespond> getBookedList(int page, int size, LocalDate date, Boolean isGuest, BookingEnum status, String search) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         Specification<BookingJpa> specification = Specification.unrestricted();
-        specification = specification.and(BookingRequestSpecification.filterBooking(date,isGuest,status));
+        specification = specification.and(BookingRequestSpecification.filterBooking(date, isGuest, status));
         if (search != null && !search.isBlank()) {
-        specification = specification.and(BookingRequestSpecification.searchBooking(search));
+            specification = specification.and(BookingRequestSpecification.searchBooking(search));
         }
 
-        Page<BookedRespond> bookingResponses = bookingManageJpaRepository.findAllBooked(specification,pageable);
-        return bookingResponses;
+        Page<BookingJpa> bookingPage = bookingManageJpaRepository.findAll(specification, pageable);
+
+        // Batch query customers
+        List<Integer> customerIds = bookingPage.getContent().stream()
+                .map(BookingJpa::getCustomerId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<Integer, CustomerProfileJpa> customerMap = customerProfileJpaRepo
+                .findAllById(customerIds).stream()
+                .collect(Collectors.toMap(CustomerProfileJpa::getCustomerId, c -> c));
+
+        return bookingPage.map(b -> {
+            CustomerProfileJpa customer = customerMap.get(b.getCustomerId());
+            return new BookedRespond(
+                    b.getBookingId(),
+                    b.getBookingCode(),
+                    new CustomerDto(
+                            customer != null ? customer.getFullName() : null,
+                            customer != null ? customer.getPhone() : null,
+                            null
+                    ),
+                    b.getScheduledDate(),
+                    b.getScheduledTime(),
+                    b.getStatus(),
+                    b.getDescription(),
+                    b.getIsGuest(),
+                    b.getCreatedAt(),
+                    b.getEstimateTime(),
+                    b.getQueueOrder()
+            );
+        });
     }
 
     @Override
@@ -103,7 +142,12 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
         booking.setServices(request.getServices());
         booking.setScheduledDate(request.getScheduledDate());
         booking.setScheduledTime(request.getScheduledTime());
-        booking.setServiceCategory(request.getServiceCategory());
+        List<CatalogItem> catalogItems = request.getServices();
+        int estimateTime = catalogItems.stream()
+                .filter(item -> item.getServiceService() != null)
+                .mapToInt(item -> item.getServiceService().getEstimateTime())
+                .sum();
+        booking.setEstimateTime(estimateTime);
         BookingJpa bookingJpa = bookingManageJpaRepository.save(bookingManagerMapper.toBooking(booking));
         return bookingJpa;
     }

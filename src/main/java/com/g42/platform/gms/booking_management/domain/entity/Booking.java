@@ -24,12 +24,12 @@ public class Booking {
     private Integer customerId;
     private LocalDate scheduledDate;
     private LocalTime scheduledTime;
-    private String serviceCategory;
     private BookingEnum status;
     private String description;
     private Boolean isGuest = false;
     private LocalDateTime createdAt;
     private List<CatalogItem> services;
-
+    private Integer queueOrder;
+    private Integer estimateTime;
 
 }
