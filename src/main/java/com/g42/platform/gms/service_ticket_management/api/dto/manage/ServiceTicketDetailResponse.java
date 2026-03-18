@@ -55,6 +55,7 @@ public class ServiceTicketDetailResponse {
     // Flags
     private Boolean immutable;
     private Boolean isGuest;
+    private Boolean safetyInspectionEnabled;
     
     @Data
     @NoArgsConstructor

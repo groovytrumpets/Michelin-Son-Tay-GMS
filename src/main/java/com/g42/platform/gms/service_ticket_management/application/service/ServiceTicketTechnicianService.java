@@ -59,30 +59,32 @@ public class ServiceTicketTechnicianService {
     private final ServiceTicketDetailMapper detailMapper;
     
     /**
-     * Get paginated list of service tickets for technician.
+     * Get paginated list of service tickets assigned to a specific technician.
      * 
-     * @param page Page number (0-indexed)
-     * @param size Page size
-     * @param date Filter by received date
-     * @param status Filter by ticket status
-     * @param search Search by ticket code, customer name, phone, or license plate
+     * @param staffId  ID của kỹ thuật viên (lấy từ JWT)
+     * @param page     Page number (0-indexed)
+     * @param size     Page size
+     * @param date     Filter by received date
+     * @param status   Filter by ticket status
+     * @param search   Search by ticket code, customer name, phone, or license plate
      * @return Page of TechnicianTicketListResponse
      */
     @Transactional(readOnly = true)
     public Page<TechnicianTicketListResponse> getTechnicianTicketList(
+            Integer staffId,
             int page, 
             int size, 
             LocalDate date, 
             TicketStatus status, 
             String search) {
         
-        log.info("Getting technician ticket list: page={}, size={}, date={}, status={}, search={}", 
-            page, size, date, status, search);
+        log.info("Getting technician ticket list: staffId={}, page={}, size={}, date={}, status={}, search={}", 
+            staffId, page, size, date, status, search);
         
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "receivedAt"));
         
-        Specification<ServiceTicketJpa> specification = Specification.anyOf();
-        specification = specification.and(ServiceTicketSpecification.filter(date, status));
+        Specification<ServiceTicketJpa> specification = ServiceTicketSpecification.assignedToStaff(staffId)
+            .and(ServiceTicketSpecification.filter(date, status));
         
         if (search != null && !search.isBlank()) {
             specification = specification.and(ServiceTicketSpecification.search(search));

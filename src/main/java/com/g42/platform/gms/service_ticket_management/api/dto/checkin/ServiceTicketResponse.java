@@ -23,7 +23,10 @@ public class ServiceTicketResponse {
     private Boolean immutable;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-    
+
+    // Safety inspection
+    private Boolean safetyInspectionEnabled;
+
     // Photo information
     private List<PhotoInfo> photos = new ArrayList<>();
     

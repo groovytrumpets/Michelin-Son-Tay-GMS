@@ -30,8 +30,7 @@ import com.g42.platform.gms.service_ticket_management.infrastructure.mapper.Serv
 import com.g42.platform.gms.service_ticket_management.infrastructure.mapper.VehicleConditionPhotoMapper;
 import com.g42.platform.gms.service_ticket_management.infrastructure.repository.OdometerHistoryRepository;
 import com.g42.platform.gms.service_ticket_management.infrastructure.repository.ServiceTicketRepository;
-import com.g42.platform.gms.service_ticket_management.infrastructure.repository.VehicleConditionPhotoRepository;
-import com.g42.platform.gms.vehicle.entity.Vehicle;
+import com.g42.platform.gms.service_ticket_management.infrastructure.repository.VehicleConditionPhotoRepository;import com.g42.platform.gms.vehicle.entity.Vehicle;
 import com.g42.platform.gms.vehicle.repository.VehicleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -90,6 +89,7 @@ public class CheckInService {
     private final BookingLookupMapper bookingLookupMapper;
     private final VehicleMapper vehicleMapper;
     private final PhotoResponseMapper photoResponseMapper;
+    private final SafetyInspectionService safetyInspectionService;
 
     /**
      * Lookup booking theo mã booking.
@@ -418,12 +418,6 @@ public class CheckInService {
         ServiceTicketJpa ticketJpa = serviceTicketRepository.findByTicketCode(request.getTicketCode())
             .orElseThrow(() -> new CheckInException("Không tìm thấy service ticket"));
         
-        // Validate odometer reading exists
-        Optional<OdometerHistoryJpa> odometerReading = odometerRepository.findLatestByVehicleId(ticketJpa.getVehicleId());
-        if (!odometerReading.isPresent()) {
-            throw new CheckInException("Chưa nhập số công tơ mét");
-        }
-        
         // Validate at least one photo exists
         List<VehicleConditionPhotoJpa> photos = photoRepository.findAll();
         List<VehicleConditionPhotoJpa> ticketPhotos = new ArrayList<>();
@@ -445,13 +439,23 @@ public class CheckInService {
         // immutable sẽ được set khi ticket chuyển sang COMPLETED
         ticketJpa.setUpdatedAt(LocalDateTime.now());
         ticketJpa = serviceTicketRepository.save(ticketJpa);
-        
+
         // 4. Update booking status to DONE
         Booking booking = bookingService.findById(ticketJpa.getBookingId());
         booking.setStatus(BookingStatus.DONE);
         bookingRepository.save(booking);
-        
-        // 5. Check appointment discrepancy
+
+        // 5. Handle safety inspection choice
+        if (Boolean.TRUE.equals(request.getSafetyInspection())) {
+            Integer staffId = request.getStaffId() != null ? request.getStaffId() : 0;
+            safetyInspectionService.enableInspectionByCode(ticketJpa.getTicketCode(), staffId);
+            log.info("Safety inspection enabled for ticket: {}", ticketJpa.getTicketCode());
+        } else {
+            safetyInspectionService.skipInspectionByCode(ticketJpa.getTicketCode());
+            log.info("Safety inspection skipped for ticket: {}", ticketJpa.getTicketCode());
+        }
+
+        // 6. Check appointment discrepancy
         List<ServiceTicketResponse.Warning> warnings = new ArrayList<>();
         LocalDate today = LocalDate.now();
         LocalTime now = LocalTime.now();
@@ -478,19 +482,20 @@ public class CheckInService {
         }
         
         // 6. Create customer auth if needed
-        Optional<CustomerAuth> existingAuth = customerAuthRepository.findByCustomerId(booking.getCustomerId());
-        if (!existingAuth.isPresent()) {
-            CustomerAuth customerAuth = new CustomerAuth();
-            customerAuth.setCustomerId(booking.getCustomerId());
-            customerAuth.setStatus(CustomerStatus.INACTIVE);
-            customerAuth.setFailedAttemptCount(0);
-            customerAuth.setOtpAttemptCount(0);
-            customerAuth.setCreatedAt(LocalDateTime.now());
-            customerAuthRepository.save(customerAuth);
-            log.info("Created customer auth for customerId={}", booking.getCustomerId());
-            
-            // TODO: Send OTP for activation (will be implemented in Phase 2)
-        }
+        // TODO: TEMPORARILY DISABLED - Will create account when confirming booking instead of check-in
+        // Optional<CustomerAuth> existingAuth = customerAuthRepository.findByCustomerId(booking.getCustomerId());
+        // if (!existingAuth.isPresent()) {
+        //     CustomerAuth customerAuth = new CustomerAuth();
+        //     customerAuth.setCustomerId(booking.getCustomerId());
+        //     customerAuth.setStatus(CustomerStatus.INACTIVE);
+        //     customerAuth.setFailedAttemptCount(0);
+        //     customerAuth.setOtpAttemptCount(0);
+        //     customerAuth.setCreatedAt(LocalDateTime.now());
+        //     customerAuthRepository.save(customerAuth);
+        //     log.info("Created customer auth for customerId={}", booking.getCustomerId());
+        //     
+        //     // TODO: Send OTP for activation (will be implemented in Phase 2)
+        // }
         
         // 7. Return ServiceTicketResponse with warnings
         ServiceTicketResponse response = new ServiceTicketResponse();
@@ -508,8 +513,8 @@ public class CheckInService {
         List<ServiceTicketResponse.PhotoInfo> photoInfos = photoResponseMapper.toPhotoInfoList(ticketPhotos);
         response.setPhotos(photoInfos);
         response.setWarnings(warnings);
+        response.setSafetyInspectionEnabled(Boolean.TRUE.equals(request.getSafetyInspection()));
         
-        log.info("Check-in completed successfully: ticketCode={}, warnings={}", ticketJpa.getTicketCode(), warnings.size());
         return response;
     }
 
@@ -772,36 +777,37 @@ public class CheckInService {
         
         log.info("Uploaded {} vehicle condition photos", photoCount);
         
-        // 5. Save odometer reading
-        if (request.getOdometerReading() == null) {
-            throw new CheckInException("Số công tơ mét là bắt buộc");
-        }
-        
-        // Check for odometer rollback
-        Optional<OdometerHistoryJpa> previousReading = odometerRepository.findLatestByVehicleId(vehicle.getVehicleId());
+        // 5. Save odometer reading (optional)
         boolean rollbackDetected = false;
         Integer previousReadingValue = null;
-        
-        if (previousReading.isPresent()) {
-            previousReadingValue = previousReading.get().getReading();
-            if (request.getOdometerReading() < previousReadingValue) {
-                rollbackDetected = true;
-                log.warn("Odometer rollback detected: vehicleId={}, previous={}, current={}", 
-                    vehicle.getVehicleId(), previousReadingValue, request.getOdometerReading());
+
+        if (request.getOdometerReading() != null) {
+            // Check for odometer rollback
+            Optional<OdometerHistoryJpa> previousReading = odometerRepository.findLatestByVehicleId(vehicle.getVehicleId());
+
+            if (previousReading.isPresent()) {
+                previousReadingValue = previousReading.get().getReading();
+                if (request.getOdometerReading() < previousReadingValue) {
+                    rollbackDetected = true;
+                    log.warn("Odometer rollback detected: vehicleId={}, previous={}, current={}",
+                        vehicle.getVehicleId(), previousReadingValue, request.getOdometerReading());
+                }
             }
+
+            OdometerHistoryJpa odometerJpa = new OdometerHistoryJpa();
+            odometerJpa.setVehicleId(vehicle.getVehicleId());
+            odometerJpa.setServiceTicketId(ticketJpa.getServiceTicketId());
+            odometerJpa.setReading(request.getOdometerReading());
+            odometerJpa.setRecordedAt(LocalDateTime.now());
+            odometerJpa.setRecordedBy(request.getStaffId());
+            odometerJpa.setRollbackDetected(rollbackDetected);
+            odometerJpa.setPreviousReading(previousReadingValue);
+            odometerRepository.save(odometerJpa);
+
+            log.info("Saved odometer reading: {} km, rollbackDetected={}", request.getOdometerReading(), rollbackDetected);
+        } else {
+            log.info("Odometer reading not provided, skipping");
         }
-        
-        OdometerHistoryJpa odometerJpa = new OdometerHistoryJpa();
-        odometerJpa.setVehicleId(vehicle.getVehicleId());
-        odometerJpa.setServiceTicketId(ticketJpa.getServiceTicketId());
-        odometerJpa.setReading(request.getOdometerReading());
-        odometerJpa.setRecordedAt(LocalDateTime.now());
-        odometerJpa.setRecordedBy(request.getStaffId());
-        odometerJpa.setRollbackDetected(rollbackDetected);
-        odometerJpa.setPreviousReading(previousReadingValue);
-        odometerRepository.save(odometerJpa);
-        
-        log.info("Saved odometer reading: {} km, rollbackDetected={}", request.getOdometerReading(), rollbackDetected);
         
         // 6. Update Service Ticket to CREATED status
         ticketJpa.setTicketStatus(TicketStatus.CREATED);
@@ -819,10 +825,19 @@ public class CheckInService {
         Booking booking = bookingService.findById(request.getBookingId());
         booking.setStatus(BookingStatus.DONE);
         bookingRepository.save(booking);
-        
+
         log.info("Updated booking status to DONE: bookingId={}", request.getBookingId());
-        
-        // 8. Check appointment discrepancy and create warnings
+
+        // 8. Handle safety inspection choice
+        if (Boolean.TRUE.equals(request.getSafetyInspection())) {
+            safetyInspectionService.enableInspectionByCode(ticketJpa.getTicketCode(), request.getStaffId());
+            log.info("Safety inspection enabled for ticket: {}", ticketJpa.getTicketCode());
+        } else {
+            safetyInspectionService.skipInspectionByCode(ticketJpa.getTicketCode());
+            log.info("Safety inspection skipped for ticket: {}", ticketJpa.getTicketCode());
+        }
+
+        // 9. Check appointment discrepancy and create warnings
         List<ServiceTicketResponse.Warning> warnings = new ArrayList<>();
         LocalDate today = LocalDate.now();
         LocalTime now = LocalTime.now();
@@ -856,20 +871,21 @@ public class CheckInService {
             warnings.add(warning);
         }
         
-        // 9. Create customer auth if needed
-        Optional<CustomerAuth> existingAuth = customerAuthRepository.findByCustomerId(request.getCustomerId());
-        if (!existingAuth.isPresent()) {
-            CustomerAuth customerAuth = new CustomerAuth();
-            customerAuth.setCustomerId(request.getCustomerId());
-            customerAuth.setStatus(CustomerStatus.INACTIVE);
-            customerAuth.setFailedAttemptCount(0);
-            customerAuth.setOtpAttemptCount(0);
-            customerAuth.setCreatedAt(LocalDateTime.now());
-            customerAuthRepository.save(customerAuth);
-            log.info("Created customer auth for customerId={}", request.getCustomerId());
-        }
+        // 10. Create customer auth if needed
+        // TODO: TEMPORARILY DISABLED - Will create account when confirming booking instead of check-in
+        // Optional<CustomerAuth> existingAuth = customerAuthRepository.findByCustomerId(request.getCustomerId());
+        // if (!existingAuth.isPresent()) {
+        //     CustomerAuth customerAuth = new CustomerAuth();
+        //     customerAuth.setCustomerId(request.getCustomerId());
+        //     customerAuth.setStatus(CustomerStatus.INACTIVE);
+        //     customerAuth.setFailedAttemptCount(0);
+        //     customerAuth.setOtpAttemptCount(0);
+        //     customerAuth.setCreatedAt(LocalDateTime.now());
+        //     customerAuthRepository.save(customerAuth);
+        //     log.info("Created customer auth for customerId={}", request.getCustomerId());
+        // }
         
-        // 10. Build response using mapper (Clean Architecture pattern)
+        // 11. Build response using mapper (Clean Architecture pattern)
         // Step 1: JPA → Domain (Infrastructure Mapper)
         ServiceTicket serviceTicketDomain = serviceTicketMapper.toDomain(ticketJpa);
         
@@ -889,6 +905,7 @@ public class CheckInService {
         
         // Step 4: Set warnings (business logic)
         response.setWarnings(warnings);
+        response.setSafetyInspectionEnabled(Boolean.TRUE.equals(request.getSafetyInspection()));
         
         log.info("Single-page check-in completed successfully: ticketCode={}, photoCount={}, warnings={}", 
             ticketJpa.getTicketCode(), photoCount, warnings.size());

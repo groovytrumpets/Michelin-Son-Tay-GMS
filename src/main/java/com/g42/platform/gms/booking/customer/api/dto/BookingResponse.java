@@ -21,4 +21,15 @@ public class BookingResponse {
     private List<Integer> serviceIds;
     private List<ServiceItemDto> services;
     private Integer totalEstimatedTime;
+
+    // Progress tracking
+    private List<ProgressStep> progressSteps;
+    private String technicianNotes;
+    private String ticketStatus; // null nếu chưa check-in
+
+    @Data
+    public static class ProgressStep {
+        private String label;
+        private String status; // COMPLETED, ACTIVE, PENDING
+    }
 }

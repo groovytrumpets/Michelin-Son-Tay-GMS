@@ -127,6 +127,7 @@ public class ServiceTicketManageService {
         response.setCreatedAt(ticket.getCreatedAt());
         response.setUpdatedAt(ticket.getUpdatedAt());
         response.setImmutable(ticket.getImmutable());
+        response.setSafetyInspectionEnabled(ticket.getSafetyInspectionEnabled());
         
         // Customer info
         CustomerProfile customer = customerRepository.findById(ticket.getCustomerId())
