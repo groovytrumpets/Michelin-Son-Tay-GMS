@@ -8,9 +8,11 @@ import com.g42.platform.gms.estimation.api.dto.request.EstimateRequestDto;
 import com.g42.platform.gms.estimation.api.mapper.EstimateDtoMapper;
 import com.g42.platform.gms.estimation.domain.entity.Estimate;
 import com.g42.platform.gms.estimation.domain.entity.EstimateItem;
+import com.g42.platform.gms.estimation.domain.entity.TaxRule;
 import com.g42.platform.gms.estimation.domain.entity.WorkCategory;
 import com.g42.platform.gms.estimation.domain.repository.EstimateItemRepository;
 import com.g42.platform.gms.estimation.domain.repository.EstimateRepository;
+import com.g42.platform.gms.estimation.domain.repository.TaxRuleRepository;
 import com.g42.platform.gms.estimation.domain.repository.WorkCategoryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -27,6 +29,8 @@ public class EstimateService {
     private final EstimateItemRepository estimateItemRepository;
     private final WorkCategoryRepository workCategoryRepo;
     private final EstimateDtoMapper estimateDtoMapper;
+    private final TaxRuleRepository taxRuleRepository;
+
 
     public List<EstimateRespondDto> getEstimateByCode(Integer serviceTicketId) {
         //todo: find all estimate
@@ -68,7 +72,7 @@ public class EstimateService {
         estimate.setEstimateType(request.getEstimateType());
         estimate.setStatus(EstimateEnum.DRAFT);
         estimate.setVersion(1);
-        estimate.setTotalPrice(estimate.getTotalPrices());
+        estimate.setTotalPrice(estimate.getTotalPrice());
         Estimate saved = estimateRepository.save(estimate);
 
         List<EstimateItem> items = resolveItems(request.getItems(), saved.getId());
@@ -76,11 +80,11 @@ public class EstimateService {
 
         //todo: update total_price
         BigDecimal totalPrice = items.stream()
-                .map(item -> item.getSubTotal() != null ? item.getSubTotal() : BigDecimal.ZERO)
+                .map(item -> item.getTotalPrice() != null ? item.getTotalPrice() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         saved.setTotalPrice(totalPrice);
-        System.out.println("Total_price: "+saved.getTotalPrices());
+        System.out.println("Total_price: " + totalPrice); // dùng biến totalPrice trực tiếp
         estimateRepository.save(saved);
 
         return getEstimateRespondDto(saved.getId());
@@ -154,6 +158,21 @@ public class EstimateService {
             item.setItemName(req.getItemName());
             item.setQuantity(req.getQuantity());
             item.setUnitPrice(req.getUnitPrice());
+            item.setTaxRuleId(req.getTaxRuleId());
+            //todo: vat calculate
+            BigDecimal subTotal = item.getSubTotal();
+            if (req.getTaxRuleId() != null) {
+                TaxRule taxRule = taxRuleRepository.findById(req.getTaxRuleId());
+                if (taxRule != null && taxRule.getTaxRate() != null) {
+                    BigDecimal vatAmount = subTotal.multiply(
+                            taxRule.getTaxRate().divide(BigDecimal.valueOf(100)));
+                    item.setTotalPrice(subTotal.add(vatAmount));
+                } else {
+                    item.setTotalPrice(subTotal);
+                }
+            } else {
+                item.setTotalPrice(subTotal);
+            }
             return item;
         }).toList();
     }
