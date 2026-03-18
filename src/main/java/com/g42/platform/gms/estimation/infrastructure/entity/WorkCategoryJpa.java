@@ -12,7 +12,10 @@ import org.hibernate.annotations.ColumnDefault;
 @Entity
 @Table(name = "work_category", schema = "michelin_garage")
 public class WorkCategoryJpa {
+
+
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "idwork_category", nullable = false)
     private Integer id;
 

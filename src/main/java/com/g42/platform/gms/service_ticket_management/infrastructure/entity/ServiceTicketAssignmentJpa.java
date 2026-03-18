@@ -1,49 +1,55 @@
 package com.g42.platform.gms.service_ticket_management.infrastructure.entity;
 
-import com.g42.platform.gms.service_ticket_management.domain.enums.RoleInTicket;
+import com.g42.platform.gms.auth.entity.StaffProfile;
 import jakarta.persistence.*;
-import lombok.Data;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import lombok.Getter;
+import lombok.Setter;
+import org.hibernate.annotations.ColumnDefault;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
-/**
- * JPA entity for service_ticket_assignment table.
- * 
- * Maps to the service_ticket_assignment table in the database.
- * This entity tracks which staff members are assigned to service tickets
- * and their roles (RECEPTIONIST, ADVISOR, TECHNICIAN, INSPECTOR).
- */
+@Getter
+@Setter
 @Entity
-@Table(name = "service_ticket_assignment", indexes = {
-    @Index(name = "idx_service_ticket_id", columnList = "service_ticket_id"),
-    @Index(name = "idx_staff_id", columnList = "staff_id"),
-    @Index(name = "idx_role", columnList = "role_in_ticket")
-})
-@Data
+@Table(name = "service_ticket_assignment", schema = "michelin_garage")
 public class ServiceTicketAssignmentJpa {
-    
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "assignment_id")
+    @Column(name = "assignment_id", nullable = false)
     private Integer assignmentId;
-    
+
+    @NotNull
     @Column(name = "service_ticket_id", nullable = false)
     private Integer serviceTicketId;
-    
+
+    @NotNull
     @Column(name = "staff_id", nullable = false)
     private Integer staffId;
-    
-    @Enumerated(EnumType.STRING)
+
+    @NotNull
+    @Lob
     @Column(name = "role_in_ticket", nullable = false)
-    private RoleInTicket roleInTicket;
-    
+    private String roleInTicket;
+
+    @ColumnDefault("CURRENT_TIMESTAMP")
     @Column(name = "assigned_at")
-    private LocalDateTime assignedAt;
-    
-    @PrePersist
-    protected void onCreate() {
-        if (assignedAt == null) {
-            assignedAt = LocalDateTime.now();
-        }
-    }
+    private Instant assignedAt;
+
+    @ColumnDefault("0")
+    @Column(name = "is_primary")
+    private Boolean isPrimary;
+
+    @NotNull
+    @ColumnDefault("'ACTIVE'")
+    @Lob
+    @Column(name = "status", nullable = false)
+    private String status;
+
+    @Size(max = 255)
+    @Column(name = "note")
+    private String note;
+
+
 }

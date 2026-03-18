@@ -4,6 +4,7 @@ import com.g42.platform.gms.booking_management.domain.enums.BookingEnum;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.customer.api.dto.CustomerCreateDto;
+import com.g42.platform.gms.customer.api.dto.CustomerUpdateDto;
 import com.g42.platform.gms.customer.application.service.CustomerService;
 import com.g42.platform.gms.customer.domain.entity.CustomerProfile;
 import lombok.AllArgsConstructor;
@@ -22,7 +23,6 @@ public class CustomerController {
     CustomerService customerService;
     @PostMapping("create")
     public ResponseEntity<ApiResponse<CustomerCreateDto>> createCustomer(@RequestBody CustomerCreateDto customerDto) {
-
         return ResponseEntity.ok(ApiResponses.success(customerService.createNewCustomer(customerDto)));
     }
     @GetMapping("getAllCustomer")
@@ -30,7 +30,25 @@ public class CustomerController {
                                                                                     @RequestParam(defaultValue = "10") int size,
                                                                                     @RequestParam(required = false) LocalDate date,
                                                                                     @RequestParam(required = false) Boolean isGuest,
-                                                                                    @RequestParam(required = false) String search) {
-        return ResponseEntity.ok(ApiResponses.success(customerService.getListOfAllCustomerProfile(page, size, date, isGuest, search)));
+                                                                                    @RequestParam(required = false) String search,
+                                                                                    @RequestParam(required = false) String status
+    ) {
+        return ResponseEntity.ok(ApiResponses.success(customerService.getListOfAllCustomerProfile(page, size, date, isGuest, search, status)));
+    }
+    @PutMapping("{customerId}/update")
+    public ResponseEntity<ApiResponse<CustomerCreateDto>> updateProfile(@PathVariable Integer customerId,@RequestBody CustomerUpdateDto customerUpdateDto) {
+        return ResponseEntity.ok(ApiResponses.success(customerService.updateCustomer(customerId, customerUpdateDto)));
+    }
+    @GetMapping("{customerId}")
+    public ResponseEntity<ApiResponse<CustomerProfile>> getCustomerProfile(@PathVariable Integer customerId) {
+        return ResponseEntity.ok(ApiResponses.success(customerService.findByCustomerId(customerId)));
+    }
+    @PutMapping("{customerId}/delete")
+    public ResponseEntity<ApiResponse<CustomerProfile>> deleteProfile(@PathVariable Integer customerId) {
+        return ResponseEntity.ok(ApiResponses.success(customerService.deleteCustomer(customerId)));
+    }
+    @PutMapping("{customerId}/locked")
+    public ResponseEntity<ApiResponse<CustomerProfile>> lockedProfile(@PathVariable Integer customerId) {
+        return ResponseEntity.ok(ApiResponses.success(customerService.lockedCustomer(customerId)));
     }
 }

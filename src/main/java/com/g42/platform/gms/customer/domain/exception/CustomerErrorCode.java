@@ -2,10 +2,8 @@ package com.g42.platform.gms.customer.domain.exception;
 
 public enum CustomerErrorCode {
     INVALID_ID,
-    BOOKING_EXPIRED,
-    BOOKING_REJECTED,
-    BOOKING_CANT_CANCEL,
-    BOOKING_SLOT_REVOKED,
-    BOOKING_STATUS_WRONG,
-    BOOKING_CANT_EDIT,
+    INVALID_CONTACT_INFO,
+    INVALID_PHONE,
+    INVALID_DOB,
+    INVALID_CUSTOMER_PROFILE,
 }
