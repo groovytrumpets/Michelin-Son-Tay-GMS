@@ -7,4 +7,6 @@ import java.util.List;
 
 public interface TaxRuleRepository {
     TaxRule findById(Integer taxRuleId);
+
+    List<TaxRule> getAllActiveTax();
 }
