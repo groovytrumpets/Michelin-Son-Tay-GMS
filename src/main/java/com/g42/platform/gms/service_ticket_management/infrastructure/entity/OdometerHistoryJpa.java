@@ -34,7 +34,7 @@ public class OdometerHistoryJpa {
     @Column(name = "recorded_at")
     private LocalDateTime recordedAt;
     
-    @Column(name = "recorded_by", nullable = false)
+    @Column(name = "recorded_by")
     private Integer recordedBy;
     
     @Column(name = "service_ticket_id")
