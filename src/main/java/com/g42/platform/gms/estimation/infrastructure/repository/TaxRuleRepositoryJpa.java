@@ -14,5 +14,4 @@ public interface TaxRuleRepositoryJpa extends JpaRepository<TaxRuleJpa, Integer>
 
     List<TaxRuleJpa> findAllByIsActive(Byte isActive);
 
-    List<TaxRuleJpa> findAllByIsActive(Byte isActive);
 }

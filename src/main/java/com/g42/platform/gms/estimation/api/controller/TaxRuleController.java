@@ -14,10 +14,10 @@ import java.util.List;
 
 @RestController
 @AllArgsConstructor
-@RequestMapping("/api/service-ticket/tax-rule/")
+@RequestMapping("/api/service-ticket/tax-rule")
 public class TaxRuleController {
     private final TaxRuleService taxRuleService;
-    @GetMapping("/tax-rules")
+    @GetMapping("/all")
     public ResponseEntity<ApiResponse<List<TaxRuleDto>>> getAllTaxRules() {
         return ResponseEntity.ok(ApiResponses.success(taxRuleService.getAllActiveTaxRules()));
     }
