@@ -32,8 +32,6 @@ public class BookingJpa {
     @Column(name = "scheduled_time", nullable = false)
     private LocalTime scheduledTime;
 
-    @Column(name = "service_category", length = 50)
-    private String serviceCategory;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
@@ -55,5 +53,12 @@ public class BookingJpa {
             inverseJoinColumns = @JoinColumn(name = "item_id")
     )
     private List<CatalogItemJpa> services;
+    @Column(name = "queue_order")
+    private Integer queueOrder;
+//    @ManyToOne(fetch = FetchType.LAZY)
+//    @JoinColumn(name = "vehicle_id")
+//    private Vehicle vehicle;
+    @Column(name = "estimate_time")
+    private Integer estimateTime;
 
 }
