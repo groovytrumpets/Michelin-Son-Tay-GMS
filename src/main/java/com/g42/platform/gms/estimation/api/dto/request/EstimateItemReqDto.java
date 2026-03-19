@@ -19,4 +19,5 @@ public class EstimateItemReqDto {
     private BigDecimal unitPrice;
     private Integer taxRuleId;
     private Boolean isChecked;
+    private Boolean isRemoved;
 }

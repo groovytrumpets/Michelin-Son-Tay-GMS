@@ -3,6 +3,7 @@ package com.g42.platform.gms.estimation.api.mapper;
 import com.g42.platform.gms.estimation.api.dto.EstimateItemDto;
 import com.g42.platform.gms.estimation.api.dto.EstimateRespondDto;
 import com.g42.platform.gms.estimation.api.dto.WorkCataDto;
+import com.g42.platform.gms.estimation.api.dto.request.EstimateItemReqDto;
 import com.g42.platform.gms.estimation.domain.entity.Estimate;
 import com.g42.platform.gms.estimation.domain.entity.EstimateItem;
 import com.g42.platform.gms.estimation.domain.entity.WorkCategory;
@@ -25,4 +26,5 @@ public interface EstimateDtoMapper {
     EstimateRespondDto toEstimateDto(Estimate estimate);
     @Mapping(target = "workCateId", source = "id")
     WorkCataDto toWorkCateDto(WorkCategory workCataDto);
+    EstimateItemReqDto toEstimateItemReqDto(EstimateItem estimateItem);
 }
