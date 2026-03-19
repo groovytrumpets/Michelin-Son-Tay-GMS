@@ -243,4 +243,20 @@ public class EstimateService {
         }).toList());
         return dto;
     }
+
+    public EstimateItemReqDto updateEstimateItem(Integer estimateItemId, EstimateItemReqDto request) {
+        EstimateItem estimateItem = estimateItemRepository.findByEstimateItemId(estimateItemId);
+        if (request.getWorkCategoryId() != null)estimateItem.setWorkCategoryId(request.getWorkCategoryId());
+        //todo: handle newCate
+        if (request.getItemId() != null)estimateItem.setItemId(request.getItemId());
+        if (request.getItemName() != null)estimateItem.setItemName(request.getItemName());
+        if (request.getQuantity() != null)estimateItem.setQuantity(request.getQuantity());
+        if (request.getUnitPrice() != null)estimateItem.setUnitPrice(request.getUnitPrice());
+        if (request.getTaxRuleId() != null)estimateItem.setTaxRuleId(request.getTaxRuleId());
+        if (request.getIsChecked() != null)estimateItem.setIsChecked(request.getIsChecked());
+        if (request.getIsRemoved() != null)estimateItem.setIsRemoved(request.getIsRemoved());
+        EstimateItem saved = estimateItemRepository.save(estimateItem);
+        return estimateDtoMapper.toEstimateItemReqDto(saved);
+
+    }
 }
