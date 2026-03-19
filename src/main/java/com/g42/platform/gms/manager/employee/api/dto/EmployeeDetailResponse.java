@@ -15,10 +15,13 @@ public class EmployeeDetailResponse {
     private Integer staffId;
     private String fullName;
     private String phone;
+    private String email;
     private String position;
     private String gender;
     private Date dob;
     private String avatar;
+    private String employmentStatus;
+    private Date hireDate;
 
     // Hiệu năng (tháng hiện tại)
     private PerformanceSummary performance;
@@ -30,7 +33,9 @@ public class EmployeeDetailResponse {
     @Builder
     public static class PerformanceSummary {
         private int totalWorkDays;       // Số ngày đi làm (tháng này)
-        private int totalTicketsHandled; // Số phiếu dịch vụ đã xử lý (tháng này)
+        private int totalTicketsHandled; // Số phiếu dịch vụ đã xử lý
+        private int ticketsAsAdvisor;    // Số phiếu với vai trò advisor
+        private int ticketsAsTechnician; // Số phiếu với vai trò technician
     }
 
     @Data

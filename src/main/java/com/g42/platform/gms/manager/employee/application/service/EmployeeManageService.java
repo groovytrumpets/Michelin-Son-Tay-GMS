@@ -42,6 +42,8 @@ public class EmployeeManageService {
         // Performance tháng hiện tại
         int workDays = checkinJpaRepo.countWorkDays(staffId, firstOfMonth, now);
         long totalTickets = assignmentRepo.countCompletedByStaffInMonth(staffId, now.getYear(), now.getMonthValue());
+        long asAdvisor = assignmentRepo.countCompletedByStaffAndRoleInMonth(staffId, "ADVISOR", now.getYear(), now.getMonthValue());
+        long asTechnician = assignmentRepo.countCompletedByStaffAndRoleInMonth(staffId, "TECHNICIAN", now.getYear(), now.getMonthValue());
 
         // Lịch điểm danh 30 ngày gần nhất
         LocalDate from = now.minusDays(29);
@@ -66,13 +68,18 @@ public class EmployeeManageService {
                 .staffId(profile.getStaffId())
                 .fullName(profile.getFullName())
                 .phone(profile.getPhone())
+                .email(profile.getEmail())
                 .position(profile.getPosition())
                 .gender(profile.getGender())
                 .dob(profile.getDob())
                 .avatar(profile.getAvatar())
+                .employmentStatus(profile.getEmploymentStatus())
+                .hireDate(profile.getHireDate())
                 .performance(EmployeeDetailResponse.PerformanceSummary.builder()
                         .totalWorkDays(workDays)
                         .totalTicketsHandled((int) totalTickets)
+                        .ticketsAsAdvisor((int) asAdvisor)
+                        .ticketsAsTechnician((int) asTechnician)
                         .build())
                 .recentAttendance(records)
                 .build();
@@ -83,10 +90,13 @@ public class EmployeeManageService {
                 .staffId(p.getStaffId())
                 .fullName(p.getFullName())
                 .phone(p.getPhone())
+                .email(p.getEmail())
                 .position(p.getPosition())
                 .gender(p.getGender())
                 .dob(p.getDob())
                 .avatar(p.getAvatar())
+                .employmentStatus(p.getEmploymentStatus())
+                .hireDate(p.getHireDate())
                 .build();
     }
 }

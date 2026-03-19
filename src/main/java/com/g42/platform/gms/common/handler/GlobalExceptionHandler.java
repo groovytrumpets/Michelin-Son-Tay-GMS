@@ -161,6 +161,22 @@ public class GlobalExceptionHandler {
                 .body(ApiResponses.error(ex.getErrorCode().name(), ex.getMessage()));
     }
 
+    @ExceptionHandler(AttendanceException.class)
+    public ResponseEntity<ApiResponse<?>> handleAttendanceException(AttendanceException ex) {
+        System.err.println("Attendance Error: " + ex.getErrorCode().getCode() + " - " + ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponses.error(ex.getErrorCode().getCode(), ex.getMessage()));
+    }
+
+    @ExceptionHandler(ScheduleException.class)
+    public ResponseEntity<ApiResponse<?>> handleScheduleException(ScheduleException ex) {
+        System.err.println("Schedule Error: " + ex.getErrorCode().name() + " - " + ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponses.error(ex.getErrorCode().name(), ex.getMessage()));
+    }
+
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ApiResponse<Object>> handleEnumError(
             MethodArgumentTypeMismatchException ex) {
