@@ -24,5 +24,6 @@ public class EstimateItemDto {
     private Boolean isChecked;
     private Boolean isRemoved;
     private BigDecimal unitPriceWithVat;
+    private BigDecimal subTotalWithVat;
 
 }

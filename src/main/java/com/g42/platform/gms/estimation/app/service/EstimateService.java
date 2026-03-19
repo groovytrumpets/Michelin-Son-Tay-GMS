@@ -75,6 +75,9 @@ public class EstimateService {
                     BigDecimal vatPerUnit = item.getUnitPrice().multiply(
                             taxRule.getTaxRate().divide(BigDecimal.valueOf(100)));
                     itemDto.setUnitPriceWithVat(item.getUnitPrice().add(vatPerUnit));
+                    BigDecimal unitPriceWithVat = item.getUnitPrice().add(vatPerUnit);
+                    itemDto.setSubTotalWithVat(unitPriceWithVat.multiply(
+                            BigDecimal.valueOf(item.getQuantity())));
                 }
                 }else {
                     itemDto.setUnitPriceWithVat(item.getUnitPrice());
@@ -235,6 +238,9 @@ public class EstimateService {
                     BigDecimal vatPerUnit = item.getUnitPrice().multiply(
                             taxRule.getTaxRate().divide(BigDecimal.valueOf(100)));
                     itemDto.setUnitPriceWithVat(item.getUnitPrice().add(vatPerUnit));
+                    BigDecimal unitPriceWithVat = item.getUnitPrice().add(vatPerUnit);
+                    itemDto.setSubTotalWithVat(unitPriceWithVat.multiply(
+                            BigDecimal.valueOf(item.getQuantity())));
                 }
             }else {
                 itemDto.setUnitPriceWithVat(item.getUnitPrice());
