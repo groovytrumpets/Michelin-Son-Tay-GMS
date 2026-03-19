@@ -7,6 +7,8 @@ import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.auth.exception.AuthException;
 import com.g42.platform.gms.customer.domain.exception.CustomerException;
+import com.g42.platform.gms.manager.attendance.domain.exception.AttendanceException;
+import com.g42.platform.gms.manager.schedule.domain.exception.ScheduleException;
 import com.g42.platform.gms.marketing.service_catalog.domain.exception.ServiceException;
 import com.g42.platform.gms.staff.attendance.domain.exception.StaffAttendanceException;
 import com.g42.platform.gms.staff.profile.domain.exception.StaffException;
@@ -120,6 +122,22 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponses.error(ex.getCode().name(), ex.getMessage()));
+    }
+
+    @ExceptionHandler(AttendanceException.class)
+    public ResponseEntity<ApiResponse<?>> handleAttendanceException(AttendanceException ex) {
+        System.err.println("Attendance Error: " + ex.getErrorCode().getCode() + " - " + ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponses.error(ex.getErrorCode().getCode(), ex.getMessage()));
+    }
+
+    @ExceptionHandler(ScheduleException.class)
+    public ResponseEntity<ApiResponse<?>> handleScheduleException(ScheduleException ex) {
+        System.err.println("Schedule Error: " + ex.getErrorCode().name() + " - " + ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponses.error(ex.getErrorCode().name(), ex.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
