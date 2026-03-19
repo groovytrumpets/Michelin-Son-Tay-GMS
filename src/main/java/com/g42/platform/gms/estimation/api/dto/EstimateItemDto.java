@@ -23,5 +23,6 @@ public class EstimateItemDto {
     private BigDecimal taxRate;
     private Boolean isChecked;
     private Boolean isRemoved;
+    private BigDecimal unitPriceWithVat;
 
 }

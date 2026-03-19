@@ -74,10 +74,10 @@ public class EstimateService {
                 if (item.getUnitPrice() != null && taxRule.getTaxRate() != null) {
                     BigDecimal vatPerUnit = item.getUnitPrice().multiply(
                             taxRule.getTaxRate().divide(BigDecimal.valueOf(100)));
-                    itemDto.setUnitPrice(item.getUnitPrice().add(vatPerUnit));
+                    itemDto.setUnitPriceWithVat(item.getUnitPrice().add(vatPerUnit));
                 }
                 }else {
-                    itemDto.setUnitPrice(item.getUnitPrice());
+                    itemDto.setUnitPriceWithVat(item.getUnitPrice());
                 }
                 return itemDto;
             }).toList();
@@ -234,10 +234,10 @@ public class EstimateService {
                 if (item.getUnitPrice() != null && taxRule.getTaxRate() != null) {
                     BigDecimal vatPerUnit = item.getUnitPrice().multiply(
                             taxRule.getTaxRate().divide(BigDecimal.valueOf(100)));
-                    itemDto.setUnitPrice(item.getUnitPrice().add(vatPerUnit));
+                    itemDto.setUnitPriceWithVat(item.getUnitPrice().add(vatPerUnit));
                 }
             }else {
-                itemDto.setUnitPrice(item.getUnitPrice());
+                itemDto.setUnitPriceWithVat(item.getUnitPrice());
             }
             return itemDto;
         }).toList());
