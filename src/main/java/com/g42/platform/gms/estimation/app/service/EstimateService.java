@@ -93,6 +93,7 @@ public class EstimateService {
 
         //todo: update total_price
         BigDecimal totalPrice = items.stream()
+                .filter(item -> Boolean.TRUE.equals(item.getIsChecked()))
                 .map(item -> item.getTotalPrice() != null ? item.getTotalPrice() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
@@ -121,6 +122,7 @@ public class EstimateService {
                 existing.setQuantity(req.getQuantity());
                 existing.setUnitPrice(req.getUnitPrice());
                 existing.setWorkCategoryId(req.getWorkCategoryId());
+                existing.setIsChecked(req.getIsChecked());
                 if (req.getTaxRuleId() != null) {
                     existing.setTaxRuleId(req.getTaxRuleId());
                     TaxRule taxRule = taxRuleRepository.findById(req.getTaxRuleId());
@@ -145,6 +147,7 @@ public class EstimateService {
 
         estimateItemRepository.saveAll(toSave);
         BigDecimal totalPrice = toSave.stream()
+                .filter(item -> Boolean.TRUE.equals(item.getIsChecked()))
                 .map(item -> item.getTotalPrice() != null ? item.getTotalPrice() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
@@ -182,6 +185,7 @@ public class EstimateService {
             item.setQuantity(req.getQuantity());
             item.setUnitPrice(req.getUnitPrice());
             item.setTaxRuleId(req.getTaxRuleId());
+            item.setIsChecked(req.getIsChecked() != null ? req.getIsChecked() : false);
             //todo: vat calculate
             BigDecimal subTotal = item.getSubTotal();
             if (req.getTaxRuleId() != null) {
