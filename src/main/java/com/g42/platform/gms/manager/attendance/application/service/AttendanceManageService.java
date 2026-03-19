@@ -105,31 +105,26 @@ public class AttendanceManageService {
 
         List<StaffProfile> allStaff = staffProfileRepo.findAll();
 
-        Map<Integer, List<AttendanceCheckin>> checkinsByStaff = checkins.stream()
-                .collect(Collectors.groupingBy(AttendanceCheckin::getStaffId));
+        Map<Integer, AttendanceCheckin> checkinByStaff = checkins.stream()
+                .collect(Collectors.toMap(AttendanceCheckin::getStaffId, c -> c, (a, b) -> a));
 
         Map<Integer, String> shiftNames = workShiftRepo.findAll().stream()
                 .collect(Collectors.toMap(WorkShift::getShiftId, WorkShift::getShiftName));
 
         List<TodaySummaryResponse.StaffAttendanceStatus> staffList = allStaff.stream().map(staff -> {
-            List<AttendanceCheckin> staffCheckins = checkinsByStaff.getOrDefault(staff.getStaffId(), List.of());
-            List<TodaySummaryResponse.ShiftCheckin> shiftCheckins = staffCheckins.stream()
-                    .map(c -> TodaySummaryResponse.ShiftCheckin.builder()
-                            .checkinId(c.getCheckinId())
-                            .shiftId(c.getShiftId())
-                            .shiftName(shiftNames.getOrDefault(c.getShiftId(), ""))
-                            .checkInTime(c.getCheckInTime())
-                            .checkOutTime(c.getCheckOutTime())
-                            .status(c.getStatus())
-                            .build())
-                    .toList();
+            AttendanceCheckin c = checkinByStaff.get(staff.getStaffId());
             return TodaySummaryResponse.StaffAttendanceStatus.builder()
                     .staffId(staff.getStaffId())
                     .fullName(staff.getFullName())
                     .position(staff.getPosition())
                     .avatar(staff.getAvatar())
-                    .hasCheckedIn(!staffCheckins.isEmpty())
-                    .checkins(shiftCheckins)
+                    .hasCheckedIn(c != null)
+                    .checkinId(c != null ? c.getCheckinId() : null)
+                    .shiftId(c != null ? c.getShiftId() : null)
+                    .shiftName(c != null ? shiftNames.getOrDefault(c.getShiftId(), "") : null)
+                    .checkInTime(c != null ? c.getCheckInTime() : null)
+                    .checkOutTime(c != null ? c.getCheckOutTime() : null)
+                    .status(c != null ? c.getStatus() : null)
                     .build();
         }).toList();
 

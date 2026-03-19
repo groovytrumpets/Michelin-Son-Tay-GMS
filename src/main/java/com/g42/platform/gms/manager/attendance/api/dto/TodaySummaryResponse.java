@@ -24,12 +24,6 @@ public class TodaySummaryResponse {
         private String position;
         private String avatar;
         private boolean hasCheckedIn;
-        private List<ShiftCheckin> checkins;
-    }
-
-    @Data
-    @Builder
-    public static class ShiftCheckin {
         private Integer checkinId;
         private Integer shiftId;
         private String shiftName;
