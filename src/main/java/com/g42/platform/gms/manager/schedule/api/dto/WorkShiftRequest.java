@@ -1,4 +1,4 @@
-package com.g42.platform.gms.manager.schedule.dto;
+package com.g42.platform.gms.manager.schedule.api.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
