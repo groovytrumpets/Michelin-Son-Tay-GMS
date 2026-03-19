@@ -36,7 +36,7 @@ public class EstimateItem {
     private Integer taxRuleId;
     private BigDecimal totalPrice;
     private Boolean isChecked;
-    private Boolean isRemoved;
+    private Boolean isRemoved = false;
     public BigDecimal getSubTotal() {
         if (unitPrice == null || quantity == null) return BigDecimal.ZERO;
         return unitPrice.multiply(BigDecimal.valueOf(quantity));
