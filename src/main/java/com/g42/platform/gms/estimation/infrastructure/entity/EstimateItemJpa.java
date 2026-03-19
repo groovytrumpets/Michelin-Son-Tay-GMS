@@ -58,6 +58,12 @@ public class EstimateItemJpa {
     private Integer taxRuleId;
     @Column(name = "total_price", precision = 12, scale = 2)
     private BigDecimal totalPrice;
+    @ColumnDefault("0")
+    @Column(name = "is_checked")
+    private Boolean isChecked;
+    @ColumnDefault("0")
+    @Column(name = "is_removed")
+    private Boolean isRemoved;
 
 
 }
