@@ -1,13 +1,13 @@
-package com.g42.platform.gms.manager.schedule.infrastructure.entity;
+package com.g42.platform.gms.dashboard.infrastructure.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
 
-import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.LocalDateTime;
 
-@Entity(name = "ManagerWorkShiftJpa")
-@Table(name = "work_shift", schema = "michelin_garage")
+@Entity(name = "DashboardWorkShiftJpa")
+@Table(name = "work_shift")
 @Data
 public class WorkShiftJpa {
 
@@ -16,7 +16,7 @@ public class WorkShiftJpa {
     @Column(name = "shift_id")
     private Integer shiftId;
 
-    @Column(name = "shift_name", nullable = false, length = 100)
+    @Column(name = "shift_name", nullable = false, length = 50)
     private String shiftName;
 
     @Column(name = "start_time", nullable = false)

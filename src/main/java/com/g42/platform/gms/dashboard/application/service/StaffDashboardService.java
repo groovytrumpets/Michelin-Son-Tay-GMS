@@ -4,11 +4,11 @@ import com.g42.platform.gms.auth.entity.StaffProfile;
 import com.g42.platform.gms.auth.repository.StaffProfileRepo;
 import com.g42.platform.gms.dashboard.api.dto.DashboardOverviewResponse;
 import com.g42.platform.gms.dashboard.api.dto.DashboardOverviewResponse.*;
+import com.g42.platform.gms.dashboard.infrastructure.entity.AttendanceCheckinJpa;
 import com.g42.platform.gms.dashboard.infrastructure.entity.StaffNotificationJpa;
+import com.g42.platform.gms.dashboard.infrastructure.entity.WorkShiftJpa;
+import com.g42.platform.gms.dashboard.infrastructure.repository.AttendanceCheckinRepository;
 import com.g42.platform.gms.dashboard.infrastructure.repository.StaffNotificationRepository;
-import com.g42.platform.gms.manager.attendance.infrastructure.entity.AttendanceCheckinJpa;
-import com.g42.platform.gms.manager.attendance.infrastructure.repository.AttendanceCheckinJpaRepo;
-import com.g42.platform.gms.manager.schedule.infrastructure.entity.WorkShiftJpa;
 import com.g42.platform.gms.service_ticket_management.infrastructure.repository.ServiceTicketAssignmentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -24,7 +24,7 @@ import java.util.Map;
 public class StaffDashboardService {
 
     private final StaffProfileRepo staffProfileRepo;
-    private final AttendanceCheckinJpaRepo attendanceRepo;
+    private final AttendanceCheckinRepository attendanceRepo;
     private final StaffNotificationRepository notificationRepo;
     private final ServiceTicketAssignmentRepository assignmentRepo;
 

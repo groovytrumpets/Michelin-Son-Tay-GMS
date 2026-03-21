@@ -1,6 +1,5 @@
-package com.g42.platform.gms.manager.attendance.infrastructure.entity;
+package com.g42.platform.gms.dashboard.infrastructure.entity;
 
-import com.g42.platform.gms.manager.schedule.infrastructure.entity.WorkShiftJpa;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -8,9 +7,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 
+@Entity(name = "DashboardAttendanceCheckinJpa")
+@Table(name = "attendance_checkin")
 @Data
-@Entity(name = "ManagerAttendanceCheckinJpa")
-@Table(name = "attendance_checkin", schema = "michelin_garage")
 public class AttendanceCheckinJpa {
 
     @Id
