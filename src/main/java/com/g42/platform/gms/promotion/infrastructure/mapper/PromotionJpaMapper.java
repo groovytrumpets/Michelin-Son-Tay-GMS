@@ -7,4 +7,5 @@ import org.mapstruct.Mapper;
 @Mapper(componentModel = "spring")
 public interface PromotionJpaMapper {
     Promotion toDomain(PromotionJpa domain);
+    PromotionJpa fromDomain(Promotion domain);
 }
