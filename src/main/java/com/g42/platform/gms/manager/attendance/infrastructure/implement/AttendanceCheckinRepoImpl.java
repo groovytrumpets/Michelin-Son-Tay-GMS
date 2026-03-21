@@ -1,4 +1,4 @@
-package com.g42.platform.gms.manager.attendance.infrastructure;
+package com.g42.platform.gms.manager.attendance.infrastructure.implement;
 
 import com.g42.platform.gms.manager.attendance.domain.entity.AttendanceCheckin;
 import com.g42.platform.gms.manager.attendance.domain.repository.AttendanceCheckinRepo;

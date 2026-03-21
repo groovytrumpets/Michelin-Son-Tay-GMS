@@ -1,4 +1,4 @@
-package com.g42.platform.gms.manager.schedule.infrastructure;
+package com.g42.platform.gms.manager.schedule.infrastructure.implement;
 
 import com.g42.platform.gms.manager.schedule.domain.entity.WorkShift;
 import com.g42.platform.gms.manager.schedule.domain.repository.WorkShiftRepo;
