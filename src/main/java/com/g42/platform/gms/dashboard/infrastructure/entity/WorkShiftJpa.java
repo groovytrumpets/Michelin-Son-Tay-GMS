@@ -6,7 +6,7 @@ import lombok.Data;
 import java.time.LocalTime;
 import java.time.LocalDateTime;
 
-@Entity
+@Entity(name = "DashboardWorkShiftJpa")
 @Table(name = "work_shift")
 @Data
 public class WorkShiftJpa {

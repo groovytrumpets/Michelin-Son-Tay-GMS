@@ -7,7 +7,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 
-@Entity
+@Entity(name = "DashboardAttendanceCheckinJpa")
 @Table(name = "attendance_checkin")
 @Data
 public class AttendanceCheckinJpa {

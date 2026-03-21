@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 @Data
-@Entity
+@Entity(name = "ManagerAttendanceCheckinJpa")
 @Table(name = "attendance_checkin", schema = "michelin_garage")
 public class AttendanceCheckinJpa {
 
