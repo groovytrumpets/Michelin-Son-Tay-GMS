@@ -8,6 +8,7 @@ import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.auth.exception.AuthException;
 import com.g42.platform.gms.customer.domain.exception.CustomerException;
 import com.g42.platform.gms.marketing.service_catalog.domain.exception.ServiceException;
+import com.g42.platform.gms.service_ticket_management.domain.exception.AssignmentException;
 import com.g42.platform.gms.staff.attendance.domain.exception.StaffAttendanceException;
 import com.g42.platform.gms.staff.profile.domain.exception.StaffException;
 import org.springframework.http.HttpStatus;
@@ -114,6 +115,16 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<?>> handleBookingManagementException(StaffException ex) {
 
         System.err.println("Customer Error: " + ex.getCode() + " - " + ex.getMessage());
+
+
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponses.error(ex.getCode().name(), ex.getMessage()));
+    }
+    @ExceptionHandler(AssignmentException.class)
+    public ResponseEntity<ApiResponse<?>> handleBookingManagementException(AssignmentException ex) {
+
+        System.err.println("Staff Assignment Error: " + ex.getCode() + " - " + ex.getMessage());
 
 
         return ResponseEntity

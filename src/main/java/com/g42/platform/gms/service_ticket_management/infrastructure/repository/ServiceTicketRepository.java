@@ -39,4 +39,6 @@ public interface ServiceTicketRepository extends JpaRepository<ServiceTicketJpa,
      * @return Optional containing the service ticket if found
      */
     Optional<ServiceTicketJpa> findByBookingId(Integer bookingId);
+
+    ServiceTicketJpa findByServiceTicketId(Integer serviceTicketId);
 }
