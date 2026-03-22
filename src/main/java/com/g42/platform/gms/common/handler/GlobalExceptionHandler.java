@@ -9,10 +9,12 @@ import com.g42.platform.gms.auth.exception.AuthException;
 import com.g42.platform.gms.customer.domain.exception.CustomerException;
 import com.g42.platform.gms.marketing.service_catalog.domain.exception.ServiceException;
 import com.g42.platform.gms.service_ticket_management.domain.exception.AssignmentException;
+import com.g42.platform.gms.promotion.domain.exception.PromotionException;
 import com.g42.platform.gms.staff.attendance.domain.exception.StaffAttendanceException;
 import com.g42.platform.gms.staff.profile.domain.exception.StaffException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -125,6 +127,10 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<?>> handleBookingManagementException(AssignmentException ex) {
 
         System.err.println("Staff Assignment Error: " + ex.getCode() + " - " + ex.getMessage());
+    @ExceptionHandler(PromotionException.class)
+    public ResponseEntity<ApiResponse<?>> handleBookingManagementException(PromotionException ex) {
+
+        System.err.println("Customer Error: " + ex.getCode() + " - " + ex.getMessage());
 
 
         return ResponseEntity
@@ -155,5 +161,38 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(
                 ApiResponses.error("FAIL","Invalid request parameter")
         );
+    }
+
+    /**
+     * Xử lý lỗi IllegalArgumentException (ví dụ: date range validation - ER021)
+     */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiResponse<?>> handleIllegalArgumentException(IllegalArgumentException ex) {
+        System.err.println("Validation Error: " + ex.getMessage());
+        
+        // Extract error code if present in message (e.g., "Invalid Date Range (ER021): ...")
+        String errorCode = "VALIDATION_ERROR";
+        String message = ex.getMessage();
+        
+        if (message != null && message.contains("ER021")) {
+            errorCode = "ER021";
+            message = "Invalid Date Range";
+        }
+        
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponses.error(errorCode, message));
+    }
+
+    /**
+     * Xử lý lỗi AccessDeniedException (ví dụ: non-technician access - ER034)
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiResponse<?>> handleAccessDeniedException(AccessDeniedException ex) {
+        System.err.println("Access Denied: " + ex.getMessage());
+        
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(ApiResponses.error("ER034", "Access Denied"));
     }
 }

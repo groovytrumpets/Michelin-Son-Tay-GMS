@@ -3,6 +3,9 @@ package com.g42.platform.gms.auth.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Data
 @Entity
 @Table(name = "staff_profile")
@@ -20,5 +23,8 @@ public class StaffProfile {
 
     @OneToOne(mappedBy = "staffProfile")
     private StaffAuth staffauth;
+
+    @OneToMany(mappedBy = "staff", fetch = FetchType.EAGER)
+    private List<StaffRole> staffRoles = new ArrayList<>();
 
 }

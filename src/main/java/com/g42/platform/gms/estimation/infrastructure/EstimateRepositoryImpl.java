@@ -32,7 +32,6 @@ public class EstimateRepositoryImpl implements EstimateRepository {
 
     @Override
     public Estimate findEstimateById(Integer estimateId) {
-
         return estimateRepositoryJpa.findById(estimateId).map(estimateJpaMapper::toDomain).orElse(null);
     }
 }

@@ -39,5 +39,17 @@ public class EstimateItemRepositoryImpl implements EstimateItemRepository {
     public void delete(EstimateItem estimateItem) {
         estimateItemRepositoryJpa.delete(estimateItemJpaMapper.toJpa(estimateItem));
     }
+
+    @Override
+    public EstimateItem findByEstimateItemId(Integer estimateItemId) {
+        EstimateItemJpa estimateItemJpa = estimateItemRepositoryJpa.getEstimateItemJpaById(estimateItemId);
+        return estimateItemJpaMapper.toDomain(estimateItemJpa);
+    }
+
+    @Override
+    public EstimateItem save(EstimateItem estimateItem) {
+        EstimateItemJpa saved = estimateItemRepositoryJpa.save(estimateItemJpaMapper.toJpa(estimateItem));
+        return estimateItemJpaMapper.toDomain(saved);
+    }
 }
 

@@ -16,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 
 @RestController
@@ -76,6 +77,16 @@ public class BookingManageController {
     @PutMapping("/booking-request/{requestId}/update")
     public ResponseEntity<ApiResponse<Boolean>> updateBookingRequest(@PathVariable String requestId, @RequestBody BookingRequestUpdateReq actionBookingRequest){
         return ResponseEntity.ok(ApiResponses.success(bookingService.updateBookingRequest(requestId, actionBookingRequest)));
+    }
+    @PutMapping("/reorder")
+    public ResponseEntity<ApiResponse<Boolean>> reorderQueue(@RequestBody ReorderQueueRequest request){
+        return ResponseEntity.ok(ApiResponses.success(bookingService.reorderQueue(request)));
+    }
+    @GetMapping("/slot")
+    public ResponseEntity<ApiResponse<List<BookedRespond>>> getBookingBySlot(
+            @RequestParam LocalDate date,
+            @RequestParam LocalTime slot) {
+        return ResponseEntity.ok(ApiResponses.success(bookingService.getBookingBySlot(date, slot)));
     }
 //
 //    @GetMapping("/booking-request")

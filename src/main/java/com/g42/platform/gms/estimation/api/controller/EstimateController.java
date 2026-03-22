@@ -4,6 +4,7 @@ package com.g42.platform.gms.estimation.api.controller;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.estimation.api.dto.EstimateRespondDto;
+import com.g42.platform.gms.estimation.api.dto.request.EstimateItemReqDto;
 import com.g42.platform.gms.estimation.api.dto.request.EstimateRequestDto;
 import com.g42.platform.gms.estimation.app.service.EstimateService;
 import lombok.AllArgsConstructor;
@@ -34,6 +35,12 @@ public class EstimateController {
     public ResponseEntity<ApiResponse<EstimateRespondDto>> updateEstimate(@PathVariable Integer estimateId, @RequestBody EstimateRequestDto request){
         return ResponseEntity.ok(
                 ApiResponses.success(estimateService.updateEstimate(estimateId, request))
+        );
+    }
+    @PutMapping("/{estimateItemId}/item")
+    public ResponseEntity<ApiResponse<EstimateItemReqDto>> updateEstimateItem(@PathVariable Integer estimateItemId, @RequestBody EstimateItemReqDto request){
+        return ResponseEntity.ok(
+                ApiResponses.success(estimateService.updateEstimateItem(estimateItemId, request))
         );
     }
 

@@ -3,6 +3,7 @@ package com.g42.platform.gms.booking_management.domain.repository;
 import com.g42.platform.gms.booking.customer.api.dto.BookingResponse;
 import com.g42.platform.gms.booking.customer.domain.enums.BookingRequestStatus;
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedRespond;
+import com.g42.platform.gms.booking_management.api.dto.requesting.ReorderQueueRequest;
 import com.g42.platform.gms.booking_management.domain.entity.*;
 import com.g42.platform.gms.booking_management.domain.enums.BookingEnum;
 import com.g42.platform.gms.booking_management.infrastructure.entity.BookingJpa;
@@ -35,4 +36,6 @@ public interface BookingManageRepository {
     void setRequestBooking(BookingRequest request);
 
     List<CatalogItem> getListOfCatalogById(List<Integer> services);
+
+    Boolean reorderQueue(ReorderQueueRequest request);
 }

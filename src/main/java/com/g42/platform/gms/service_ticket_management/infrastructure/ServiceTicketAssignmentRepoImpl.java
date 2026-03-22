@@ -92,4 +92,28 @@ public class ServiceTicketAssignmentRepoImpl implements TicketAssignmentRepo {
         ServiceTicketAssignmentJpa savedSa = ticketAssignmentJpaRepo.save(sa);
         return ticketAssignmentJpaMapper.toAssginDto(savedSa);
     }
+
+    @Override
+    public AssignStaffDto updateAssignment(Integer ticketId, Integer assignmentId, AssignStaffDto dto) {
+        if ("ADVISOR".equals(dto.getRoleInTicket())) {
+            if (ticketAssignmentJpaRepo.existsByServiceTicketId(ticketId)) {
+                throw new RuntimeException("Ticket đã có advisor!");
+            }
+        }
+        if (Boolean.TRUE.equals(dto.getIsPrimary())) {
+            if (ticketAssignmentJpaRepo.existsByIsPrimaryAndServiceTicketId(Boolean.TRUE,ticketId)) {
+                throw new RuntimeException("Ticket đã có technician chính!");
+            }
+        }
+        ServiceTicketAssignmentJpa sa = ticketAssignmentJpaRepo.findByAssignmentId(assignmentId);
+        if (sa == null) {
+            throw new RuntimeException("Assignment not found!");
+        }
+        if (dto.getStaffId() != null) sa.setStaffId(dto.getStaffId());
+        if (dto.getRoleInTicket() != null) sa.setRoleInTicket(dto.getRoleInTicket());
+        if (dto.getIsPrimary() != null) sa.setIsPrimary(dto.getIsPrimary());
+        if (dto.getNote() != null) sa.setNote(dto.getNote());
+        ServiceTicketAssignmentJpa savedSa = ticketAssignmentJpaRepo.save(sa);
+        return ticketAssignmentJpaMapper.toAssginDto(savedSa);
+    }
 }
