@@ -1,7 +1,6 @@
 package com.g42.platform.gms.common.handler;
 
 import com.g42.platform.gms.auth.constant.AuthErrorCode;
-import com.g42.platform.gms.billing.domain.exception.BillingException;
 import com.g42.platform.gms.booking.customer.domain.exception.BookingException;
 import com.g42.platform.gms.booking_management.domain.exception.BookingStaffException;
 import com.g42.platform.gms.common.dto.ApiResponse;
@@ -130,10 +129,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<?>> handleBookingManagementException(AssignmentException ex) {
 
         System.err.println("Staff Assignment Error: " + ex.getCode() + " - " + ex.getMessage());
+
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponses.error(ex.getCode().name(), ex.getMessage()));
     }
+
     @ExceptionHandler(PromotionException.class)
     public ResponseEntity<ApiResponse<?>> handlePromotionException(PromotionException ex) {
 
@@ -143,22 +144,6 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponses.error(ex.getCode().name(), ex.getMessage()));
-    }
-
-    @ExceptionHandler(AttendanceException.class)
-    public ResponseEntity<ApiResponse<?>> handleAttendanceException(AttendanceException ex) {
-        System.err.println("Attendance Error: " + ex.getErrorCode().getCode() + " - " + ex.getMessage());
-        return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponses.error(ex.getErrorCode().getCode(), ex.getMessage()));
-    }
-
-    @ExceptionHandler(ScheduleException.class)
-    public ResponseEntity<ApiResponse<?>> handleScheduleException(ScheduleException ex) {
-        System.err.println("Schedule Error: " + ex.getErrorCode().name() + " - " + ex.getMessage());
-        return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponses.error(ex.getErrorCode().name(), ex.getMessage()));
     }
 
     @ExceptionHandler(AttendanceException.class)
@@ -233,13 +218,5 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.FORBIDDEN)
                 .body(ApiResponses.error("ER034", "Access Denied"));
-    }
-    @ExceptionHandler(BillingException.class)
-    public ResponseEntity<ApiResponse<?>> handleBookingManagementException(BillingException ex) {
-
-        System.err.println("Billing Error: " + ex.getCode() + " - " + ex.getMessage());
-        return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponses.error(ex.getCode().name(), ex.getMessage()));
     }
 }

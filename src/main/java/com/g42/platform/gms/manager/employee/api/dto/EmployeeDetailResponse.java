@@ -33,9 +33,7 @@ public class EmployeeDetailResponse {
     @Builder
     public static class PerformanceSummary {
         private int totalWorkDays;       // Số ngày đi làm (tháng này)
-        private int totalTicketsHandled; // Số phiếu dịch vụ đã xử lý
-        private int ticketsAsAdvisor;    // Số phiếu với vai trò advisor
-        private int ticketsAsTechnician; // Số phiếu với vai trò technician
+        private int totalTicketsHandled; // Số phiếu dịch vụ đã xử lý (tháng này)
     }
 
     @Data

@@ -42,8 +42,6 @@ public class EmployeeManageService {
         // Performance tháng hiện tại
         int workDays = checkinJpaRepo.countWorkDays(staffId, firstOfMonth, now);
         long totalTickets = assignmentRepo.countCompletedByStaffInMonth(staffId, now.getYear(), now.getMonthValue());
-        long asAdvisor = assignmentRepo.countCompletedByStaffAndRoleInMonth(staffId, "ADVISOR", now.getYear(), now.getMonthValue());
-        long asTechnician = assignmentRepo.countCompletedByStaffAndRoleInMonth(staffId, "TECHNICIAN", now.getYear(), now.getMonthValue());
 
         // Lịch điểm danh 30 ngày gần nhất
         LocalDate from = now.minusDays(29);
@@ -78,8 +76,6 @@ public class EmployeeManageService {
                 .performance(EmployeeDetailResponse.PerformanceSummary.builder()
                         .totalWorkDays(workDays)
                         .totalTicketsHandled((int) totalTickets)
-                        .ticketsAsAdvisor((int) asAdvisor)
-                        .ticketsAsTechnician((int) asTechnician)
                         .build())
                 .recentAttendance(records)
                 .build();

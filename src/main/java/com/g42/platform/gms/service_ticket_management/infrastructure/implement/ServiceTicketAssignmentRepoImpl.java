@@ -92,5 +92,4 @@ public class ServiceTicketAssignmentRepoImpl implements TicketAssignmentRepo {
         ServiceTicketAssignmentJpa savedSa = ticketAssignmentJpaRepo.save(sa);
         return ticketAssignmentJpaMapper.toAssginDto(savedSa);
     }
-
 }
