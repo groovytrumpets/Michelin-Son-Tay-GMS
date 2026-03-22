@@ -26,4 +26,14 @@ public interface ServiceTicketAssignmentRepository extends JpaRepository<Service
     long countCompletedByStaffInMonth(@Param("staffId") Integer staffId,
                                       @Param("year") int year,
                                       @Param("month") int month);
+
+    @Query("SELECT COUNT(a) FROM ServiceTicketAssignmentJpa a " +
+           "JOIN ServiceTicketManagement t ON t.serviceTicketId = a.serviceTicketId " +
+           "WHERE a.staffId = :staffId AND a.roleInTicket = :role " +
+           "AND t.ticketStatus = 'COMPLETED' " +
+           "AND YEAR(t.completedAt) = :year AND MONTH(t.completedAt) = :month")
+    long countCompletedByStaffAndRoleInMonth(@Param("staffId") Integer staffId,
+                                             @Param("role") String role,
+                                             @Param("year") int year,
+                                             @Param("month") int month);
 }

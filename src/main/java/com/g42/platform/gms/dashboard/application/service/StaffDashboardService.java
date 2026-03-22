@@ -5,359 +5,167 @@ import com.g42.platform.gms.auth.repository.StaffProfileRepo;
 import com.g42.platform.gms.dashboard.api.dto.DashboardOverviewResponse;
 import com.g42.platform.gms.dashboard.api.dto.DashboardOverviewResponse.*;
 import com.g42.platform.gms.dashboard.infrastructure.entity.StaffNotificationJpa;
-import com.g42.platform.gms.dashboard.infrastructure.entity.StaffScheduleJpa;
 import com.g42.platform.gms.dashboard.infrastructure.repository.StaffNotificationRepository;
-import com.g42.platform.gms.dashboard.infrastructure.repository.StaffScheduleRepository;
-import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketAssignmentJpa;
-import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
+import com.g42.platform.gms.manager.attendance.infrastructure.entity.AttendanceCheckinJpa;
+import com.g42.platform.gms.manager.attendance.infrastructure.repository.AttendanceCheckinJpaRepo;
+import com.g42.platform.gms.manager.schedule.infrastructure.entity.WorkShiftJpa;
 import com.g42.platform.gms.service_ticket_management.infrastructure.repository.ServiceTicketAssignmentRepository;
-import com.g42.platform.gms.service_ticket_management.infrastructure.repository.ServiceTicketRepository;
-import com.g42.platform.gms.staff.attendance.infrastructure.entity.StaffAttendanceJpa;
-import com.g42.platform.gms.staff.attendance.infrastructure.repository.StaffAttendanceJpaRepo;
-import com.g42.platform.gms.staff.attendance.domain.enums.AttendanceSlotEnum;
-import com.g42.platform.gms.vehicle.entity.Vehicle;
-import com.g42.platform.gms.vehicle.repository.VehicleRepository;
-import com.g42.platform.gms.auth.entity.CustomerProfile;
-import com.g42.platform.gms.auth.repository.CustomerProfileRepository;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.stream.Collectors;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class StaffDashboardService {
 
     private final StaffProfileRepo staffProfileRepo;
-    private final StaffScheduleRepository scheduleRepository;
-    private final StaffAttendanceJpaRepo attendanceRepository;
-    private final StaffNotificationRepository notificationRepository;
-    private final ServiceTicketAssignmentRepository assignmentRepository;
-    private final ServiceTicketRepository serviceTicketRepository;
-    private final VehicleRepository vehicleRepository;
-    private final CustomerProfileRepository customerProfileRepository;
+    private final AttendanceCheckinJpaRepo attendanceRepo;
+    private final StaffNotificationRepository notificationRepo;
+    private final ServiceTicketAssignmentRepository assignmentRepo;
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm");
-    private static final DateTimeFormatter MONTH_FMT = DateTimeFormatter.ofPattern("MM/yyyy");
-    private static final String[] DAY_NAMES = {"", "Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"};
 
-    @Transactional(readOnly = true)
     public DashboardOverviewResponse getDashboardOverview(Integer staffId) {
-        log.info("Getting dashboard overview for staffId={}", staffId);
-
+        StaffProfile profile = staffProfileRepo.findById(staffId).orElseThrow();
         LocalDate today = LocalDate.now();
-        int year = today.getYear();
-        int month = today.getMonthValue();
 
         DashboardOverviewResponse response = new DashboardOverviewResponse();
 
         // Staff info
-        response.setStaff(buildStaffInfo(staffId));
+        StaffInfo info = new StaffInfo();
+        info.setStaffId(profile.getStaffId());
+        info.setFullName(profile.getFullName());
+        info.setAvatar(profile.getAvatar());
+        info.setPosition(profile.getPosition());
+        response.setStaff(info);
 
-        // Today's shift
-        response.setTodayShift(buildTodayShift(staffId, today));
+        // Today shift
+        List<AttendanceCheckinJpa> todayCheckins = attendanceRepo.findByStaffIdAndAttendanceDate(staffId, today);
+        response.setTodayShift(buildTodayShift(todayCheckins, today));
 
         // Monthly hours
-        response.setMonthlyHours(buildMonthlyHours(staffId, year, month));
+        MonthlyHoursDto hours = new MonthlyHoursDto();
+        Double totalHours = attendanceRepo.sumMonthlyHours(staffId, today.getYear(), today.getMonthValue());
+        hours.setTotalHours(totalHours != null ? totalHours : 0.0);
+        hours.setMonth(today.getYear() + "-" + String.format("%02d", today.getMonthValue()));
+        response.setMonthlyHours(hours);
 
-        // Completed services this month
-        response.setCompletedServices(buildCompletedServices(staffId, year, month));
+        // Completed services
+        CompletedServicesDto services = new CompletedServicesDto();
+        services.setCount(assignmentRepo.countCompletedByStaffInMonth(staffId, today.getYear(), today.getMonthValue()));
+        services.setMonth(hours.getMonth());
+        response.setCompletedServices(services);
 
-        // Today's tasks (top 5)
-        response.setTodayTasks(buildTodayTasks(staffId, today));
+        // Today tasks — empty list (tickets handled by service_ticket module)
+        response.setTodayTasks(List.of());
 
-        // Upcoming schedule (7 days)
-        response.setUpcomingSchedule(buildUpcomingSchedule(staffId, today));
+        // Upcoming schedule (next 7 days)
+        response.setUpcomingSchedule(getWorkSchedule(staffId, today, today.plusDays(6)));
 
-        // Recent attendance (5 records)
-        response.setRecentAttendance(buildRecentAttendance(staffId));
+        // Recent attendance (last 7 days)
+        response.setRecentAttendance(getAttendanceHistory(staffId, today.getMonthValue(), today.getYear()));
 
-        // Unread notifications (top 5)
-        response.setNotifications(buildNotifications(staffId));
+        // Notifications (top 5)
+        response.setNotifications(getNotifications(staffId, 0, 5));
 
         return response;
     }
 
-    public void markNotificationAsRead(Integer staffId, Integer notificationId) {
-        StaffNotificationJpa notification = notificationRepository.findById(notificationId)
-            .orElseThrow(() -> new RuntimeException("Không tìm thấy thông báo: " + notificationId));
-
-        // Chỉ cho phép đánh dấu nếu notification thuộc về staff này hoặc là broadcast
-        if (notification.getStaffId() != null && !notification.getStaffId().equals(staffId)) {
-            throw new RuntimeException("Không có quyền truy cập thông báo này");
-        }
-
-        notification.setIsRead(true);
-        notificationRepository.save(notification);
-    }
-
-    @Transactional(readOnly = true)
     public List<TaskSummaryDto> getTodayTasks(Integer staffId) {
-        return buildTodayTasks(staffId, LocalDate.now());
+        return List.of(); // tickets handled by service_ticket module
     }
 
-    @Transactional(readOnly = true)
     public List<ScheduleDayDto> getWorkSchedule(Integer staffId, LocalDate from, LocalDate to) {
-        List<StaffScheduleJpa> schedules = scheduleRepository
-            .findByStaffIdAndWorkDateBetweenOrderByWorkDateAsc(staffId, from, to);
+        List<AttendanceCheckinJpa> checkins = attendanceRepo
+                .findByStaffIdAndAttendanceDateBetweenOrderByAttendanceDateAsc(staffId, from, to);
 
-        Map<LocalDate, StaffScheduleJpa> scheduleMap = schedules.stream()
-            .collect(Collectors.toMap(StaffScheduleJpa::getWorkDate, s -> s));
-
-        List<ScheduleDayDto> result = new ArrayList<>();
-        LocalDate current = from;
-        while (!current.isAfter(to)) {
+        return checkins.stream().map(c -> {
             ScheduleDayDto dto = new ScheduleDayDto();
-            dto.setDate(current.format(DATE_FMT));
-            dto.setDayOfWeek(getDayOfWeek(current));
-            StaffScheduleJpa schedule = scheduleMap.get(current);
-            if (schedule != null) {
-                dto.setStatus(schedule.getStatus());
-                if (schedule.getShift() != null) {
-                    dto.setShiftName(schedule.getShift().getShiftName());
-                    dto.setStartTime(schedule.getShift().getStartTime().format(TIME_FMT));
-                    dto.setEndTime(schedule.getShift().getEndTime().format(TIME_FMT));
-                }
-            } else {
-                dto.setStatus("OFF");
+            dto.setDate(c.getAttendanceDate().format(DATE_FMT));
+            dto.setDayOfWeek(c.getAttendanceDate().getDayOfWeek().name());
+            WorkShiftJpa shift = c.getShift();
+            if (shift != null) {
+                dto.setShiftName(shift.getShiftName());
+                dto.setStartTime(shift.getStartTime().format(TIME_FMT));
+                dto.setEndTime(shift.getEndTime().format(TIME_FMT));
             }
-            result.add(dto);
-            current = current.plusDays(1);
-        }
-        return result;
-    }
-
-    @Transactional(readOnly = true)
-    public List<AttendanceRecordDto> getAttendanceHistory(Integer staffId, int month, int year) {
-        List<StaffAttendanceJpa> records = attendanceRepository.findByStaffIdAndMonth(staffId, year, month);
-        return records.stream().map(this::toAttendanceRecordDto).collect(Collectors.toList());
-    }
-
-    @Transactional(readOnly = true)
-    public List<NotificationSummaryDto> getNotifications(Integer staffId, int page, int size) {
-        List<StaffNotificationJpa> notifications = notificationRepository
-            .findAllByStaffId(staffId, PageRequest.of(page, size));
-        return notifications.stream().map(n -> {
-            NotificationSummaryDto dto = new NotificationSummaryDto();
-            dto.setNotificationId(n.getNotificationId());
-            dto.setTitle(n.getTitle());
-            dto.setMessage(n.getMessage());
-            dto.setNotificationType(n.getNotificationType());
-            dto.setIsRead(n.getIsRead());
-            dto.setSentAt(n.getSentAt() != null
-                ? n.getSentAt().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME) : null);
+            dto.setStatus(c.getStatus());
             return dto;
-        }).collect(Collectors.toList());
+        }).toList();
     }
 
-    @Transactional(readOnly = true)
-    public Map<String, Object> getPersonalStatistics(Integer staffId, int month, int year) {
-        Double totalHours = scheduleRepository.sumMonthlyHours(staffId, year, month);
-        long completedCount = assignmentRepository.countCompletedByStaffInMonth(staffId, year, month);
-        Map<String, Object> stats = new java.util.LinkedHashMap<>();
-        stats.put("month", String.format("%02d/%d", month, year));
-        stats.put("totalHours", totalHours != null ? totalHours : 0.0);
-        stats.put("completedServices", completedCount);
-        return stats;
+    public List<AttendanceRecordDto> getAttendanceHistory(Integer staffId, int month, int year) {
+        LocalDate from = LocalDate.of(year, month, 1);
+        LocalDate to = from.withDayOfMonth(from.lengthOfMonth());
+
+        return attendanceRepo.findByStaffIdAndAttendanceDateBetweenOrderByAttendanceDateAsc(staffId, from, to)
+                .stream().map(c -> {
+                    AttendanceRecordDto dto = new AttendanceRecordDto();
+                    dto.setDate(c.getAttendanceDate().format(DATE_FMT));
+                    dto.setDayOfWeek(c.getAttendanceDate().getDayOfWeek().name());
+                    dto.setShiftType(c.getShift() != null ? c.getShift().getShiftName() : null);
+                    dto.setCheckInTime(c.getCheckInTime() != null ? c.getCheckInTime().format(TIME_FMT) : null);
+                    dto.setCheckOutTime(c.getCheckOutTime() != null ? c.getCheckOutTime().format(TIME_FMT) : null);
+                    dto.setStatus(c.getStatus());
+                    return dto;
+                }).toList();
     }
 
-    // ===== Private helpers =====
+    public List<NotificationSummaryDto> getNotifications(Integer staffId, int page, int size) {
+        return notificationRepo.findAllByStaffId(staffId, PageRequest.of(page, size))
+                .stream().map(n -> {
+                    NotificationSummaryDto dto = new NotificationSummaryDto();
+                    dto.setNotificationId(n.getNotificationId());
+                    dto.setTitle(n.getTitle());
+                    dto.setMessage(n.getMessage());
+                    dto.setNotificationType(n.getNotificationType());
+                    dto.setIsRead(n.getIsRead());
+                    dto.setSentAt(n.getSentAt() != null ? n.getSentAt().toString() : null);
+                    return dto;
+                }).toList();
+    }
 
-    private StaffInfo buildStaffInfo(Integer staffId) {
-        StaffInfo info = new StaffInfo();
-        staffProfileRepo.findById(staffId).ifPresent(sp -> {
-            info.setStaffId(sp.getStaffId());
-            info.setFullName(sp.getFullName());
-            info.setAvatar(sp.getAvatar());
-            info.setPosition(sp.getPosition());
+    public void markNotificationAsRead(Integer staffId, Integer notificationId) {
+        notificationRepo.findById(notificationId).ifPresent(n -> {
+            n.setIsRead(true);
+            notificationRepo.save(n);
         });
-        return info;
     }
 
-    private TodayShiftDto buildTodayShift(Integer staffId, LocalDate today) {
+    public Map<String, Object> getPersonalStatistics(Integer staffId, int month, int year) {
+        long completed = assignmentRepo.countCompletedByStaffInMonth(staffId, year, month);
+        Double hours = attendanceRepo.sumMonthlyHours(staffId, year, month);
+        return Map.of(
+                "month", year + "-" + String.format("%02d", month),
+                "completedTickets", completed,
+                "totalHours", hours != null ? hours : 0.0
+        );
+    }
+
+    // ===== Helpers =====
+
+    private TodayShiftDto buildTodayShift(List<AttendanceCheckinJpa> checkins, LocalDate today) {
         TodayShiftDto dto = new TodayShiftDto();
         dto.setDate(today.format(DATE_FMT));
-        dto.setDayOfWeek(getDayOfWeek(today));
-
-        scheduleRepository.findByStaffIdAndWorkDate(staffId, today).ifPresentOrElse(
-            schedule -> {
-                dto.setStatus(schedule.getStatus());
-                if (schedule.getShift() != null) {
-                    dto.setShiftName(schedule.getShift().getShiftName());
-                    dto.setStartTime(schedule.getShift().getStartTime().format(TIME_FMT));
-                    dto.setEndTime(schedule.getShift().getEndTime().format(TIME_FMT));
-                }
-            },
-            () -> dto.setStatus("OFF")
-        );
-        return dto;
-    }
-
-    private MonthlyHoursDto buildMonthlyHours(Integer staffId, int year, int month) {
-        MonthlyHoursDto dto = new MonthlyHoursDto();
-        Double hours = scheduleRepository.sumMonthlyHours(staffId, year, month);
-        dto.setTotalHours(hours != null ? hours : 0.0);
-        dto.setMonth(String.format("%02d/%d", month, year));
-        return dto;
-    }
-
-    private CompletedServicesDto buildCompletedServices(Integer staffId, int year, int month) {
-        CompletedServicesDto dto = new CompletedServicesDto();
-        long count = assignmentRepository.countCompletedByStaffInMonth(staffId, year, month);
-        dto.setCount(count);
-        dto.setMonth(String.format("%02d/%d", month, year));
-        return dto;
-    }
-
-    private List<TaskSummaryDto> buildTodayTasks(Integer staffId, LocalDate today) {
-        // Lấy tất cả assignment của staff
-        List<ServiceTicketAssignmentJpa> assignments = assignmentRepository.findByStaffId(staffId);
-        List<Integer> ticketIds = assignments.stream()
-            .map(ServiceTicketAssignmentJpa::getServiceTicketId)
-            .distinct()
-            .collect(Collectors.toList());
-
-        if (ticketIds.isEmpty()) return new ArrayList<>();
-
-        // Lấy tickets có receivedAt trong ngày hôm nay
-        LocalDateTime startOfDay = today.atStartOfDay();
-        LocalDateTime endOfDay = today.atTime(23, 59, 59);
-
-        List<ServiceTicketJpa> todayTickets = serviceTicketRepository.findAllById(ticketIds).stream()
-            .filter(t -> t.getReceivedAt() != null
-                && !t.getReceivedAt().isBefore(startOfDay)
-                && !t.getReceivedAt().isAfter(endOfDay))
-            .limit(5)
-            .collect(Collectors.toList());
-
-        return todayTickets.stream().map(this::toTaskSummary).collect(Collectors.toList());
-    }
-
-    private TaskSummaryDto toTaskSummary(ServiceTicketJpa ticket) {
-        TaskSummaryDto dto = new TaskSummaryDto();
-        dto.setServiceTicketId(ticket.getServiceTicketId());
-        dto.setTicketCode(ticket.getTicketCode());
-        dto.setTicketStatus(ticket.getTicketStatus() != null ? ticket.getTicketStatus().name() : null);
-        if (ticket.getReceivedAt() != null) {
-            dto.setReceivedAt(ticket.getReceivedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
-        }
-
-        vehicleRepository.findById(ticket.getVehicleId()).ifPresent(v -> {
-            dto.setLicensePlate(v.getLicensePlate());
-            dto.setVehicleBrand(v.getBrand());
-            dto.setVehicleModel(v.getModel());
-        });
-
-        customerProfileRepository.findById(ticket.getCustomerId()).ifPresent(c ->
-            dto.setCustomerName(c.getFullName())
-        );
-
-        return dto;
-    }
-
-    private List<ScheduleDayDto> buildUpcomingSchedule(Integer staffId, LocalDate today) {
-        LocalDate endDate = today.plusDays(6);
-        List<StaffScheduleJpa> schedules = scheduleRepository
-            .findByStaffIdAndWorkDateBetweenOrderByWorkDateAsc(staffId, today, endDate);
-
-        Map<LocalDate, StaffScheduleJpa> scheduleMap = schedules.stream()
-            .collect(Collectors.toMap(StaffScheduleJpa::getWorkDate, s -> s));
-
-        List<ScheduleDayDto> result = new ArrayList<>();
-        for (int i = 0; i < 7; i++) {
-            LocalDate date = today.plusDays(i);
-            ScheduleDayDto dto = new ScheduleDayDto();
-            dto.setDate(date.format(DATE_FMT));
-            dto.setDayOfWeek(getDayOfWeek(date));
-
-            StaffScheduleJpa schedule = scheduleMap.get(date);
-            if (schedule != null) {
-                dto.setStatus(schedule.getStatus());
-                if (schedule.getShift() != null) {
-                    dto.setShiftName(schedule.getShift().getShiftName());
-                    dto.setStartTime(schedule.getShift().getStartTime().format(TIME_FMT));
-                    dto.setEndTime(schedule.getShift().getEndTime().format(TIME_FMT));
-                }
-            } else {
-                dto.setStatus("OFF");
+        dto.setDayOfWeek(today.getDayOfWeek().name());
+        if (!checkins.isEmpty()) {
+            AttendanceCheckinJpa c = checkins.get(0);
+            WorkShiftJpa shift = c.getShift();
+            if (shift != null) {
+                dto.setShiftName(shift.getShiftName());
+                dto.setStartTime(shift.getStartTime().format(TIME_FMT));
+                dto.setEndTime(shift.getEndTime().format(TIME_FMT));
             }
-            result.add(dto);
-        }
-        return result;
-    }
-
-    private List<AttendanceRecordDto> buildRecentAttendance(Integer staffId) {
-        List<StaffAttendanceJpa> records = attendanceRepository
-            .findRecentByStaffId(staffId, PageRequest.of(0, 5));
-        return records.stream().map(this::toAttendanceRecordDto).collect(Collectors.toList());
-    }
-
-    private AttendanceRecordDto toAttendanceRecordDto(StaffAttendanceJpa r) {
-        AttendanceRecordDto dto = new AttendanceRecordDto();
-        dto.setDate(r.getAttendanceDate().format(DATE_FMT));
-        dto.setDayOfWeek(getDayOfWeek(r.getAttendanceDate()));
-
-        // Xác định ca dựa trên morningStatus/afternoonStatus
-        if (r.getMorningStatus() != null && r.getAfternoonStatus() != null) {
-            dto.setShiftType("FULL_DAY");
-        } else if (r.getMorningStatus() != null) {
-            dto.setShiftType("MORNING");
+            dto.setStatus(c.getStatus());
         } else {
-            dto.setShiftType("AFTERNOON");
+            dto.setStatus("NOT_CHECKED_IN");
         }
-
-        // created_at = giờ check-in, updated_at = giờ check-out
-        ZoneId zone = ZoneId.systemDefault();
-        if (r.getCreatedAt() != null) {
-            LocalTime checkIn = r.getCreatedAt().atZone(zone).toLocalTime();
-            dto.setCheckInTime(checkIn.format(TIME_FMT));
-        }
-        if (r.getUpdatedAt() != null) {
-            LocalTime checkOut = r.getUpdatedAt().atZone(zone).toLocalTime();
-            dto.setCheckOutTime(checkOut.format(TIME_FMT));
-        }
-
-        // Status: lấy từ morning hoặc afternoon (ưu tiên morning)
-        AttendanceSlotEnum slot = r.getMorningStatus() != null ? r.getMorningStatus() : r.getAfternoonStatus();
-        dto.setStatus(slot != null ? slot.name() : "NOT_YET");
         return dto;
-    }
-
-    private List<NotificationSummaryDto> buildNotifications(Integer staffId) {
-        List<StaffNotificationJpa> notifications = notificationRepository
-            .findUnreadByStaffId(staffId, PageRequest.of(0, 5));
-
-        return notifications.stream().map(n -> {
-            NotificationSummaryDto dto = new NotificationSummaryDto();
-            dto.setNotificationId(n.getNotificationId());
-            dto.setTitle(n.getTitle());
-            dto.setMessage(n.getMessage());
-            dto.setNotificationType(n.getNotificationType());
-            dto.setIsRead(n.getIsRead());
-            dto.setSentAt(n.getSentAt() != null
-                ? n.getSentAt().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME) : null);
-            return dto;
-        }).collect(Collectors.toList());
-    }
-
-    private String getDayOfWeek(LocalDate date) {
-        int dow = date.getDayOfWeek().getValue(); // 1=Mon ... 7=Sun
-        // Convert to our array index: Mon=2, Tue=3, ..., Sun=1
-        int idx = (dow % 7) + 1;
-        return DAY_NAMES[idx];
     }
 }
