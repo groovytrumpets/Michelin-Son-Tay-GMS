@@ -8,6 +8,7 @@ import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.auth.exception.AuthException;
 import com.g42.platform.gms.customer.domain.exception.CustomerException;
 import com.g42.platform.gms.marketing.service_catalog.domain.exception.ServiceException;
+import com.g42.platform.gms.service_ticket_management.domain.exception.AssignmentException;
 import com.g42.platform.gms.promotion.domain.exception.PromotionException;
 import com.g42.platform.gms.staff.attendance.domain.exception.StaffAttendanceException;
 import com.g42.platform.gms.staff.profile.domain.exception.StaffException;
@@ -122,6 +123,10 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponses.error(ex.getCode().name(), ex.getMessage()));
     }
+    @ExceptionHandler(AssignmentException.class)
+    public ResponseEntity<ApiResponse<?>> handleBookingManagementException(AssignmentException ex) {
+
+        System.err.println("Staff Assignment Error: " + ex.getCode() + " - " + ex.getMessage());
     @ExceptionHandler(PromotionException.class)
     public ResponseEntity<ApiResponse<?>> handleBookingManagementException(PromotionException ex) {
 
