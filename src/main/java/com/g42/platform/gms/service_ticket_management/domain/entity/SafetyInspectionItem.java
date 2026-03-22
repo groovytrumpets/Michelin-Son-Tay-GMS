@@ -11,8 +11,11 @@ public class SafetyInspectionItem {
     
     private Integer itemId;
     private Integer inspectionId;
-    private Integer workCategoryId;  // Foreign key to work_category table
-    private String categoryName;     // Vietnamese display name from work_category (for response only)
+    /** FK → work_category (13 default). Null nếu là hạng mục tùy chỉnh. */
+    private Integer workCategoryId;
+    /** FK → ticket_custom_category. Null nếu là hạng mục default. */
+    private Integer customCategoryId;
+    private String categoryName;     // Populated from JOIN query (for response only)
     private ItemStatus itemStatus;
     private String advisorNote;
 }

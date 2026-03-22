@@ -1,6 +1,7 @@
 package com.g42.platform.gms.service_ticket_management.application.service;
 
 import com.g42.platform.gms.service_ticket_management.api.dto.safety.AdvisorNoteItemRequest;
+import com.g42.platform.gms.service_ticket_management.api.dto.safety.AddCustomCategoryRequest;
 import com.g42.platform.gms.service_ticket_management.api.dto.safety.SafetyInspectionRequest;
 import com.g42.platform.gms.service_ticket_management.api.dto.safety.SafetyInspectionResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.safety.TireDataRequest;
@@ -9,7 +10,6 @@ import com.g42.platform.gms.service_ticket_management.api.dto.safety.InspectionI
 import com.g42.platform.gms.service_ticket_management.domain.enums.TirePosition;
 import com.g42.platform.gms.service_ticket_management.api.dto.safety.InspectionItemResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.safety.WorkCategoryResponse;
-import com.g42.platform.gms.service_ticket_management.api.dto.safety.CreateWorkCategoryRequest;
 import com.g42.platform.gms.service_ticket_management.api.mapper.SafetyInspectionMapper;
 import com.g42.platform.gms.service_ticket_management.api.mapper.WorkCategoryApiMapper;
 import com.g42.platform.gms.service_ticket_management.domain.entity.SafetyInspection;
@@ -21,6 +21,7 @@ import com.g42.platform.gms.service_ticket_management.infrastructure.entity.Safe
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.SafetyInspectionItemJpa;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.SafetyInspectionTireJpa;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.SafetyWorkCategoryJpa;
+import com.g42.platform.gms.service_ticket_management.infrastructure.entity.TicketCustomCategoryJpa;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
 import com.g42.platform.gms.service_ticket_management.infrastructure.mapper.SafetyInspectionInfraMapper;
 import com.g42.platform.gms.service_ticket_management.infrastructure.mapper.WorkCategoryInfraMapper;
@@ -28,6 +29,7 @@ import com.g42.platform.gms.service_ticket_management.infrastructure.repository.
 import com.g42.platform.gms.service_ticket_management.infrastructure.repository.SafetyInspectionRepository;
 import com.g42.platform.gms.service_ticket_management.infrastructure.repository.SafetyInspectionTireRepository;
 import com.g42.platform.gms.service_ticket_management.infrastructure.repository.ServiceTicketRepository;
+import com.g42.platform.gms.service_ticket_management.infrastructure.repository.TicketCustomCategoryRepository;
 import com.g42.platform.gms.service_ticket_management.infrastructure.repository.WorkCategoryRepository;
 import com.g42.platform.gms.service_ticket_management.infrastructure.projection.SafetyInspectionItemWithCategory;
 import lombok.RequiredArgsConstructor;
@@ -36,7 +38,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -49,22 +50,12 @@ public class SafetyInspectionService {
     private final SafetyInspectionTireRepository tireRepository;
     private final SafetyInspectionItemRepository itemRepository;
     private final WorkCategoryRepository workCategoryRepository;
+    private final TicketCustomCategoryRepository customCategoryRepository;
     private final ServiceTicketRepository serviceTicketRepository;
     private final SafetyInspectionInfraMapper infraMapper;
     private final WorkCategoryInfraMapper workCategoryInfraMapper;
     private final SafetyInspectionMapper apiMapper;
     private final WorkCategoryApiMapper workCategoryApiMapper;
-
-    /**
-     * Get valid work category IDs from database (work_category table)
-     * Note: All categories in work_category table (IDs 9001-9013) are safety inspection items
-     */
-    private List<Integer> getValidWorkCategoryIds() {
-        List<SafetyWorkCategoryJpa> categories = workCategoryRepository.findActiveCategories();
-        return categories.stream()
-                .map(SafetyWorkCategoryJpa::getId)
-                .toList();
-    }
 
     /**
      * Enable inspection by ticket code (create PENDING record)
@@ -335,83 +326,203 @@ public class SafetyInspectionService {
     }
 
     /**
-     * Smart update items: UPDATE existing by workCategoryId, DELETE removed, INSERT new
+     * Smart update items: UPDATE existing by workCategoryId or customCategoryId, DELETE removed, INSERT new
      */
     private void updateItems(Integer inspectionId, List<InspectionItemRequest> requestItems) {
-        // Load existing items from database
         List<SafetyInspectionItemJpa> existingItems = itemRepository.findByInspectionId(inspectionId);
         
         if (requestItems == null || requestItems.isEmpty()) {
-            // Delete all existing items if request has none
             itemRepository.deleteAll(existingItems);
             return;
         }
 
-        // Convert request to domain
         List<SafetyInspectionItem> newItems = apiMapper.itemsToDomain(requestItems);
         
-        // Create map of existing items by workCategoryId for quick lookup
-        java.util.Map<Integer, SafetyInspectionItemJpa> existingItemMap = 
-            existingItems.stream()
+        // Map existing by workCategoryId (default) và customCategoryId (custom)
+        java.util.Map<Integer, SafetyInspectionItemJpa> byWorkCategory = existingItems.stream()
+                .filter(i -> i.getWorkCategoryId() != null)
                 .collect(java.util.stream.Collectors.toMap(
-                    SafetyInspectionItemJpa::getWorkCategoryId,
-                    item -> item,
-                    (existing, replacement) -> existing
-                ));
+                        SafetyInspectionItemJpa::getWorkCategoryId, i -> i, (a, b) -> a));
+        java.util.Map<Integer, SafetyInspectionItemJpa> byCustomCategory = existingItems.stream()
+                .filter(i -> i.getCustomCategoryId() != null)
+                .collect(java.util.stream.Collectors.toMap(
+                        SafetyInspectionItemJpa::getCustomCategoryId, i -> i, (a, b) -> a));
 
-        // Track which workCategoryIds are in the new request
-        java.util.Set<Integer> requestedCategoryIds = new java.util.HashSet<>();
-        
-        // Update or insert items
+        java.util.Set<Integer> touchedItemIds = new java.util.HashSet<>();
+
         for (SafetyInspectionItem newItem : newItems) {
             newItem.setInspectionId(inspectionId);
-            requestedCategoryIds.add(newItem.getWorkCategoryId());
-            
-            SafetyInspectionItemJpa existingItem = existingItemMap.get(newItem.getWorkCategoryId());
-            if (existingItem != null) {
-                // UPDATE existing item - keep same itemId
-                existingItem.setItemStatus(newItem.getItemStatus());
-                // advisorNote chỉ được cập nhật bởi advisor, không phải KTV
-                itemRepository.save(existingItem);
+            SafetyInspectionItemJpa existing = null;
+
+            if (newItem.getWorkCategoryId() != null) {
+                existing = byWorkCategory.get(newItem.getWorkCategoryId());
+            } else if (newItem.getCustomCategoryId() != null) {
+                existing = byCustomCategory.get(newItem.getCustomCategoryId());
+            }
+
+            if (existing != null) {
+                existing.setItemStatus(newItem.getItemStatus());
+                itemRepository.save(existing);
+                touchedItemIds.add(existing.getItemId());
             } else {
-                // INSERT new item
                 SafetyInspectionItemJpa newItemJpa = infraMapper.toJpa(newItem);
-                itemRepository.save(newItemJpa);
+                SafetyInspectionItemJpa saved = itemRepository.save(newItemJpa);
+                touchedItemIds.add(saved.getItemId());
             }
         }
-        
-        // DELETE items that are no longer in the request
+
+        // Xóa các item không còn trong request (chỉ xóa custom, giữ default)
         for (SafetyInspectionItemJpa existingItem : existingItems) {
-            if (!requestedCategoryIds.contains(existingItem.getWorkCategoryId())) {
+            if (!touchedItemIds.contains(existingItem.getItemId()) && existingItem.getCustomCategoryId() != null) {
                 itemRepository.delete(existingItem);
             }
         }
     }
 
     /**
-     * Upsert một item lẻ theo workCategoryId.
-     * Nếu item đã tồn tại → update itemStatus.
-     * Nếu chưa → tạo mới.
+     * Lấy danh sách tất cả hạng mục kiểm tra của một phiếu (13 default + hạng mục phụ).
+     */
+    @Transactional(readOnly = true)
+    public List<InspectionItemResponse> getInspectionItems(Integer inspectionId) {
+        return itemRepository.findByInspectionIdWithCategory(inspectionId).stream()
+                .map(p -> {
+                    InspectionItemResponse resp = new InspectionItemResponse();
+                    resp.setItemId(p.getItemId());
+                    resp.setWorkCategoryId(p.getWorkCategoryId());
+                    resp.setCustomCategoryId(p.getCustomCategoryId());
+                    resp.setCategoryName(p.getCategoryName());
+                    resp.setItemStatus(p.getItemStatus());
+                    resp.setAdvisorNote(p.getAdvisorNote());
+                    return resp;
+                })
+                .toList();
+    }
+
+    /**
+     * Bulk upsert itemStatus cho nhiều hạng mục cùng lúc (tech điền).
      */
     @Transactional
-    public InspectionItemResponse upsertItem(Integer inspectionId, InspectionItemRequest request) {
-        if (request.getWorkCategoryId() == null) {
-            throw new IllegalArgumentException("workCategoryId là bắt buộc");
+    public List<InspectionItemResponse> upsertItems(Integer inspectionId, List<InspectionItemRequest> requests) {
+        return requests.stream()
+                .map(req -> upsertItemInternal(inspectionId, req))
+                .toList();
+    }
+
+    private InspectionItemResponse upsertItemInternal(Integer inspectionId, InspectionItemRequest request) {
+        if (request.getWorkCategoryId() == null && request.getCustomCategoryId() == null) {
+            throw new IllegalArgumentException("workCategoryId hoặc customCategoryId là bắt buộc");
         }
 
-        SafetyInspectionItemJpa item = itemRepository
-                .findByInspectionIdAndWorkCategoryId(inspectionId, request.getWorkCategoryId())
-                .orElseGet(() -> {
-                    SafetyInspectionItemJpa newItem = new SafetyInspectionItemJpa();
-                    newItem.setInspectionId(inspectionId);
-                    newItem.setWorkCategoryId(request.getWorkCategoryId());
-                    return newItem;
-                });
+        SafetyInspectionItemJpa item;
+        if (request.getWorkCategoryId() != null) {
+            item = itemRepository
+                    .findByInspectionIdAndWorkCategoryId(inspectionId, request.getWorkCategoryId())
+                    .orElseGet(() -> {
+                        SafetyInspectionItemJpa newItem = new SafetyInspectionItemJpa();
+                        newItem.setInspectionId(inspectionId);
+                        newItem.setWorkCategoryId(request.getWorkCategoryId());
+                        return newItem;
+                    });
+        } else {
+            item = itemRepository
+                    .findByInspectionIdAndCustomCategoryId(inspectionId, request.getCustomCategoryId())
+                    .orElseGet(() -> {
+                        SafetyInspectionItemJpa newItem = new SafetyInspectionItemJpa();
+                        newItem.setInspectionId(inspectionId);
+                        newItem.setCustomCategoryId(request.getCustomCategoryId());
+                        return newItem;
+                    });
+        }
 
         item.setItemStatus(request.getItemStatus());
         SafetyInspectionItemJpa saved = itemRepository.save(item);
 
-        // Build response with categoryName
+        return buildItemResponse(saved, inspectionId);
+    }
+
+    /**
+     * Get only default safety inspection categories (13 fixed items with is_default = 1)
+     */
+    @Transactional(readOnly = true)
+    public List<WorkCategoryResponse> getDefaultSafetyInspectionCategories() {
+        List<SafetyWorkCategoryJpa> defaultCategories = workCategoryRepository.findActiveCategories().stream()
+            .filter(cat -> cat.getIsDefault() != null && cat.getIsDefault())
+            .toList();
+        List<WorkCategory> workCategories = workCategoryInfraMapper.toDomainList(defaultCategories);
+        return workCategoryApiMapper.toResponseList(workCategories);
+    }
+
+    /**
+     * Advisor cập nhật ghi chú cho nhiều hạng mục kiểm tra cùng lúc.
+     * Hỗ trợ cả default (workCategoryId) và custom (customCategoryId).
+     */
+    public List<InspectionItemResponse> updateAdvisorNotes(Integer inspectionId, List<AdvisorNoteItemRequest> noteItems) {
+        return noteItems.stream().map(noteItem -> {
+            if (noteItem.getWorkCategoryId() == null && noteItem.getCustomCategoryId() == null) {
+                throw new IllegalArgumentException("workCategoryId hoặc customCategoryId là bắt buộc");
+            }
+
+            SafetyInspectionItemJpa item;
+            if (noteItem.getWorkCategoryId() != null) {
+                item = itemRepository
+                        .findByInspectionIdAndWorkCategoryId(inspectionId, noteItem.getWorkCategoryId())
+                        .orElseGet(() -> {
+                            SafetyInspectionItemJpa newItem = new SafetyInspectionItemJpa();
+                            newItem.setInspectionId(inspectionId);
+                            newItem.setWorkCategoryId(noteItem.getWorkCategoryId());
+                            return newItem;
+                        });
+            } else {
+                item = itemRepository
+                        .findByInspectionIdAndCustomCategoryId(inspectionId, noteItem.getCustomCategoryId())
+                        .orElseGet(() -> {
+                            SafetyInspectionItemJpa newItem = new SafetyInspectionItemJpa();
+                            newItem.setInspectionId(inspectionId);
+                            newItem.setCustomCategoryId(noteItem.getCustomCategoryId());
+                            return newItem;
+                        });
+            }
+
+            item.setAdvisorNote(noteItem.getAdvisorNote());
+            SafetyInspectionItemJpa saved = itemRepository.save(item);
+            return buildItemResponse(saved, inspectionId);
+        }).toList();
+    }
+
+    /**
+     * Thêm hạng mục tùy chỉnh vào phiếu kiểm tra an toàn.
+     * Insert vào ticket_custom_category (không ảnh hưởng work_category).
+     * Tự động tạo item tương ứng trong safety_inspection_item.
+     */
+    @Transactional
+    public InspectionItemResponse addCustomCategory(Integer inspectionId, AddCustomCategoryRequest request) {
+        inspectionRepository.findById(inspectionId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy phiếu kiểm tra: " + inspectionId));
+
+        if (customCategoryRepository.existsByInspectionIdAndCategoryName(inspectionId, request.getCategoryName())) {
+            throw new IllegalArgumentException("Hạng mục '" + request.getCategoryName() + "' đã tồn tại trong phiếu này");
+        }
+
+        TicketCustomCategoryJpa customCat = new TicketCustomCategoryJpa();
+        customCat.setInspectionId(inspectionId);
+        customCat.setCategoryName(request.getCategoryName());
+        customCat.setDisplayOrder(request.getDisplayOrder());
+        TicketCustomCategoryJpa savedCat = customCategoryRepository.save(customCat);
+
+        SafetyInspectionItemJpa item = new SafetyInspectionItemJpa();
+        item.setInspectionId(inspectionId);
+        item.setCustomCategoryId(savedCat.getId());
+        SafetyInspectionItemJpa savedItem = itemRepository.save(item);
+
+        InspectionItemResponse resp = new InspectionItemResponse();
+        resp.setItemId(savedItem.getItemId());
+        resp.setCustomCategoryId(savedCat.getId());
+        resp.setCategoryName(savedCat.getCategoryName());
+        return resp;
+    }
+
+    /** Helper: build InspectionItemResponse từ saved item + JOIN query để lấy categoryName */
+    private InspectionItemResponse buildItemResponse(SafetyInspectionItemJpa saved, Integer inspectionId) {
         List<SafetyInspectionItemWithCategory> withCategory =
                 itemRepository.findByInspectionIdWithCategory(inspectionId);
         return withCategory.stream()
@@ -421,6 +532,7 @@ public class SafetyInspectionService {
                     InspectionItemResponse resp = new InspectionItemResponse();
                     resp.setItemId(p.getItemId());
                     resp.setWorkCategoryId(p.getWorkCategoryId());
+                    resp.setCustomCategoryId(p.getCustomCategoryId());
                     resp.setCategoryName(p.getCategoryName());
                     resp.setItemStatus(saved.getItemStatus());
                     resp.setAdvisorNote(saved.getAdvisorNote());
@@ -430,120 +542,11 @@ public class SafetyInspectionService {
                     InspectionItemResponse resp = new InspectionItemResponse();
                     resp.setItemId(saved.getItemId());
                     resp.setWorkCategoryId(saved.getWorkCategoryId());
+                    resp.setCustomCategoryId(saved.getCustomCategoryId());
                     resp.setItemStatus(saved.getItemStatus());
                     resp.setAdvisorNote(saved.getAdvisorNote());
                     return resp;
                 });
-    }
-
-    /**
-     * Get available safety inspection categories from work_category table
-     * Note: All categories in work_category table (IDs 9001-9013) are safety inspection items
-     */
-    @Transactional(readOnly = true)
-    public List<WorkCategoryResponse> getSafetyInspectionCategories() {
-        List<SafetyWorkCategoryJpa> workCategoryJpas = workCategoryRepository.findActiveCategories();
-        List<WorkCategory> workCategories = workCategoryInfraMapper.toDomainList(workCategoryJpas);
-        return workCategoryApiMapper.toResponseList(workCategories);
-    }
-
-    /**
-     * Get only default safety inspection categories (13 fixed items with is_default = 1)
-     * These are the standard safety inspection items
-     */
-    @Transactional(readOnly = true)
-    public List<WorkCategoryResponse> getDefaultSafetyInspectionCategories() {
-        List<SafetyWorkCategoryJpa> workCategoryJpas = workCategoryRepository.findActiveCategories();
-        // Filter only default categories
-        List<SafetyWorkCategoryJpa> defaultCategories = workCategoryJpas.stream()
-            .filter(cat -> cat.getIsDefault() != null && cat.getIsDefault())
-            .toList();
-        List<WorkCategory> workCategories = workCategoryInfraMapper.toDomainList(defaultCategories);
-        return workCategoryApiMapper.toResponseList(workCategories);
-    }
-
-    /**
-     * Tạo mới một hạng mục kiểm tra an toàn (work_category) với is_default = false.
-     * Dùng khi KTV muốn thêm hạng mục ngoài 13 hạng mục mặc định.
-     */
-    public WorkCategoryResponse createWorkCategory(CreateWorkCategoryRequest request) {
-        // Validate trùng tên
-        if (workCategoryRepository.existsByCategoryName(request.getCategoryName())) {
-            throw new IllegalArgumentException("Tên hạng mục đã tồn tại: " + request.getCategoryName());
-        }
-
-        // Tự generate categoryCode nếu không truyền
-        String categoryCode = request.getCategoryCode();
-        if (categoryCode == null || categoryCode.isBlank()) {
-            categoryCode = request.getCategoryName().toUpperCase()
-                    .replace(" ", "_")
-                    .replaceAll("[^A-Z0-9_]", "");
-        }
-
-        // Validate trùng code
-        if (workCategoryRepository.existsByCategoryCode(categoryCode)) {
-            throw new IllegalArgumentException("Mã hạng mục đã tồn tại: " + categoryCode);
-        }
-
-        SafetyWorkCategoryJpa jpa = new SafetyWorkCategoryJpa();
-        jpa.setCategoryName(request.getCategoryName());
-        jpa.setCategoryCode(categoryCode);
-        jpa.setDisplayOrder(request.getDisplayOrder());
-        jpa.setIsActive(true);
-        jpa.setIsDefault(false);
-
-        SafetyWorkCategoryJpa saved = workCategoryRepository.save(jpa);
-        WorkCategory domain = workCategoryInfraMapper.toDomain(saved);
-        return workCategoryApiMapper.toResponse(domain);
-    }
-
-    /**
-     * Advisor cập nhật ghi chú cho nhiều hạng mục kiểm tra cùng lúc (upsert theo workCategoryId).
-     * - Enable: item đã có sẵn → update advisorNote
-     * - Skip: item chưa có → tạo mới item với advisorNote
-     */
-    public List<InspectionItemResponse> updateAdvisorNotes(Integer inspectionId, List<AdvisorNoteItemRequest> noteItems) {
-        return noteItems.stream().map(noteItem -> {
-            if (noteItem.getWorkCategoryId() == null) {
-                throw new IllegalArgumentException("workCategoryId là bắt buộc");
-            }
-
-            SafetyInspectionItemJpa item = itemRepository
-                    .findByInspectionIdAndWorkCategoryId(inspectionId, noteItem.getWorkCategoryId())
-                    .orElseGet(() -> {
-                        SafetyInspectionItemJpa newItem = new SafetyInspectionItemJpa();
-                        newItem.setInspectionId(inspectionId);
-                        newItem.setWorkCategoryId(noteItem.getWorkCategoryId());
-                        return newItem;
-                    });
-
-            item.setAdvisorNote(noteItem.getAdvisorNote());
-            SafetyInspectionItemJpa saved = itemRepository.save(item);
-
-            List<SafetyInspectionItemWithCategory> withCategory =
-                    itemRepository.findByInspectionIdWithCategory(inspectionId);
-
-            return withCategory.stream()
-                    .filter(p -> p.getItemId().equals(saved.getItemId()))
-                    .findFirst()
-                    .map(p -> {
-                        InspectionItemResponse resp = new InspectionItemResponse();
-                        resp.setItemId(p.getItemId());
-                        resp.setWorkCategoryId(p.getWorkCategoryId());
-                        resp.setCategoryName(p.getCategoryName());
-                        resp.setItemStatus(saved.getItemStatus());
-                        resp.setAdvisorNote(saved.getAdvisorNote());
-                        return resp;
-                    })
-                    .orElseGet(() -> {
-                        InspectionItemResponse resp = new InspectionItemResponse();
-                        resp.setItemId(saved.getItemId());
-                        resp.setWorkCategoryId(saved.getWorkCategoryId());
-                        resp.setItemStatus(saved.getItemStatus());
-                        resp.setAdvisorNote(saved.getAdvisorNote());
-                        return resp;
-                    });
-        }).toList();
     }
 
     /**
@@ -564,23 +567,11 @@ public class SafetyInspectionService {
             validateActualTire("spare",      t.getSpare());
         }
 
-        // Validate inspection items against database using work_category_id
+        // Validate inspection items
         if (request.getItems() != null) {
-            List<Integer> validCategoryIds = getValidWorkCategoryIds();
-            if (validCategoryIds.isEmpty()) {
-                throw new IllegalStateException("No active safety inspection categories found in database");
-            }
-
-            if (request.getItems().size() > validCategoryIds.size()) {
-                throw new IllegalArgumentException("Maximum " + validCategoryIds.size() + " inspection items allowed");
-            }
-
             for (InspectionItemRequest item : request.getItems()) {
-                if (item.getWorkCategoryId() == null) {
-                    throw new IllegalArgumentException("Work category ID is required for inspection item");
-                }
-                if (!validCategoryIds.contains(item.getWorkCategoryId())) {
-                    throw new IllegalArgumentException("Invalid work category ID: " + item.getWorkCategoryId());
+                if (item.getWorkCategoryId() == null && item.getCustomCategoryId() == null) {
+                    throw new IllegalArgumentException("workCategoryId hoặc customCategoryId là bắt buộc cho mỗi hạng mục");
                 }
             }
         }

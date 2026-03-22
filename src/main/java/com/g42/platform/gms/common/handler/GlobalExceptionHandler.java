@@ -129,8 +129,14 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<?>> handleBookingManagementException(AssignmentException ex) {
 
         System.err.println("Staff Assignment Error: " + ex.getCode() + " - " + ex.getMessage());
+
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponses.error(ex.getCode().name(), ex.getMessage()));
+    }
+
     @ExceptionHandler(PromotionException.class)
-    public ResponseEntity<ApiResponse<?>> handleBookingManagementException(PromotionException ex) {
+    public ResponseEntity<ApiResponse<?>> handlePromotionException(PromotionException ex) {
 
         System.err.println("Customer Error: " + ex.getCode() + " - " + ex.getMessage());
 
