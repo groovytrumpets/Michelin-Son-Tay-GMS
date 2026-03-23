@@ -3,10 +3,12 @@ package com.g42.platform.gms.service_ticket_management.infrastructure.mapper;
 import com.g42.platform.gms.service_ticket_management.domain.entity.SafetyInspection;
 import com.g42.platform.gms.service_ticket_management.domain.entity.SafetyInspectionItem;
 import com.g42.platform.gms.service_ticket_management.domain.entity.SafetyInspectionTire;
+import com.g42.platform.gms.service_ticket_management.domain.entity.TicketCustomCategory;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.SafetyInspectionJpa;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.SafetyInspectionItemJpa;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.SafetyInspectionTireJpa;
-import com.g42.platform.gms.service_ticket_management.infrastructure.projection.SafetyInspectionItemWithCategory;
+import com.g42.platform.gms.service_ticket_management.infrastructure.entity.TicketCustomCategoryJpa;
+import com.g42.platform.gms.service_ticket_management.domain.projection.SafetyInspectionItemWithCategory;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Mappings;
@@ -49,4 +51,8 @@ public interface SafetyInspectionInfraMapper {
     // Projection mapping - converts projection with categoryName to domain
     SafetyInspectionItem projectionToDomain(SafetyInspectionItemWithCategory projection);
     List<SafetyInspectionItem> projectionsToItems(List<SafetyInspectionItemWithCategory> projections);
+
+    // TicketCustomCategory mappings
+    TicketCustomCategory toDomain(TicketCustomCategoryJpa jpa);
+    TicketCustomCategoryJpa toJpa(TicketCustomCategory domain);
 }

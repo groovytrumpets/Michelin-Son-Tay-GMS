@@ -1,7 +1,7 @@
 package com.g42.platform.gms.service_ticket_management.infrastructure.repository;
 
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.SafetyInspectionItemJpa;
-import com.g42.platform.gms.service_ticket_management.infrastructure.projection.SafetyInspectionItemWithCategory;
+import com.g42.platform.gms.service_ticket_management.domain.projection.SafetyInspectionItemWithCategory;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;

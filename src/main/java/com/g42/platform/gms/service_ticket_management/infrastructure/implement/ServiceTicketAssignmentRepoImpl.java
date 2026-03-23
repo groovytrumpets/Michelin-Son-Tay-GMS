@@ -1,8 +1,7 @@
-package com.g42.platform.gms.service_ticket_management.infrastructure;
+package com.g42.platform.gms.service_ticket_management.infrastructure.implement;
 
 import com.g42.platform.gms.service_ticket_management.api.dto.assign.AssignStaffDto;
 import com.g42.platform.gms.service_ticket_management.api.dto.assign.AvailableStaffDto;
-import com.g42.platform.gms.service_ticket_management.api.dto.assign.RoleDto;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import com.g42.platform.gms.service_ticket_management.domain.exception.AssignmentErrorCode;
 import com.g42.platform.gms.service_ticket_management.domain.exception.AssignmentException;
@@ -12,7 +11,6 @@ import com.g42.platform.gms.service_ticket_management.infrastructure.entity.Serv
 import com.g42.platform.gms.service_ticket_management.infrastructure.mapper.TicketAssignmentJpaMapper;
 import com.g42.platform.gms.service_ticket_management.infrastructure.repository.ServiceTicketRepository;
 import com.g42.platform.gms.service_ticket_management.infrastructure.repository.TicketAssignmentJpaRepo;
-import com.g42.platform.gms.staff.profile.infrastructure.entity.StaffProfileJpa;
 import com.g42.platform.gms.staff.profile.infrastructure.repository.StaffProileJpaRepo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;

@@ -1,4 +1,4 @@
-package com.g42.platform.gms.service_ticket_management.infrastructure.projection;
+package com.g42.platform.gms.service_ticket_management.domain.projection;
 
 import com.g42.platform.gms.service_ticket_management.domain.enums.ItemStatus;
 
