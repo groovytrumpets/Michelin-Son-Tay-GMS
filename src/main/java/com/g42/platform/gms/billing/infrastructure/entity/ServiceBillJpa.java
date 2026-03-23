@@ -1,6 +1,7 @@
-package com.g42.platform.gms.estimation.infrastructure.entity;
+package com.g42.platform.gms.billing.infrastructure.entity;
 
-import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
+import com.g42.platform.gms.billing.domain.enums.BillingStatus;
+import com.g42.platform.gms.billing.domain.enums.PaymentStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -22,9 +23,8 @@ public class ServiceBillJpa {
     private Integer billId;
 
     @NotNull
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "service_ticket_id", nullable = false)
-    private ServiceTicketJpa serviceTicket;
+    @Column(name = "service_ticket_id", nullable = false)
+    private Integer serviceTicketId;
 
     @Column(name = "sub_total", precision = 12, scale = 2)
     private BigDecimal subTotal;
@@ -42,16 +42,17 @@ public class ServiceBillJpa {
     @NotNull
     @ColumnDefault("'UNPAID'")
     @Lob
+    @Enumerated(EnumType.STRING)
     @Column(name = "payment_status", nullable = false)
-    private String paymentStatus;
+    private PaymentStatus paymentStatus;
 
     @Column(name = "paid_at")
     private Instant paidAt;
-
+    @Enumerated(EnumType.STRING)
     @ColumnDefault("'DRAFT'")
     @Lob
     @Column(name = "bill_status")
-    private String billStatus;
+    private BillingStatus billStatus;
 
     @Column(name = "warehouse_id")
     private Integer warehouseId;
@@ -61,9 +62,11 @@ public class ServiceBillJpa {
     @Column(name = "version", nullable = false)
     private Integer version;
 
-    @NotNull
-    @JoinColumn(name = "estimate_estimate_id", nullable = false)
+    @Column(name = "estimate_id", nullable = false)
     private Integer estimateId;
+    @NotNull
+    @Column(name = "promotion_id", nullable = false)
+    private Integer promotionId;
 
 
 }

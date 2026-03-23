@@ -1,5 +1,6 @@
 package com.g42.platform.gms.promotion.infrastructure;
 
+import com.g42.platform.gms.billing.api.dto.ServiceBillDto;
 import com.g42.platform.gms.promotion.api.dto.PromotionCreateDto;
 import com.g42.platform.gms.promotion.domain.entity.Promotion;
 import com.g42.platform.gms.promotion.domain.repository.PromotionRepo;
@@ -9,6 +10,8 @@ import com.g42.platform.gms.promotion.infrastructure.repository.PromotionJpaRepo
 import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
+
+import java.util.List;
 
 @Repository
 @AllArgsConstructor
