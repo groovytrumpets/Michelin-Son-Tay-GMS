@@ -1,9 +1,9 @@
 package com.g42.platform.gms.billing.domain.exception;
 
 public enum BillingErrorCode {
-    INVALID_ID,
-    INVALID_CONTACT_INFO,
-    INVALID_PHONE,
-    INVALID_DOB,
-    INVALID_CUSTOMER_PROFILE,
+    INVALID_PAYMENT_STATUS,
+    INVALID_BILLING_STATUS,
+    ESTIMATE_404,
+    SERVICE_TICKET_404,
+    ESTIMATE_NOT_MATCH_SERVICE_TICKET,
 }

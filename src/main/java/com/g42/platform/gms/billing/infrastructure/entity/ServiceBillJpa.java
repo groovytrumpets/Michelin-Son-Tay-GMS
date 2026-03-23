@@ -1,8 +1,7 @@
 package com.g42.platform.gms.billing.infrastructure.entity;
 
-import com.g42.platform.gms.estimation.infrastructure.entity.EstimateJpa;
-import com.g42.platform.gms.promotion.infrastructure.entity.PromotionJpa;
-import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
+import com.g42.platform.gms.billing.domain.enums.BillingStatus;
+import com.g42.platform.gms.billing.domain.enums.PaymentStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -43,16 +42,17 @@ public class ServiceBillJpa {
     @NotNull
     @ColumnDefault("'UNPAID'")
     @Lob
+    @Enumerated(EnumType.STRING)
     @Column(name = "payment_status", nullable = false)
-    private String paymentStatus;
+    private PaymentStatus paymentStatus;
 
     @Column(name = "paid_at")
     private Instant paidAt;
-
+    @Enumerated(EnumType.STRING)
     @ColumnDefault("'DRAFT'")
     @Lob
     @Column(name = "bill_status")
-    private String billStatus;
+    private BillingStatus billStatus;
 
     @Column(name = "warehouse_id")
     private Integer warehouseId;
