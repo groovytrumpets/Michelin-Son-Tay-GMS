@@ -19,9 +19,6 @@ public class StaffProfile {
     private String gender;
     private java.sql.Date dob;
     private String avatar;
-    private String email;
-    private String employmentStatus;
-    private java.sql.Date hireDate;
     private java.sql.Timestamp createdAt;
 
     @OneToOne(mappedBy = "staffProfile")
