@@ -20,6 +20,7 @@ public interface ServiceTicketMapper {
 
     @Mappings({
             @Mapping(target = "conditionPhotos", ignore = true),
+            @Mapping(target = "assignments", ignore = true),
             @Mapping(target = "createdBy", source = "createdBy")
     })
     ServiceTicketJpa toJpa(ServiceTicket domain);
