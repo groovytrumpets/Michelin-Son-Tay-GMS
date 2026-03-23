@@ -6,6 +6,9 @@ import lombok.Data;
 @Data
 public class InspectionItemRequest {
     
-    private Integer workCategoryId;  // Foreign key to work_category table
+    /** Dùng cho hạng mục default (13 cái). Null nếu là custom. */
+    private Integer workCategoryId;
+    /** Dùng cho hạng mục tùy chỉnh. Null nếu là default. */
+    private Integer customCategoryId;
     private ItemStatus itemStatus;
 }

@@ -4,16 +4,14 @@ import com.g42.platform.gms.auth.entity.CustomerProfile;
 import com.g42.platform.gms.auth.repository.CustomerProfileRepository;
 import com.g42.platform.gms.service_ticket_management.api.dto.work_history.WorkHistoryResponse;
 import com.g42.platform.gms.service_ticket_management.api.mapper.WorkHistoryApiMapper;
-import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
-import com.g42.platform.gms.service_ticket_management.infrastructure.repository.WorkCategoryRepository;
-import com.g42.platform.gms.service_ticket_management.infrastructure.repository.ServiceTicketRepository;
-import com.g42.platform.gms.service_ticket_management.infrastructure.specification.WorkHistorySpecification;
+import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicket;
+import com.g42.platform.gms.service_ticket_management.domain.repository.ServiceTicketRepo;
+import com.g42.platform.gms.service_ticket_management.domain.repository.WorkCategoryRepo;
 import com.g42.platform.gms.vehicle.entity.Vehicle;
 import com.g42.platform.gms.vehicle.repository.VehicleRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,10 +36,10 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class WorkHistoryService {
     
-    private final ServiceTicketRepository serviceTicketRepository;
+    private final ServiceTicketRepo serviceTicketRepo;
     private final VehicleRepository vehicleRepository;
     private final CustomerProfileRepository customerRepository;
-    private final WorkCategoryRepository workCategoryRepository;
+    private final WorkCategoryRepo workCategoryRepository;
     private final WorkHistoryApiMapper workHistoryMapper;
     
     /**
@@ -67,19 +65,9 @@ public class WorkHistoryService {
         // Validate date range
         validateDateRange(startDate, endDate);
         
-        // Build specification
-        Specification<ServiceTicketJpa> spec = Specification.where(null);
-        spec = spec.and(WorkHistorySpecification.byTechnicianId(technicianId));
-        spec = spec.and(WorkHistorySpecification.isCompleted());
-        spec = spec.and(WorkHistorySpecification.completedBetween(startDate, endDate));
-        
-        if (licensePlate != null && !licensePlate.isBlank()) {
-            spec = spec.and(WorkHistorySpecification.byLicensePlate(licensePlate));
-        }
-        
         // Execute query with pagination
-        Page<ServiceTicketJpa> ticketPage = serviceTicketRepository.findAll(spec, pageable);
-        
+        Page<ServiceTicket> ticketPage = serviceTicketRepo.findByTechnicianCompleted(technicianId, startDate, endDate, licensePlate, pageable);
+
         // Map to response DTOs
         return ticketPage.map(this::mapToWorkHistoryResponse);
     }
@@ -106,43 +94,23 @@ public class WorkHistoryService {
      * @param ticket The service ticket entity
      * @return WorkHistoryResponse DTO
      */
-    private WorkHistoryResponse mapToWorkHistoryResponse(ServiceTicketJpa ticket) {
-        // Fetch vehicle - throw exception if not found
+    private WorkHistoryResponse mapToWorkHistoryResponse(ServiceTicket ticket) {
         Vehicle vehicle = vehicleRepository.findById(ticket.getVehicleId())
             .orElseThrow(() -> new IllegalStateException(
                 "Vehicle not found for service ticket: " + ticket.getTicketCode()));
-        
-        // Fetch customer - throw exception if not found
+
         CustomerProfile customer = customerRepository.findById(ticket.getCustomerId())
             .orElseThrow(() -> new IllegalStateException(
                 "Customer not found for service ticket: " + ticket.getTicketCode()));
-        
-        // Resolve service type
-        String serviceType = resolveServiceType(ticket);
-        
-        // Map to response
+
+        String serviceType = resolveServiceType();
+
         return workHistoryMapper.toWorkHistoryResponse(ticket, vehicle, customer, serviceType);
     }
-    
-    /**
-     * Resolve the service type for a service ticket.
-     * 
-     * Lấy danh sách 13 hạng mục kiểm tra an toàn default (is_default = 1).
-     * Đây là danh sách cố định, không phụ thuộc vào service ticket cụ thể.
-     * 
-     * @param ticket The service ticket
-     * @return Service type string (comma-separated default work category names)
-     */
-    private String resolveServiceType(ServiceTicketJpa ticket) {
-        // Query all default work categories (13 items with is_default = 1)
+
+    private String resolveServiceType() {
         List<String> workCategories = workCategoryRepository.findDefaultWorkCategoryNames();
-        
-        // If no work categories found, return placeholder
-        if (workCategories == null || workCategories.isEmpty()) {
-            return "Service";
-        }
-        
-        // Join work category names with comma
+        if (workCategories == null || workCategories.isEmpty()) return "Service";
         return String.join(", ", workCategories);
     }
     
