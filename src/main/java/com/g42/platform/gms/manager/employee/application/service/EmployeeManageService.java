@@ -66,13 +66,10 @@ public class EmployeeManageService {
                 .staffId(profile.getStaffId())
                 .fullName(profile.getFullName())
                 .phone(profile.getPhone())
-                .email(profile.getEmail())
                 .position(profile.getPosition())
                 .gender(profile.getGender())
                 .dob(profile.getDob())
                 .avatar(profile.getAvatar())
-                .employmentStatus(profile.getEmploymentStatus())
-                .hireDate(profile.getHireDate())
                 .performance(EmployeeDetailResponse.PerformanceSummary.builder()
                         .totalWorkDays(workDays)
                         .totalTicketsHandled((int) totalTickets)
@@ -86,13 +83,10 @@ public class EmployeeManageService {
                 .staffId(p.getStaffId())
                 .fullName(p.getFullName())
                 .phone(p.getPhone())
-                .email(p.getEmail())
                 .position(p.getPosition())
                 .gender(p.getGender())
                 .dob(p.getDob())
                 .avatar(p.getAvatar())
-                .employmentStatus(p.getEmploymentStatus())
-                .hireDate(p.getHireDate())
                 .build();
     }
 }
