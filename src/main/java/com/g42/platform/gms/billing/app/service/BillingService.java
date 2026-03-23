@@ -10,6 +10,7 @@ import com.g42.platform.gms.estimation.domain.entity.Estimate;
 import com.g42.platform.gms.estimation.domain.repository.EstimateRepository;
 import com.g42.platform.gms.promotion.domain.entity.Promotion;
 import com.g42.platform.gms.promotion.domain.repository.PromotionRepo;
+import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
 import com.g42.platform.gms.service_ticket_management.infrastructure.repository.ServiceTicketRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,7 +49,10 @@ public class BillingService {
     }
 
 //    private List<Promotion> resolvePromotion(ServiceBillDto serviceBillDto) {
-//        List<Promotion> promotions = promotionRepo.getListOfBillingPromotion(serviceBillDto);
+//        List<Promotion> promotions = promotionRepo.getAllPromotionForBilling(serviceBillDto);
+//        promotions.stream().filter(p -> p.getPromotionId().equals(serviceBillDto.getPromotionId())).findFirst().ifPresent(promotion -> {
+//
+//        });
 //
 //    }
 
@@ -62,5 +66,7 @@ public class BillingService {
         if (!estimate.getServiceTicketId().equals(serviceTicket.getServiceTicketId())) {
             throw new BillingException("Service Ticket and Estimate not match", BillingErrorCode.ESTIMATE_NOT_MATCH_SERVICE_TICKET);
         }
+        serviceTicket.setTicketStatus(TicketStatus.IN_PROGRESS);
+        serviceTicketRepository.save(serviceTicket);
     }
 }
