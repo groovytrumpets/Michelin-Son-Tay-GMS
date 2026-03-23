@@ -24,8 +24,8 @@ import com.g42.platform.gms.service_ticket_management.api.mapper.BookingLookupMa
 import com.g42.platform.gms.service_ticket_management.api.mapper.PhotoResponseMapper;
 import com.g42.platform.gms.service_ticket_management.api.mapper.VehicleMapper;
 import com.g42.platform.gms.service_ticket_management.api.mapper.ServiceTicketDtoMapper;
-import com.g42.platform.gms.vehicle.entity.Vehicle;
-import com.g42.platform.gms.vehicle.repository.VehicleRepository;
+import com.g42.platform.gms.vehicle.domain.entity.Vehicle;
+import com.g42.platform.gms.vehicle.domain.repository.VehicleRepo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -54,7 +54,7 @@ public class CheckInService {
     private final ServiceTicketService serviceTicketService;
     private final ServiceTicketRepo serviceTicketRepo;
     private final ServiceTicketCodeGenerator ticketCodeGenerator;
-    private final VehicleRepository vehicleRepository;
+    private final VehicleRepo vehicleRepository;
     private final CustomerProfileRepository customerRepository;
     private final CustomerAuthRepository customerAuthRepository;
     private final VehicleConditionPhotoRepo photoRepo;
@@ -108,7 +108,7 @@ public class CheckInService {
         vehicle.setBrand(request.getMake());
         vehicle.setModel(request.getModel());
         vehicle.setManufactureYear(request.getYear());
-        vehicle.setCustomer(customer);
+        vehicle.setCustomerId(customer.getCustomerId());
 
         vehicle = vehicleRepository.save(vehicle);
         log.info("Created new vehicle: vehicleId={}, licensePlate={}", vehicle.getVehicleId(), vehicle.getLicensePlate());
@@ -148,7 +148,7 @@ public class CheckInService {
 
             CustomerProfile customer = customerRepository.findById(request.getCustomerId())
                 .orElseThrow(() -> new CheckInException("Không tìm thấy khách hàng"));
-            vehicle.setCustomer(customer);
+            vehicle.setCustomerId(customer.getCustomerId());
 
             vehicle = vehicleRepository.save(vehicle);
             isNewVehicle = true;
@@ -345,7 +345,7 @@ public class CheckInService {
         customerRepository.findById(customerId)
             .orElseThrow(() -> new CheckInException("Không tìm thấy khách hàng"));
 
-        List<Vehicle> vehicles = vehicleRepository.findByCustomer_CustomerId(customerId);
+        List<Vehicle> vehicles = vehicleRepository.findByCustomerId(customerId);
 
         List<CustomerVehiclesResponse.VehicleInfo> vehicleInfos = vehicleMapper.toVehicleInfoList(vehicles);
 

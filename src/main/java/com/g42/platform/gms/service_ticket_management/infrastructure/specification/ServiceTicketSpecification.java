@@ -4,7 +4,7 @@ import com.g42.platform.gms.auth.entity.CustomerProfile;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketAssignmentJpa;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
-import com.g42.platform.gms.vehicle.entity.Vehicle;
+import com.g42.platform.gms.vehicle.infrastructure.entity.VehicleJpa;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Subquery;
 import org.springframework.data.jpa.domain.Specification;
@@ -105,7 +105,7 @@ public class ServiceTicketSpecification {
             
             // === 5. SEARCH TRONG LICENSE PLATE (SUBQUERY) ===
             Subquery<Integer> vehicleSubquery = query.subquery(Integer.class);
-            var vehicleRoot = vehicleSubquery.from(Vehicle.class);
+            var vehicleRoot = vehicleSubquery.from(VehicleJpa.class);
             vehicleSubquery.select(vehicleRoot.get("vehicleId"))
                 .where(cb.like(cb.lower(vehicleRoot.get("licensePlate")), like));
             predicates.add(root.get("vehicleId").in(vehicleSubquery));

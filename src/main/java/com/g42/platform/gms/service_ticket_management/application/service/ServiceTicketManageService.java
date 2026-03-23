@@ -20,8 +20,8 @@ import com.g42.platform.gms.service_ticket_management.domain.repository.ServiceT
 import com.g42.platform.gms.service_ticket_management.domain.repository.VehicleConditionPhotoRepo;
 import com.g42.platform.gms.service_ticket_management.api.mapper.ServiceTicketListMapper;
 import com.g42.platform.gms.service_ticket_management.api.mapper.ServiceTicketDetailMapper;
-import com.g42.platform.gms.vehicle.entity.Vehicle;
-import com.g42.platform.gms.vehicle.repository.VehicleRepository;
+import com.g42.platform.gms.vehicle.domain.entity.Vehicle;
+import com.g42.platform.gms.vehicle.domain.repository.VehicleRepo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -47,7 +47,7 @@ public class ServiceTicketManageService {
     
     private final ServiceTicketRepo serviceTicketRepo;
     private final CustomerProfileRepository customerRepository;
-    private final VehicleRepository vehicleRepository;
+    private final VehicleRepo vehicleRepository;
     private final BookingRepository bookingRepository;
     private final CatalogItemRepository catalogRepository;
     private final OdometerReadingRepo odometerRepo;

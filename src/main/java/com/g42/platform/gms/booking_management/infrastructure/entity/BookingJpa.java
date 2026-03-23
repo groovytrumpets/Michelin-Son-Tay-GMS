@@ -2,7 +2,6 @@ package com.g42.platform.gms.booking_management.infrastructure.entity;
 
 import com.g42.platform.gms.auth.entity.CustomerProfile;
 import com.g42.platform.gms.booking_management.domain.enums.BookingEnum;
-import com.g42.platform.gms.vehicle.entity.Vehicle;
 import jakarta.persistence.*;
 import lombok.Data;
 

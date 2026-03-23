@@ -4,7 +4,7 @@ import com.g42.platform.gms.service_ticket_management.domain.enums.RoleInTicket;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketAssignmentJpa;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
-import com.g42.platform.gms.vehicle.entity.Vehicle;
+import com.g42.platform.gms.vehicle.infrastructure.entity.VehicleJpa;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import org.springframework.data.jpa.domain.Specification;
@@ -111,7 +111,7 @@ public class WorkHistorySpecification {
     public static Specification<ServiceTicketJpa> byLicensePlate(String licensePlate) {
         return (root, query, cb) -> {
             // Join with vehicle table
-            Join<ServiceTicketJpa, Vehicle> vehicleJoin = 
+            Join<ServiceTicketJpa, VehicleJpa> vehicleJoin = 
                 root.join("vehicleId", JoinType.INNER);
             
             // Filter: license_plate = licensePlate (case-insensitive)

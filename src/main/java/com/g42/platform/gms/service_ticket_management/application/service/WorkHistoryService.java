@@ -7,8 +7,8 @@ import com.g42.platform.gms.service_ticket_management.api.mapper.WorkHistoryApiM
 import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicket;
 import com.g42.platform.gms.service_ticket_management.domain.repository.ServiceTicketRepo;
 import com.g42.platform.gms.service_ticket_management.domain.repository.WorkCategoryRepo;
-import com.g42.platform.gms.vehicle.entity.Vehicle;
-import com.g42.platform.gms.vehicle.repository.VehicleRepository;
+import com.g42.platform.gms.vehicle.domain.entity.Vehicle;
+import com.g42.platform.gms.vehicle.domain.repository.VehicleRepo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -37,7 +37,7 @@ import java.util.List;
 public class WorkHistoryService {
     
     private final ServiceTicketRepo serviceTicketRepo;
-    private final VehicleRepository vehicleRepository;
+    private final VehicleRepo vehicleRepository;
     private final CustomerProfileRepository customerRepository;
     private final WorkCategoryRepo workCategoryRepository;
     private final WorkHistoryApiMapper workHistoryMapper;

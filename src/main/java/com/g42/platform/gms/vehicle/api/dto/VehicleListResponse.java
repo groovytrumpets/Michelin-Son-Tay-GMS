@@ -1,28 +1,28 @@
-package com.g42.platform.gms.vehicle.dto;
+package com.g42.platform.gms.vehicle.api.dto;
 
 import lombok.Data;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Response DTO for listing customer vehicles.
- * Returns all vehicles owned by a customer.
+ * Response DTO for listing vehicles of a customer.
  */
 @Data
 public class VehicleListResponse {
-    
+
     private Integer customerId;
-    private List<VehicleInfo> vehicles = new ArrayList<>();
-    
+    private String customerName;
+    private String customerPhone;
+    private List<VehicleItem> vehicles;
+
     @Data
-    public static class VehicleInfo {
+    public static class VehicleItem {
         private Integer vehicleId;
         private String licensePlate;
-        private String make;
+        private String brand;
         private String model;
-        private Integer year;
+        private Integer manufactureYear;
         private Integer lastOdometerReading;
         private LocalDate lastServiceDate;
     }

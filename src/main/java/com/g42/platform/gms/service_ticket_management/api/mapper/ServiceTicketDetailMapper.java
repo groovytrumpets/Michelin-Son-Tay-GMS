@@ -7,7 +7,7 @@ import com.g42.platform.gms.booking.customer.infrastructure.entity.CatalogItemJp
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceTicketDetailResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.technician.TechnicianTicketDetailResponse;
 import com.g42.platform.gms.service_ticket_management.domain.entity.VehicleConditionPhoto;
-import com.g42.platform.gms.vehicle.entity.Vehicle;
+import com.g42.platform.gms.vehicle.domain.entity.Vehicle;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 

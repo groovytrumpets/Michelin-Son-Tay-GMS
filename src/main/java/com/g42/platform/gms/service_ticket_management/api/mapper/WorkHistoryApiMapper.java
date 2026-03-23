@@ -3,7 +3,7 @@ package com.g42.platform.gms.service_ticket_management.api.mapper;
 import com.g42.platform.gms.auth.entity.CustomerProfile;
 import com.g42.platform.gms.service_ticket_management.api.dto.work_history.WorkHistoryResponse;
 import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicket;
-import com.g42.platform.gms.vehicle.entity.Vehicle;
+import com.g42.platform.gms.vehicle.domain.entity.Vehicle;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 

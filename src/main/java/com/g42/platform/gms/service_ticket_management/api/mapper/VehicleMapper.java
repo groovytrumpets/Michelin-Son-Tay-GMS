@@ -3,7 +3,7 @@ package com.g42.platform.gms.service_ticket_management.api.mapper;
 import com.g42.platform.gms.service_ticket_management.api.dto.checkin.CreateVehicleResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.checkin.CustomerVehiclesResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.checkin.VehicleResponse;
-import com.g42.platform.gms.vehicle.entity.Vehicle;
+import com.g42.platform.gms.vehicle.domain.entity.Vehicle;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -23,7 +23,7 @@ public interface VehicleMapper {
     @Mapping(target = "make", source = "brand")
     @Mapping(target = "model", source = "model")
     @Mapping(target = "year", source = "manufactureYear")
-    @Mapping(target = "customerId", source = "customer.customerId")
+    @Mapping(target = "customerId", source = "customerId")
     @Mapping(target = "message", constant = "Tạo xe mới thành công")
     CreateVehicleResponse toCreateResponse(Vehicle vehicle);
     
@@ -35,7 +35,7 @@ public interface VehicleMapper {
     @Mapping(target = "make", source = "brand")
     @Mapping(target = "model", source = "model")
     @Mapping(target = "year", source = "manufactureYear")
-    @Mapping(target = "customerId", source = "customer.customerId")
+    @Mapping(target = "customerId", source = "customerId")
     @Mapping(target = "isNewVehicle", ignore = true)
     @Mapping(target = "ticketCode", ignore = true)
     VehicleResponse toVehicleResponse(Vehicle vehicle);
