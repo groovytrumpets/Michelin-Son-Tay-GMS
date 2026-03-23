@@ -37,7 +37,7 @@ public class EstimateService {
         List<Estimate> estimateList = estimateRepository.getListOfEstimateByServiceTiketCode(serviceTicketId);
         //todo: get estimate item list of list estimate ids
         List<Integer> estimateIds = estimateList.stream().map(Estimate::getId).toList();
-        List<EstimateItem> estimateItems =estimateItemRepository.findByEstimateIds(estimateIds);
+        List<EstimateItem> estimateItems =estimateItemRepository.findByEstimateIds(estimateIds).stream().filter(estimateItem -> Boolean.FALSE.equals(estimateItem.getIsRemoved())).toList();
         //todo: get work-catalog of estimateItem
         List<Integer> workCategoryId = estimateItems.stream().map(EstimateItem::getWorkCategoryId).filter(Objects::nonNull).distinct().toList();
         Map<Integer, WorkCategory> categoryMap = workCategoryRepo
@@ -70,6 +70,17 @@ public class EstimateService {
                 if (taxRule != null) {
                     itemDto.setTaxCode(taxRule.getTaxCode());
                     itemDto.setTaxRate(taxRule.getTaxRate());
+
+                if (item.getUnitPrice() != null && taxRule.getTaxRate() != null) {
+                    BigDecimal vatPerUnit = item.getUnitPrice().multiply(
+                            taxRule.getTaxRate().divide(BigDecimal.valueOf(100)));
+                    itemDto.setUnitPriceWithVat(item.getUnitPrice().add(vatPerUnit));
+                    BigDecimal unitPriceWithVat = item.getUnitPrice().add(vatPerUnit);
+                    itemDto.setSubTotalWithVat(unitPriceWithVat.multiply(
+                            BigDecimal.valueOf(item.getQuantity())));
+                }
+                }else {
+                    itemDto.setUnitPriceWithVat(item.getUnitPrice());
                 }
                 return itemDto;
             }).toList();
@@ -93,6 +104,8 @@ public class EstimateService {
 
         //todo: update total_price
         BigDecimal totalPrice = items.stream()
+                .filter(item -> Boolean.TRUE.equals(item.getIsChecked()))
+                .filter(item -> Boolean.FALSE.equals(item.getIsRemoved()))
                 .map(item -> item.getTotalPrice() != null ? item.getTotalPrice() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
@@ -121,18 +134,9 @@ public class EstimateService {
                 existing.setQuantity(req.getQuantity());
                 existing.setUnitPrice(req.getUnitPrice());
                 existing.setWorkCategoryId(req.getWorkCategoryId());
-                if (req.getTaxRuleId() != null) {
-                    existing.setTaxRuleId(req.getTaxRuleId());
-                    TaxRule taxRule = taxRuleRepository.findById(req.getTaxRuleId());
-                    if (taxRule != null && taxRule.getTaxRate() != null) {
-                        BigDecimal subTotal = existing.getSubTotal();
-                        BigDecimal vatAmount = subTotal.multiply(
-                                taxRule.getTaxRate().divide(BigDecimal.valueOf(100)));
-                        existing.setTotalPrice(subTotal.add(vatAmount));
-                    }
-                } else {
-                    existing.setTotalPrice(existing.getSubTotal());
-                }
+                existing.setIsChecked(req.getIsChecked());
+                existing.setIsRemoved(req.getIsRemoved());
+                applyTax(existing);
                 toSave.add(existing);
                 incomingIds.add(req.getItemId());
             } else {
@@ -141,10 +145,15 @@ public class EstimateService {
         }
         estimateItems.stream()
                 .filter(i -> !incomingIds.contains(i.getId()))
-                .forEach(estimateItemRepository::delete);
+                .forEach(i -> {
+                    i.setIsRemoved(true);
+                    estimateItemRepository.save(i);
+                });
 
         estimateItemRepository.saveAll(toSave);
         BigDecimal totalPrice = toSave.stream()
+                .filter(item -> Boolean.TRUE.equals(item.getIsChecked()))
+                .filter(item -> Boolean.FALSE.equals(item.getIsRemoved()))
                 .map(item -> item.getTotalPrice() != null ? item.getTotalPrice() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
@@ -182,20 +191,9 @@ public class EstimateService {
             item.setQuantity(req.getQuantity());
             item.setUnitPrice(req.getUnitPrice());
             item.setTaxRuleId(req.getTaxRuleId());
+            item.setIsChecked(req.getIsChecked() != null ? req.getIsChecked() : false);
             //todo: vat calculate
-            BigDecimal subTotal = item.getSubTotal();
-            if (req.getTaxRuleId() != null) {
-                TaxRule taxRule = taxRuleRepository.findById(req.getTaxRuleId());
-                if (taxRule != null && taxRule.getTaxRate() != null) {
-                    BigDecimal vatAmount = subTotal.multiply(
-                            taxRule.getTaxRate().divide(BigDecimal.valueOf(100)));
-                    item.setTotalPrice(subTotal.add(vatAmount));
-                } else {
-                    item.setTotalPrice(subTotal);
-                }
-            } else {
-                item.setTotalPrice(subTotal);
-            }
+            applyTax(item);
             return item;
         }).toList();
     }
@@ -204,7 +202,9 @@ public class EstimateService {
         if (estimate == null) {
             throw new RuntimeException("Estimate not found");
         }
-        List<EstimateItem> items = estimateItemRepository.findByEstimateId(estimateId);
+        List<EstimateItem> items = estimateItemRepository.findByEstimateId(estimateId).stream()
+                .filter(i -> Boolean.FALSE.equals(i.getIsRemoved()))
+                .toList();
 
         List<Integer> categoryIds = items.stream()
                 .map(EstimateItem::getWorkCategoryId)
@@ -234,6 +234,16 @@ public class EstimateService {
                 itemDto.setTaxRuleId(taxRule.getTaxRuleId());
                 itemDto.setTaxCode(taxRule.getTaxCode());
                 itemDto.setTaxRate(taxRule.getTaxRate());
+                if (item.getUnitPrice() != null && taxRule.getTaxRate() != null) {
+                    BigDecimal vatPerUnit = item.getUnitPrice().multiply(
+                            taxRule.getTaxRate().divide(BigDecimal.valueOf(100)));
+                    itemDto.setUnitPriceWithVat(item.getUnitPrice().add(vatPerUnit));
+                    BigDecimal unitPriceWithVat = item.getUnitPrice().add(vatPerUnit);
+                    itemDto.setSubTotalWithVat(unitPriceWithVat.multiply(
+                            BigDecimal.valueOf(item.getQuantity())));
+                }
+            }else {
+                itemDto.setUnitPriceWithVat(item.getUnitPrice());
             }
             return itemDto;
         }).toList());
@@ -242,7 +252,23 @@ public class EstimateService {
 
     public EstimateItemReqDto updateEstimateItem(Integer estimateItemId, EstimateItemReqDto request) {
         EstimateItem estimateItem = estimateItemRepository.findByEstimateItemId(estimateItemId);
-        if (request.getWorkCategoryId() != null)estimateItem.setWorkCategoryId(request.getWorkCategoryId());
+
+
+        if (request.getWorkCategoryId() != null) {
+            estimateItem.setWorkCategoryId(request.getWorkCategoryId());
+        } else if (request.getNewCategoryName() != null) {
+            WorkCategory newCategory = new WorkCategory();
+            newCategory.setCategoryName(request.getNewCategoryName());
+            newCategory.setCategoryCode(
+                    request.getNewCategoryName().toUpperCase().replace(" ", "_")
+            );
+            newCategory.setIsDefault(false);
+            newCategory.setIsActive(true);
+            int nextOrder = workCategoryRepo.findMaxDisplayOrder() + 1;
+            newCategory.setDisplayOrder(nextOrder);
+            WorkCategory saved = workCategoryRepo.save(newCategory);
+            estimateItem.setWorkCategoryId(saved.getId());
+        }
         //todo: handle newCate
         if (request.getItemId() != null)estimateItem.setItemId(request.getItemId());
         if (request.getItemName() != null)estimateItem.setItemName(request.getItemName());
@@ -251,8 +277,33 @@ public class EstimateService {
         if (request.getTaxRuleId() != null)estimateItem.setTaxRuleId(request.getTaxRuleId());
         if (request.getIsChecked() != null)estimateItem.setIsChecked(request.getIsChecked());
         if (request.getIsRemoved() != null)estimateItem.setIsRemoved(request.getIsRemoved());
+        applyTax(estimateItem);
         EstimateItem saved = estimateItemRepository.save(estimateItem);
+        //todo: recalculate
+        List<EstimateItem> allItems = estimateItemRepository.findByEstimateId(saved.getEstimateId());
+        BigDecimal totalPrice = allItems.stream()
+                .filter(i -> Boolean.TRUE.equals(i.getIsChecked()))
+                .filter(i -> Boolean.FALSE.equals(i.getIsRemoved()))
+                .map(i -> i.getTotalPrice() != null ? i.getTotalPrice() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        Estimate estimate = estimateRepository.findEstimateById(saved.getEstimateId());
+        estimate.setTotalPrice(totalPrice);
+        estimateRepository.save(estimate);
         return estimateDtoMapper.toEstimateItemReqDto(saved);
 
+    }
+    private void applyTax(EstimateItem item) {
+        if (item.getTaxRuleId() != null) {
+            TaxRule taxRule = taxRuleRepository.findById(item.getTaxRuleId());
+            if (taxRule != null && taxRule.getTaxRate() != null) {
+                BigDecimal vatPerUnit = item.getUnitPrice().multiply(
+                        taxRule.getTaxRate().divide(BigDecimal.valueOf(100)));
+                BigDecimal unitPriceWithVat = item.getUnitPrice().add(vatPerUnit);
+                item.setTotalPrice(unitPriceWithVat.multiply(BigDecimal.valueOf(item.getQuantity())));
+                return;
+            }
+        }
+        item.setTotalPrice(item.getSubTotal());
     }
 }
