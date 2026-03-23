@@ -15,13 +15,10 @@ public class EmployeeDetailResponse {
     private Integer staffId;
     private String fullName;
     private String phone;
-    private String email;
     private String position;
     private String gender;
     private Date dob;
     private String avatar;
-    private String employmentStatus;
-    private Date hireDate;
 
     // Hiệu năng (tháng hiện tại)
     private PerformanceSummary performance;
