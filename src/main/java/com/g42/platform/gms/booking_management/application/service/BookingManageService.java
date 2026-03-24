@@ -160,6 +160,7 @@ return confirmed;
     }
 
     public List<BookedRespond> getBookingBySlot(LocalDate date, LocalTime slot) {
-        return null;
+        List<Booking> bookings = bookingRepository.getBookingBySlot(date,slot);
+        return bookings.stream().map(bookingManageDtoMapper::toBookedRespond).toList();
     }
 }
