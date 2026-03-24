@@ -1,5 +1,6 @@
 package com.g42.platform.gms.billing.api.controller;
 
+import com.g42.platform.gms.billing.api.dto.PaymentTransactionDto;
 import com.g42.platform.gms.billing.api.dto.ServiceBillDto;
 import com.g42.platform.gms.billing.app.service.BillingService;
 import com.g42.platform.gms.common.dto.ApiResponse;
@@ -21,5 +22,11 @@ public class BillingController {
         ServiceBillDto promotion = billingService.createNewBilling(serviceBillDto);
         return ResponseEntity.ok(ApiResponses.success(promotion));
     }
+    @PostMapping("/create/payment")
+    public ResponseEntity<ApiResponse<PaymentTransactionDto>> createPayment(@RequestBody PaymentTransactionDto dto) {
+        PaymentTransactionDto savedDto = billingService.createNewPayment(dto);
+        return ResponseEntity.ok(ApiResponses.success(savedDto));
+    }
+
 
 }
