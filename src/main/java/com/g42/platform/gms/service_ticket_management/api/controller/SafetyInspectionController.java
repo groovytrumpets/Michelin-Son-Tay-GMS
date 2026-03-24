@@ -49,6 +49,18 @@ public class SafetyInspectionController {
     }
 
     /**
+     * Mở lại inspection đã hoàn thành để technician bổ sung vấn đề mới.
+     * Ticket phải đang PENDING hoặc IN_PROGRESS.
+     */
+    @PostMapping("/{ticketCode}/reopen")
+    public ResponseEntity<ApiResponse<SafetyInspectionResponse>> reopenInspection(
+            @PathVariable String ticketCode) {
+
+        SafetyInspectionResponse response = safetyInspectionService.reopenInspection(ticketCode);
+        return ResponseEntity.ok(ApiResponses.success(response, "Đã mở lại phiếu kiểm tra an toàn"));
+    }
+
+    /**
      * Skip safety inspection for a service ticket
      */
     @PostMapping("/{ticketCode}/skip")

@@ -18,6 +18,7 @@ import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicke
 import com.g42.platform.gms.service_ticket_management.domain.entity.TicketCustomCategory;
 import com.g42.platform.gms.service_ticket_management.domain.entity.WorkCategory;
 import com.g42.platform.gms.service_ticket_management.domain.enums.InspectionStatus;
+import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TirePosition;
 import com.g42.platform.gms.service_ticket_management.domain.repository.SafetyInspectionItemRepo;
 import com.g42.platform.gms.service_ticket_management.domain.repository.SafetyInspectionRepo;
@@ -92,6 +93,8 @@ public class SafetyInspectionService {
         ServiceTicket ticket = serviceTicketRepo.findByServiceTicketId(serviceTicketId);
         if (ticket == null) throw new IllegalArgumentException("Service ticket not found: " + serviceTicketId);
         ticket.setSafetyInspectionEnabled(true);
+        ticket.setTicketStatus(TicketStatus.INSPECTION);
+        ticket.setUpdatedAt(LocalDateTime.now());
         serviceTicketRepo.save(ticket);
         return getInspectionByServiceTicket(serviceTicketId);
     }
@@ -108,7 +111,43 @@ public class SafetyInspectionService {
         return apiMapper.toResponse(inspectionRepo.save(domain));
     }
 
+    /** Chỉ cho phép technician write khi ticket đang ở trạng thái INSPECTION */
+    private void requireTicketInInspectionStatus(Integer serviceTicketId) {
+        ServiceTicket ticket = serviceTicketRepo.findByServiceTicketId(serviceTicketId);
+        if (ticket == null) throw new IllegalArgumentException("Service ticket not found: " + serviceTicketId);
+        if (ticket.getTicketStatus() != TicketStatus.INSPECTION) {
+            throw new IllegalStateException(
+                "Chỉ có thể chỉnh sửa phiếu kiểm tra khi ticket đang ở trạng thái INSPECTION. " +
+                "Trạng thái hiện tại: " + ticket.getTicketStatus());
+        }
+    }
+
+    /**
+     * Mở lại inspection để technician bổ sung — ticket phải đang DRAFT, PENDING, hoặc IN_PROGRESS.
+     * Chuyển ticketStatus → INSPECTION, inspectionStatus → PENDING.
+     */
+    public SafetyInspectionResponse reopenInspection(String ticketCode) {
+        ServiceTicket ticket = serviceTicketRepo.findByTicketCode(ticketCode)
+                .orElseThrow(() -> new IllegalArgumentException("Service ticket not found: " + ticketCode));
+        TicketStatus current = ticket.getTicketStatus();
+        if (current != TicketStatus.DRAFT && current != TicketStatus.PENDING && current != TicketStatus.IN_PROGRESS) {
+            throw new IllegalStateException(
+                "Chỉ có thể mở lại kiểm tra khi ticket đang DRAFT, PENDING hoặc IN_PROGRESS. " +
+                "Trạng thái hiện tại: " + current);
+        }
+        SafetyInspection inspection = inspectionRepo.findByServiceTicketId(ticket.getServiceTicketId())
+                .orElseThrow(() -> new IllegalStateException("Chưa có phiếu kiểm tra cho ticket này"));
+        inspection.setInspectionStatus(InspectionStatus.PENDING);
+        inspection.setUpdatedAt(LocalDateTime.now());
+        inspectionRepo.save(inspection);
+        ticket.setTicketStatus(TicketStatus.INSPECTION);
+        ticket.setUpdatedAt(LocalDateTime.now());
+        serviceTicketRepo.save(ticket);
+        return getInspectionByServiceTicket(ticket.getServiceTicketId());
+    }
+
     public SafetyInspectionResponse saveInspectionData(SafetyInspectionRequest request, Integer technicianId) {
+        requireTicketInInspectionStatus(request.getServiceTicketId());
         validateInspectionData(request);
         SafetyInspection domain = apiMapper.toDomain(request);
         domain.setTechnicianId(technicianId);
@@ -129,6 +168,13 @@ public class SafetyInspectionService {
         }
         updateTires(saved.getInspectionId(), expandTires(request.getTires()));
         updateItems(saved.getInspectionId(), request.getItems());
+        // Technician submit xong → ticket về DRAFT
+        ServiceTicket ticket = serviceTicketRepo.findByServiceTicketId(request.getServiceTicketId());
+        if (ticket != null && ticket.getTicketStatus() == TicketStatus.INSPECTION) {
+            ticket.setTicketStatus(TicketStatus.DRAFT);
+            ticket.setUpdatedAt(LocalDateTime.now());
+            serviceTicketRepo.save(ticket);
+        }
         return getInspectionByServiceTicket(request.getServiceTicketId());
     }
 
@@ -224,6 +270,9 @@ public class SafetyInspectionService {
 
     @Transactional
     public List<InspectionItemResponse> upsertItems(Integer inspectionId, List<InspectionItemRequest> requests) {
+        SafetyInspection inspection = inspectionRepo.findById(inspectionId)
+                .orElseThrow(() -> new IllegalArgumentException("Inspection not found: " + inspectionId));
+        requireTicketInInspectionStatus(inspection.getServiceTicketId());
         return requests.stream().map(req -> upsertItemInternal(inspectionId, req)).toList();
     }
 
@@ -271,8 +320,9 @@ public class SafetyInspectionService {
 
     @Transactional
     public InspectionItemResponse addCustomCategory(Integer inspectionId, AddCustomCategoryRequest request) {
-        inspectionRepo.findById(inspectionId)
+        SafetyInspection inspection = inspectionRepo.findById(inspectionId)
                 .orElseThrow(() -> new IllegalArgumentException("Khong tim thay phieu kiem tra: " + inspectionId));
+        requireTicketInInspectionStatus(inspection.getServiceTicketId());
         if (customCategoryRepo.existsByInspectionIdAndCategoryName(inspectionId, request.getCategoryName()))
             throw new IllegalArgumentException("Hang muc da ton tai trong phieu nay");
         TicketCustomCategory cat = new TicketCustomCategory();

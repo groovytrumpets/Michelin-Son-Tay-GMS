@@ -29,6 +29,8 @@ public class ServiceTicket {
     private String checkInNotes;
     private Boolean immutable;
     private Boolean safetyInspectionEnabled;
+    private Boolean isPrinted;
+    private LocalDateTime printedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime completedAt;

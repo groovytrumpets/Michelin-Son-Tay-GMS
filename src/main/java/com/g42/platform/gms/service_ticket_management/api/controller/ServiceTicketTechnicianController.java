@@ -83,18 +83,47 @@ public class ServiceTicketTechnicianController {
     
     /**
      * Update technician notes.
-     * 
-     * @param ticketCode Ticket code (ST_XXXXXX or MST_XXXXXX)
-     * @param request Update request with technicianNotes
-     * @return Updated TechnicianTicketDetailResponse
      */
     @PutMapping("/tickets/{ticketCode}/notes")
     public ResponseEntity<ApiResponse<TechnicianTicketDetailResponse>> updateTechnicianNotes(
             @PathVariable String ticketCode,
             @RequestBody @jakarta.validation.Valid UpdateTechnicianNotesRequest request) {
-        
+
         TechnicianTicketDetailResponse updated = technicianService.updateTechnicianNotes(ticketCode, request);
-        
         return ResponseEntity.ok(ApiResponses.success(updated));
+    }
+
+    /**
+     * Technician bắt đầu sửa xe — PENDING → IN_PROGRESS.
+     */
+    @PostMapping("/tickets/{ticketCode}/start")
+    public ResponseEntity<ApiResponse<TechnicianTicketDetailResponse>> startWork(
+            @PathVariable String ticketCode) {
+
+        TechnicianTicketDetailResponse result = technicianService.startWork(ticketCode);
+        return ResponseEntity.ok(ApiResponses.success(result));
+    }
+
+    /**
+     * Technician báo thiếu phụ tùng — IN_PROGRESS → PENDING.
+     */
+    @PostMapping("/tickets/{ticketCode}/wait-parts")
+    public ResponseEntity<ApiResponse<TechnicianTicketDetailResponse>> waitForParts(
+            @PathVariable String ticketCode,
+            @RequestBody(required = false) com.g42.platform.gms.service_ticket_management.api.dto.technician.WaitPartsRequest request) {
+
+        TechnicianTicketDetailResponse result = technicianService.waitForParts(ticketCode, request);
+        return ResponseEntity.ok(ApiResponses.success(result));
+    }
+
+    /**
+     * Technician báo xong sửa xe — IN_PROGRESS → COMPLETED.
+     */
+    @PostMapping("/tickets/{ticketCode}/finish")
+    public ResponseEntity<ApiResponse<TechnicianTicketDetailResponse>> finishWork(
+            @PathVariable String ticketCode) {
+
+        TechnicianTicketDetailResponse result = technicianService.finishWork(ticketCode);
+        return ResponseEntity.ok(ApiResponses.success(result));
     }
 }
