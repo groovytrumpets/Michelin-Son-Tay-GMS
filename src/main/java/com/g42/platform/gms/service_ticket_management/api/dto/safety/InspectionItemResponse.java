@@ -7,8 +7,9 @@ import lombok.Data;
 public class InspectionItemResponse {
     
     private Integer itemId;
-    private Integer workCategoryId;  // Foreign key to work_category table
-    private String categoryName;     // Vietnamese display name from work_category
+    private Integer workCategoryId;    // FK → work_category (default 13), null nếu custom
+    private Integer customCategoryId;  // FK → ticket_custom_category, null nếu default
+    private String categoryName;       // Tên hiển thị (từ work_category hoặc ticket_custom_category)
     private ItemStatus itemStatus;
     private String advisorNote;
 }

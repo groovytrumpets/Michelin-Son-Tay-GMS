@@ -6,8 +6,7 @@ import com.g42.platform.gms.booking.customer.domain.entity.Booking;
 import com.g42.platform.gms.booking.customer.infrastructure.entity.CatalogItemJpaEntity;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceTicketDetailResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.technician.TechnicianTicketDetailResponse;
-import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
-import com.g42.platform.gms.service_ticket_management.infrastructure.entity.VehicleConditionPhotoJpa;
+import com.g42.platform.gms.service_ticket_management.domain.entity.VehicleConditionPhoto;
 import com.g42.platform.gms.vehicle.entity.Vehicle;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -59,19 +58,19 @@ public interface ServiceTicketDetailMapper {
     ServiceTicketDetailResponse.ServiceInfo toManageServiceInfo(CatalogItemJpaEntity catalogItem);
     
     /**
-     * Map VehicleConditionPhotoJpa to PhotoInfo (Manage view).
+     * Map VehicleConditionPhoto to PhotoInfo (Manage view).
      */
     @Mapping(target = "photoId", source = "photoId")
     @Mapping(target = "category", expression = "java(photo.getCategory().name())")
     @Mapping(target = "photoUrl", source = "photoUrl")
     @Mapping(target = "description", source = "description")
     @Mapping(target = "uploadedAt", source = "uploadedAt")
-    ServiceTicketDetailResponse.PhotoInfo toManagePhotoInfo(VehicleConditionPhotoJpa photo);
+    ServiceTicketDetailResponse.PhotoInfo toManagePhotoInfo(VehicleConditionPhoto photo);
     
     /**
      * Map list of photos (Manage view).
      */
-    List<ServiceTicketDetailResponse.PhotoInfo> toManagePhotoInfoList(List<VehicleConditionPhotoJpa> photos);
+    List<ServiceTicketDetailResponse.PhotoInfo> toManagePhotoInfoList(List<VehicleConditionPhoto> photos);
     
     /**
      * Map list of services (Manage view).
@@ -117,19 +116,19 @@ public interface ServiceTicketDetailMapper {
     TechnicianTicketDetailResponse.ServiceInfo toTechnicianServiceInfo(CatalogItemJpaEntity catalogItem);
     
     /**
-     * Map VehicleConditionPhotoJpa to PhotoInfo (Technician view).
+     * Map VehicleConditionPhoto to PhotoInfo (Technician view).
      */
     @Mapping(target = "photoId", source = "photoId")
     @Mapping(target = "category", expression = "java(photo.getCategory().name())")
     @Mapping(target = "photoUrl", source = "photoUrl")
     @Mapping(target = "description", source = "description")
     @Mapping(target = "uploadedAt", source = "uploadedAt")
-    TechnicianTicketDetailResponse.PhotoInfo toTechnicianPhotoInfo(VehicleConditionPhotoJpa photo);
+    TechnicianTicketDetailResponse.PhotoInfo toTechnicianPhotoInfo(VehicleConditionPhoto photo);
     
     /**
      * Map list of photos (Technician view).
      */
-    List<TechnicianTicketDetailResponse.PhotoInfo> toTechnicianPhotoInfoList(List<VehicleConditionPhotoJpa> photos);
+    List<TechnicianTicketDetailResponse.PhotoInfo> toTechnicianPhotoInfoList(List<VehicleConditionPhoto> photos);
     
     /**
      * Map list of services (Technician view).

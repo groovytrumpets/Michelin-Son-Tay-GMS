@@ -1,7 +1,7 @@
 package com.g42.platform.gms.service_ticket_management.infrastructure.repository;
 
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.SafetyInspectionItemJpa;
-import com.g42.platform.gms.service_ticket_management.infrastructure.projection.SafetyInspectionItemWithCategory;
+import com.g42.platform.gms.service_ticket_management.domain.projection.SafetyInspectionItemWithCategory;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -16,23 +16,28 @@ public interface SafetyInspectionItemRepository extends JpaRepository<SafetyInsp
     List<SafetyInspectionItemJpa> findByInspectionId(Integer inspectionId);
 
     java.util.Optional<SafetyInspectionItemJpa> findByInspectionIdAndWorkCategoryId(Integer inspectionId, Integer workCategoryId);
+
+    java.util.Optional<SafetyInspectionItemJpa> findByInspectionIdAndCustomCategoryId(Integer inspectionId, Integer customCategoryId);
     
     /**
-     * Find inspection items with category names using JOIN query.
-     * Returns projection with categoryName populated from work_category table.
+     * Find inspection items with category names.
+     * LEFT JOIN work_category cho default items, LEFT JOIN ticket_custom_category cho custom items.
+     * COALESCE lấy tên từ bảng nào có giá trị.
      */
     @Query(value = """
         SELECT 
             i.item_id AS itemId,
             i.inspection_id AS inspectionId,
             i.work_category_id AS workCategoryId,
+            i.custom_category_id AS customCategoryId,
             i.item_status AS itemStatus,
             i.advisor_note AS advisorNote,
-            wc.category_name AS categoryName
+            COALESCE(wc.category_name, cc.category_name) AS categoryName
         FROM safety_inspection_item i
-        INNER JOIN work_category wc ON i.work_category_id = wc.idwork_category
+        LEFT JOIN work_category wc ON i.work_category_id = wc.idwork_category
+        LEFT JOIN ticket_custom_category cc ON i.custom_category_id = cc.id
         WHERE i.inspection_id = :inspectionId
-        ORDER BY wc.display_order
+        ORDER BY COALESCE(wc.display_order, cc.display_order, 999)
         """, nativeQuery = true)
     List<SafetyInspectionItemWithCategory> findByInspectionIdWithCategory(@Param("inspectionId") Integer inspectionId);
     

@@ -3,8 +3,8 @@ package com.g42.platform.gms.service_ticket_management.api.controller;
 import com.g42.platform.gms.auth.entity.StaffPrincipal;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
+import com.g42.platform.gms.service_ticket_management.api.dto.safety.AddCustomCategoryRequest;
 import com.g42.platform.gms.service_ticket_management.api.dto.safety.AdvisorNoteRequest;
-import com.g42.platform.gms.service_ticket_management.api.dto.safety.CreateWorkCategoryRequest;
 import com.g42.platform.gms.service_ticket_management.api.dto.safety.InspectionItemRequest;
 import com.g42.platform.gms.service_ticket_management.api.dto.safety.InspectionItemResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.safety.SafetyInspectionRequest;
@@ -114,51 +114,50 @@ public class SafetyInspectionController {
     }
 
     /**
-     * Get available safety inspection categories from work_category table
-     */
-//    @PreAuthorize("hasRole('TECHNICIAN')")
-
-    @GetMapping("/categories")
-    public ResponseEntity<ApiResponse<List<WorkCategoryResponse>>> getSafetyInspectionCategories() {
-        
-        List<WorkCategoryResponse> categories = safetyInspectionService.getSafetyInspectionCategories();
-        return ResponseEntity.ok(ApiResponses.success(categories, "Danh sách hạng mục kiểm tra an toàn"));
-    }
-
-    /**
-     * Get only default safety inspection categories (13 fixed items with is_default = 1)
+     * Get default safety inspection categories (13 hạng mục cố định).
      */
     @GetMapping("/categories/default")
     public ResponseEntity<ApiResponse<List<WorkCategoryResponse>>> getDefaultSafetyInspectionCategories() {
-        
         List<WorkCategoryResponse> categories = safetyInspectionService.getDefaultSafetyInspectionCategories();
         return ResponseEntity.ok(ApiResponses.success(categories, "Danh sách 13 hạng mục kiểm tra an toàn mặc định"));
     }
 
     /**
-     * Tạo mới một hạng mục kiểm tra an toàn (ngoài 13 hạng mục mặc định).
-     * is_default = false, is_active = true.
+     * Lấy danh sách tất cả hạng mục kiểm tra của một phiếu (13 default + hạng mục phụ).
+     * Tech dùng để xem và điền itemStatus.
      */
-    @PostMapping("/categories")
-    public ResponseEntity<ApiResponse<WorkCategoryResponse>> createWorkCategory(
-            @Valid @RequestBody CreateWorkCategoryRequest request) {
+    @GetMapping("/{inspectionId}/items")
+    public ResponseEntity<ApiResponse<List<InspectionItemResponse>>> getInspectionItems(
+            @PathVariable Integer inspectionId) {
 
-        WorkCategoryResponse response = safetyInspectionService.createWorkCategory(request);
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponses.success(response, "Tạo mới hạng mục kiểm tra thành công"));
+        List<InspectionItemResponse> items = safetyInspectionService.getInspectionItems(inspectionId);
+        return ResponseEntity.ok(ApiResponses.success(items));
     }
 
     /**
-     * PATCH /{inspectionId}/items
-     * Upsert một hạng mục lẻ: tạo mới nếu chưa có, update nếu đã có.
-     * Frontend gửi workCategoryId + itemStatus.
+     * Thêm hạng mục tùy chỉnh vào phiếu kiểm tra an toàn.
+     * Lưu vào ticket_custom_category, không ảnh hưởng work_category.
+     */
+    @PostMapping("/{inspectionId}/custom-categories")
+    public ResponseEntity<ApiResponse<InspectionItemResponse>> addCustomCategory(
+            @PathVariable Integer inspectionId,
+            @Valid @RequestBody AddCustomCategoryRequest request) {
+
+        InspectionItemResponse response = safetyInspectionService.addCustomCategory(inspectionId, request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponses.success(response, "Đã thêm hạng mục tùy chỉnh thành công"));
+    }
+
+    /**
+     * Bulk update itemStatus cho nhiều hạng mục cùng lúc (tech điền).
+     * Hỗ trợ cả default (workCategoryId) và custom (customCategoryId).
      */
     @PatchMapping("/{inspectionId}/items")
-    public ResponseEntity<ApiResponse<InspectionItemResponse>> upsertItem(
+    public ResponseEntity<ApiResponse<List<InspectionItemResponse>>> upsertItems(
             @PathVariable Integer inspectionId,
-            @RequestBody InspectionItemRequest request) {
+            @RequestBody List<InspectionItemRequest> items) {
 
-        InspectionItemResponse response = safetyInspectionService.upsertItem(inspectionId, request);
+        List<InspectionItemResponse> response = safetyInspectionService.upsertItems(inspectionId, items);
         return ResponseEntity.ok(ApiResponses.success(response, "Đã cập nhật hạng mục kiểm tra"));
     }
 

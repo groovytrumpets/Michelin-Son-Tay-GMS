@@ -8,8 +8,7 @@ import lombok.Data;
  * JPA entity for safety_inspection_item table.
  */
 @Entity
-@Table(name = "safety_inspection_item",
-       uniqueConstraints = @UniqueConstraint(columnNames = {"inspection_id", "work_category_id"}))
+@Table(name = "safety_inspection_item")
 @Data
 public class SafetyInspectionItemJpa {
     
@@ -20,9 +19,14 @@ public class SafetyInspectionItemJpa {
     
     @Column(name = "inspection_id", nullable = false)
     private Integer inspectionId;
-    
-    @Column(name = "work_category_id", nullable = false)
+
+    /** FK → work_category (13 default). Null nếu là hạng mục tùy chỉnh. */
+    @Column(name = "work_category_id")
     private Integer workCategoryId;
+
+    /** FK → ticket_custom_category. Null nếu là hạng mục default. */
+    @Column(name = "custom_category_id")
+    private Integer customCategoryId;
     
     @Enumerated(EnumType.STRING)
     @Column(name = "item_status", length = 20)
