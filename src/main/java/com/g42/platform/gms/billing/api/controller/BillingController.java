@@ -7,10 +7,7 @@ import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/payment")
@@ -26,6 +23,11 @@ public class BillingController {
     public ResponseEntity<ApiResponse<PaymentTransactionDto>> createPayment(@RequestBody PaymentTransactionDto dto) {
         PaymentTransactionDto savedDto = billingService.createNewPayment(dto);
         return ResponseEntity.ok(ApiResponses.success(savedDto));
+    }
+    @GetMapping("/get-bill/{estimateId}")
+    public ResponseEntity<ApiResponse<ServiceBillDto>> getBilling(@PathVariable Integer estimateId) {
+        ServiceBillDto promotion = billingService.getBillingByEstimate(estimateId);
+        return ResponseEntity.ok(ApiResponses.success(promotion));
     }
 
 

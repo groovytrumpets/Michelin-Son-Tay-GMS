@@ -6,4 +6,6 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface BillingRepository {
     ServiceBill createNewBilling(ServiceBill serviceBill);
+
+    ServiceBill getBillingByEstimateId(Integer estimateId);
 }

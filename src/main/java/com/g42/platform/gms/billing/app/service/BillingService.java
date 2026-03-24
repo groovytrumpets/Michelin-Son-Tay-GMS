@@ -97,11 +97,19 @@ public class BillingService {
             throw new BillingException("Service Ticket and Estimate not match", BillingErrorCode.ESTIMATE_NOT_MATCH_SERVICE_TICKET);
         }
     }
-
+    @Transactional
     public PaymentTransactionDto createNewPayment(PaymentTransactionDto dto) {
         PaymentTransaction paymentTransactionDto = serviceBillDtoMapper.mapPaymentToEntity(dto);
         paymentTransactionDto.setPaidAt(Instant.now());
         PaymentTransaction paymentTransaction = paymentTransationRepo.createNewPayment(paymentTransactionDto);
         return serviceBillDtoMapper.mapPaymentToDto(paymentTransaction);
+    }
+
+    public ServiceBillDto getBillingByEstimate(Integer estimateId) {
+        ServiceBill serviceBill = billingRepository.getBillingByEstimateId(estimateId);
+        if (serviceBill == null) {
+            throw new BillingException("Billing not found!", BillingErrorCode.SERVICE_BILLING_404);
+        }
+        return serviceBillDtoMapper.mapToDto(serviceBill);
     }
 }

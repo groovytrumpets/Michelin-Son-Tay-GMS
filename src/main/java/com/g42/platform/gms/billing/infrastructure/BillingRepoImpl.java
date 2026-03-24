@@ -23,4 +23,10 @@ public class BillingRepoImpl implements BillingRepository {
         ServiceBillJpa saved= serviceBillJpaRepo.save(serviceBillJpa);
         return serviceBillJpaMapper.toDomain(saved);
     }
+
+    @Override
+    public ServiceBill getBillingByEstimateId(Integer estimateId) {
+        ServiceBillJpa serviceBillJpa = serviceBillJpaRepo.findByEstimateId(estimateId);
+        return serviceBillJpaMapper.toDomain(serviceBillJpa);
+    }
 }
