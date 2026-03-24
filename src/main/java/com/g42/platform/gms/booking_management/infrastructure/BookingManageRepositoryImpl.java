@@ -219,9 +219,4 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
         return bookingManagerMapper.toDomain(bookingJpa);
     }
 
-    @Override
-    public List<Booking> getBookingByBookingId(Integer bookingId1, Integer bookingId2) {
-
-        List<BookingJpa> bookingJpas = bookingManageJpaRepository.findAllBookingBySlotDate(date,slot);
-    }
 }
