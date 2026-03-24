@@ -43,5 +43,11 @@ public class EstimateController {
                 ApiResponses.success(estimateService.updateEstimateItem(estimateItemId, request))
         );
     }
+    @PutMapping("/{estimateId}/approve")
+    public ResponseEntity<ApiResponse<EstimateRespondDto>> updateEstimateApprove(@PathVariable Integer estimateId){
+        return ResponseEntity.ok(
+                ApiResponses.success(estimateService.updateEstimateApprove(estimateId))
+        );
+    }
 
 }
