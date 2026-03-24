@@ -39,4 +39,15 @@ public class PromotionRepoImpl implements PromotionRepo {
                 findPromotionOfBilling(LocalDate.now(),serviceBillDto.getSubTotal(),serviceBillDto.getPromotionId());
         return promotionJpaMapper.toDomain(promotionJpa);
     }
+
+    @Override
+    public List<Promotion> getAllAvailablePromotion() {
+        List<PromotionJpa> promotionJpa = promotionJpaRepo.findAllAvailable();
+        return promotionJpa.stream().map(promotionJpaMapper::toDomain).toList();
+    }
+
+    @Override
+    public Promotion getPromotionByCode(String code) {
+        return promotionJpaMapper.toDomain(promotionJpaRepo.findPromotionJpasByCode(code));
+    }
 }
