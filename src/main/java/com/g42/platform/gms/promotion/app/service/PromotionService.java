@@ -11,6 +11,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @AllArgsConstructor
 @Service
 public class PromotionService {
@@ -40,6 +42,21 @@ public class PromotionService {
             );
         }
         Promotion promotion = promotionRepo.createNewPromotion(promotionDtoMapper.fromDto(promotionCreateDto));
+        return promotionDtoMapper.toDto(promotion);
+    }
+
+    public List<PromotionCreateDto> getAllAvailablePromotion() {
+        List<Promotion> promotions = promotionRepo.getAllAvailablePromotion();
+        return promotions.stream().map(promotionDtoMapper::toDto).toList();
+    }
+
+    public List<PromotionCreateDto> getAllPromotion() {
+        List<Promotion> promotions = promotionRepo.getAllPromotion();
+        return promotions.stream().map(promotionDtoMapper::toDto).toList();
+    }
+
+    public PromotionCreateDto getPromotionByCode(String code) {
+        Promotion promotion = promotionRepo.getPromotionByCode(code);
         return promotionDtoMapper.toDto(promotion);
     }
 }

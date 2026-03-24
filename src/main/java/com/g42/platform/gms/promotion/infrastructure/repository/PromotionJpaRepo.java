@@ -20,4 +20,10 @@ public interface PromotionJpaRepo extends JpaRepository<PromotionJpa,Integer> {
             and (p.usageLimit is null or p.usedCount<p.usageLimit)
     """)
     PromotionJpa findPromotionOfBilling(LocalDate now, BigDecimal subTotal, Integer promotionId);
+    @Query("""
+    select p from PromotionJpa p where p.targetType = 'ALL'
+    """)
+    List<PromotionJpa> findAllAvailable();
+
+    PromotionJpa findPromotionJpasByCode(String code);
 }
