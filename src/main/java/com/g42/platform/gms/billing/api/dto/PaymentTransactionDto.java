@@ -1,6 +1,5 @@
-package com.g42.platform.gms.billing.domain.entity;
+package com.g42.platform.gms.billing.api.dto;
 
-import com.g42.platform.gms.billing.domain.enums.PaymentTransactionStatus;
 import com.g42.platform.gms.billing.infrastructure.entity.ServiceBillJpa;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -13,11 +12,8 @@ import java.time.Instant;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class PaymentTransaction {
-    private Integer transactionId;
+public class PaymentTransactionDto {
     private Integer billId;
     private BigDecimal amount;
     private String method;
-    private PaymentTransactionStatus status;
-    private Instant paidAt;
 }

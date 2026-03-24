@@ -11,6 +11,7 @@ import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Repository
@@ -24,5 +25,38 @@ public class PromotionRepoImpl implements PromotionRepo {
     public Promotion createNewPromotion(Promotion promotionCreateDto) {
         PromotionJpa promotionJpa = promotionJpaRepo.save(promotionJpaMapper.fromDomain(promotionCreateDto));
         return promotionJpaMapper.toDomain(promotionJpa);
+    }
+
+    @Override
+    public List<Promotion> getAllPromotion() {
+        List<PromotionJpa> promotionJpa = promotionJpaRepo.findAll();
+        return promotionJpa.stream().map(promotionJpaMapper::toDomain).toList();
+    }
+
+    @Override
+    public Promotion getAllPromotionForBilling(ServiceBillDto serviceBillDto) {
+        PromotionJpa promotionJpa = promotionJpaRepo.
+                findPromotionOfBilling(LocalDate.now(),serviceBillDto.getSubTotal(),serviceBillDto.getPromotionId());
+        return promotionJpaMapper.toDomain(promotionJpa);
+    }
+
+    @Override
+    public List<Promotion> getAllAvailablePromotion() {
+        List<PromotionJpa> promotionJpa = promotionJpaRepo.findAllAvailable();
+        return promotionJpa.stream().map(promotionJpaMapper::toDomain).toList();
+    }
+
+    @Override
+    public Promotion getPromotionByCode(String code) {
+        return promotionJpaMapper.toDomain(promotionJpaRepo.findPromotionJpasByCode(code));
+    }
+
+    @Override
+    public Promotion updatePromotion(Integer promotionId, Promotion promotion) {
+
+        PromotionJpa promotionJpa = new PromotionJpa();
+        promotionJpa.setPromotionId(promotionId);
+        PromotionJpa saved = promotionJpaRepo.save(promotionJpa);
+        return promotionJpaMapper.toDomain(saved);
     }
 }
