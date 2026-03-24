@@ -57,16 +57,13 @@ public class WorkHistorySpecification {
     }
     
     /**
-     * Filter service tickets by COMPLETED status.
-     * 
-     * This specification filters for service tickets that have been
-     * completed (ticket_status = COMPLETED).
-     * 
-     * @return Specification that filters by COMPLETED status
+     * Filter service tickets by COMPLETED or PAID status.
+     * PAID là trạng thái cuối sau COMPLETED (lễ tân xác nhận thanh toán),
+     * nên work history cần include cả hai.
      */
     public static Specification<ServiceTicketJpa> isCompleted() {
-        return (root, query, cb) -> 
-            cb.equal(root.get("ticketStatus"), TicketStatus.COMPLETED);
+        return (root, query, cb) ->
+            root.get("ticketStatus").in(TicketStatus.COMPLETED, TicketStatus.PAID);
     }
     
     /**

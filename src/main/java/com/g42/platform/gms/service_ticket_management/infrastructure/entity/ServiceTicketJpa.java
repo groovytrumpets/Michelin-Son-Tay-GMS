@@ -69,7 +69,13 @@ public class ServiceTicketJpa {
 
     @Column(name = "safety_inspection_enabled")
     private Boolean safetyInspectionEnabled = false;
-    
+
+    @Column(name = "is_printed")
+    private Boolean isPrinted = false;
+
+    @Column(name = "printed_at")
+    private LocalDateTime printedAt;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
     

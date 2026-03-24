@@ -290,7 +290,7 @@ public class CheckInService {
             throw new CheckInException("Chưa upload ảnh xe");
         }
 
-        ticketDomain.setTicketStatus(TicketStatus.CREATED);
+        ticketDomain.setTicketStatus(TicketStatus.DRAFT);
         ticketDomain.setCheckInNotes(request.getCheckInNotes());
         ticketDomain.setReceivedAt(LocalDateTime.now());
         ticketDomain.setUpdatedAt(LocalDateTime.now());
@@ -462,13 +462,13 @@ public class CheckInService {
             log.info("Saved odometer reading: {} km, rollbackDetected={}", request.getOdometerReading(), rollbackDetected);
         }
 
-        // 6. Update Service Ticket to CREATED
-        ticketDomain.setTicketStatus(TicketStatus.CREATED);
+        // 6. Update Service Ticket to DRAFT
+        ticketDomain.setTicketStatus(TicketStatus.DRAFT);
         ticketDomain.setCheckInNotes(request.getCheckInNotes());
         ticketDomain.setReceivedAt(LocalDateTime.now());
         ticketDomain.setUpdatedAt(LocalDateTime.now());
         ServiceTicket savedTicketAll = serviceTicketRepo.save(ticketDomain);
-        log.info("Updated ticket status to CREATED: {}", savedTicketAll.getTicketCode());
+        log.info("Updated ticket status to DRAFT: {}", savedTicketAll.getTicketCode());
 
         // 7. Update booking status to DONE
         Booking booking = bookingService.findById(request.getBookingId());
