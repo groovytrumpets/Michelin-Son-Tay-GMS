@@ -5,6 +5,9 @@ import lombok.Data;
 @Data
 public class AdvisorNoteItemRequest {
 
+    /** Dùng cho hạng mục default. Null nếu là custom. */
     private Integer workCategoryId;
+    /** Dùng cho hạng mục tùy chỉnh. Null nếu là default. */
+    private Integer customCategoryId;
     private String advisorNote;
 }
