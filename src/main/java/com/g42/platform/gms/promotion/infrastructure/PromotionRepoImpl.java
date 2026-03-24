@@ -50,4 +50,13 @@ public class PromotionRepoImpl implements PromotionRepo {
     public Promotion getPromotionByCode(String code) {
         return promotionJpaMapper.toDomain(promotionJpaRepo.findPromotionJpasByCode(code));
     }
+
+    @Override
+    public Promotion updatePromotion(Integer promotionId, Promotion promotion) {
+
+        PromotionJpa promotionJpa = new PromotionJpa();
+        promotionJpa.setPromotionId(promotionId);
+        PromotionJpa saved = promotionJpaRepo.save(promotionJpa);
+        return promotionJpaMapper.toDomain(saved);
+    }
 }

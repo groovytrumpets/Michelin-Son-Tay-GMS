@@ -59,4 +59,9 @@ public class PromotionService {
         Promotion promotion = promotionRepo.getPromotionByCode(code);
         return promotionDtoMapper.toDto(promotion);
     }
+
+    public PromotionCreateDto updatePromotion(PromotionCreateDto promotionCreateDto) {
+        Promotion promotion = promotionRepo.updatePromotion(promotionCreateDto.getPromotionId(), promotionDtoMapper.fromDto(promotionCreateDto));
+        return promotionDtoMapper.toDto(promotion);
+    }
 }
