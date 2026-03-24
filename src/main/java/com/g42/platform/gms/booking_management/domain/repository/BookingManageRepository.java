@@ -38,4 +38,12 @@ public interface BookingManageRepository {
     List<CatalogItem> getListOfCatalogById(List<Integer> services);
 
     Boolean reorderQueue(ReorderQueueRequest request);
+
+    List<Booking> getBookingBySlot(LocalDate date, LocalTime slot);
+
+    Booking getBookedById(Integer bookingId);
+
+    Booking save(Booking booking);
+
+    List<Booking> getBookingByBookingId(Integer bookingId1, Integer bookingId2);
 }

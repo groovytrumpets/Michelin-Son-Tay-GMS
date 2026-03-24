@@ -8,4 +8,6 @@ public enum BookingStaffErrorCode {
     BOOKING_SLOT_REVOKED,
     BOOKING_STATUS_WRONG,
     BOOKING_CANT_EDIT,
+    BOOKING_SWAP_ERROR,
+    BOOKING_SWAP_NULL,
 }

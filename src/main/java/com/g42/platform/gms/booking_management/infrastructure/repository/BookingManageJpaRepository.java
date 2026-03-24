@@ -11,9 +11,19 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.List;
+
 @Repository
 public interface BookingManageJpaRepository extends JpaRepository<BookingJpa, Integer>, JpaSpecificationExecutor<BookingJpa> {
     BookingJpa getBookingJpaByBookingId(Integer bookingId);
 
     BookingJpa getBookingJpaByBookingCode(String bookingCode);
+    @Query("""
+    select b from BookingJpa b join BookingSlotReservationJpa bs on b.bookingId = bs.booking.bookingId where
+        bs.reservedDate=:date
+        and bs.startTime=:slot
+    """)
+    List<BookingJpa> findAllBookingBySlotDate(LocalDate date, LocalTime slot);
 }

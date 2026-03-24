@@ -200,4 +200,28 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
         });
         return true;
     }
+
+    @Override
+    public List<Booking> getBookingBySlot(LocalDate date, LocalTime slot) {
+        List<BookingJpa> bookingJpas = bookingManageJpaRepository.findAllBookingBySlotDate(date,slot);
+        return bookingJpas.stream().map(bookingManagerMapper::toDomain).toList();
+    }
+
+    @Override
+    public Booking getBookedById(Integer bookingId) {
+        BookingJpa bookingJpa = bookingManageJpaRepository.getBookingJpaByBookingId(bookingId);
+        return bookingManagerMapper.toDomain(bookingJpa);
+    }
+
+    @Override
+    public Booking save(Booking booking) {
+        BookingJpa bookingJpa = bookingManageJpaRepository.save(bookingManagerMapper.toBooking(booking));
+        return bookingManagerMapper.toDomain(bookingJpa);
+    }
+
+    @Override
+    public List<Booking> getBookingByBookingId(Integer bookingId1, Integer bookingId2) {
+
+        List<BookingJpa> bookingJpas = bookingManageJpaRepository.findAllBookingBySlotDate(date,slot);
+    }
 }
