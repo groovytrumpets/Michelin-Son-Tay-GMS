@@ -44,4 +44,6 @@ public interface BookingManageRepository {
     Booking getBookedById(Integer bookingId);
 
     Booking save(Booking booking);
+
+    List<Booking> getBookingByBookingId(Integer bookingId1, Integer bookingId2);
 }

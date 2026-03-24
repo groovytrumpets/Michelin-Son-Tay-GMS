@@ -190,4 +190,29 @@ return confirmed;
         }
         return bookings.stream().map(bookingManageDtoMapper::toBookedRespond).toList();
     }
+    @Transactional
+    public List<BookedRespond> setswapQueueByBookingIds(Integer bookingId1, Integer bookingId2) {
+        Booking booking1 = bookingRepository.getBookedById(bookingId1);
+        Booking booking2 = bookingRepository.getBookedById(bookingId2);
+        compare2BookingsSlot(booking1,booking2);
+        Integer swap = booking1.getQueueOrder();
+        booking1.setQueueOrder(booking2.getQueueOrder());
+        booking2.setQueueOrder(swap);
+        bookingRepository.save(booking1);
+        bookingRepository.save(booking2);
+        return getBookingBySlot(booking1.getScheduledDate(), booking1.getScheduledTime());
+    }
+
+    private void compare2BookingsSlot(Booking booking1, Booking booking2) {
+        //todo:check booking swapAble
+        if (!booking1.getScheduledDate().equals(booking2.getScheduledDate())) {
+        throw new BookingStaffException("Swap Booking not match Date",BookingStaffErrorCode.BOOKING_SWAP_ERROR);
+        }
+        if (!booking1.getScheduledTime().equals(booking2.getScheduledTime())) {
+            throw new BookingStaffException("Swap Booking not match Time",BookingStaffErrorCode.BOOKING_SWAP_ERROR);
+        }
+        if (booking1.getQueueOrder()==null || booking2.getQueueOrder()==null){
+            throw new BookingStaffException("Swap Booking queue NULL",BookingStaffErrorCode.BOOKING_SWAP_NULL);
+        }
+    }
 }
