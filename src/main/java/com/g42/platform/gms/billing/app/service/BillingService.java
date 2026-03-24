@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -105,6 +106,7 @@ public class BillingService {
         ServiceBill serviceBill = billingRepository.getBillingByBillingId(dto.getBillId());
         ServiceTicketJpa serviceTicketJpa = serviceTicketRepository.findByServiceTicketId(serviceBill.getServiceTicketId());
         serviceTicketJpa.setTicketStatus(TicketStatus.PAID);
+        serviceTicketJpa.setDeliveredAt(LocalDateTime.now());
         serviceTicketRepository.save(serviceTicketJpa);
         return serviceBillDtoMapper.mapPaymentToDto(paymentTransaction);
     }
