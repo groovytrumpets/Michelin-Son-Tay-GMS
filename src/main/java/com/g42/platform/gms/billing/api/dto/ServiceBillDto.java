@@ -9,7 +9,7 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ServiceBillDto {
-
+    private Integer billId;
     private Integer serviceTicketId;
     private BigDecimal subTotal;
     private BigDecimal discountAmount;
