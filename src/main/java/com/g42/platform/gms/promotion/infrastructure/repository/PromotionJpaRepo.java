@@ -21,7 +21,7 @@ public interface PromotionJpaRepo extends JpaRepository<PromotionJpa,Integer> {
     """)
     PromotionJpa findPromotionOfBilling(LocalDate now, BigDecimal subTotal, Integer promotionId);
     @Query("""
-    select p from PromotionJpa p where p.targetType = 'ALL'
+    select p from PromotionJpa p where p.targetType = 'ALL' and p.applyTo ='ALL'
     """)
     List<PromotionJpa> findAllAvailable();
 

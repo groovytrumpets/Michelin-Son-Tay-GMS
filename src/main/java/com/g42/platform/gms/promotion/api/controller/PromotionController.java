@@ -32,7 +32,7 @@ public class PromotionController {
         List<PromotionCreateDto> promotionCreateDtoList = promotionService.getAllAvailablePromotion();
         return ResponseEntity.ok(ApiResponses.success(promotionCreateDtoList));
     }
-    @GetMapping("/{code}")
+    @GetMapping("/")
     public ResponseEntity<ApiResponse<PromotionCreateDto>> getPromotionByCode(@RequestParam String code) {
         PromotionCreateDto promotionCreateDtoList = promotionService.getPromotionByCode(code);
         return ResponseEntity.ok(ApiResponses.success(promotionCreateDtoList));
