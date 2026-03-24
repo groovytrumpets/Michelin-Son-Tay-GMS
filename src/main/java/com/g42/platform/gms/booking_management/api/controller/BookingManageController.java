@@ -88,6 +88,16 @@ public class BookingManageController {
             @RequestParam LocalTime slot) {
         return ResponseEntity.ok(ApiResponses.success(bookingService.getBookingBySlot(date, slot)));
     }
+    @PutMapping("/set-queue")
+    public ResponseEntity<ApiResponse<List<BookedRespond>>> setQueue(@RequestParam Integer bookingId,
+                                                                     @RequestParam Integer queueNumber){
+        return ResponseEntity.ok(ApiResponses.success(bookingService.setQueue(bookingId, queueNumber)));
+    }
+    @PutMapping("/set-queue-auto")
+    public ResponseEntity<ApiResponse<List<BookedRespond>>> setQueueAuto(@RequestParam LocalDate date,
+                                                                         @RequestParam LocalTime slot){
+        return ResponseEntity.ok(ApiResponses.success(bookingService.setQueueAutoBySlotDate(date, slot)));
+    }
 //
 //    @GetMapping("/booking-request")
 //    public ResponseEntity<ApiResponse<Page<BookingRequestRes>>> getAllBookingSlot(@RequestParam(required = false) LocalDate date){

@@ -40,4 +40,8 @@ public interface BookingManageRepository {
     Boolean reorderQueue(ReorderQueueRequest request);
 
     List<Booking> getBookingBySlot(LocalDate date, LocalTime slot);
+
+    Booking getBookedById(Integer bookingId);
+
+    Booking save(Booking booking);
 }

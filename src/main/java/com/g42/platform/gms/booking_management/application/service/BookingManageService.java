@@ -4,6 +4,7 @@ package com.g42.platform.gms.booking_management.application.service;
 
 import com.g42.platform.gms.booking.customer.api.dto.BookingResponse;
 import com.g42.platform.gms.booking.customer.domain.enums.BookingRequestStatus;
+import com.g42.platform.gms.booking.customer.domain.exception.BookingException;
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedDetailResponse;
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedRespond;
 import com.g42.platform.gms.booking_management.api.dto.requesting.*;
@@ -30,6 +31,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 @AllArgsConstructor
@@ -132,7 +134,7 @@ return confirmed;
         bookingRepository.setRequestBooking(request);
         return new ActionBookingRespond("SUCCESS","SUCCESS");
     }
-
+    @Transactional
     public Boolean updateBookingRequest(String requestId, BookingRequestUpdateReq actionBookingRequest) {
         BookingRequest request = bookingRepository.getBookingRequestById(requestId);
         if (request==null){
@@ -161,6 +163,31 @@ return confirmed;
 
     public List<BookedRespond> getBookingBySlot(LocalDate date, LocalTime slot) {
         List<Booking> bookings = bookingRepository.getBookingBySlot(date,slot);
+        return bookings.stream().map(bookingManageDtoMapper::toBookedRespond).toList();
+    }
+    @Transactional
+    public List<BookedRespond> setQueue(Integer bookingId, Integer queueNumber) {
+        Booking booking = bookingRepository.getBookedById(bookingId);
+        booking.setQueueOrder(queueNumber);
+        Booking savedBook = bookingRepository.save(booking);
+        if (savedBook.getQueueOrder()==null){
+            throw new BookingStaffException("Booking not found",BookingStaffErrorCode.BOOKING_CANT_EDIT);
+        }
+        return getBookingBySlot(booking.getScheduledDate(), booking.getScheduledTime());
+    }
+    @Transactional
+    public List<BookedRespond> setQueueAutoBySlotDate(LocalDate date, LocalTime slot) {
+        List<Booking> bookings = new ArrayList<>(bookingRepository.getBookingBySlot(date, slot));
+        bookings.sort(
+                Comparator.comparing(
+                        Booking::getEstimateTime,
+                        Comparator.nullsLast(Integer::compareTo)
+                )
+        );
+        int queue = 1;
+        for (Booking booking : bookings) {
+            booking.setQueueOrder(queue++);
+        }
         return bookings.stream().map(bookingManageDtoMapper::toBookedRespond).toList();
     }
 }
