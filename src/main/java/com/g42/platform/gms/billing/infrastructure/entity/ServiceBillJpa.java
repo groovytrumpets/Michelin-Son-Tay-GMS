@@ -64,8 +64,7 @@ public class ServiceBillJpa {
 
     @Column(name = "estimate_id", nullable = false)
     private Integer estimateId;
-    @NotNull
-    @Column(name = "promotion_id", nullable = false)
+    @Column(name = "promotion_id", nullable = true)
     private Integer promotionId;
 
 
