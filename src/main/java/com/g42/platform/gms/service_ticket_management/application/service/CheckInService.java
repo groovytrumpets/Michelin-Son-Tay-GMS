@@ -431,7 +431,7 @@ public class CheckInService {
         }
         
         // 2. Update ServiceTicket entity
-        ticketJpa.setTicketStatus(TicketStatus.CREATED);
+        ticketJpa.setTicketStatus(TicketStatus.DRAFT);
         ticketJpa.setCheckInNotes(request.getCheckInNotes());
         ticketJpa.setReceivedAt(LocalDateTime.now()); // Set thời điểm khách hàng đến garage
         
@@ -810,7 +810,7 @@ public class CheckInService {
         }
         
         // 6. Update Service Ticket to CREATED status
-        ticketJpa.setTicketStatus(TicketStatus.CREATED);
+        ticketJpa.setTicketStatus(TicketStatus.DRAFT);
         ticketJpa.setCheckInNotes(request.getCheckInNotes());
         ticketJpa.setReceivedAt(LocalDateTime.now()); // Set thời điểm khách hàng đến garage
         

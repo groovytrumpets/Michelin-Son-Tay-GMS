@@ -13,5 +13,5 @@ public interface PromotionRepo {
 
     List<Promotion> getAllPromotion();
 
-    List<Promotion> getAllPromotionForBilling(ServiceBillDto serviceBillDto);
+    Promotion getAllPromotionForBilling(ServiceBillDto serviceBillDto);
 }

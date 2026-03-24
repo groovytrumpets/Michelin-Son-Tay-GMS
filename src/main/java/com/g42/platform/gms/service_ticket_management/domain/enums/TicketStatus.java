@@ -10,9 +10,8 @@ package com.g42.platform.gms.service_ticket_management.domain.enums;
  * CANCELLED: Service ticket was cancelled
  */
 public enum TicketStatus {
-    CREATED,
     DRAFT,
     IN_PROGRESS,
     COMPLETED,
-    CANCELLED
+    CANCELLED, PENDING,PAID
 }

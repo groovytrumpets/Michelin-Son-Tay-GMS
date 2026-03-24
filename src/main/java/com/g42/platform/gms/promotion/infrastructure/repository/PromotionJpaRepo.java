@@ -12,9 +12,12 @@ import java.util.List;
 public interface PromotionJpaRepo extends JpaRepository<PromotionJpa,Integer> {
     @Query("""
     select p from PromotionJpa p 
-        where p.isActive and p.startDate <= :now and (p.endDate is null or p.endDate>=:now)
+        where p.promotionId =:promotionId
+            and p.isActive = true 
+            and p.startDate <= :now 
+            and (p.endDate is null or p.endDate>=:now)
             and (p.minOrderValue is null or p.minOrderValue <= :subTotal)
             and (p.usageLimit is null or p.usedCount<p.usageLimit)
     """)
-    List<PromotionJpa> findPromotionOfBilling(LocalDate now, BigDecimal subTotal);
+    PromotionJpa findPromotionOfBilling(LocalDate now, BigDecimal subTotal, Integer promotionId);
 }
