@@ -37,5 +37,10 @@ public class PromotionController {
         PromotionCreateDto promotionCreateDtoList = promotionService.getPromotionByCode(code);
         return ResponseEntity.ok(ApiResponses.success(promotionCreateDtoList));
     }
+    @PutMapping("/admin/update")
+    public ResponseEntity<ApiResponse<PromotionCreateDto>> updatePromotion(@RequestBody PromotionCreateDto promotionCreateDto) {
+        PromotionCreateDto promotion = promotionService.updatePromotion(promotionCreateDto);
+        return ResponseEntity.ok(ApiResponses.success(promotion));
+    }
 
 }

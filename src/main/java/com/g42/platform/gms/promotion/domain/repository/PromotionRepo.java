@@ -18,4 +18,6 @@ public interface PromotionRepo {
     List<Promotion> getAllAvailablePromotion();
 
     Promotion getPromotionByCode(String code);
+
+    Promotion updatePromotion(Integer promotionId, Promotion promotion);
 }
