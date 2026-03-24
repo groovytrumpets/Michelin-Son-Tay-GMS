@@ -1,5 +1,6 @@
 package com.g42.platform.gms.billing.infrastructure.entity;
 
+import com.g42.platform.gms.billing.domain.enums.PaymentTransactionStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -20,9 +21,8 @@ public class PaymentTransactionJpa {
     private Integer transactionId;
 
     @NotNull
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "bill_id", nullable = false)
-    private ServiceBillJpa bill;
+    @Column(name = "bill_id", nullable = false)
+    private Integer billId;
 
     @NotNull
     @Column(name = "amount", nullable = false, precision = 12, scale = 2)
@@ -31,10 +31,10 @@ public class PaymentTransactionJpa {
     @Size(max = 50)
     @Column(name = "method", length = 50)
     private String method;
-
+    @Enumerated(EnumType.STRING)
     @Lob
     @Column(name = "status")
-    private String status;
+    private PaymentTransactionStatus status;
 
     @Column(name = "paid_at")
     private Instant paidAt;
