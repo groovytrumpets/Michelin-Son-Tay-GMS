@@ -66,7 +66,7 @@ public class BillingService {
             serviceBill.setFinalAmount(estimate.getTotalPrice());
         }
         //todo: change status of estimate and service ticket
-//        serviceTicket.setTicketStatus(TicketStatus.PAID);
+        serviceTicket.setTicketStatus(TicketStatus.COMPLETED);
         serviceTicketRepository.save(serviceTicket);
         estimate.setStatus(EstimateEnum.ARCHIVED);
         estimateRepository.save(estimate);
@@ -102,6 +102,10 @@ public class BillingService {
         PaymentTransaction paymentTransactionDto = serviceBillDtoMapper.mapPaymentToEntity(dto);
         paymentTransactionDto.setPaidAt(Instant.now());
         PaymentTransaction paymentTransaction = paymentTransationRepo.createNewPayment(paymentTransactionDto);
+        ServiceBill serviceBill = billingRepository.getBillingByBillingId(dto.getBillId());
+        ServiceTicketJpa serviceTicketJpa = serviceTicketRepository.findByServiceTicketId(serviceBill.getServiceTicketId());
+        serviceTicketJpa.setTicketStatus(TicketStatus.PAID);
+        serviceTicketRepository.save(serviceTicketJpa);
         return serviceBillDtoMapper.mapPaymentToDto(paymentTransaction);
     }
 }
