@@ -94,29 +94,6 @@ public class ServiceTicketTechnicianController {
     }
 
     /**
-     * Technician bắt đầu sửa xe — PENDING → IN_PROGRESS.
-     */
-    @PostMapping("/tickets/{ticketCode}/start")
-    public ResponseEntity<ApiResponse<TechnicianTicketDetailResponse>> startWork(
-            @PathVariable String ticketCode) {
-
-        TechnicianTicketDetailResponse result = technicianService.startWork(ticketCode);
-        return ResponseEntity.ok(ApiResponses.success(result));
-    }
-
-    /**
-     * Technician báo thiếu phụ tùng — IN_PROGRESS → PENDING.
-     */
-    @PostMapping("/tickets/{ticketCode}/wait-parts")
-    public ResponseEntity<ApiResponse<TechnicianTicketDetailResponse>> waitForParts(
-            @PathVariable String ticketCode,
-            @RequestBody(required = false) com.g42.platform.gms.service_ticket_management.api.dto.technician.WaitPartsRequest request) {
-
-        TechnicianTicketDetailResponse result = technicianService.waitForParts(ticketCode, request);
-        return ResponseEntity.ok(ApiResponses.success(result));
-    }
-
-    /**
      * Technician báo xong sửa xe — IN_PROGRESS → COMPLETED.
      */
     @PostMapping("/tickets/{ticketCode}/finish")
