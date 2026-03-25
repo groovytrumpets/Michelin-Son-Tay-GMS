@@ -136,7 +136,9 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
         booking.setBookingCode(request.getRequestCode());
         System.out.println("booking code: " + booking.getBookingCode());
         System.out.println("booking request code: " + request.getRequestCode());
-
+        //todo: find maxQueueOrder
+        Integer maxQueueOrder = bookingManageJpaRepository.findMaxQueueOrderBySLotDate(request.getScheduledDate(),request.getScheduledTime());
+        booking.setQueueOrder(maxQueueOrder!=null?maxQueueOrder+1:1);
         booking.setCustomerId(customerId);
         booking.setDescription(request.getDescription());
         booking.setIsGuest(request.getIsGuest());
@@ -144,6 +146,7 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
         booking.setServices(request.getServices());
         booking.setScheduledDate(request.getScheduledDate());
         booking.setScheduledTime(request.getScheduledTime());
+        booking.setCreatedAt(request.getCreatedAt());
         List<CatalogItem> catalogItems = request.getServices();
         int estimateTime = catalogItems.stream()
                 .filter(item -> item.getServiceService() != null)

@@ -26,4 +26,8 @@ public interface BookingManageJpaRepository extends JpaRepository<BookingJpa, In
         and bs.startTime=:slot
     """)
     List<BookingJpa> findAllBookingBySlotDate(LocalDate date, LocalTime slot);
+    @Query("""
+    select max(b.queueOrder)from BookingJpa b where b.scheduledDate=:scheduledDate and b.scheduledTime=:scheduledTime
+    """)
+    Integer findMaxQueueOrderBySLotDate(LocalDate scheduledDate, LocalTime scheduledTime);
 }
