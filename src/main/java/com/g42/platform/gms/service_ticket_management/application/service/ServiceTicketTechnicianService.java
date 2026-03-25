@@ -196,55 +196,6 @@ public class ServiceTicketTechnicianService {
     }
 
     /**
-     * Technician bắt đầu sửa xe — PENDING → IN_PROGRESS.
-     */
-    @Transactional
-    public TechnicianTicketDetailResponse startWork(String ticketCode) {
-        log.info("Technician starting work on ticket: {}", ticketCode);
-
-        ServiceTicket ticket = serviceTicketRepo.findByTicketCode(ticketCode)
-            .orElseThrow(() -> new CheckInException("Không tìm thấy service ticket: " + ticketCode));
-
-        if (ticket.getTicketStatus() != TicketStatus.PENDING) {
-            throw new CheckInException("Chỉ có thể bắt đầu sửa khi phiếu đang ở trạng thái PENDING");
-        }
-
-        ticket.setTicketStatus(TicketStatus.IN_PROGRESS);
-        ticket.setUpdatedAt(java.time.LocalDateTime.now());
-        serviceTicketRepo.save(ticket);
-
-        log.info("Ticket {} moved to IN_PROGRESS", ticketCode);
-        return getTechnicianTicketDetail(ticketCode);
-    }
-
-    /**
-     * Technician báo thiếu phụ tùng, cần chờ — IN_PROGRESS → PENDING.
-     */
-    @Transactional
-    public TechnicianTicketDetailResponse waitForParts(String ticketCode,
-            com.g42.platform.gms.service_ticket_management.api.dto.technician.WaitPartsRequest request) {
-        log.info("Technician waiting for parts on ticket: {}", ticketCode);
-
-        ServiceTicket ticket = serviceTicketRepo.findByTicketCode(ticketCode)
-            .orElseThrow(() -> new CheckInException("Không tìm thấy service ticket: " + ticketCode));
-
-        if (ticket.getTicketStatus() != TicketStatus.IN_PROGRESS) {
-            throw new CheckInException("Chỉ có thể báo chờ phụ tùng khi phiếu đang ở trạng thái IN_PROGRESS");
-        }
-
-        ticket.setTicketStatus(TicketStatus.PENDING);
-        ticket.setUpdatedAt(java.time.LocalDateTime.now());
-        if (request != null && request.getReason() != null) {
-            String notes = ticket.getTechnicianNotes() != null ? ticket.getTechnicianNotes() : "";
-            ticket.setTechnicianNotes(notes + "\n[Chờ phụ tùng] " + request.getReason());
-        }
-        serviceTicketRepo.save(ticket);
-
-        log.info("Ticket {} moved back to PENDING (waiting for parts)", ticketCode);
-        return getTechnicianTicketDetail(ticketCode);
-    }
-
-    /**
      * Technician báo xong sửa xe — IN_PROGRESS → COMPLETED.
      * Chỉ là signal "xe xong", lễ tân sẽ xác nhận thanh toán sau.
      */

@@ -166,38 +166,28 @@ public class ServiceTicketManageService {
         return response;
     }
 
+    /**
+     * Lễ tân xác nhận thanh toán — COMPLETED → PAID.
+     * TODO: implement phần thanh toán + ZNS trigger sau.
+     */
     @Transactional
-    public ServiceTicketDetailResponse updateServiceTicket(String ticketCode, UpdateServiceTicketRequest request) {
-        log.info("Updating service ticket: {}", ticketCode);
+    public ServiceTicketDetailResponse completeTicket(String ticketCode) {
+        log.info("Receptionist completing ticket: {}", ticketCode);
 
         ServiceTicket ticket = serviceTicketRepo.findByTicketCode(ticketCode)
             .orElseThrow(() -> new CheckInException("Không tìm thấy service ticket: " + ticketCode));
 
-        if (ticket.getTicketStatus() == TicketStatus.COMPLETED) {
-            throw new CheckInException("Không thể chỉnh sửa service ticket đã hoàn thành");
+        if (ticket.getTicketStatus() != TicketStatus.COMPLETED) {
+            throw new CheckInException("Chỉ có thể xác nhận thanh toán khi phiếu đang COMPLETED. Hiện tại: " + ticket.getTicketStatus());
         }
 
-        if (ticket.getTicketStatus() == TicketStatus.CANCELLED) {
-            throw new CheckInException("Không thể chỉnh sửa service ticket đã hủy");
-        }
-
-        if (request.getCustomerRequest() != null) {
-            ticket.setCustomerRequest(request.getCustomerRequest());
-        }
-
-        if (ticket.getBookingId() != null && request.getCatalogItemIds() != null) {
-            Booking booking = bookingRepository.findById(ticket.getBookingId())
-                .orElseThrow(() -> new CheckInException("Không tìm thấy booking"));
-
-            booking.setCatalogItemIds(request.getCatalogItemIds());
-            bookingRepository.save(booking);
-
-            log.info("Updated services for booking {}: {}", booking.getBookingId(), request.getCatalogItemIds());
-        }
-
+        ticket.setTicketStatus(TicketStatus.PAID);
+        ticket.setDeliveredAt(java.time.LocalDateTime.now());
+        ticket.setUpdatedAt(java.time.LocalDateTime.now());
         serviceTicketRepo.save(ticket);
 
-        log.info("Service ticket updated successfully: {}", ticketCode);
+        // TODO: trigger ZNS feedback notification here
+        log.info("Ticket {} → PAID", ticketCode);
         return getServiceTicketDetail(ticketCode);
     }
 

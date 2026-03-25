@@ -122,30 +122,6 @@ public class SafetyInspectionService {
         }
     }
 
-    /**
-     * Mở lại inspection để technician bổ sung — ticket phải đang DRAFT, PENDING, hoặc IN_PROGRESS.
-     * Chuyển ticketStatus → INSPECTION, inspectionStatus → PENDING.
-     */
-    public SafetyInspectionResponse reopenInspection(String ticketCode) {
-        ServiceTicket ticket = serviceTicketRepo.findByTicketCode(ticketCode)
-                .orElseThrow(() -> new IllegalArgumentException("Service ticket not found: " + ticketCode));
-        TicketStatus current = ticket.getTicketStatus();
-        if (current != TicketStatus.DRAFT && current != TicketStatus.PENDING && current != TicketStatus.IN_PROGRESS) {
-            throw new IllegalStateException(
-                "Chỉ có thể mở lại kiểm tra khi ticket đang DRAFT, PENDING hoặc IN_PROGRESS. " +
-                "Trạng thái hiện tại: " + current);
-        }
-        SafetyInspection inspection = inspectionRepo.findByServiceTicketId(ticket.getServiceTicketId())
-                .orElseThrow(() -> new IllegalStateException("Chưa có phiếu kiểm tra cho ticket này"));
-        inspection.setInspectionStatus(InspectionStatus.PENDING);
-        inspection.setUpdatedAt(LocalDateTime.now());
-        inspectionRepo.save(inspection);
-        ticket.setTicketStatus(TicketStatus.INSPECTION);
-        ticket.setUpdatedAt(LocalDateTime.now());
-        serviceTicketRepo.save(ticket);
-        return getInspectionByServiceTicket(ticket.getServiceTicketId());
-    }
-
     public SafetyInspectionResponse saveInspectionData(SafetyInspectionRequest request, Integer technicianId) {
         requireTicketInInspectionStatus(request.getServiceTicketId());
         validateInspectionData(request);
