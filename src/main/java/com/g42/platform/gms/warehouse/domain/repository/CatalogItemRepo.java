@@ -1,9 +1,6 @@
 package com.g42.platform.gms.warehouse.domain.repository;
 
-import com.g42.platform.gms.warehouse.domain.entity.Brand;
-import com.g42.platform.gms.warehouse.domain.entity.ProductLine;
-import com.g42.platform.gms.warehouse.domain.entity.SpecAttribute;
-import com.g42.platform.gms.warehouse.domain.entity.Specification;
+import com.g42.platform.gms.warehouse.domain.entity.*;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -17,4 +14,10 @@ public interface CatalogItemRepo {
     List<ProductLine> getAllProductLines();
 
     List<SpecAttribute> getAllSpecAttibutes();
+
+    Brand createBrand(Brand brand);
+
+    Brand getBrandById(Integer brandId);
+
+    CatalogItem createCatalog(CatalogItem domain);
 }

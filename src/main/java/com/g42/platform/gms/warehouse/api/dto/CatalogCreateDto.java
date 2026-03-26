@@ -1,12 +1,9 @@
-package com.g42.platform.gms.warehouse.domain.entity;
-
-import com.g42.platform.gms.marketing.service_catalog.infrastructure.entity.ServiceJpaEntity;
+package com.g42.platform.gms.warehouse.api.dto;
 import com.g42.platform.gms.warehouse.domain.enums.CatalogItemType;
-import jakarta.persistence.*;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
-import lombok.*;
-import org.hibernate.annotations.ColumnDefault;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.math.BigDecimal;
 
@@ -14,12 +11,10 @@ import java.math.BigDecimal;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class CatalogItem {
+public class CatalogCreateDto {
 
-    private Integer itemId;
     private String itemName;
     private CatalogItemType itemType;
-    private Boolean isActive = true;
     private Integer warrantyDurationMonths;
     private Long serviceServiceId;
     private String sku;
@@ -33,4 +28,5 @@ public class CatalogItem {
     private Boolean isRecurring;
     private Integer brandId;
     private Integer productLineId;
+
 }
