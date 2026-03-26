@@ -134,7 +134,6 @@ public abstract class BookingDtoMapper {
         dto.setItemId(item.getItemId());
         dto.setItemName(item.getItemName());
         dto.setItemType(item.getItemType());
-        dto.setEstimatedPrice(item.getEstimatedPrice());
         if (item.getServiceService() != null) {
             dto.setEstimateTime(item.getServiceService().getEstimateTime());
         }

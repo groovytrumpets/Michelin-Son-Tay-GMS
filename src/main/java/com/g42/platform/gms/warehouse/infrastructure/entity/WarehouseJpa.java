@@ -1,4 +1,4 @@
-package com.g42.platform.gms.estimation.infrastructure.entity;
+package com.g42.platform.gms.warehouse.infrastructure.entity;
 
 import com.g42.platform.gms.auth.entity.StaffProfile;
 import com.g42.platform.gms.common.enums.WarehouseTypeEnum;
@@ -19,7 +19,7 @@ public class WarehouseJpa {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "warehouse_id", nullable = false)
-    private Integer id;
+    private Integer warehouseId;
 
     @Size(max = 20)
     @NotNull
@@ -43,9 +43,8 @@ public class WarehouseJpa {
     @Column(name = "address")
     private String address;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "manager_staff_id")
-    private StaffProfile managerStaff;
+    @Column(name = "manager_staff_id")
+    private Integer managerStaffId;
 
     @ColumnDefault("1")
     @Column(name = "is_active")
