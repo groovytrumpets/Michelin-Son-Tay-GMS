@@ -135,4 +135,35 @@ public class ImageUploadService {
             return null;
         }
     }
+
+    public String uploadVideo(MultipartFile file, String folder) throws IOException {
+
+
+
+
+        if (file.getSize() > FileUploadConstants.MAX_VIDEO_SIZE_BYTES) {
+            throw new IllegalArgumentException("Dung lượng video vượt quá mức cho phép!");
+        }
+
+        // 3. Lấy trực tiếp mảng byte của file gốc (Không dùng Thumbnailator)
+        byte[] videoBytes = file.getBytes();
+
+        // 4. Cấu hình upload cho Cloudinary
+        Map<String, Object> options = new HashMap<>();
+        options.put("folder", folder);
+
+        // BẮT BUỘC: Định dạng tài nguyên phải là "video"
+        options.put("resource_type", "video");
+
+        // BÍ QUYẾT TỐI ƯU: Nhờ Cloudinary tự nén dung lượng và chọn format nhẹ nhất
+        options.put("quality", "auto");
+        options.put("fetch_format", "auto");
+
+        // 5. Upload và lấy link
+        Map uploadResult = cloudinary.uploader().upload(videoBytes, options);
+        String url = (String) uploadResult.get("secure_url");
+
+        log.info("Video uploaded successfully: {}", url);
+        return url;
+    }
 }
