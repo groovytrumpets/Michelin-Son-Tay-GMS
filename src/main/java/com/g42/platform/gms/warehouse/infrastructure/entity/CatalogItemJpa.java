@@ -22,7 +22,7 @@ public class CatalogItemJpa {
     @Column(nullable = false)
     private CatalogItemType itemType;
 
-    private Double estimatedPrice;
+
 
     private Boolean isActive = true;
     @ColumnDefault("0")

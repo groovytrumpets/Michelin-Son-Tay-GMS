@@ -36,7 +36,6 @@ public class CatalogItemService {
                 .itemId(entity.getItemId())
                 .itemName(entity.getItemName())
                 .itemType(entity.getItemType())
-                .estimatedPrice(entity.getEstimatedPrice())
                 .estimateTime(estimateTime)
                 .isActive(entity.getIsActive())
                 .build();
