@@ -36,7 +36,7 @@ public class WarehouseController {
         List<SpecificationDto> promotionCreateDtoList = catalogItemService.getAllSpecs();
         return ResponseEntity.ok(ApiResponses.success(promotionCreateDtoList));
     }
-    @GetMapping("/specification/all")
+    @GetMapping("/spec-attribute/all")
     public ResponseEntity<ApiResponse<List<SpecAttributeDto>>> getAllSpecAttributes() {
         List<SpecAttributeDto> promotionCreateDtoList = catalogItemService.getAllSpecAttributes();
         return ResponseEntity.ok(ApiResponses.success(promotionCreateDtoList));
