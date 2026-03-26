@@ -1,8 +1,5 @@
-package com.g42.platform.gms.warehouse.domain.entity;
+package com.g42.platform.gms.warehouse.api.dto;
 
-import jakarta.persistence.*;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -12,11 +9,9 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class Specification {
+public class SpecificationDto {
     private Integer specId;
     private Integer itemId;
     private Integer attributeId;
     private String specValue;
-
-
 }

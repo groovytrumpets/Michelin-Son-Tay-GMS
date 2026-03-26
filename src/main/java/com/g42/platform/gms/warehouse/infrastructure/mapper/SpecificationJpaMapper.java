@@ -7,6 +7,6 @@ import com.g42.platform.gms.warehouse.infrastructure.entity.SpecificationJpa;
 import org.mapstruct.Mapper;
 
 @Mapper(componentModel = "spring")
-public interface SpectificationJpaMapper {
+public interface SpecificationJpaMapper {
     Specification toDomain(SpecificationJpa specificationJpa);
 }

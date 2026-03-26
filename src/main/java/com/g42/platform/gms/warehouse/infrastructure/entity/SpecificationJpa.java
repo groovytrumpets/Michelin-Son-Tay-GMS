@@ -23,7 +23,7 @@ public class SpecificationJpa {
 
     @NotNull
     @Column(name = "attribute_id", nullable = false)
-    private Integer attribute;
+    private Integer attributeId;
 
     @Size(max = 100)
     @Column(name = "spec_value", length = 100)

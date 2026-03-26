@@ -14,7 +14,7 @@ import org.hibernate.annotations.ColumnDefault;
 @AllArgsConstructor
 @Table(name = "brand", schema = "michelin_garage")
 public class Brand {
-    private Integer id;
+    private Integer brandId;
     private String brandName;
     private String logoUrl;
     private Byte isActive;

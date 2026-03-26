@@ -14,7 +14,7 @@ public class BrandJpa {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "brand_id", nullable = false)
-    private Integer id;
+    private Integer brandId;
 
     @Size(max = 100)
     @Column(name = "brand_name", length = 100)
