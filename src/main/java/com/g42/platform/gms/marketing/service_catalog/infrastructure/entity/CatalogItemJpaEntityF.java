@@ -19,7 +19,6 @@ public class CatalogItemJpaEntityF {
     @Column(nullable = false)
     private String itemType; // SERVICE hoặc PART
 
-    private Double estimatedPrice;
 
     private Boolean isActive = true;
     @ColumnDefault("0")
