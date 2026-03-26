@@ -39,7 +39,6 @@ public class NotificationTestController {
         String verifier = PKCE.generateVerifier();
         String challenge = PKCE.generateChallenge(verifier);
         String url = zaloOAuthService.buildAuthorizeUrl();
-
         response.sendRedirect(url);
     }
     private ZaloTokenRepo zaloTokenRepo;
