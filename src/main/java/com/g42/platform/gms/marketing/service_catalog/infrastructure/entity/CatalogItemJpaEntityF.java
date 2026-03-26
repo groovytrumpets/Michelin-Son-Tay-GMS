@@ -24,7 +24,6 @@ public class CatalogItemJpaEntityF {
     @ColumnDefault("0")
     @Column(name = "warranty_duration_months")
     private Integer warrantyDurationMonths;
-    @NotNull
-    @Column(name = "service_service_id", nullable = false)
+    @Column(name = "service_service_id", nullable = true)
     private Long serviceService;
 }

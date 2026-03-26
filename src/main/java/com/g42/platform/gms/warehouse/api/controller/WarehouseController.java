@@ -2,15 +2,16 @@ package com.g42.platform.gms.warehouse.api.controller;
 
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
+import com.g42.platform.gms.customer.api.dto.CustomerCreateDto;
 import com.g42.platform.gms.warehouse.api.dto.*;
 import com.g42.platform.gms.warehouse.app.service.CatalogItemService;
 import com.g42.platform.gms.warehouse.app.service.WarehouseService;
+import com.g42.platform.gms.warehouse.domain.entity.Brand;
+import com.g42.platform.gms.warehouse.domain.entity.CatalogItem;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -40,5 +41,13 @@ public class WarehouseController {
     public ResponseEntity<ApiResponse<List<SpecAttributeDto>>> getAllSpecAttributes() {
         List<SpecAttributeDto> promotionCreateDtoList = catalogItemService.getAllSpecAttributes();
         return ResponseEntity.ok(ApiResponses.success(promotionCreateDtoList));
+    }
+    @PostMapping("/brand/create")
+    public ResponseEntity<ApiResponse<Brand>> createBrand(@RequestBody Brand brand) {
+        return ResponseEntity.ok(ApiResponses.success(catalogItemService.createNewBrand(brand)));
+    }
+    @PostMapping("/catalog-item/create")
+    public ResponseEntity<ApiResponse<CatalogItemDto>> createCatalog(@RequestBody CatalogCreateDto createDto) {
+        return ResponseEntity.ok(ApiResponses.success(catalogItemService.createNewCatalog(createDto)));
     }
 }
