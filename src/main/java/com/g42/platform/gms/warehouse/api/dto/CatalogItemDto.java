@@ -1,25 +1,21 @@
-package com.g42.platform.gms.warehouse.domain.entity;
+package com.g42.platform.gms.warehouse.api.dto;
 
-import com.g42.platform.gms.marketing.service_catalog.infrastructure.entity.ServiceJpaEntity;
 import com.g42.platform.gms.warehouse.domain.enums.CatalogItemType;
-import jakarta.persistence.*;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
-import lombok.*;
-import org.hibernate.annotations.ColumnDefault;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.math.BigDecimal;
-
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class CatalogItem {
-
+public class CatalogItemDto {
     private Integer itemId;
     private String itemName;
     private CatalogItemType itemType;
-    private Boolean isActive = true;
+    private Boolean isActive;
     private Integer warrantyDurationMonths;
     private Long serviceServiceId;
     private String sku;

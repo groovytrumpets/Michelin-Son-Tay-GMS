@@ -8,6 +8,8 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 import org.hibernate.annotations.ColumnDefault;
 
+import java.math.BigDecimal;
+
 @Entity(name = "WarehouseCatalogItem")
 @Table(name = "catalog_item")
 @Data
@@ -32,12 +34,10 @@ public class CatalogItemJpa {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "service_service_id", nullable = false)
     private ServiceJpaEntity serviceService;
-    @Size(max = 45)
-    @NotNull
-    @Column(name = "sku", nullable = false, length = 45)
+
     private String sku;
-    @Column(name = "price")
-    private Double price;
+    @Column(name = "price", precision = 12, scale = 2)
+    private BigDecimal price;
     @Column(name = "show_price")
     private Boolean showPrice;
     @Lob
@@ -46,6 +46,9 @@ public class CatalogItemJpa {
     @Size(max = 100)
     @Column(name = "image_url", length = 100)
     private String imageUrl;
+    @Size(max = 50)
+    @Column(name = "unit", length = 50)
+    private String unit;
     @Column(name = "combo_duration_months")
     private Integer comboDurationMonths;
     @Lob
@@ -54,4 +57,11 @@ public class CatalogItemJpa {
     @ColumnDefault("0")
     @Column(name = "is_recurring")
     private Boolean isRecurring;
+    @NotNull
+    @Column(name = "brand_id", nullable = false)
+    private Integer brandId;
+    @NotNull
+    @Column(name = "product_line_iid", nullable = false)
+    private Integer productLineIid;
+
 }

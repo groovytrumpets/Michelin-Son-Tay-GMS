@@ -1,9 +1,7 @@
 package com.g42.platform.gms.warehouse.infrastructure;
 
-import com.g42.platform.gms.warehouse.domain.entity.Brand;
-import com.g42.platform.gms.warehouse.domain.entity.ProductLine;
-import com.g42.platform.gms.warehouse.domain.entity.SpecAttribute;
-import com.g42.platform.gms.warehouse.domain.entity.Specification;
+import com.g42.platform.gms.warehouse.api.dto.CatalogCreateDto;
+import com.g42.platform.gms.warehouse.domain.entity.*;
 import com.g42.platform.gms.warehouse.domain.repository.CatalogItemRepo;
 import com.g42.platform.gms.warehouse.infrastructure.entity.*;
 import com.g42.platform.gms.warehouse.infrastructure.mapper.*;
@@ -60,5 +58,23 @@ public class CatalogItemRepoImpl implements CatalogItemRepo {
     public List<SpecAttribute> getAllSpecAttibutes() {
         List<SpecAttributeJpa> specificationJpaList = specAttributeJpaRepo.findAll();
         return specificationJpaList.stream().map(specAttributeJpaMapper::toDomain).toList();
+    }
+
+    @Override
+    public Brand createBrand(Brand brand) {
+        BrandJpa brandJpa = brandJpaRepo.save(brandJpaMapper.toJpa(brand));
+        return brandJpaMapper.toDomain(brandJpa);
+    }
+
+    @Override
+    public Brand getBrandById(Integer brandId) {
+        BrandJpa brandJpa = brandJpaRepo.findById(brandId).orElse(null);
+        return brandJpaMapper.toDomain(brandJpa);
+    }
+
+    @Override
+    public CatalogItem createCatalog(CatalogItem catalogItem) {
+        CatalogItemJpa catalogItemJpa = catalogItemJpaRepo.save(catalogItemJpaMapper.toJpa(catalogItem));
+        return catalogItemJpaMapper.toDomain(catalogItemJpa);
     }
 }
