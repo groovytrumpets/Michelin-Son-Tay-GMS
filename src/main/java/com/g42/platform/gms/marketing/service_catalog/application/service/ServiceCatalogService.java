@@ -63,15 +63,18 @@ public class ServiceCatalogService {
             int displayOrder=1;
             for (MultipartFile file : request.getMediaFiles()) {
                 if (!file.isEmpty()) {
-                    String mediaUrl = imageUploadService.uploadImage(file, "garage/services/gallery");
-                    ServiceMedia mediaEntity = new ServiceMedia();
-                    mediaEntity.setMediaUrl(mediaUrl);
-                    mediaEntity.setDisplayOrder(displayOrder++);
+
 
                     String contentType = file.getContentType();
+                        ServiceMedia mediaEntity = new ServiceMedia();
+                        mediaEntity.setDisplayOrder(displayOrder++);
                     if (contentType != null && contentType.startsWith("video")) {
+                        String mediaUrl = imageUploadService.uploadVideo(file, "garage/services/video");
+                        mediaEntity.setMediaUrl(mediaUrl);
                         mediaEntity.setMediaType(MediaType.VIDEO);
-                    } else {
+                    } else {String mediaUrl = imageUploadService.uploadImage(file, "garage/services/gallery");
+
+                        mediaEntity.setMediaUrl(mediaUrl);
                         mediaEntity.setMediaType(MediaType.IMAGE);
                     }
                     mediaList.add(mediaEntity);
