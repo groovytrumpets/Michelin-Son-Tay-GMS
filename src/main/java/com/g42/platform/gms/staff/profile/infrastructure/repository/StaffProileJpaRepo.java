@@ -42,9 +42,24 @@ public interface StaffProileJpaRepo extends JpaRepository<StaffProfileJpa, Integ
         AND sta.serviceTicketId IN (
             SELECT st.serviceTicketId FROM ServiceTicketManagement st
             WHERE st.ticketStatus = 'IN_PROGRESS'
+            OR st.ticketStatus = 'INSPECTION'
         )
+    )
+    AND sp.staffId NOT IN (
+        SELECT sta2.staffId FROM ServiceTicketAssignmentJpa sta2
+        WHERE sta2.serviceTicketId = :ticketId
+        AND sta2.status = 'ACTIVE'
     )
     AND r.roleCode = :role
 """)
-    List<StaffProfileJpa> findAvailableStaffByRole(@Param("role") String role);
+    List<StaffProfileJpa> findAvailableStaffByRole(@Param("role") String role, @Param("ticketId") Integer ticketId);
+
+    /** Kiểm tra staff có role cụ thể không (dùng để validate khi assign). */
+    @Query("""
+    SELECT COUNT(sp) > 0 FROM StaffProfileJpa sp
+    JOIN sp.roles r
+    WHERE sp.staffId = :staffId
+    AND r.roleCode = :role
+""")
+    boolean existsByStaffIdAndRole(@Param("staffId") Integer staffId, @Param("role") String role);
 }

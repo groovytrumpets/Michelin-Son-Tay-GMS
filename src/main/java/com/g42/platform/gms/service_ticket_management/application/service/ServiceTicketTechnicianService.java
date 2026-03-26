@@ -12,7 +12,7 @@ import com.g42.platform.gms.service_ticket_management.api.dto.technician.Technic
 import com.g42.platform.gms.service_ticket_management.api.dto.technician.UpdateTechnicianNotesRequest;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import com.g42.platform.gms.service_ticket_management.domain.entity.OdometerReading;
-import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicket;
+import com.g42.platform.gms.service_ticket_management.domain.repository.TicketAssignmentRepo;import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicket;
 import com.g42.platform.gms.service_ticket_management.domain.entity.VehicleConditionPhoto;
 import com.g42.platform.gms.service_ticket_management.domain.exception.CheckInException;
 import com.g42.platform.gms.service_ticket_management.domain.repository.OdometerReadingRepo;
@@ -192,6 +192,29 @@ public class ServiceTicketTechnicianService {
         serviceTicketRepo.save(ticket);
 
         log.info("Technician notes updated successfully: {}", ticketCode);
+        return getTechnicianTicketDetail(ticketCode);
+    }
+
+    /**
+     * Technician bắt đầu kiểm tra an toàn — DRAFT → INSPECTION.
+     * Kỹ thuật viên nhận phiếu và bắt đầu quá trình kiểm tra.
+     */
+    @Transactional
+    public TechnicianTicketDetailResponse startInspection(String ticketCode) {
+        log.info("Technician starting inspection on ticket: {}", ticketCode);
+
+        ServiceTicket ticket = serviceTicketRepo.findByTicketCode(ticketCode)
+            .orElseThrow(() -> new CheckInException("Không tìm thấy service ticket: " + ticketCode));
+
+        if (ticket.getTicketStatus() != TicketStatus.DRAFT) {
+            throw new CheckInException("Chỉ có thể bắt đầu kiểm tra khi phiếu đang ở trạng thái DRAFT");
+        }
+
+        ticket.setTicketStatus(TicketStatus.INSPECTION);
+        ticket.setUpdatedAt(java.time.LocalDateTime.now());
+        serviceTicketRepo.save(ticket);
+
+        log.info("Ticket {} status changed to INSPECTION by technician", ticketCode);
         return getTechnicianTicketDetail(ticketCode);
     }
 

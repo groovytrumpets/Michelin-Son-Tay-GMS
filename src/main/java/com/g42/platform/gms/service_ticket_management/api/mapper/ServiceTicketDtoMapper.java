@@ -14,5 +14,7 @@ public interface ServiceTicketDtoMapper {
 
     @Mapping(target = "photos", ignore = true)
     @Mapping(target = "warnings", ignore = true)
+    @Mapping(target = "advisorId", ignore = true)
+    @Mapping(target = "inspectionStatus", ignore = true)
     ServiceTicketResponse toResponse(ServiceTicket domain);
 }

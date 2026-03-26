@@ -1,5 +1,7 @@
 package com.g42.platform.gms.service_ticket_management.api.controller;
 
+import com.g42.platform.gms.service_ticket_management.api.dto.assign.AvailableStaffDto;
+import com.g42.platform.gms.service_ticket_management.application.service.TicketAssignmentService;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.service_ticket_management.api.dto.checkin.*;
@@ -11,7 +13,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
+
 
 /**
  * REST Controller for vehicle check-in process.
@@ -24,11 +28,11 @@ import org.springframework.web.multipart.MultipartFile;
 public class CheckInController {
 
     private final CheckInService checkInService;
+    private final TicketAssignmentService ticketAssignmentService;
 
     /**
-     * Lookup booking by booking code.
-     * Returns booking information with customer details and vehicle suggestions.
-     * 
+     * Tra cứu booking theo booking code — bước đầu tiên của check-in form.
+     * Frontend gọi để hiển thị thông tin khách hàng, dịch vụ trước khi điền form.
      * POST /api/receptionist/check-in/lookup
      */
     @PostMapping("/lookup")
@@ -48,9 +52,7 @@ public class CheckInController {
     }
 
     /**
-     * Create a new vehicle for customer.
-     * Used when customer doesn't have a vehicle in the system yet.
-     * 
+     * Tạo xe mới cho khách hàng chưa có xe trong hệ thống.
      * POST /api/receptionist/check-in/vehicles/create
      */
     @PostMapping("/vehicles/create")
@@ -70,142 +72,25 @@ public class CheckInController {
     }
 
     /**
-     * Save or select vehicle for check-in.
-     * If vehicleId provided, validate and return existing vehicle.
-     * If vehicleId null, create new vehicle.
-     * 
-     * POST /api/receptionist/check-in/vehicle
+     * Lấy danh sách advisor để hiển thị popup phân công khi check-in.
+     * GET /api/receptionist/check-in/advisors
      */
-    @PostMapping("/vehicle")
-    public ResponseEntity<ApiResponse<VehicleResponse>> saveVehicle(@Valid @RequestBody VehicleRequest request) {
-        try {
-            VehicleResponse response = checkInService.saveVehicle(request);
-            return ResponseEntity.ok(ApiResponses.success(response));
-        } catch (CheckInException e) {
-            log.error("Vehicle save failed: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponses.error(e.getCode(), e.getMessage()));
-        } catch (Exception e) {
-            log.error("Unexpected error during vehicle save", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponses.error("INTERNAL_ERROR", "Lỗi hệ thống"));
-        }
-    }
-
-    /**
-     * Upload license plate photo.
-     * 
-     * POST /api/receptionist/check-in/photos/license-plate
-     */
-    @PostMapping("/photos/license-plate")
-    public ResponseEntity<ApiResponse<PhotoUploadResponse>> uploadLicensePlatePhoto(
-            @RequestParam("file") MultipartFile file,
-            @RequestParam("vehicleId") Integer vehicleId) {
-        try {
-            PhotoUploadResponse response = checkInService.uploadLicensePlatePhoto(file, vehicleId);
-            return ResponseEntity.ok(ApiResponses.success(response));
-        } catch (CheckInException e) {
-            log.error("License plate photo upload failed: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponses.error(e.getCode(), e.getMessage()));
-        } catch (Exception e) {
-            log.error("Unexpected error during license plate photo upload", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponses.error("INTERNAL_ERROR", "Lỗi hệ thống"));
-        }
-    }
-
-    /**
-     * Upload vehicle condition photo.
-     * 
-     * POST /api/receptionist/check-in/photos/condition
-     */
-    @PostMapping("/photos/condition")
-    public ResponseEntity<ApiResponse<PhotoUploadResponse>> uploadConditionPhoto(
-            @RequestParam("file") MultipartFile file,
-            @RequestParam("ticketCode") String ticketCode,
-            @RequestParam("category") String category,
-            @RequestParam(value = "description", required = false) String description) {
-        try {
-            PhotoUploadRequest request = new PhotoUploadRequest();
-            request.setTicketCode(ticketCode);
-            request.setCategory(com.g42.platform.gms.service_ticket_management.domain.enums.PhotoCategory.valueOf(category));
-            request.setDescription(description);
-            
-            PhotoUploadResponse response = checkInService.uploadConditionPhoto(file, request);
-            return ResponseEntity.ok(ApiResponses.success(response));
-        } catch (CheckInException e) {
-            log.error("Condition photo upload failed: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponses.error(e.getCode(), e.getMessage()));
-        } catch (IllegalArgumentException e) {
-            log.error("Invalid photo category: {}", category);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponses.error("INVALID_CATEGORY", "Category không hợp lệ"));
-        } catch (Exception e) {
-            log.error("Unexpected error during condition photo upload", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponses.error("INTERNAL_ERROR", "Lỗi hệ thống"));
-        }
-    }
-
-    /**
-     * Save odometer reading with rollback detection.
-     * 
-     * POST /api/receptionist/check-in/odometer
-     */
-    @PostMapping("/odometer")
-    public ResponseEntity<ApiResponse<OdometerResponse>> saveOdometer(@Valid @RequestBody OdometerRequest request) {
-        try {
-            OdometerResponse response = checkInService.saveOdometer(request);
-            return ResponseEntity.ok(ApiResponses.success(response));
-        } catch (CheckInException e) {
-            log.error("Odometer save failed: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponses.error(e.getCode(), e.getMessage()));
-        } catch (Exception e) {
-            log.error("Unexpected error during odometer save", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponses.error("INTERNAL_ERROR", "Lỗi hệ thống"));
-        }
-    }
-
-    /**
-     * Complete check-in process.
-     * Finalizes service ticket creation and marks data as immutable.
-     * 
-     * POST /api/receptionist/check-in/complete
-     */
-    @PostMapping("/complete")
-    public ResponseEntity<ApiResponse<ServiceTicketResponse>> completeCheckIn(@Valid @RequestBody CompleteCheckInRequest request) {
-        try {
-            ServiceTicketResponse response = checkInService.completeCheckIn(request);
-            return ResponseEntity.ok(ApiResponses.success(response));
-        } catch (CheckInException e) {
-            log.error("Check-in completion failed: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponses.error(e.getCode(), e.getMessage()));
-        } catch (Exception e) {
-            log.error("Unexpected error during check-in completion", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponses.error("INTERNAL_ERROR", "Lỗi hệ thống"));
-        }
+    @GetMapping("/advisors")
+    public ResponseEntity<ApiResponse<List<AvailableStaffDto>>> getAdvisors() {
+        List<AvailableStaffDto> advisors = ticketAssignmentService.getAvailableStaff(0, "ADVISOR");
+        return ResponseEntity.ok(ApiResponses.success(advisors));
     }
 
     /**
      * Get all vehicles of a customer.
-     * Used for vehicle selection dropdown in check-in form.
-     * 
      * GET /api/receptionist/check-in/customers/{customerId}/vehicles
      */
     @GetMapping("/customers/{customerId}/vehicles")
     public ResponseEntity<ApiResponse<CustomerVehiclesResponse>> getCustomerVehicles(@PathVariable Integer customerId) {
         try {
-            log.info("Getting vehicles for customer: {}", customerId);
             CustomerVehiclesResponse response = checkInService.getCustomerVehicles(customerId);
             return ResponseEntity.ok(ApiResponses.success(response));
         } catch (CheckInException e) {
-            log.error("Get customer vehicles failed: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponses.error(e.getCode(), e.getMessage()));
         } catch (Exception e) {
@@ -217,14 +102,6 @@ public class CheckInController {
 
     /**
      * Complete check-in in single page form (all-in-one).
-     * This endpoint handles the entire check-in process in one API call:
-     * - Select/create vehicle
-     * - Upload all photos
-     * - Save odometer reading
-     * - Complete check-in
-     * 
-     * All operations are done in a single transaction.
-     * 
      * POST /api/receptionist/check-in/complete-all
      */
     @PostMapping("/complete-all")
@@ -244,5 +121,4 @@ public class CheckInController {
                 .body(ApiResponses.error("INTERNAL_ERROR", "Lỗi hệ thống: " + e.getMessage()));
         }
     }
-
 }

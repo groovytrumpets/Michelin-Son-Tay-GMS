@@ -69,7 +69,8 @@ public class ServiceTicketAdvisorService {
     public ServiceTicketDetailResponse backToDraft(String ticketCode) {
         ServiceTicket ticket = findTicket(ticketCode);
         TicketStatus current = ticket.getTicketStatus();
-        if (current != TicketStatus.PENDING && current != TicketStatus.IN_PROGRESS) {
+        boolean canBackToDraft = current == TicketStatus.PENDING || current == TicketStatus.IN_PROGRESS;
+        if (!canBackToDraft) {
             throw new CheckInException("Chỉ có thể đưa về DRAFT khi phiếu đang PENDING hoặc IN_PROGRESS. Hiện tại: " + current);
         }
         ticket.setTicketStatus(TicketStatus.DRAFT);
@@ -84,7 +85,10 @@ public class ServiceTicketAdvisorService {
     public ServiceTicketDetailResponse cancelTicket(String ticketCode) {
         ServiceTicket ticket = findTicket(ticketCode);
         TicketStatus current = ticket.getTicketStatus();
-        if (current != TicketStatus.DRAFT && current != TicketStatus.PENDING && current != TicketStatus.IN_PROGRESS) {
+        boolean canCancel = current == TicketStatus.DRAFT
+            || current == TicketStatus.PENDING
+            || current == TicketStatus.IN_PROGRESS;
+        if (!canCancel) {
             throw new CheckInException("Chỉ có thể hủy khi phiếu đang DRAFT, PENDING hoặc IN_PROGRESS. Hiện tại: " + current);
         }
         ticket.setTicketStatus(TicketStatus.CANCELLED);
@@ -99,7 +103,10 @@ public class ServiceTicketAdvisorService {
     public ServiceTicketDetailResponse updateEstimate(String ticketCode, UpdateServiceTicketRequest request) {
         ServiceTicket ticket = findTicket(ticketCode);
         TicketStatus current = ticket.getTicketStatus();
-        if (current == TicketStatus.COMPLETED || current == TicketStatus.PAID || current == TicketStatus.CANCELLED) {
+        boolean isFinalized = current == TicketStatus.COMPLETED
+            || current == TicketStatus.PAID
+            || current == TicketStatus.CANCELLED;
+        if (isFinalized) {
             throw new CheckInException("Không thể cập nhật báo giá khi phiếu đang " + current);
         }
         if (request.getCustomerRequest() != null) {
