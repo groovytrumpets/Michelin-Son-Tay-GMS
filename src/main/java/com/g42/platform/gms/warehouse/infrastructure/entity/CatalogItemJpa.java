@@ -30,10 +30,8 @@ public class CatalogItemJpa {
     @ColumnDefault("0")
     @Column(name = "warranty_duration_months")
     private Integer warrantyDurationMonths;
-    @NotNull
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "service_service_id", nullable = false)
-    private ServiceJpaEntity serviceService;
+    @Column(name = "service_service_id", nullable = false)
+    private Long serviceId;
 
     private String sku;
     @Column(name = "price", precision = 12, scale = 2)
@@ -57,11 +55,11 @@ public class CatalogItemJpa {
     @ColumnDefault("0")
     @Column(name = "is_recurring")
     private Boolean isRecurring;
-    @NotNull
+
     @Column(name = "brand_id", nullable = false)
     private Integer brandId;
-    @NotNull
-    @Column(name = "product_line_iid", nullable = false)
-    private Integer productLineIid;
+
+    @Column(name = "product_line_id", nullable = false)
+    private Integer productLineId;
 
 }

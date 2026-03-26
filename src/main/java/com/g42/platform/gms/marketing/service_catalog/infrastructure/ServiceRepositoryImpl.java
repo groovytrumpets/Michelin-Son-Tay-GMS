@@ -38,4 +38,10 @@ public class ServiceRepositoryImpl implements ServiceRepository {
 
         return catalogIds.toArray(new Long[0]);
     }
+
+    @Override
+    public Service save(Service service) {
+        ServiceJpaEntity serviceJpaEntity = serviceJpaRepository.save(serviceMapper.toJpaEntity(service));
+        return serviceMapper.toDomain(serviceJpaEntity);
+    }
 }

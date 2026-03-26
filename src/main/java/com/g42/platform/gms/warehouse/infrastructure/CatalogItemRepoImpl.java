@@ -1,7 +1,11 @@
 package com.g42.platform.gms.warehouse.infrastructure;
 
+import com.g42.platform.gms.marketing.service_catalog.domain.entity.Service;
+import com.g42.platform.gms.marketing.service_catalog.infrastructure.entity.ServiceJpaEntity;
+import com.g42.platform.gms.marketing.service_catalog.infrastructure.repository.ServiceJpaRepository;
 import com.g42.platform.gms.warehouse.api.dto.CatalogCreateDto;
 import com.g42.platform.gms.warehouse.domain.entity.*;
+import com.g42.platform.gms.warehouse.domain.enums.CatalogItemType;
 import com.g42.platform.gms.warehouse.domain.repository.CatalogItemRepo;
 import com.g42.platform.gms.warehouse.infrastructure.entity.*;
 import com.g42.platform.gms.warehouse.infrastructure.mapper.*;
@@ -34,6 +38,8 @@ public class CatalogItemRepoImpl implements CatalogItemRepo {
     private ProductLineJpaMapper productLineJpaMapper;
     @Autowired
     private SpecificationJpaMapper specificationJpaMapper;
+    @Autowired
+    private ServiceJpaRepository serviceJpaRepository;
 
 
     @Override

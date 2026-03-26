@@ -4,10 +4,13 @@ import com.cloudinary.Cloudinary;
 import com.g42.platform.gms.common.constant.FileUploadConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.coobird.thumbnailator.Thumbnails;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,14 +30,20 @@ public class ImageUploadService {
      */
     public String uploadImage(MultipartFile file, String folder) throws IOException {
         validateFile(file);
-        
-        // Simple upload without transformation - Cloudinary will store original
-        // You can apply transformation via URL later if needed
+        ByteArrayOutputStream os = new ByteArrayOutputStream();
+        try (InputStream is = file.getInputStream()) {
+            Thumbnails.of(is)
+                    .size(1280, 1280) // Giới hạn kích thước tối đa (VD: HD/FullHD)
+                    .outputQuality(0.7) // Giảm chất lượng xuống 70% (mắt thường không phân biệt được)
+                    .toOutputStream(os); // Xuất ra stream
+        }
+        byte[] compressedImageBytes = os.toByteArray();
+
         Map<String, Object> options = new HashMap<>();
         options.put("folder", folder);
         options.put("resource_type", "image");
         
-        Map uploadResult = cloudinary.uploader().upload(file.getBytes(), options);
+        Map uploadResult = cloudinary.uploader().upload(compressedImageBytes, options);
         String url = (String) uploadResult.get("secure_url");
         
         log.info("Image uploaded successfully: {}", url);
