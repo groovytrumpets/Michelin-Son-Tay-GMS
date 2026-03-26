@@ -15,6 +15,7 @@ import com.g42.platform.gms.service_ticket_management.domain.exception.Assignmen
 import com.g42.platform.gms.promotion.domain.exception.PromotionException;
 import com.g42.platform.gms.staff.attendance.domain.exception.StaffAttendanceException;
 import com.g42.platform.gms.staff.profile.domain.exception.StaffException;
+import com.g42.platform.gms.warehouse.domain.exception.WarehouseException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -159,6 +160,13 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponses.error(ex.getErrorCode().name(), ex.getMessage()));
+    }
+    @ExceptionHandler(WarehouseException.class)
+    public ResponseEntity<ApiResponse<?>> handleScheduleException(WarehouseException ex) {
+        System.err.println("Warehouse Error: " + ex.getCode().name() + " - " + ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponses.error(ex.getCode().name(), ex.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
