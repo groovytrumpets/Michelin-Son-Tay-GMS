@@ -7,6 +7,6 @@ public class ServiceItemDto {
     private Integer itemId;
     private String itemName;
     private String itemType;
-    private Double estimatedPrice;
+
     private Integer estimateTime;
 }

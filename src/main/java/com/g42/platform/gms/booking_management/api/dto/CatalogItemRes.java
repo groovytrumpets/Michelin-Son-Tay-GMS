@@ -14,5 +14,5 @@ public class CatalogItemRes {
     private Integer itemId;
     private String itemName;
     private String itemType;
-    private Double estimatedPrice;
+
 }
