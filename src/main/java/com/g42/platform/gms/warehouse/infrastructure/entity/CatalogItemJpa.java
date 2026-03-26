@@ -1,13 +1,14 @@
 package com.g42.platform.gms.warehouse.infrastructure.entity;
 
 import com.g42.platform.gms.marketing.service_catalog.infrastructure.entity.ServiceJpaEntity;
+import com.g42.platform.gms.warehouse.domain.enums.CatalogItemType;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 import org.hibernate.annotations.ColumnDefault;
 
-@Entity
+@Entity(name = "WarehouseCatalogItem")
 @Table(name = "catalog_item")
 @Data
 public class CatalogItemJpa {
@@ -19,7 +20,7 @@ public class CatalogItemJpa {
     private String itemName;
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private CascadeType itemType;
+    private CatalogItemType itemType;
 
     private Double estimatedPrice;
 

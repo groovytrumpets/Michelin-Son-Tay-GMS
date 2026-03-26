@@ -1,7 +1,6 @@
 package com.g42.platform.gms.warehouse.infrastructure.entity;
 
 import com.g42.platform.gms.auth.entity.StaffProfile;
-import com.g42.platform.gms.estimation.infrastructure.entity.WarehouseJpa;
 import com.g42.platform.gms.warehouse.domain.enums.StockTransferStatus;
 import com.g42.platform.gms.warehouse.domain.enums.StockTransferType;
 import jakarta.persistence.*;

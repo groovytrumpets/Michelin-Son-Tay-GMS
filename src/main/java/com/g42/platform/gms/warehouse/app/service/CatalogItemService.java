@@ -15,7 +15,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
-@Service
+@Service("catalogItemWarehouseService")
 public class CatalogItemService {
     @Autowired
     private CatalogItemRepo catalogItemRepo;
