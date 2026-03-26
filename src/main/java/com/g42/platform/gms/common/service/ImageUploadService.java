@@ -30,6 +30,8 @@ public class ImageUploadService {
      */
     public String uploadImage(MultipartFile file, String folder) throws IOException {
         validateFile(file);
+        byte[] compressedImageBytes;
+        if (file.getSize() > FileUploadConstants.MAX_IMAGE_SIZE_BYTES){
         ByteArrayOutputStream os = new ByteArrayOutputStream();
         try (InputStream is = file.getInputStream()) {
             Thumbnails.of(is)
@@ -37,15 +39,18 @@ public class ImageUploadService {
                     .outputQuality(0.7) // Giảm chất lượng xuống 70% (mắt thường không phân biệt được)
                     .toOutputStream(os); // Xuất ra stream
         }
-        byte[] compressedImageBytes = os.toByteArray();
+            compressedImageBytes = os.toByteArray();
+        }else {
+            compressedImageBytes = file.getBytes();
+        }
 
         Map<String, Object> options = new HashMap<>();
         options.put("folder", folder);
         options.put("resource_type", "image");
-        
+
         Map uploadResult = cloudinary.uploader().upload(compressedImageBytes, options);
         String url = (String) uploadResult.get("secure_url");
-        
+
         log.info("Image uploaded successfully: {}", url);
         return url;
     }
@@ -72,11 +77,11 @@ public class ImageUploadService {
             throw new IllegalArgumentException(FileUploadConstants.ERROR_FILE_EMPTY);
         }
         
-        if (file.getSize() > FileUploadConstants.MAX_IMAGE_SIZE_BYTES) {
-            throw new IllegalArgumentException(
-                String.format(FileUploadConstants.ERROR_FILE_TOO_LARGE, FileUploadConstants.MAX_IMAGE_SIZE_MB)
-            );
-        }
+//        if (file.getSize() > FileUploadConstants.MAX_IMAGE_SIZE_BYTES) {
+//            throw new IllegalArgumentException(
+//                String.format(FileUploadConstants.ERROR_FILE_TOO_LARGE, FileUploadConstants.MAX_IMAGE_SIZE_MB)
+//            );
+//        }
         
         String contentType = file.getContentType();
         if (contentType == null || !FileUploadConstants.ALLOWED_IMAGE_TYPES.contains(contentType.toLowerCase())) {
