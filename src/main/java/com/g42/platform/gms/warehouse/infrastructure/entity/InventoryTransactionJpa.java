@@ -1,8 +1,6 @@
 package com.g42.platform.gms.warehouse.infrastructure.entity;
 
-import com.g42.platform.gms.auth.entity.StaffProfile;
-import com.g42.platform.gms.booking.customer.infrastructure.entity.CatalogItemJpaEntity;
-import com.g42.platform.gms.estimation.infrastructure.entity.WarehouseJpa;
+
 import com.g42.platform.gms.warehouse.domain.enums.InventoryTransactionType;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
