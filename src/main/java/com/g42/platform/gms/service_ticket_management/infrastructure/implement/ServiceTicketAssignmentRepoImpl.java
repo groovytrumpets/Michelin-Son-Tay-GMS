@@ -1,96 +1,65 @@
-package com.g42.platform.gms.service_ticket_management.infrastructure;
+package com.g42.platform.gms.service_ticket_management.infrastructure.implement;
 
-import com.g42.platform.gms.service_ticket_management.api.dto.assign.AssignStaffDto;
-import com.g42.platform.gms.service_ticket_management.api.dto.assign.AvailableStaffDto;
-import com.g42.platform.gms.service_ticket_management.api.dto.assign.RoleDto;
-import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
-import com.g42.platform.gms.service_ticket_management.domain.exception.AssignmentErrorCode;
-import com.g42.platform.gms.service_ticket_management.domain.exception.AssignmentException;
+import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicketAssignment;
 import com.g42.platform.gms.service_ticket_management.domain.repository.TicketAssignmentRepo;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketAssignmentJpa;
-import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
 import com.g42.platform.gms.service_ticket_management.infrastructure.mapper.TicketAssignmentJpaMapper;
-import com.g42.platform.gms.service_ticket_management.infrastructure.repository.ServiceTicketRepository;
 import com.g42.platform.gms.service_ticket_management.infrastructure.repository.TicketAssignmentJpaRepo;
-import com.g42.platform.gms.staff.profile.infrastructure.entity.StaffProfileJpa;
-import com.g42.platform.gms.staff.profile.infrastructure.repository.StaffProileJpaRepo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
-import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
+
+/**
+ * Infrastructure implementation of TicketAssignmentRepo.
+ * Chỉ xử lý persistence, không chứa business logic.
+ */
 @Repository
 @RequiredArgsConstructor
 public class ServiceTicketAssignmentRepoImpl implements TicketAssignmentRepo {
-    private final TicketAssignmentJpaRepo  ticketAssignmentJpaRepo;
-    private final StaffProileJpaRepo  staffProileJpaRepo;
-    private final TicketAssignmentJpaMapper  ticketAssignmentJpaMapper;
-    private final ServiceTicketRepository  serviceTicketRepository;
+
+    private final TicketAssignmentJpaRepo ticketAssignmentJpaRepo;
+    private final TicketAssignmentJpaMapper mapper;
+
     @Override
-    public List<AvailableStaffDto> getAvailableStaff(Integer ticketId, String role) {
-        return staffProileJpaRepo.findAvailableStaffByRole(role).stream().map(ticketAssignmentJpaMapper::toDto).toList();
+    public ServiceTicketAssignment save(ServiceTicketAssignment assignment) {
+        ServiceTicketAssignmentJpa jpa = mapper.toJpa(assignment);
+        return mapper.toDomain(ticketAssignmentJpaRepo.save(jpa));
     }
 
     @Override
-    public AssignStaffDto assignStaff(Integer ticketId, AssignStaffDto dto) {
-        if ("ADVISOR".equals(dto.getRoleInTicket())) {
-            if (ticketAssignmentJpaRepo.existsByServiceTicketId(ticketId)) {
-                throw new RuntimeException("Ticket đã có advisor!");
-            }
-        }
-        if (Boolean.TRUE.equals(dto.getIsPrimary())) {
-            if (ticketAssignmentJpaRepo.existsByIsPrimaryAndServiceTicketId(Boolean.TRUE,ticketId)) {
-                throw new RuntimeException("Ticket đã có technician chính!");
-            }
-        }
-        ServiceTicketAssignmentJpa serviceTicketAssignmentJpa = ticketAssignmentJpaRepo.findByStaffIdAndStatus(dto.getStaffId(),"CANCEL");
-        if (serviceTicketAssignmentJpa == null) {
-            throw new AssignmentException("Staff are busy",AssignmentErrorCode.UNAVAILABLE_STAFF);
-        }
-        //todo: create new assign
-        ServiceTicketAssignmentJpa sa = new ServiceTicketAssignmentJpa();
-        sa.setServiceTicketId(ticketId);
-        sa.setStaffId(dto.getStaffId());
-        sa.setRoleInTicket(dto.getRoleInTicket());
-        sa.setIsPrimary(dto.getIsPrimary() != null ? dto.getIsPrimary() : false);
-        sa.setNote(dto.getNote());
-        sa.setAssignedAt(Instant.now());
-        sa.setStatus("ACTIVE");
-
-        ServiceTicketAssignmentJpa savedSa = ticketAssignmentJpaRepo.save(sa);
-
-        //todo: update serviceTicketStatus
-        ServiceTicketJpa serviceTicketJpa = serviceTicketRepository.findByServiceTicketId(ticketId);
-        if (serviceTicketJpa == null) {
-            throw new AssignmentException("Service Tiket 404", AssignmentErrorCode.INVALID_SERVICE_TICKET_ID);
-        }
-        serviceTicketJpa.setTicketStatus(TicketStatus.IN_PROGRESS);
-        serviceTicketRepository.save(serviceTicketJpa);
-        return ticketAssignmentJpaMapper.toAssginDto(savedSa);
+    public Optional<ServiceTicketAssignment> findById(Integer assignmentId) {
+        return ticketAssignmentJpaRepo.findById(assignmentId)
+            .map(mapper::toDomain);
     }
 
     @Override
-    public AssignStaffDto updateAssignment(Integer ticketId, Integer assignmentId, AssignStaffDto dto) {
-        if ("ADVISOR".equals(dto.getRoleInTicket())) {
-            if (ticketAssignmentJpaRepo.existsByServiceTicketId(ticketId)) {
-                throw new RuntimeException("Ticket đã có advisor!");
-            }
-        }
-        if (Boolean.TRUE.equals(dto.getIsPrimary())) {
-            if (ticketAssignmentJpaRepo.existsByIsPrimaryAndServiceTicketId(Boolean.TRUE,ticketId)) {
-                throw new RuntimeException("Ticket đã có technician chính!");
-            }
-        }
-        ServiceTicketAssignmentJpa sa = ticketAssignmentJpaRepo.findByAssignmentId(assignmentId);
-        if (sa == null) {
-            throw new RuntimeException("Assignment not found!");
-        }
-        if (dto.getStaffId() != null) sa.setStaffId(dto.getStaffId());
-        if (dto.getRoleInTicket() != null) sa.setRoleInTicket(dto.getRoleInTicket());
-        if (dto.getIsPrimary() != null) sa.setIsPrimary(dto.getIsPrimary());
-        if (dto.getNote() != null) sa.setNote(dto.getNote());
-        ServiceTicketAssignmentJpa savedSa = ticketAssignmentJpaRepo.save(sa);
-        return ticketAssignmentJpaMapper.toAssginDto(savedSa);
+    public List<ServiceTicketAssignment> findByTicketId(Integer ticketId) {
+        return ticketAssignmentJpaRepo.findByServiceTicketId(ticketId).stream()
+            .map(mapper::toDomain)
+            .toList();
     }
 
+    @Override
+    public boolean existsByTicketIdAndRole(Integer ticketId, String role) {
+        return ticketAssignmentJpaRepo.existsByServiceTicketIdAndRoleInTicket(ticketId, role);
+    }
+
+    @Override
+    public boolean existsPrimaryByTicketId(Integer ticketId) {
+        return ticketAssignmentJpaRepo.existsByIsPrimaryAndServiceTicketId(Boolean.TRUE, ticketId);
+    }
+
+    @Override
+    public boolean isStaffAvailable(Integer staffId) {
+        // Staff rảnh khi không có assignment nào đang ACTIVE
+        ServiceTicketAssignmentJpa active = ticketAssignmentJpaRepo.findByStaffIdAndStatus(staffId, "ACTIVE");
+        return active == null;
+    }
+
+    @Override
+    public boolean isStaffAssignedToTicket(Integer staffId, Integer ticketId) {
+        return ticketAssignmentJpaRepo.existsByStaffIdAndServiceTicketId(staffId, ticketId);
+    }
 }
