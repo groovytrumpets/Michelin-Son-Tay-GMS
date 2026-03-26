@@ -55,6 +55,7 @@ public class ServiceTicketManageService {
     private final StaffProfileRepo staffRepository;
     private final ServiceTicketListMapper listMapper;
     private final ServiceTicketDetailMapper detailMapper;
+    private final TicketAssignmentService ticketAssignmentService;
     
     /**
      * Get paginated list of service tickets with filters.
@@ -186,9 +187,38 @@ public class ServiceTicketManageService {
         ticket.setUpdatedAt(java.time.LocalDateTime.now());
         serviceTicketRepo.save(ticket);
 
+        // Mark all assignments as DONE when ticket is paid
+        markAssignmentsDone(ticket.getServiceTicketId());
+
         // TODO: trigger ZNS feedback notification here
         log.info("Ticket {} → PAID", ticketCode);
         return getServiceTicketDetail(ticketCode);
+    }
+
+    /**
+     * Lễ tân thay đổi advisor cho ticket.
+     * Chỉ được phép thay đổi khi advisor hiện tại đang ở trạng thái PENDING (chưa bắt đầu làm việc).
+     */
+    @Transactional
+    public ServiceTicketDetailResponse changeAdvisor(String ticketCode, Integer newAdvisorId, String note) {
+        log.info("Receptionist changing advisor for ticket: {} to staffId: {}", ticketCode, newAdvisorId);
+
+        ServiceTicket ticket = serviceTicketRepo.findByTicketCode(ticketCode)
+            .orElseThrow(() -> new CheckInException("Không tìm thấy service ticket: " + ticketCode));
+
+        // Delegate to TicketAssignmentService for the actual logic
+        ticketAssignmentService.changeAdvisor(ticket.getServiceTicketId(), newAdvisorId, note);
+
+        log.info("Advisor changed successfully for ticket: {}", ticketCode);
+        return getServiceTicketDetail(ticketCode);
+    }
+
+    /**
+     * Đánh dấu assignments hoàn thành khi ticket được thanh toán.
+     */
+    @Transactional
+    public void markAssignmentsDone(Integer ticketId) {
+        ticketAssignmentService.markAssignmentDone(ticketId);
     }
 
 }

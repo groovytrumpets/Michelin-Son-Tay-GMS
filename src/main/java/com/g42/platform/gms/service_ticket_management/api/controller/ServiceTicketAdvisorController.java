@@ -8,9 +8,11 @@ import com.g42.platform.gms.service_ticket_management.api.dto.manage.UpdateServi
 import com.g42.platform.gms.service_ticket_management.application.service.ServiceTicketAdvisorService;
 import com.g42.platform.gms.service_ticket_management.application.service.ServiceTicketManageService;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
+import com.g42.platform.gms.auth.entity.StaffPrincipal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -59,8 +61,10 @@ public class ServiceTicketAdvisorController {
 
     /** DRAFT → IN_PROGRESS: khách đồng ý, bắt đầu sửa. */
     @PostMapping("/tickets/{ticketCode}/start")
-    public ResponseEntity<ApiResponse<ServiceTicketDetailResponse>> startService(@PathVariable String ticketCode) {
-        return ResponseEntity.ok(ApiResponses.success(advisorService.startService(ticketCode)));
+    public ResponseEntity<ApiResponse<ServiceTicketDetailResponse>> startService(
+            @PathVariable String ticketCode,
+            @AuthenticationPrincipal StaffPrincipal principal) {
+        return ResponseEntity.ok(ApiResponses.success(advisorService.startService(ticketCode, principal.getStaffId())));
     }
 
     /** IN_PROGRESS → PENDING: chờ phụ tùng. */
@@ -85,5 +89,31 @@ public class ServiceTicketAdvisorController {
     @PostMapping("/tickets/{ticketCode}/cancel")
     public ResponseEntity<ApiResponse<ServiceTicketDetailResponse>> cancelTicket(@PathVariable String ticketCode) {
         return ResponseEntity.ok(ApiResponses.success(advisorService.cancelTicket(ticketCode)));
+    }
+
+    /**
+     * Advisor hủy assignment technician.
+     * Chỉ được phép hủy khi technician đang ở trạng thái PENDING.
+     */
+    @DeleteMapping("/tickets/{ticketCode}/technician/{technicianId}")
+    public ResponseEntity<ApiResponse<ServiceTicketDetailResponse>> removeTechnician(
+            @PathVariable String ticketCode,
+            @PathVariable Integer technicianId) {
+        return ResponseEntity.ok(ApiResponses.success(
+            advisorService.removeTechnician(ticketCode, technicianId)));
+    }
+
+    /**
+     * Advisor thay đổi technician.
+     * Hủy technician cũ và assign technician mới với trạng thái PENDING.
+     */
+    @PutMapping("/tickets/{ticketCode}/technician/{oldTechnicianId}/change/{newTechnicianId}")
+    public ResponseEntity<ApiResponse<ServiceTicketDetailResponse>> changeTechnician(
+            @PathVariable String ticketCode,
+            @PathVariable Integer oldTechnicianId,
+            @PathVariable Integer newTechnicianId,
+            @RequestParam(required = false) String note) {
+        return ResponseEntity.ok(ApiResponses.success(
+            advisorService.changeTechnician(ticketCode, oldTechnicianId, newTechnicianId, note)));
     }
 }

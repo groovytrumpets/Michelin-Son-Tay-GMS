@@ -23,12 +23,14 @@ public class TicketAssignmentController {
                                                                                   @RequestParam String role) {
         return ResponseEntity.ok(ApiResponses.success(ticketAssignmentService.getAvailableStaff(ticketId, role)));
     }
+    
     @PostMapping("{ticketId}/assign")
     public ResponseEntity<ApiResponse<AssignStaffDto>> assignStaff(
             @PathVariable Integer ticketId,
             @RequestBody AssignStaffDto dto) {
         return ResponseEntity.ok(ApiResponses.success(ticketAssignmentService.assignStaff(ticketId, dto)));
     }
+    
     @PutMapping("{ticketId}/assign/{assignmentId}")
     public ResponseEntity<ApiResponse<AssignStaffDto>> updateAssignment(
             @PathVariable Integer ticketId,
@@ -36,4 +38,7 @@ public class TicketAssignmentController {
             @RequestBody AssignStaffDto dto) {
         return ResponseEntity.ok(ApiResponses.success(ticketAssignmentService.updateAssignment(ticketId, assignmentId, dto)));
     }
+    
+
+
 }

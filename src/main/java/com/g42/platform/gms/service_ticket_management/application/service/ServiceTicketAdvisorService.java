@@ -27,16 +27,21 @@ public class ServiceTicketAdvisorService {
     private final ServiceTicketRepo serviceTicketRepo;
     private final BookingRepository bookingRepository;
     private final ServiceTicketManageService manageService; // delegate getDetail/getList
+    private final TicketAssignmentService ticketAssignmentService;
 
     /** Advisor bắt đầu dịch vụ sửa — DRAFT → IN_PROGRESS. */
     @Transactional
-    public ServiceTicketDetailResponse startService(String ticketCode) {
+    public ServiceTicketDetailResponse startService(String ticketCode, Integer staffId) {
         ServiceTicket ticket = findTicket(ticketCode);
         requireStatus(ticket, TicketStatus.DRAFT);
         ticket.setTicketStatus(TicketStatus.IN_PROGRESS);
         ticket.setUpdatedAt(LocalDateTime.now());
         serviceTicketRepo.save(ticket);
-        log.info("Ticket {} → IN_PROGRESS (advisor start)", ticketCode);
+
+        // Chuyển assignment của advisor từ PENDING sang ACTIVE
+        ticketAssignmentService.startWork(ticket.getServiceTicketId(), staffId);
+
+        log.info("Ticket {} → IN_PROGRESS (advisor start) by staffId: {}", ticketCode, staffId);
         return manageService.getServiceTicketDetail(ticketCode);
     }
 
@@ -120,6 +125,40 @@ public class ServiceTicketAdvisorService {
         }
         serviceTicketRepo.save(ticket);
         log.info("Ticket {} estimate updated by advisor", ticketCode);
+        return manageService.getServiceTicketDetail(ticketCode);
+    }
+
+    /**
+     * Advisor hủy assignment technician.
+     * Chỉ được phép hủy khi technician đang ở trạng thái PENDING.
+     */
+    @Transactional
+    public ServiceTicketDetailResponse removeTechnician(String ticketCode, Integer technicianId) {
+        log.info("Advisor removing technician {} from ticket: {}", technicianId, ticketCode);
+
+        ServiceTicket ticket = findTicket(ticketCode);
+        
+        // Delegate to TicketAssignmentService for the actual logic
+        ticketAssignmentService.removeTechnician(ticket.getServiceTicketId(), technicianId);
+
+        log.info("Technician {} removed from ticket: {}", technicianId, ticketCode);
+        return manageService.getServiceTicketDetail(ticketCode);
+    }
+
+    /**
+     * Advisor thay đổi technician.
+     * Hủy technician cũ và assign technician mới với trạng thái PENDING.
+     */
+    @Transactional
+    public ServiceTicketDetailResponse changeTechnician(String ticketCode, Integer oldTechnicianId, Integer newTechnicianId, String note) {
+        log.info("Advisor changing technician from {} to {} for ticket: {}", oldTechnicianId, newTechnicianId, ticketCode);
+
+        ServiceTicket ticket = findTicket(ticketCode);
+        
+        // Delegate to TicketAssignmentService for the actual logic
+        ticketAssignmentService.changeTechnician(ticket.getServiceTicketId(), oldTechnicianId, newTechnicianId, note);
+
+        log.info("Technician changed successfully for ticket: {}", ticketCode);
         return manageService.getServiceTicketDetail(ticketCode);
     }
 

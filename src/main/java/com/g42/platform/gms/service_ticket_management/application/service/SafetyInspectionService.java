@@ -108,7 +108,16 @@ public class SafetyInspectionService {
         domain.setTechnicianId(null);
         domain.setInspectionStatus(InspectionStatus.SKIPPED);
         domain.initializeDefaults();
-        return apiMapper.toResponse(inspectionRepo.save(domain));
+        SafetyInspection saved = inspectionRepo.save(domain);
+        
+        // Update ServiceTicket to set safetyInspectionEnabled = false
+        ServiceTicket ticket = serviceTicketRepo.findByServiceTicketId(serviceTicketId);
+        if (ticket == null) throw new IllegalArgumentException("Service ticket not found: " + serviceTicketId);
+        ticket.setSafetyInspectionEnabled(false);
+        ticket.setUpdatedAt(LocalDateTime.now());
+        serviceTicketRepo.save(ticket);
+        
+        return apiMapper.toResponse(saved);
     }
 
     /** Chỉ cho phép technician write khi ticket đang ở trạng thái INSPECTION */

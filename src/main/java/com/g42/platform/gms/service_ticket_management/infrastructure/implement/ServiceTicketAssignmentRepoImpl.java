@@ -53,13 +53,19 @@ public class ServiceTicketAssignmentRepoImpl implements TicketAssignmentRepo {
 
     @Override
     public boolean isStaffAvailable(Integer staffId) {
-        // Staff rảnh khi không có assignment nào đang ACTIVE
-        ServiceTicketAssignmentJpa active = ticketAssignmentJpaRepo.findByStaffIdAndStatus(staffId, "ACTIVE");
-        return active == null;
+        // Staff rảnh khi không có assignment ACTIVE nào trong ticket có trạng thái bận (DRAFT, IN_PROGRESS, INSPECTION)
+        return !ticketAssignmentJpaRepo.hasActiveAssignmentInBusyTickets(staffId);
     }
 
     @Override
     public boolean isStaffAssignedToTicket(Integer staffId, Integer ticketId) {
         return ticketAssignmentJpaRepo.existsByStaffIdAndServiceTicketId(staffId, ticketId);
+    }
+    
+    @Override
+    public List<ServiceTicketAssignment> findByTicketIdAndRole(Integer ticketId, String role) {
+        return ticketAssignmentJpaRepo.findByTicketIdAndRole(ticketId, role).stream()
+            .map(mapper::toDomain)
+            .toList();
     }
 }

@@ -36,19 +36,43 @@ public interface StaffProileJpaRepo extends JpaRepository<StaffProfileJpa, Integ
     @Query("""
     SELECT DISTINCT sp FROM StaffProfileJpa sp
     JOIN sp.roles r
-    WHERE sp.staffId NOT IN (
-        SELECT sta.staffId FROM ServiceTicketAssignmentJpa sta
-        WHERE sta.status = 'ACTIVE'
-        AND sta.serviceTicketId IN (
-            SELECT st.serviceTicketId FROM ServiceTicketManagement st
-            WHERE st.ticketStatus = 'IN_PROGRESS'
-            OR st.ticketStatus = 'INSPECTION'
+    WHERE (
+        (:role = 'ADVISOR' AND (
+            sp.staffId NOT IN (
+                SELECT sta.staffId FROM ServiceTicketAssignmentJpa sta
+                WHERE (sta.status = 'ACTIVE' OR sta.status = 'PENDING')
+                AND sta.roleInTicket = 'TECHNICIAN'
+                AND sta.serviceTicketId IN (
+                    SELECT st.serviceTicketId FROM ServiceTicketManagement st
+                    WHERE st.ticketStatus = 'DRAFT'
+                    OR st.ticketStatus = 'IN_PROGRESS'
+                    OR st.ticketStatus = 'INSPECTION'
+                )
+            )
+            AND (
+                :ticketId = 0 OR sp.staffId NOT IN (
+                    SELECT sta2.staffId FROM ServiceTicketAssignmentJpa sta2
+                    WHERE sta2.serviceTicketId = :ticketId
+                    AND (sta2.status = 'ACTIVE' OR sta2.status = 'PENDING')
+                )
+            )
+        ))
+        OR
+        (:role != 'ADVISOR' AND sp.staffId NOT IN (
+            SELECT sta.staffId FROM ServiceTicketAssignmentJpa sta
+            WHERE (sta.status = 'ACTIVE' OR sta.status = 'PENDING')
+            AND sta.serviceTicketId IN (
+                SELECT st.serviceTicketId FROM ServiceTicketManagement st
+                WHERE st.ticketStatus = 'DRAFT'
+                OR st.ticketStatus = 'IN_PROGRESS'
+                OR st.ticketStatus = 'INSPECTION'
+            )
         )
-    )
-    AND sp.staffId NOT IN (
-        SELECT sta2.staffId FROM ServiceTicketAssignmentJpa sta2
-        WHERE sta2.serviceTicketId = :ticketId
-        AND sta2.status = 'ACTIVE'
+        AND sp.staffId NOT IN (
+            SELECT sta2.staffId FROM ServiceTicketAssignmentJpa sta2
+            WHERE sta2.serviceTicketId = :ticketId
+            AND (sta2.status = 'ACTIVE' OR sta2.status = 'PENDING')
+        ))
     )
     AND r.roleCode = :role
 """)

@@ -98,9 +98,10 @@ public class ServiceTicketTechnicianController {
      */
     @PostMapping("/tickets/{ticketCode}/start-inspection")
     public ResponseEntity<ApiResponse<TechnicianTicketDetailResponse>> startInspection(
-            @PathVariable String ticketCode) {
+            @PathVariable String ticketCode,
+            @RequestParam Integer staffId) {
 
-        TechnicianTicketDetailResponse result = technicianService.startInspection(ticketCode);
+        TechnicianTicketDetailResponse result = technicianService.startInspection(ticketCode, staffId);
         return ResponseEntity.ok(ApiResponses.success(result));
     }
 

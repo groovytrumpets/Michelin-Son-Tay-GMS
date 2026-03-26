@@ -1,5 +1,6 @@
 package com.g42.platform.gms.service_ticket_management.domain.entity;
 
+import com.g42.platform.gms.service_ticket_management.domain.enums.AssignmentStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -22,6 +23,6 @@ public class ServiceTicketAssignment {
     private String roleInTicket;
     private Instant assignedAt;
     private Boolean isPrimary;
-    private String status;
+    private AssignmentStatus status;
     private String note;
 }

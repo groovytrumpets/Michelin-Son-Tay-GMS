@@ -12,7 +12,7 @@ import com.g42.platform.gms.service_ticket_management.api.dto.technician.Technic
 import com.g42.platform.gms.service_ticket_management.api.dto.technician.UpdateTechnicianNotesRequest;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import com.g42.platform.gms.service_ticket_management.domain.entity.OdometerReading;
-import com.g42.platform.gms.service_ticket_management.domain.repository.TicketAssignmentRepo;import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicket;
+import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicket;
 import com.g42.platform.gms.service_ticket_management.domain.entity.VehicleConditionPhoto;
 import com.g42.platform.gms.service_ticket_management.domain.exception.CheckInException;
 import com.g42.platform.gms.service_ticket_management.domain.repository.OdometerReadingRepo;
@@ -32,7 +32,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -49,6 +48,7 @@ public class ServiceTicketTechnicianService {
     private final CustomerProfileRepository customerRepository;
     private final VehicleRepository vehicleRepository;
     private final BookingRepository bookingRepository;
+    private final TicketAssignmentService ticketAssignmentService;
     private final CatalogItemRepository catalogRepository;
     private final OdometerReadingRepo odometerRepo;
     private final VehicleConditionPhotoRepo photoRepo;
@@ -200,7 +200,7 @@ public class ServiceTicketTechnicianService {
      * Kỹ thuật viên nhận phiếu và bắt đầu quá trình kiểm tra.
      */
     @Transactional
-    public TechnicianTicketDetailResponse startInspection(String ticketCode) {
+    public TechnicianTicketDetailResponse startInspection(String ticketCode, Integer staffId) {
         log.info("Technician starting inspection on ticket: {}", ticketCode);
 
         ServiceTicket ticket = serviceTicketRepo.findByTicketCode(ticketCode)
@@ -214,7 +214,10 @@ public class ServiceTicketTechnicianService {
         ticket.setUpdatedAt(java.time.LocalDateTime.now());
         serviceTicketRepo.save(ticket);
 
-        log.info("Ticket {} status changed to INSPECTION by technician", ticketCode);
+        // Chuyển assignment của technician từ PENDING sang ACTIVE
+        ticketAssignmentService.startWork(ticket.getServiceTicketId(), staffId);
+
+        log.info("Ticket {} status changed to INSPECTION by technician {}", ticketCode, staffId);
         return getTechnicianTicketDetail(ticketCode);
     }
 
