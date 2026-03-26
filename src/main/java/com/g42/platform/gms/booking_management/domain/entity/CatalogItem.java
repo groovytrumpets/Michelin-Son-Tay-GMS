@@ -14,7 +14,7 @@ public class CatalogItem {
     private Integer itemId;
     private String itemName;
     private String itemType;
-    private Double estimatedPrice;
+
     private Boolean isActive;
     private Integer warrantyDurationMonths;
     private ServiceJpaEntity serviceService;
