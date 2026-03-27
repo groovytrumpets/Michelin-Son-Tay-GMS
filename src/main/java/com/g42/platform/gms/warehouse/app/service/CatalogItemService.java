@@ -3,7 +3,6 @@ package com.g42.platform.gms.warehouse.app.service;
 import com.g42.platform.gms.warehouse.api.dto.*;
 import com.g42.platform.gms.warehouse.api.mapper.*;
 import com.g42.platform.gms.warehouse.domain.entity.*;
-import com.g42.platform.gms.warehouse.domain.enums.CatalogItemType;
 import com.g42.platform.gms.warehouse.domain.exception.WarehouseErrorCode;
 import com.g42.platform.gms.warehouse.domain.exception.WarehouseException;
 import com.g42.platform.gms.warehouse.domain.repository.CatalogItemRepo;
@@ -53,8 +52,15 @@ public class CatalogItemService {
 
     public CatalogItemDto createNewCatalog(CatalogCreateDto createDto) {
         validateCatalogItemDto(createDto);
+        Brand brand = catalogItemRepo.getBrandById(createDto.getBrandId());
+        ProductLine productLine = catalogItemRepo.getProductLineById(createDto.getProductLineId());
+        ItemCategory itemCategory = catalogItemRepo.getItemCategoryById(createDto.getItemCategoryId());
         CatalogItem catalogItem = catalogItemRepo.createCatalog(catalogDtoMapper.toDomain(createDto));
-        return catalogDtoMapper.toDto(catalogItem);
+        List<Specification> specifications = catalogItemRepo.getListOfSpecsByItem(catalogItem.getItemId());
+        String itemName = builDisplayName(catalogDtoMapper.toDomain(createDto),brand,productLine,specifications,itemCategory);
+        catalogItem.setItemName(itemName);
+        CatalogItem saveCatalogItem = catalogItemRepo.saveCatalogItem(catalogItem);
+        return catalogDtoMapper.toDto(saveCatalogItem);
     }
 
     private void validateCatalogItemDto(CatalogCreateDto createDto) {
@@ -65,6 +71,63 @@ public class CatalogItemService {
                         WarehouseErrorCode.INVALID_BRAND);
             }
         }
+        if (catalogItemRepo.exitBySku(createDto.getSku())){
+            throw new WarehouseException("Sku is duplicated! please create new sku",
+                    WarehouseErrorCode.DUPLICATE_SKU);
+        }
         //todo:validate catalog category items
     }
+    private String builDisplayName(CatalogItem catalogItem, Brand brand, ProductLine productLine, List<Specification> specs,ItemCategory itemCategory) {
+        StringBuilder displayName = new StringBuilder();
+
+        //type
+        if (itemCategory.getCategoryName() != null && !itemCategory.getCategoryName().isBlank()) {
+            displayName.append(itemCategory.getCategoryName()).append(" ");
+        }
+
+        if (brand.getBrandName() != null && !brand.getBrandName().isBlank()) {
+            displayName.append(brand.getBrandName()).append(" ");
+        }
+
+        if (specs !=null && !specs.isEmpty()) {
+            //todo: buildSpecString (advance)
+//            String specStr = buildSpecString(specs);
+//            if (specStr != null && !specStr.isBlank()) {
+//                displayName.append(specStr).append(" ");
+//            }
+            for (Specification specification : specs) {
+                displayName.append(specification.getSpecValue()).append("/ ");
+            }
+        }
+
+        if (productLine != null) {
+            displayName.append(productLine.getLineName()).append(" ");
+        }
+
+        if (displayName.isEmpty() && itemCategory.getCategoryName() != null && !itemCategory.getCategoryName().isBlank()) {
+            displayName.append(itemCategory.getCategoryName());
+        }
+        return displayName.toString().trim();
+
+    }
+
+    public ProductLine saveProductLine(ProductLine productLine) {
+        if (productLine.getBrandId() == null) {
+            throw new WarehouseException("Product line must have brand", WarehouseErrorCode.INVALID_BRAND);
+        }
+        return catalogItemRepo.saveProductLine(productLine);
+    }
+
+    public ItemCategory saveItemCate(ItemCategory itemCategory) {
+        if (itemCategory.getCategoryType()==null) {
+            throw new WarehouseException("Category must not null!",WarehouseErrorCode.WRONG_ENUM);
+        }
+        if (!itemCategory.getCategoryType().equals("SERVICE") && !itemCategory.getCategoryType().equals("PART")) {
+            throw new WarehouseException("Category type must be PART or SERVICE!",WarehouseErrorCode.WRONG_ENUM);
+        }
+        if (catalogItemRepo.exitByCategoryCode(itemCategory.getCategoryCode()))
+            throw new WarehouseException("Category code must be UNIQUE!",WarehouseErrorCode.INVALID_CATEGORY);
+        return catalogItemRepo.saveItemCate(itemCategory);
+    }
+
 }

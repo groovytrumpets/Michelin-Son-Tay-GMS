@@ -9,4 +9,6 @@ import org.mapstruct.Mapper;
 @Mapper(componentModel = "spring")
 public interface ProductLineJpaMapper {
     ProductLine toDomain(ProductLineJpa productLineJpa);
+
+    ProductLineJpa toJpa(ProductLine productLine);
 }
