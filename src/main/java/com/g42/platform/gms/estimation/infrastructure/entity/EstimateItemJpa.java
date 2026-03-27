@@ -54,8 +54,6 @@ public class EstimateItemJpa {
     private Integer workCategoryId;
     @NotNull
 
-    @Column(name = "tax_rule_idtax_rule", nullable = false)
-    private Integer taxRuleId;
     @Column(name = "total_price", precision = 12, scale = 2)
     private BigDecimal totalPrice;
     @ColumnDefault("0")
@@ -64,6 +62,10 @@ public class EstimateItemJpa {
     @ColumnDefault("0")
     @Column(name = "is_removed")
     private Boolean isRemoved;
+    @Column(name = "tax_amount", precision = 12, scale = 2)
+    private BigDecimal taxAmount;
+    @Column(name = "applied_tax_rate", precision = 5, scale = 2)
+    private BigDecimal appliedTaxRate;
 
 
 }

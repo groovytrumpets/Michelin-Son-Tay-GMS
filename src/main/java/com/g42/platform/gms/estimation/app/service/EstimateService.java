@@ -35,22 +35,18 @@ public class EstimateService {
     public List<EstimateRespondDto> getEstimateByCode(Integer serviceTicketId) {
         //todo: find all estimate
         List<Estimate> estimateList = estimateRepository.getListOfEstimateByServiceTiketCode(serviceTicketId);
+
         //todo: get estimate item list of list estimate ids
         List<Integer> estimateIds = estimateList.stream().map(Estimate::getId).toList();
         List<EstimateItem> estimateItems =estimateItemRepository.findByEstimateIds(estimateIds).stream().filter(estimateItem -> Boolean.FALSE.equals(estimateItem.getIsRemoved())).toList();
+
         //todo: get work-catalog of estimateItem
         List<Integer> workCategoryId = estimateItems.stream().map(EstimateItem::getWorkCategoryId).filter(Objects::nonNull).distinct().toList();
         Map<Integer, WorkCategory> categoryMap = workCategoryRepo
                 .findAllById(workCategoryId)
                 .stream()
                 .collect(Collectors.toMap(WorkCategory::getId, wc -> wc));
-        //todo:add tax rule
-        List<Integer> taxRuleIds = estimateItems.stream()
-                .map(EstimateItem::getTaxRuleId)
-                .filter(Objects::nonNull).distinct().toList();
-        Map<Integer, TaxRule> taxRuleMap = taxRuleRepository.findAllByIds(taxRuleIds)
-                .stream()
-                .collect(Collectors.toMap(TaxRule::getTaxRuleId, tr -> tr));
+
         //todo: group by estimateItem by estimateId
         Map<Integer, List<EstimateItem>> itemsByEstimateId = estimateItems.stream()
                 .collect(Collectors.groupingBy(EstimateItem::getEstimateId));
@@ -60,31 +56,34 @@ public class EstimateService {
             List<EstimateItem> items = itemsByEstimateId
                     .getOrDefault(estimate.getId(), List.of());
 
-            List<EstimateItemDto> itemDtos = items.stream().map(item -> {
+            BigDecimal totalTax = BigDecimal.ZERO;
+            BigDecimal subTotal = BigDecimal.ZERO;
+            List<EstimateItemDto> itemDtos = new ArrayList<>();
+            for (EstimateItem item : items) {
                 EstimateItemDto itemDto = estimateDtoMapper.toEstimateItemDto(item);
                 // inject work category to ech items
                 WorkCategory wc = categoryMap.get(item.getWorkCategoryId());
-                itemDto.setWorkCategory(estimateDtoMapper.toWorkCateDto(wc));
-                //injection for tax rule
-                TaxRule taxRule = taxRuleMap.get(item.getTaxRuleId());
-                if (taxRule != null) {
-                    itemDto.setTaxCode(taxRule.getTaxCode());
-                    itemDto.setTaxRate(taxRule.getTaxRate());
-
-                if (item.getUnitPrice() != null && taxRule.getTaxRate() != null) {
-                    BigDecimal vatPerUnit = item.getUnitPrice().multiply(
-                            taxRule.getTaxRate().divide(BigDecimal.valueOf(100)));
-                    itemDto.setUnitPriceWithVat(item.getUnitPrice().add(vatPerUnit));
-                    BigDecimal unitPriceWithVat = item.getUnitPrice().add(vatPerUnit);
-                    itemDto.setSubTotalWithVat(unitPriceWithVat.multiply(
-                            BigDecimal.valueOf(item.getQuantity())));
+                if (wc != null) {
+                    itemDto.setWorkCategory(estimateDtoMapper.toWorkCateDto(wc));
                 }
-                }else {
-                    itemDto.setUnitPriceWithVat(item.getUnitPrice());
-                }
-                return itemDto;
-            }).toList();
 
+                if (Boolean.TRUE.equals(item.getIsChecked())) {
+
+                    // 1. Cộng dồn tiền thuế (chỉ cho item được chọn)
+                    if (item.getTaxAmount() != null) {
+                        totalTax = totalTax.add(item.getTaxAmount());
+                    }
+
+                    // 2. Cộng dồn tiền hàng (chỉ cho item được chọn)
+                    BigDecimal itemQty = BigDecimal.valueOf(item.getQuantity() != null ? item.getQuantity() : 0);
+                    BigDecimal itemPrice = item.getUnitPrice() != null ? item.getUnitPrice() : BigDecimal.ZERO;
+                    subTotal = subTotal.add(itemPrice.multiply(itemQty));
+                }
+                itemDtos.add(itemDto);
+            }
+            dto.setTotalPrice(subTotal.add(totalTax));
+            dto.setSubTotal(subTotal);
+            dto.setTotalTaxAmount(totalTax);
             dto.setItems(itemDtos);
             return dto;
         }).toList();
@@ -96,7 +95,7 @@ public class EstimateService {
         estimate.setEstimateType(request.getEstimateType());
         estimate.setStatus(EstimateEnum.DRAFT);
         estimate.setVersion(1);
-        estimate.setTotalPrice(estimate.getTotalPrice());
+        estimate.setTotalPrice(BigDecimal.ZERO);
         Estimate saved = estimateRepository.save(estimate);
 
         List<EstimateItem> items = resolveItems(request.getItems(), saved.getId());
@@ -136,7 +135,9 @@ public class EstimateService {
                 existing.setWorkCategoryId(req.getWorkCategoryId());
                 existing.setIsChecked(req.getIsChecked());
                 existing.setIsRemoved(req.getIsRemoved());
-                applyTax(existing);
+                WorkCategory wc = workCategoryRepo.findById(req.getWorkCategoryId());
+                TaxRule taxRule = (wc != null) ? taxRuleRepository.findById(wc.getTaxRuleId()) : null;
+                applyTax(existing,taxRule.getTaxRuleId());
                 toSave.add(existing);
                 incomingIds.add(req.getItemId());
             } else {
@@ -167,9 +168,10 @@ public class EstimateService {
                                             Integer estimateId) {
         return itemRequests.stream().map(req -> {
             Integer categoryId = req.getWorkCategoryId();
-
+            WorkCategory workCategory = new WorkCategory();
             // Tạo work_category mới nếu không có sẵn
             if (categoryId == null && req.getNewCategoryName() != null) {
+            System.out.println("DEBUG CREATING CATA: ");
                 WorkCategory newCategory = new WorkCategory();
                 newCategory.setCategoryName(req.getNewCategoryName());
                 newCategory.setCategoryCode(
@@ -177,10 +179,14 @@ public class EstimateService {
                 );
                 newCategory.setIsDefault(false);
                 newCategory.setIsActive(true);
+                newCategory.setTaxRuleId(req.getTaxRuleId() != null ? req.getTaxRuleId() : 1);
                 int nextOrder = workCategoryRepo.findMaxDisplayOrder()+1;
                 newCategory.setDisplayOrder(nextOrder);
                 WorkCategory saved = workCategoryRepo.save(newCategory);
                 categoryId = saved.getId();
+            }else if (categoryId != null) {
+                // Nếu có categoryId, bốc từ DB lên để tý lấy ID thuế của nó
+                workCategory = workCategoryRepo.findById(categoryId);
             }
 
             EstimateItem item = new EstimateItem();
@@ -190,10 +196,25 @@ public class EstimateService {
             item.setItemName(req.getItemName());
             item.setQuantity(req.getQuantity());
             item.setUnitPrice(req.getUnitPrice());
-            item.setTaxRuleId(req.getTaxRuleId());
             item.setIsChecked(req.getIsChecked() != null ? req.getIsChecked() : false);
+
+            TaxRule taxRule = null;
+            if (workCategory != null && workCategory.getTaxRuleId() != null) {
+                taxRule = taxRuleRepository.findById(workCategory.getTaxRuleId());
+            }
             //todo: vat calculate
-            applyTax(item);
+            Integer ruleId = null;
+            if (workCategory != null) {
+                ruleId = workCategory.getTaxRuleId();
+            } else {
+                ruleId = req.getTaxRuleId();
+            }
+            BigDecimal quantity = BigDecimal.valueOf(req.getQuantity());
+            BigDecimal unitPrice = req.getUnitPrice();
+
+            BigDecimal totalPrice = unitPrice.multiply(quantity);
+            item.setTotalPrice(totalPrice);
+            applyTax(item,ruleId);
             return item;
         }).toList();
     }
@@ -215,44 +236,44 @@ public class EstimateService {
                 .findAllById(categoryIds).stream()
                 .collect(Collectors.toMap(WorkCategory::getId, wc -> wc));
 
-        List<Integer> taxRuleIds = items.stream()
-                .map(EstimateItem::getTaxRuleId)
-                .filter(Objects::nonNull).distinct().toList();
-        Map<Integer, TaxRule> taxRuleMap = taxRuleRepository.findAllByIds(taxRuleIds).stream()
-                .collect(Collectors.toMap(TaxRule::getTaxRuleId, tr -> tr));
-        System.out.println("taxRuleIds: " + taxRuleIds);
-        System.out.println("taxRuleMap size: " + taxRuleMap.size());
+
         EstimateRespondDto dto = estimateDtoMapper.toEstimateDto(estimate);
-        dto.setItems(items.stream().map(item -> {
+        BigDecimal totalTax = BigDecimal.ZERO;
+        BigDecimal subTotal = BigDecimal.ZERO;
+        List<EstimateItemDto> itemDtos = new ArrayList<>();
+
+        for (EstimateItem item : items) {
+            // MapStruct tự động lôi taxAmount, appliedTaxRate, totalPrice từ Entity sang DTO
             EstimateItemDto itemDto = estimateDtoMapper.toEstimateItemDto(item);
-            itemDto.setWorkCategory(
-                    estimateDtoMapper.toWorkCateDto(categoryMap.get(item.getWorkCategoryId()))
-            );
-                    //todo: add inject tax info
-            TaxRule taxRule = taxRuleMap.get(item.getTaxRuleId());
-            if (taxRule != null) {
-                itemDto.setTaxRuleId(taxRule.getTaxRuleId());
-                itemDto.setTaxCode(taxRule.getTaxCode());
-                itemDto.setTaxRate(taxRule.getTaxRate());
-                if (item.getUnitPrice() != null && taxRule.getTaxRate() != null) {
-                    BigDecimal vatPerUnit = item.getUnitPrice().multiply(
-                            taxRule.getTaxRate().divide(BigDecimal.valueOf(100)));
-                    itemDto.setUnitPriceWithVat(item.getUnitPrice().add(vatPerUnit));
-                    BigDecimal unitPriceWithVat = item.getUnitPrice().add(vatPerUnit);
-                    itemDto.setSubTotalWithVat(unitPriceWithVat.multiply(
-                            BigDecimal.valueOf(item.getQuantity())));
-                }
-            }else {
-                itemDto.setUnitPriceWithVat(item.getUnitPrice());
+
+            // Map tên hạng mục
+            WorkCategory wc = categoryMap.get(item.getWorkCategoryId());
+            if (wc != null) {
+                itemDto.setWorkCategory(estimateDtoMapper.toWorkCateDto(wc));
             }
-            return itemDto;
-        }).toList());
+
+            // Cộng dồn tiền thuế
+            if (item.getTaxAmount() != null) {
+                totalTax = totalTax.add(item.getTaxAmount());
+            }
+
+            // Cộng dồn tiền gốc (Đơn giá * Số lượng)
+            BigDecimal itemQty = BigDecimal.valueOf(item.getQuantity() != null ? item.getQuantity() : 0);
+            BigDecimal itemPrice = item.getUnitPrice() != null ? item.getUnitPrice() : BigDecimal.ZERO;
+            subTotal = subTotal.add(itemPrice.multiply(itemQty));
+
+            itemDtos.add(itemDto);
+        }
+        dto.setItems(itemDtos);
+        dto.setTotalTaxAmount(totalTax);
+        dto.setSubTotal(subTotal);
         return dto;
     }
 
     public EstimateItemReqDto updateEstimateItem(Integer estimateItemId, EstimateItemReqDto request) {
         EstimateItem estimateItem = estimateItemRepository.findByEstimateItemId(estimateItemId);
 
+        Integer currentTaxRuleId = null;
 
         if (request.getWorkCategoryId() != null) {
             estimateItem.setWorkCategoryId(request.getWorkCategoryId());
@@ -264,20 +285,23 @@ public class EstimateService {
             );
             newCategory.setIsDefault(false);
             newCategory.setIsActive(true);
+            System.out.println("DEBUG CREATING CATA");
+            newCategory.setTaxRuleId(request.getTaxRuleId() != null ? request.getTaxRuleId() : 1);
             int nextOrder = workCategoryRepo.findMaxDisplayOrder() + 1;
             newCategory.setDisplayOrder(nextOrder);
             WorkCategory saved = workCategoryRepo.save(newCategory);
+
             estimateItem.setWorkCategoryId(saved.getId());
+            currentTaxRuleId = saved.getTaxRuleId();
         }
         //todo: handle newCate
         if (request.getItemId() != null)estimateItem.setItemId(request.getItemId());
         if (request.getItemName() != null)estimateItem.setItemName(request.getItemName());
         if (request.getQuantity() != null)estimateItem.setQuantity(request.getQuantity());
         if (request.getUnitPrice() != null)estimateItem.setUnitPrice(request.getUnitPrice());
-        if (request.getTaxRuleId() != null)estimateItem.setTaxRuleId(request.getTaxRuleId());
         if (request.getIsChecked() != null)estimateItem.setIsChecked(request.getIsChecked());
         if (request.getIsRemoved() != null)estimateItem.setIsRemoved(request.getIsRemoved());
-        applyTax(estimateItem);
+        applyTax(estimateItem,currentTaxRuleId);
         EstimateItem saved = estimateItemRepository.save(estimateItem);
         //todo: recalculate
         List<EstimateItem> allItems = estimateItemRepository.findByEstimateId(saved.getEstimateId());
@@ -293,18 +317,31 @@ public class EstimateService {
         return estimateDtoMapper.toEstimateItemReqDto(saved);
 
     }
-    private void applyTax(EstimateItem item) {
-        if (item.getTaxRuleId() != null) {
-            TaxRule taxRule = taxRuleRepository.findById(item.getTaxRuleId());
+    private void applyTax(EstimateItem item,Integer taxRuleId) {
+        BigDecimal quantity = BigDecimal.valueOf(item.getQuantity() != null ? item.getQuantity() : 0);
+        BigDecimal unitPrice = item.getUnitPrice() != null ? item.getUnitPrice() : BigDecimal.ZERO;
+        BigDecimal subTotal = unitPrice.multiply(quantity);
+        if (taxRuleId != null) {
+            TaxRule taxRule = taxRuleRepository.findById(taxRuleId); // Tùy cách bạn viết repo, có thể bỏ .orElse(null)
+
             if (taxRule != null && taxRule.getTaxRate() != null) {
-                BigDecimal vatPerUnit = item.getUnitPrice().multiply(
-                        taxRule.getTaxRate().divide(BigDecimal.valueOf(100)));
-                BigDecimal unitPriceWithVat = item.getUnitPrice().add(vatPerUnit);
-                item.setTotalPrice(unitPriceWithVat.multiply(BigDecimal.valueOf(item.getQuantity())));
+                BigDecimal taxRate = taxRule.getTaxRate();
+
+                // a. Lưu cứng % thuế (Ví dụ: 8.0)
+                item.setAppliedTaxRate(taxRate);
+
+                // b. Lưu cứng Số tiền thuế (TaxAmount = SubTotal * TaxRate / 100)
+                BigDecimal taxAmount = subTotal.multiply(taxRate).divide(BigDecimal.valueOf(100));
+                item.setTaxAmount(taxAmount);
+
+                // c. Tổng thanh toán = Tiền gốc + Tiền thuế
+                item.setTotalPrice(subTotal.add(taxAmount));
                 return;
             }
+            item.setAppliedTaxRate(BigDecimal.ZERO);
+            item.setTaxAmount(BigDecimal.ZERO);
+            item.setTotalPrice(subTotal);
         }
-        item.setTotalPrice(item.getSubTotal());
     }
 
     public EstimateRespondDto updateEstimateApprove(Integer estimateId) {
