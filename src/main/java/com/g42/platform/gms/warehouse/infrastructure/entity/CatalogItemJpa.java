@@ -61,5 +61,8 @@ public class CatalogItemJpa {
 
     @Column(name = "product_line_id", nullable = false)
     private Integer productLineId;
+    @NotNull
+    @Column(name = "item_category_id", nullable = false)
+    private Integer itemCategoryId;
 
 }

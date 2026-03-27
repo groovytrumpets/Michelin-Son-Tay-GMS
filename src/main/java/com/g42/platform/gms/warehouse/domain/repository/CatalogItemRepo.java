@@ -1,6 +1,7 @@
 package com.g42.platform.gms.warehouse.domain.repository;
 
 import com.g42.platform.gms.warehouse.domain.entity.*;
+import jakarta.validation.constraints.NotNull;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -20,4 +21,18 @@ public interface CatalogItemRepo {
     Brand getBrandById(Integer brandId);
 
     CatalogItem createCatalog(CatalogItem domain);
+
+    ProductLine saveProductLine(ProductLine productLine);
+
+    boolean exitBySku(String sku);
+
+    ItemCategory saveItemCate(ItemCategory itemCategory);
+
+    ProductLine getProductLineById(Integer productLineId);
+
+    List<Specification> getListOfSpecsByItem(Integer itemId);
+
+    ItemCategory getItemCategoryById(@NotNull Integer itemCategoryId);
+
+    CatalogItem saveCatalogItem(CatalogItem catalogItem);
 }

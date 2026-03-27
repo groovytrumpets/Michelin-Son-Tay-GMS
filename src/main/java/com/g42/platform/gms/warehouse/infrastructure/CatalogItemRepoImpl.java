@@ -40,6 +40,10 @@ public class CatalogItemRepoImpl implements CatalogItemRepo {
     private SpecificationJpaMapper specificationJpaMapper;
     @Autowired
     private ServiceJpaRepository serviceJpaRepository;
+    @Autowired
+    private ItemCategoryJpaMapper itemCategoryJpaMapper;
+    @Autowired
+    private ItemCategoryJpaRepo itemCategoryJpaRepo;
 
 
     @Override
@@ -80,6 +84,48 @@ public class CatalogItemRepoImpl implements CatalogItemRepo {
 
     @Override
     public CatalogItem createCatalog(CatalogItem catalogItem) {
+        CatalogItemJpa catalogItemJpa = catalogItemJpaRepo.save(catalogItemJpaMapper.toJpa(catalogItem));
+        return catalogItemJpaMapper.toDomain(catalogItemJpa);
+    }
+
+
+    @Override
+    public ProductLine saveProductLine(ProductLine productLine) {
+        ProductLineJpa productLineJpa = productLineJpaRepo.save(productLineJpaMapper.toJpa(productLine));
+        return  productLineJpaMapper.toDomain(productLineJpa);
+    }
+
+    @Override
+    public boolean exitBySku(String sku) {
+        return catalogItemJpaRepo.existsBySku(sku);
+    }
+
+    @Override
+    public ItemCategory saveItemCate(ItemCategory itemCategory) {
+        ItemCategoryJpa itemCategoryJpa = itemCategoryJpaRepo.save(itemCategoryJpaMapper.toJpa(itemCategory));
+        return itemCategoryJpaMapper.toDomain(itemCategoryJpa);
+    }
+
+    @Override
+    public ProductLine getProductLineById(Integer productLineId) {
+        ProductLineJpa itemJpa = productLineJpaRepo.findById(productLineId).orElse(null);
+        return productLineJpaMapper.toDomain(itemJpa);
+    }
+
+    @Override
+    public List<Specification> getListOfSpecsByItem(Integer itemId) {
+        List<SpecificationJpa> specificationJpas = specificationJpaRepo.findAllByItemId(itemId);
+        return specificationJpas.stream().map(specificationJpaMapper::toDomain).toList();
+    }
+
+    @Override
+    public ItemCategory getItemCategoryById(Integer itemCategoryId) {
+        ItemCategoryJpa itemCategoryJpa = itemCategoryJpaRepo.findById(itemCategoryId).orElse(null);
+        return itemCategoryJpaMapper.toDomain(itemCategoryJpa);
+    }
+
+    @Override
+    public CatalogItem saveCatalogItem(CatalogItem catalogItem) {
         CatalogItemJpa catalogItemJpa = catalogItemJpaRepo.save(catalogItemJpaMapper.toJpa(catalogItem));
         return catalogItemJpaMapper.toDomain(catalogItemJpa);
     }

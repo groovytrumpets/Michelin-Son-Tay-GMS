@@ -2,13 +2,12 @@ package com.g42.platform.gms.warehouse.api.controller;
 
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
-import com.g42.platform.gms.customer.api.dto.CustomerCreateDto;
 import com.g42.platform.gms.warehouse.api.dto.*;
 import com.g42.platform.gms.warehouse.app.service.CatalogItemService;
 import com.g42.platform.gms.warehouse.app.service.WarehouseService;
 import com.g42.platform.gms.warehouse.domain.entity.Brand;
-import com.g42.platform.gms.warehouse.domain.entity.CatalogItem;
-import lombok.RequiredArgsConstructor;
+import com.g42.platform.gms.warehouse.domain.entity.ItemCategory;
+import com.g42.platform.gms.warehouse.domain.entity.ProductLine;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -49,5 +48,13 @@ public class WarehouseController {
     @PostMapping("/catalog-item/create")
     public ResponseEntity<ApiResponse<CatalogItemDto>> createCatalog(@RequestBody CatalogCreateDto createDto) {
         return ResponseEntity.ok(ApiResponses.success(catalogItemService.createNewCatalog(createDto)));
+    }
+    @PostMapping("/product-line/create")
+    public ResponseEntity<ApiResponse<ProductLine>> createProductLine(@RequestBody ProductLine productLine) {
+        return ResponseEntity.ok(ApiResponses.success(catalogItemService.saveProductLine(productLine)));
+    }
+    @PostMapping("/itemCategory/create")
+    public ResponseEntity<ApiResponse<ItemCategory>> createItemCategory(@RequestBody ItemCategory itemCategory) {
+        return ResponseEntity.ok(ApiResponses.success(catalogItemService.saveItemCate(itemCategory)));
     }
 }
