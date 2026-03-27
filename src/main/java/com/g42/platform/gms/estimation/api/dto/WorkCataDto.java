@@ -1,5 +1,6 @@
 package com.g42.platform.gms.estimation.api.dto;
 
+import com.g42.platform.gms.estimation.infrastructure.entity.TaxRuleJpa;
 import lombok.*;
 
 @Getter
@@ -12,4 +13,5 @@ public class WorkCataDto {
     private String categoryName;
     private Integer displayOrder;
     private Boolean isDefault;
+    private Integer taxRuleId;
 }
