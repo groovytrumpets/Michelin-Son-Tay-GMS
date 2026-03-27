@@ -35,4 +35,6 @@ public interface CatalogItemRepo {
     ItemCategory getItemCategoryById(@NotNull Integer itemCategoryId);
 
     CatalogItem saveCatalogItem(CatalogItem catalogItem);
+
+    boolean exitByCategoryCode(String categoryCode);
 }

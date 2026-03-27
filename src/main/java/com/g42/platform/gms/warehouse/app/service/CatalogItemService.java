@@ -122,9 +122,12 @@ public class CatalogItemService {
         if (itemCategory.getCategoryType()==null) {
             throw new WarehouseException("Category must not null!",WarehouseErrorCode.WRONG_ENUM);
         }
-        if (itemCategory.getCategoryType()!="SERVICE" || itemCategory.getCategoryType()!="PART") {
+        if (!itemCategory.getCategoryType().equals("SERVICE") && !itemCategory.getCategoryType().equals("PART")) {
             throw new WarehouseException("Category type must be PART or SERVICE!",WarehouseErrorCode.WRONG_ENUM);
         }
+        if (catalogItemRepo.exitByCategoryCode(itemCategory.getCategoryCode()))
+            throw new WarehouseException("Category code must be UNIQUE!",WarehouseErrorCode.INVALID_CATEGORY);
         return catalogItemRepo.saveItemCate(itemCategory);
     }
+
 }

@@ -6,4 +6,5 @@ public enum WarehouseErrorCode {
     SERVICE_NOT_FOUND,
     DUPLICATE_SKU,
     WRONG_ENUM,
+    INVALID_CATEGORY,
 }

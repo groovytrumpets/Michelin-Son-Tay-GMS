@@ -129,4 +129,9 @@ public class CatalogItemRepoImpl implements CatalogItemRepo {
         CatalogItemJpa catalogItemJpa = catalogItemJpaRepo.save(catalogItemJpaMapper.toJpa(catalogItem));
         return catalogItemJpaMapper.toDomain(catalogItemJpa);
     }
+
+    @Override
+    public boolean exitByCategoryCode(String categoryCode) {
+        return itemCategoryJpaRepo.existsByCategoryCode(categoryCode);
+    }
 }

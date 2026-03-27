@@ -5,4 +5,5 @@ import com.g42.platform.gms.warehouse.infrastructure.entity.ItemCategoryJpa;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ItemCategoryJpaRepo extends JpaRepository<ItemCategoryJpa,Integer> {
+    boolean existsByCategoryCode(String categoryCode);
 }
