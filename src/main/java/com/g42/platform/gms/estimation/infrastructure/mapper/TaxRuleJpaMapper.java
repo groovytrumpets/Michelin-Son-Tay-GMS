@@ -9,4 +9,6 @@ import org.mapstruct.Mapper;
 @Mapper(componentModel = "spring")
 public interface TaxRuleJpaMapper {
     TaxRule toDomain (TaxRuleJpa taxRule);
+
+    TaxRuleJpa toJpa(TaxRule taxRule);
 }

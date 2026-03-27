@@ -12,4 +12,6 @@ public interface TaxRuleRepository {
     List<TaxRule> getAllActiveTax();
 
     List<TaxRule> findAllByIds(List<Integer> taxRuleIds);
+
+    TaxRule save(TaxRule taxRule);
 }
