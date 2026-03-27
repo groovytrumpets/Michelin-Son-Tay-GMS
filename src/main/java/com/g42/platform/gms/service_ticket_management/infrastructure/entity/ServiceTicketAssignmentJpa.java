@@ -1,6 +1,7 @@
 package com.g42.platform.gms.service_ticket_management.infrastructure.entity;
 
 import com.g42.platform.gms.auth.entity.StaffProfile;
+import com.g42.platform.gms.service_ticket_management.domain.enums.AssignmentStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -42,10 +43,10 @@ public class ServiceTicketAssignmentJpa {
     private Boolean isPrimary;
 
     @NotNull
-    @ColumnDefault("'ACTIVE'")
-    @Lob
+    @Enumerated(EnumType.STRING)
+    @ColumnDefault("'PENDING'")
     @Column(name = "status", nullable = false)
-    private String status;
+    private AssignmentStatus status;
 
     @Size(max = 255)
     @Column(name = "note")

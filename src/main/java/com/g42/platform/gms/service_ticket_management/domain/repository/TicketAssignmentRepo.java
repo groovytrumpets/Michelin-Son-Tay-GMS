@@ -31,4 +31,7 @@ public interface TicketAssignmentRepo {
 
     /** Kiểm tra staff đã được assign vào ticket cụ thể chưa. */
     boolean isStaffAssignedToTicket(Integer staffId, Integer ticketId);
+    
+    /** Tìm assignment theo ticket và role. */
+    List<ServiceTicketAssignment> findByTicketIdAndRole(Integer ticketId, String role);
 }

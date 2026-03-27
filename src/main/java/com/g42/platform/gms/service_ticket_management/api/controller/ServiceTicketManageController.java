@@ -55,4 +55,17 @@ public class ServiceTicketManageController {
             @PathVariable String ticketCode) {
         return ResponseEntity.ok(ApiResponses.success(serviceTicketManageService.completeTicket(ticketCode)));
     }
+
+    /**
+     * Lễ tân thay đổi advisor cho ticket.
+     * Chỉ được phép thay đổi khi advisor hiện tại đang ở trạng thái PENDING.
+     */
+    @PutMapping("/tickets/{ticketCode}/change-advisor")
+    public ResponseEntity<ApiResponse<ServiceTicketDetailResponse>> changeAdvisor(
+            @PathVariable String ticketCode,
+            @RequestParam Integer newAdvisorId,
+            @RequestParam(required = false) String note) {
+        return ResponseEntity.ok(ApiResponses.success(
+            serviceTicketManageService.changeAdvisor(ticketCode, newAdvisorId, note)));
+    }
 }

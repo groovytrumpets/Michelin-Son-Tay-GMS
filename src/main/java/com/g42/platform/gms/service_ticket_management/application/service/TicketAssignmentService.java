@@ -4,6 +4,7 @@ import com.g42.platform.gms.service_ticket_management.api.dto.assign.AssignStaff
 import com.g42.platform.gms.service_ticket_management.api.dto.assign.AvailableStaffDto;
 import com.g42.platform.gms.service_ticket_management.api.mapper.assignment.TicketAssignmentDtoMapper;
 import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicketAssignment;
+import com.g42.platform.gms.service_ticket_management.domain.enums.AssignmentStatus;
 import com.g42.platform.gms.service_ticket_management.domain.exception.AssignmentErrorCode;
 import com.g42.platform.gms.service_ticket_management.domain.exception.AssignmentException;
 import com.g42.platform.gms.service_ticket_management.domain.repository.TicketAssignmentRepo;
@@ -73,9 +74,16 @@ public class TicketAssignmentService {
         assignment.setIsPrimary(isPrimary);
         assignment.setNote(dto.getNote());
         assignment.setAssignedAt(Instant.now());
-        assignment.setStatus("ACTIVE");
+        assignment.setStatus(AssignmentStatus.PENDING); // Bắt đầu với PENDING, chưa làm việc
 
         ServiceTicketAssignment saved = ticketAssignmentRepo.save(assignment);
+        
+        // Nếu assign technician thành công, chuyển advisor từ PENDING sang ACTIVE
+        // Nhưng technician vẫn ở PENDING cho đến khi bắt đầu làm việc thực sự
+        if ("TECHNICIAN".equals(dto.getRoleInTicket())) {
+            activateAdvisorAssignment(ticketId);
+        }
+        
         return dtoMapper.toDto(saved);
     }
 
@@ -100,5 +108,137 @@ public class TicketAssignmentService {
         dto.setPhone(staff.getPhone());
         dto.setAvatar(staff.getAvatar());
         return dto;
+    }
+
+    /**
+     * Chuyển advisor từ PENDING sang ACTIVE khi bắt đầu làm việc (assign technician thành công).
+     */
+    @Transactional
+    public void activateAdvisorAssignment(Integer ticketId) {
+        List<ServiceTicketAssignment> advisorAssignments = ticketAssignmentRepo.findByTicketIdAndRole(ticketId, "ADVISOR");
+        for (ServiceTicketAssignment assignment : advisorAssignments) {
+            if (assignment.getStatus() == AssignmentStatus.PENDING) {
+                assignment.setStatus(AssignmentStatus.ACTIVE);
+                ticketAssignmentRepo.save(assignment);
+            }
+        }
+    }
+    
+    /**
+     * Đánh dấu assignment hoàn thành khi ticket được thanh toán.
+     */
+    @Transactional
+    public void markAssignmentDone(Integer ticketId) {
+        List<ServiceTicketAssignment> assignments = ticketAssignmentRepo.findByTicketId(ticketId);
+        for (ServiceTicketAssignment assignment : assignments) {
+            if (assignment.getStatus() == AssignmentStatus.ACTIVE || assignment.getStatus() == AssignmentStatus.PENDING) {
+                assignment.setStatus(AssignmentStatus.DONE);
+                ticketAssignmentRepo.save(assignment);
+            }
+        }
+    }
+    
+    /**
+     * Chuyển assignment từ PENDING sang ACTIVE khi bắt đầu làm việc thực sự.
+     * Được gọi khi:
+     * - Technician bấm "Bắt đầu kiểm tra an toàn"
+     * - Advisor bấm "Bắt đầu làm việc"
+     */
+    @Transactional
+    public void startWork(Integer ticketId, Integer staffId) {
+        List<ServiceTicketAssignment> assignments = ticketAssignmentRepo.findByTicketId(ticketId);
+        for (ServiceTicketAssignment assignment : assignments) {
+            if (assignment.getStaffId().equals(staffId) && assignment.getStatus() == AssignmentStatus.PENDING) {
+                assignment.setStatus(AssignmentStatus.ACTIVE);
+                ticketAssignmentRepo.save(assignment);
+            }
+        }
+    }
+
+    /**
+     * Thay đổi advisor cho ticket (chỉ dành cho lễ tân).
+     * Chỉ được phép thay đổi khi advisor hiện tại đang ở trạng thái PENDING (chưa bắt đầu làm việc).
+     */
+    @Transactional
+    public AssignStaffDto changeAdvisor(Integer ticketId, Integer newAdvisorId, String note) {
+        // 1. Tìm assignment advisor hiện tại
+        List<ServiceTicketAssignment> currentAssignments = ticketAssignmentRepo.findByTicketIdAndRole(ticketId, "ADVISOR");
+        if (currentAssignments.isEmpty()) {
+            throw new AssignmentException("Ticket chưa có advisor!", AssignmentErrorCode.INVALID_SERVICE_TICKET_ID);
+        }
+        
+        ServiceTicketAssignment currentAdvisor = currentAssignments.get(0);
+        
+        // 2. Kiểm tra điều kiện thay đổi: chỉ được thay khi advisor đang PENDING (chưa bắt đầu làm việc)
+        if (currentAdvisor.getStatus() != AssignmentStatus.PENDING) {
+            throw new AssignmentException("Không thể thay đổi advisor khi đã bắt đầu làm việc (status: " + currentAdvisor.getStatus() + ")", 
+                AssignmentErrorCode.UNAVAILABLE_STAFF);
+        }
+        
+        // 3. Validate advisor mới phải rảnh và có role ADVISOR
+        boolean newAdvisorHasRole = staffProfileRepo.existsByStaffIdAndRole(newAdvisorId, "ADVISOR");
+        if (!newAdvisorHasRole) {
+            throw new AssignmentException("Staff không có role ADVISOR", AssignmentErrorCode.UNAVAILABLE_STAFF);
+        }
+        
+        // 4. Hủy assignment cũ
+        currentAdvisor.setStatus(AssignmentStatus.CANCELLED);
+        ticketAssignmentRepo.save(currentAdvisor);
+        
+        // 5. Tạo assignment mới với trạng thái PENDING
+        ServiceTicketAssignment newAssignment = new ServiceTicketAssignment();
+        newAssignment.setServiceTicketId(ticketId);
+        newAssignment.setStaffId(newAdvisorId);
+        newAssignment.setRoleInTicket("ADVISOR");
+        newAssignment.setIsPrimary(true);
+        newAssignment.setNote(note != null ? note : "Thay đổi advisor bởi lễ tân");
+        newAssignment.setAssignedAt(Instant.now());
+        newAssignment.setStatus(AssignmentStatus.PENDING); // Bắt đầu với PENDING
+        
+        ServiceTicketAssignment saved = ticketAssignmentRepo.save(newAssignment);
+        return dtoMapper.toDto(saved);
+    }
+    
+    /**
+     * Hủy assignment technician (chỉ dành cho advisor).
+     * Chỉ được phép hủy khi technician đang ở trạng thái PENDING.
+     */
+    @Transactional
+    public void removeTechnician(Integer ticketId, Integer technicianId) {
+        // 1. Tìm assignment technician
+        List<ServiceTicketAssignment> assignments = ticketAssignmentRepo.findByTicketId(ticketId);
+        ServiceTicketAssignment technicianAssignment = assignments.stream()
+            .filter(a -> a.getStaffId().equals(technicianId) && "TECHNICIAN".equals(a.getRoleInTicket()))
+            .findFirst()
+            .orElseThrow(() -> new AssignmentException("Không tìm thấy assignment technician!", AssignmentErrorCode.INVALID_SERVICE_TICKET_ID));
+        
+        // 2. Kiểm tra điều kiện hủy: chỉ được hủy khi đang PENDING
+        if (technicianAssignment.getStatus() != AssignmentStatus.PENDING) {
+            throw new AssignmentException("Không thể hủy technician khi đã bắt đầu làm việc (status: " + technicianAssignment.getStatus() + ")", 
+                AssignmentErrorCode.UNAVAILABLE_STAFF);
+        }
+        
+        // 3. Hủy assignment
+        technicianAssignment.setStatus(AssignmentStatus.CANCELLED);
+        ticketAssignmentRepo.save(technicianAssignment);
+    }
+    
+    /**
+     * Thay đổi technician (chỉ dành cho advisor).
+     * Hủy technician cũ và assign technician mới với trạng thái PENDING.
+     */
+    @Transactional
+    public AssignStaffDto changeTechnician(Integer ticketId, Integer oldTechnicianId, Integer newTechnicianId, String note) {
+        // 1. Hủy technician cũ (chỉ được hủy nếu đang PENDING)
+        removeTechnician(ticketId, oldTechnicianId);
+        
+        // 2. Assign technician mới
+        AssignStaffDto newTechnicianDto = new AssignStaffDto();
+        newTechnicianDto.setStaffId(newTechnicianId);
+        newTechnicianDto.setRoleInTicket("TECHNICIAN");
+        newTechnicianDto.setIsPrimary(false); // Mặc định không phải primary
+        newTechnicianDto.setNote(note != null ? note : "Thay đổi technician bởi advisor");
+        
+        return assignStaff(ticketId, newTechnicianDto);
     }
 }
