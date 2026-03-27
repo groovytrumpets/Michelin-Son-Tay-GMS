@@ -306,4 +306,11 @@ public class EstimateService {
         }
         item.setTotalPrice(item.getSubTotal());
     }
+
+    public EstimateRespondDto updateEstimateApprove(Integer estimateId) {
+        Estimate estimate =  estimateRepository.findEstimateById(estimateId);
+        estimate.setStatus(EstimateEnum.APPROVED);
+        Estimate saved = estimateRepository.save(estimate);
+        return estimateDtoMapper.toEstimateDto(saved);
+    }
 }

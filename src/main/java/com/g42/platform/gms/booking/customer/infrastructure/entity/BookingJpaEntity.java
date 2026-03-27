@@ -32,9 +32,6 @@ public class BookingJpaEntity {
     @Column(name = "scheduled_time", nullable = false)
     private LocalTime scheduledTime;
 
-    @Column(name = "service_category", length = 50)
-    private String serviceCategory;
-
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private BookingStatus status;

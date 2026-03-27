@@ -2,7 +2,6 @@ package com.g42.platform.gms.estimation.domain.entity;
 
 import com.g42.platform.gms.booking_management.infrastructure.entity.CatalogItemJpa;
 import com.g42.platform.gms.estimation.infrastructure.entity.EstimateJpa;
-import com.g42.platform.gms.estimation.infrastructure.entity.WarehouseJpa;
 import jakarta.persistence.Column;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;

@@ -1,5 +1,6 @@
 package com.g42.platform.gms.marketing.service_catalog.api.mapper;
 
+import com.g42.platform.gms.marketing.service_catalog.api.dto.ServiceCreateRequest;
 import com.g42.platform.gms.marketing.service_catalog.api.dto.ServiceDetailRespond;
 import com.g42.platform.gms.marketing.service_catalog.api.dto.ServiceSumaryRespond;
 import com.g42.platform.gms.marketing.service_catalog.domain.entity.CatalogItem;
@@ -23,5 +24,7 @@ public interface ServiceDtoMapper {
     }
     List<ServiceSumaryRespond> toDto(List<Service> services);
     ServiceDetailRespond toDetailDto(Service service);
-
+    @Mapping(target = "mediaThumbnail", ignore = true)
+    @Mapping(target = "media", ignore = true)
+    Service toEntity(ServiceCreateRequest request);
 }

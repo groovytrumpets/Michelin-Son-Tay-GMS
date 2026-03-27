@@ -83,18 +83,24 @@ public class ServiceTicketTechnicianController {
     
     /**
      * Update technician notes.
-     * 
-     * @param ticketCode Ticket code (ST_XXXXXX or MST_XXXXXX)
-     * @param request Update request with technicianNotes
-     * @return Updated TechnicianTicketDetailResponse
      */
     @PutMapping("/tickets/{ticketCode}/notes")
     public ResponseEntity<ApiResponse<TechnicianTicketDetailResponse>> updateTechnicianNotes(
             @PathVariable String ticketCode,
             @RequestBody @jakarta.validation.Valid UpdateTechnicianNotesRequest request) {
-        
+
         TechnicianTicketDetailResponse updated = technicianService.updateTechnicianNotes(ticketCode, request);
-        
         return ResponseEntity.ok(ApiResponses.success(updated));
+    }
+
+    /**
+     * Technician báo xong sửa xe — IN_PROGRESS → COMPLETED.
+     */
+    @PostMapping("/tickets/{ticketCode}/finish")
+    public ResponseEntity<ApiResponse<TechnicianTicketDetailResponse>> finishWork(
+            @PathVariable String ticketCode) {
+
+        TechnicianTicketDetailResponse result = technicianService.finishWork(ticketCode);
+        return ResponseEntity.ok(ApiResponses.success(result));
     }
 }

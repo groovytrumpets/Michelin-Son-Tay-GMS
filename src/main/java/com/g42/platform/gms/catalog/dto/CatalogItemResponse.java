@@ -13,7 +13,7 @@ public class CatalogItemResponse {
     private Integer itemId;
     private String itemName;
     private String itemType;
-    private Double estimatedPrice;
+
     private Integer estimateTime;
     private Boolean isActive;
 }

@@ -4,10 +4,13 @@ import com.cloudinary.Cloudinary;
 import com.g42.platform.gms.common.constant.FileUploadConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.coobird.thumbnailator.Thumbnails;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,16 +30,27 @@ public class ImageUploadService {
      */
     public String uploadImage(MultipartFile file, String folder) throws IOException {
         validateFile(file);
-        
-        // Simple upload without transformation - Cloudinary will store original
-        // You can apply transformation via URL later if needed
+        byte[] compressedImageBytes;
+        if (file.getSize() > FileUploadConstants.MAX_IMAGE_SIZE_BYTES){
+        ByteArrayOutputStream os = new ByteArrayOutputStream();
+        try (InputStream is = file.getInputStream()) {
+            Thumbnails.of(is)
+                    .size(1280, 1280) // Giới hạn kích thước tối đa (VD: HD/FullHD)
+                    .outputQuality(0.7) // Giảm chất lượng xuống 70% (mắt thường không phân biệt được)
+                    .toOutputStream(os); // Xuất ra stream
+        }
+            compressedImageBytes = os.toByteArray();
+        }else {
+            compressedImageBytes = file.getBytes();
+        }
+
         Map<String, Object> options = new HashMap<>();
         options.put("folder", folder);
         options.put("resource_type", "image");
-        
-        Map uploadResult = cloudinary.uploader().upload(file.getBytes(), options);
+
+        Map uploadResult = cloudinary.uploader().upload(compressedImageBytes, options);
         String url = (String) uploadResult.get("secure_url");
-        
+
         log.info("Image uploaded successfully: {}", url);
         return url;
     }
@@ -63,11 +77,11 @@ public class ImageUploadService {
             throw new IllegalArgumentException(FileUploadConstants.ERROR_FILE_EMPTY);
         }
         
-        if (file.getSize() > FileUploadConstants.MAX_IMAGE_SIZE_BYTES) {
-            throw new IllegalArgumentException(
-                String.format(FileUploadConstants.ERROR_FILE_TOO_LARGE, FileUploadConstants.MAX_IMAGE_SIZE_MB)
-            );
-        }
+//        if (file.getSize() > FileUploadConstants.MAX_IMAGE_SIZE_BYTES) {
+//            throw new IllegalArgumentException(
+//                String.format(FileUploadConstants.ERROR_FILE_TOO_LARGE, FileUploadConstants.MAX_IMAGE_SIZE_MB)
+//            );
+//        }
         
         String contentType = file.getContentType();
         if (contentType == null || !FileUploadConstants.ALLOWED_IMAGE_TYPES.contains(contentType.toLowerCase())) {
@@ -120,5 +134,36 @@ public class ImageUploadService {
             log.warn("Failed to extract public_id from URL: {}", cloudinaryUrl, e);
             return null;
         }
+    }
+
+    public String uploadVideo(MultipartFile file, String folder) throws IOException {
+
+
+
+
+        if (file.getSize() > FileUploadConstants.MAX_VIDEO_SIZE_BYTES) {
+            throw new IllegalArgumentException("Dung lượng video vượt quá mức cho phép!");
+        }
+
+        // 3. Lấy trực tiếp mảng byte của file gốc (Không dùng Thumbnailator)
+        byte[] videoBytes = file.getBytes();
+
+        // 4. Cấu hình upload cho Cloudinary
+        Map<String, Object> options = new HashMap<>();
+        options.put("folder", folder);
+
+        // BẮT BUỘC: Định dạng tài nguyên phải là "video"
+        options.put("resource_type", "video");
+
+        // BÍ QUYẾT TỐI ƯU: Nhờ Cloudinary tự nén dung lượng và chọn format nhẹ nhất
+        options.put("quality", "auto");
+        options.put("fetch_format", "auto");
+
+        // 5. Upload và lấy link
+        Map uploadResult = cloudinary.uploader().upload(videoBytes, options);
+        String url = (String) uploadResult.get("secure_url");
+
+        log.info("Video uploaded successfully: {}", url);
+        return url;
     }
 }
