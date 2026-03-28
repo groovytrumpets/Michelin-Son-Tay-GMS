@@ -6,6 +6,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -34,4 +35,6 @@ public interface ServiceTicketRepo {
     Page<ServiceTicket> findByAssignedStaff(Integer staffId, TicketStatus status, LocalDate date, String search, Pageable pageable);
 
     Page<ServiceTicket> findByTechnicianCompleted(Integer technicianId, LocalDate startDate, LocalDate endDate, String licensePlate, Pageable pageable);
+
+    List<ServiceTicket> findAllByDate(LocalDateTime receivedAt);
 }

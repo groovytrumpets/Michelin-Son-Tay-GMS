@@ -15,6 +15,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -95,5 +96,11 @@ public class ServiceTicketRepoImpl implements ServiceTicketRepo {
             spec = spec.and(WorkHistorySpecification.byLicensePlate(licensePlate));
         }
         return jpaRepo.findAll(spec, pageable).map(mapper::toDomain);
+    }
+
+    @Override
+    public List<ServiceTicket> findAllByDate(LocalDateTime receivedAt) {
+        List<ServiceTicketJpa> serviceTicketJpas = jpaRepo.findAllByReceivedAt(receivedAt);
+        return serviceTicketJpas.stream().map(mapper::toDomain).toList();
     }
 }
