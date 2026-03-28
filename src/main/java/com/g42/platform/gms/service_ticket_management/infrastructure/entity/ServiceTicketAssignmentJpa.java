@@ -30,8 +30,7 @@ public class ServiceTicketAssignmentJpa {
     private Integer staffId;
 
     @NotNull
-    @Lob
-    @Column(name = "role_in_ticket", nullable = false)
+    @Column(name = "role_in_ticket", nullable = false, length = 50)
     private String roleInTicket;
 
     @ColumnDefault("CURRENT_TIMESTAMP")
@@ -52,5 +51,8 @@ public class ServiceTicketAssignmentJpa {
     @Column(name = "note")
     private String note;
 
-
+    // Relationship với ServiceTicket để lấy thông tin chi tiết
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "service_ticket_id", insertable = false, updatable = false)
+    private ServiceTicketJpa serviceTicket;
 }

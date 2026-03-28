@@ -1,5 +1,6 @@
 package com.g42.platform.gms.service_ticket_management.api.controller;
 
+
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceTicketDetailResponse;
@@ -15,7 +16,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+
 import java.time.LocalDate;
+
 
 /**
  * Controller for advisor actions on service tickets.
@@ -26,8 +29,10 @@ import java.time.LocalDate;
 @RequestMapping("/api/service-ticket/advisor")
 public class ServiceTicketAdvisorController {
 
+
     private final ServiceTicketAdvisorService advisorService;
     private final ServiceTicketManageService manageService; // reuse read methods
+
 
     /** Xem danh sách phiếu (advisor cũng cần xem). */
     @GetMapping("/tickets")
@@ -36,20 +41,31 @@ public class ServiceTicketAdvisorController {
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) LocalDate date,
             @RequestParam(required = false) String status,
-            @RequestParam(required = false) String search) {
+            @RequestParam(required = false) String search,
+            @AuthenticationPrincipal StaffPrincipal principal) {
+
 
         TicketStatus ticketStatus = null;
         if (status != null && !status.isBlank()) {
             try { ticketStatus = TicketStatus.valueOf(status.toUpperCase()); } catch (IllegalArgumentException ignored) {}
         }
-        return ResponseEntity.ok(ApiResponses.success(manageService.getServiceTicketList(page, size, date, ticketStatus, search)));
+        if (principal == null || principal.getStaffId() == null) {
+            return ResponseEntity.status(401).body(ApiResponses.error("UNAUTHORIZED", "Unauthorized"));
+        }
+        return ResponseEntity.ok(ApiResponses.success(
+                manageService.getServiceTicketListByAssignedStaff(
+                        principal.getStaffId(), page, size, date, ticketStatus, search
+                )
+        ));
     }
+
 
     /** Xem chi tiết phiếu. */
     @GetMapping("/tickets/{ticketCode}")
     public ResponseEntity<ApiResponse<ServiceTicketDetailResponse>> getDetail(@PathVariable String ticketCode) {
         return ResponseEntity.ok(ApiResponses.success(manageService.getServiceTicketDetail(ticketCode)));
     }
+
 
     /** Cập nhật dịch vụ/báo giá khi ticket đang DRAFT. */
     @PutMapping("/tickets/{ticketCode}")
@@ -59,6 +75,7 @@ public class ServiceTicketAdvisorController {
         return ResponseEntity.ok(ApiResponses.success(advisorService.updateEstimate(ticketCode, request)));
     }
 
+
     /** DRAFT → IN_PROGRESS: khách đồng ý, bắt đầu sửa. */
     @PostMapping("/tickets/{ticketCode}/start")
     public ResponseEntity<ApiResponse<ServiceTicketDetailResponse>> startService(
@@ -67,11 +84,13 @@ public class ServiceTicketAdvisorController {
         return ResponseEntity.ok(ApiResponses.success(advisorService.startService(ticketCode, principal.getStaffId())));
     }
 
+
     /** IN_PROGRESS → PENDING: chờ phụ tùng. */
     @PostMapping("/tickets/{ticketCode}/wait-parts")
     public ResponseEntity<ApiResponse<ServiceTicketDetailResponse>> waitForParts(@PathVariable String ticketCode) {
         return ResponseEntity.ok(ApiResponses.success(advisorService.waitForParts(ticketCode)));
     }
+
 
     /** PENDING → IN_PROGRESS: có phụ tùng, tiếp tục sửa. */
     @PostMapping("/tickets/{ticketCode}/resume")
@@ -79,17 +98,34 @@ public class ServiceTicketAdvisorController {
         return ResponseEntity.ok(ApiResponses.success(advisorService.resumeWork(ticketCode)));
     }
 
+
     /** PENDING/IN_PROGRESS → DRAFT: thêm dịch vụ mới vào báo giá. */
     @PostMapping("/tickets/{ticketCode}/back-to-draft")
     public ResponseEntity<ApiResponse<ServiceTicketDetailResponse>> backToDraft(@PathVariable String ticketCode) {
         return ResponseEntity.ok(ApiResponses.success(advisorService.backToDraft(ticketCode)));
     }
 
+
     /** DRAFT/PENDING/IN_PROGRESS → CANCELLED. */
     @PostMapping("/tickets/{ticketCode}/cancel")
     public ResponseEntity<ApiResponse<ServiceTicketDetailResponse>> cancelTicket(@PathVariable String ticketCode) {
         return ResponseEntity.ok(ApiResponses.success(advisorService.cancelTicket(ticketCode)));
     }
+
+
+    /**
+     * Advisor thay đổi advisor cho ticket.
+     * Chỉ được phép thay đổi khi advisor hiện tại đang ở trạng thái PENDING.
+     */
+    @PutMapping("/tickets/{ticketCode}/change-advisor")
+    public ResponseEntity<ApiResponse<ServiceTicketDetailResponse>> changeAdvisor(
+            @PathVariable String ticketCode,
+            @RequestParam Integer newAdvisorId,
+            @RequestParam(required = false) String note) {
+        return ResponseEntity.ok(ApiResponses.success(
+                advisorService.changeAdvisor(ticketCode, newAdvisorId, note)));
+    }
+
 
     /**
      * Advisor hủy assignment technician.
@@ -100,8 +136,9 @@ public class ServiceTicketAdvisorController {
             @PathVariable String ticketCode,
             @PathVariable Integer technicianId) {
         return ResponseEntity.ok(ApiResponses.success(
-            advisorService.removeTechnician(ticketCode, technicianId)));
+                advisorService.removeTechnician(ticketCode, technicianId)));
     }
+
 
     /**
      * Advisor thay đổi technician.
@@ -114,6 +151,7 @@ public class ServiceTicketAdvisorController {
             @PathVariable Integer newTechnicianId,
             @RequestParam(required = false) String note) {
         return ResponseEntity.ok(ApiResponses.success(
-            advisorService.changeTechnician(ticketCode, oldTechnicianId, newTechnicianId, note)));
+                advisorService.changeTechnician(ticketCode, oldTechnicianId, newTechnicianId, note)));
     }
 }
+

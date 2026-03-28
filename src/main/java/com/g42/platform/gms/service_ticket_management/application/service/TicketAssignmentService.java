@@ -1,7 +1,10 @@
 package com.g42.platform.gms.service_ticket_management.application.service;
 
+
 import com.g42.platform.gms.service_ticket_management.api.dto.assign.AssignStaffDto;
 import com.g42.platform.gms.service_ticket_management.api.dto.assign.AvailableStaffDto;
+import com.g42.platform.gms.service_ticket_management.api.dto.assign.StaffWorkloadDto;
+import com.g42.platform.gms.service_ticket_management.api.dto.assign.WorkloadTicketDto;
 import com.g42.platform.gms.service_ticket_management.api.mapper.assignment.TicketAssignmentDtoMapper;
 import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicketAssignment;
 import com.g42.platform.gms.service_ticket_management.domain.enums.AssignmentStatus;
@@ -14,8 +17,15 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 
 /**
  * Application service cho ticket assignment.
@@ -25,16 +35,31 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TicketAssignmentService {
 
+
     private final TicketAssignmentRepo ticketAssignmentRepo;
     private final TicketAssignmentDtoMapper dtoMapper;
     private final StaffProileJpaRepo staffProfileRepo;
 
+
     @Transactional(readOnly = true)
     public List<AvailableStaffDto> getAvailableStaff(Integer ticketId, String role) {
-        return staffProfileRepo.findAvailableStaffByRole(role, ticketId).stream()
-            .map(this::toAvailableStaffDto)
-            .toList();
+        // Lấy tất cả staff có role — không lọc bận/rảnh
+        List<StaffProfileJpa> staffList = staffProfileRepo.findAllByRole(role);
+
+        return staffList.stream()
+                .map(staff -> toAvailableStaffDto(staff, ticketId))
+                .toList();
     }
+
+
+    @Transactional(readOnly = true)
+    public List<AssignStaffDto> getAssignments(Integer ticketId) {
+        List<AssignStaffDto> assignments = ticketAssignmentRepo.findByTicketId(ticketId).stream()
+                .map(dtoMapper::toDto)
+                .toList();
+        return enrichDtosWithStaffName(assignments);
+    }
+
 
     @Transactional
     public AssignStaffDto assignStaff(Integer ticketId, AssignStaffDto dto) {
@@ -46,6 +71,7 @@ public class TicketAssignmentService {
             }
         }
 
+
         // Validate: mỗi ticket chỉ có 1 primary technician
         boolean wantPrimary = dto.getIsPrimary() != null && dto.getIsPrimary();
         if (wantPrimary) {
@@ -54,21 +80,19 @@ public class TicketAssignmentService {
             }
         }
 
-        // Validate: staff phải rảnh (chỉ áp dụng cho TECHNICIAN, advisor không giới hạn)
+
         // Validate: staff phải có đúng role tương ứng với roleInTicket
         boolean staffHasRole = staffProfileRepo.existsByStaffIdAndRole(dto.getStaffId(), dto.getRoleInTicket());
         if (!staffHasRole) {
             throw new AssignmentException("Staff không có role " + dto.getRoleInTicket(), AssignmentErrorCode.UNAVAILABLE_STAFF);
         }
 
-        if (!isAdvisorRole && !ticketAssignmentRepo.isStaffAvailable(dto.getStaffId())) {
-            throw new AssignmentException("Staff đang bận!", AssignmentErrorCode.UNAVAILABLE_STAFF);
-        }
 
         ServiceTicketAssignment assignment = new ServiceTicketAssignment();
         assignment.setServiceTicketId(ticketId);
         assignment.setStaffId(dto.getStaffId());
         assignment.setRoleInTicket(dto.getRoleInTicket());
+
 
         boolean isPrimary = dto.getIsPrimary() != null && dto.getIsPrimary();
         assignment.setIsPrimary(isPrimary);
@@ -76,39 +100,85 @@ public class TicketAssignmentService {
         assignment.setAssignedAt(Instant.now());
         assignment.setStatus(AssignmentStatus.PENDING); // Bắt đầu với PENDING, chưa làm việc
 
+
         ServiceTicketAssignment saved = ticketAssignmentRepo.save(assignment);
-        
+
         // Nếu assign technician thành công, chuyển advisor từ PENDING sang ACTIVE
         // Nhưng technician vẫn ở PENDING cho đến khi bắt đầu làm việc thực sự
         if ("TECHNICIAN".equals(dto.getRoleInTicket())) {
             activateAdvisorAssignment(ticketId);
         }
-        
-        return dtoMapper.toDto(saved);
+
+        return enrichDtoWithStaffName(dtoMapper.toDto(saved));
     }
+
 
     @Transactional
     public AssignStaffDto updateAssignment(Integer ticketId, Integer assignmentId, AssignStaffDto dto) {
         ServiceTicketAssignment existing = ticketAssignmentRepo.findById(assignmentId)
-            .orElseThrow(() -> new AssignmentException("Assignment không tồn tại!", AssignmentErrorCode.INVALID_SERVICE_TICKET_ID));
+                .orElseThrow(() -> new AssignmentException("Assignment không tồn tại!", AssignmentErrorCode.INVALID_SERVICE_TICKET_ID));
+
 
         if (dto.getStaffId() != null) existing.setStaffId(dto.getStaffId());
         if (dto.getRoleInTicket() != null) existing.setRoleInTicket(dto.getRoleInTicket());
         if (dto.getIsPrimary() != null) existing.setIsPrimary(dto.getIsPrimary());
         if (dto.getNote() != null) existing.setNote(dto.getNote());
 
+
         ServiceTicketAssignment saved = ticketAssignmentRepo.save(existing);
-        return dtoMapper.toDto(saved);
+        return enrichDtoWithStaffName(dtoMapper.toDto(saved));
     }
 
-    private AvailableStaffDto toAvailableStaffDto(StaffProfileJpa staff) {
+
+    @Transactional
+    public AssignStaffDto cancelAssignmentById(Integer ticketId, Integer assignmentId) {
+        ServiceTicketAssignment existing = ticketAssignmentRepo.findById(assignmentId)
+                .orElseThrow(() -> new AssignmentException("Assignment không tồn tại!", AssignmentErrorCode.INVALID_SERVICE_TICKET_ID));
+
+
+        if (!ticketId.equals(existing.getServiceTicketId())) {
+            throw new AssignmentException("Assignment không thuộc ticket này!", AssignmentErrorCode.INVALID_SERVICE_TICKET_ID);
+        }
+
+
+        if (!"TECHNICIAN".equals(existing.getRoleInTicket())) {
+            throw new AssignmentException("Chỉ hủy assignment TECHNICIAN ở API này!", AssignmentErrorCode.UNAVAILABLE_STAFF);
+        }
+
+
+        if (existing.getStatus() != AssignmentStatus.PENDING) {
+            throw new AssignmentException(
+                    "Không thể hủy technician khi đã bắt đầu làm việc (status: " + existing.getStatus() + ")",
+                    AssignmentErrorCode.UNAVAILABLE_STAFF
+            );
+        }
+
+
+        existing.setStatus(AssignmentStatus.CANCELLED);
+        ServiceTicketAssignment saved = ticketAssignmentRepo.save(existing);
+        return enrichDtoWithStaffName(dtoMapper.toDto(saved));
+    }
+
+
+    private AvailableStaffDto toAvailableStaffDto(StaffProfileJpa staff, Integer ticketId) {
         AvailableStaffDto dto = new AvailableStaffDto();
         dto.setStaffId(staff.getStaffId());
         dto.setFullName(staff.getFullName());
         dto.setPhone(staff.getPhone());
         dto.setAvatar(staff.getAvatar());
+
+        // Kiểm tra bận/rảnh để hiển thị note — không chặn assign
+        boolean busy = !ticketAssignmentRepo.isStaffAvailable(staff.getStaffId());
+        dto.setIsBusy(busy);
+        if (busy) {
+            long activeCount = ticketAssignmentRepo.findByStaffId(staff.getStaffId()).stream()
+                    .filter(a -> a.getStatus() == AssignmentStatus.ACTIVE || a.getStatus() == AssignmentStatus.PENDING)
+                    .count();
+            dto.setBusyNote("Đang làm " + activeCount + " dịch vụ khác");
+        }
         return dto;
     }
+
 
     /**
      * Chuyển advisor từ PENDING sang ACTIVE khi bắt đầu làm việc (assign technician thành công).
@@ -123,7 +193,7 @@ public class TicketAssignmentService {
             }
         }
     }
-    
+
     /**
      * Đánh dấu assignment hoàn thành khi ticket được thanh toán.
      */
@@ -137,7 +207,7 @@ public class TicketAssignmentService {
             }
         }
     }
-    
+
     /**
      * Chuyển assignment từ PENDING sang ACTIVE khi bắt đầu làm việc thực sự.
      * Được gọi khi:
@@ -155,6 +225,7 @@ public class TicketAssignmentService {
         }
     }
 
+
     /**
      * Thay đổi advisor cho ticket (chỉ dành cho lễ tân).
      * Chỉ được phép thay đổi khi advisor hiện tại đang ở trạng thái PENDING (chưa bắt đầu làm việc).
@@ -166,25 +237,25 @@ public class TicketAssignmentService {
         if (currentAssignments.isEmpty()) {
             throw new AssignmentException("Ticket chưa có advisor!", AssignmentErrorCode.INVALID_SERVICE_TICKET_ID);
         }
-        
+
         ServiceTicketAssignment currentAdvisor = currentAssignments.get(0);
-        
+
         // 2. Kiểm tra điều kiện thay đổi: chỉ được thay khi advisor đang PENDING (chưa bắt đầu làm việc)
         if (currentAdvisor.getStatus() != AssignmentStatus.PENDING) {
-            throw new AssignmentException("Không thể thay đổi advisor khi đã bắt đầu làm việc (status: " + currentAdvisor.getStatus() + ")", 
-                AssignmentErrorCode.UNAVAILABLE_STAFF);
+            throw new AssignmentException("Không thể thay đổi advisor khi đã bắt đầu làm việc (status: " + currentAdvisor.getStatus() + ")",
+                    AssignmentErrorCode.UNAVAILABLE_STAFF);
         }
-        
+
         // 3. Validate advisor mới phải rảnh và có role ADVISOR
         boolean newAdvisorHasRole = staffProfileRepo.existsByStaffIdAndRole(newAdvisorId, "ADVISOR");
         if (!newAdvisorHasRole) {
             throw new AssignmentException("Staff không có role ADVISOR", AssignmentErrorCode.UNAVAILABLE_STAFF);
         }
-        
+
         // 4. Hủy assignment cũ
         currentAdvisor.setStatus(AssignmentStatus.CANCELLED);
         ticketAssignmentRepo.save(currentAdvisor);
-        
+
         // 5. Tạo assignment mới với trạng thái PENDING
         ServiceTicketAssignment newAssignment = new ServiceTicketAssignment();
         newAssignment.setServiceTicketId(ticketId);
@@ -194,35 +265,54 @@ public class TicketAssignmentService {
         newAssignment.setNote(note != null ? note : "Thay đổi advisor bởi lễ tân");
         newAssignment.setAssignedAt(Instant.now());
         newAssignment.setStatus(AssignmentStatus.PENDING); // Bắt đầu với PENDING
-        
+
         ServiceTicketAssignment saved = ticketAssignmentRepo.save(newAssignment);
-        return dtoMapper.toDto(saved);
+        return enrichDtoWithStaffName(dtoMapper.toDto(saved));
     }
-    
+
     /**
      * Hủy assignment technician (chỉ dành cho advisor).
      * Chỉ được phép hủy khi technician đang ở trạng thái PENDING.
      */
     @Transactional
     public void removeTechnician(Integer ticketId, Integer technicianId) {
-        // 1. Tìm assignment technician
+        // 1. Find current TECHNICIAN assignment (prefer latest PENDING)
         List<ServiceTicketAssignment> assignments = ticketAssignmentRepo.findByTicketId(ticketId);
-        ServiceTicketAssignment technicianAssignment = assignments.stream()
-            .filter(a -> a.getStaffId().equals(technicianId) && "TECHNICIAN".equals(a.getRoleInTicket()))
-            .findFirst()
-            .orElseThrow(() -> new AssignmentException("Không tìm thấy assignment technician!", AssignmentErrorCode.INVALID_SERVICE_TICKET_ID));
-        
-        // 2. Kiểm tra điều kiện hủy: chỉ được hủy khi đang PENDING
-        if (technicianAssignment.getStatus() != AssignmentStatus.PENDING) {
-            throw new AssignmentException("Không thể hủy technician khi đã bắt đầu làm việc (status: " + technicianAssignment.getStatus() + ")", 
-                AssignmentErrorCode.UNAVAILABLE_STAFF);
+        List<ServiceTicketAssignment> technicianAssignments = assignments.stream()
+                .filter(a -> a.getStaffId().equals(technicianId) && "TECHNICIAN".equals(a.getRoleInTicket()))
+                .sorted(Comparator.comparing(
+                        ServiceTicketAssignment::getAssignedAt,
+                        Comparator.nullsLast(Comparator.naturalOrder())
+                ).reversed())
+                .toList();
+
+
+        if (technicianAssignments.isEmpty()) {
+            throw new AssignmentException("Khong tim thay assignment technician!", AssignmentErrorCode.INVALID_SERVICE_TICKET_ID);
         }
-        
-        // 3. Hủy assignment
+
+
+        Optional<ServiceTicketAssignment> pendingAssignment = technicianAssignments.stream()
+                .filter(a -> a.getStatus() == AssignmentStatus.PENDING)
+                .findFirst();
+        ServiceTicketAssignment technicianAssignment = pendingAssignment.orElse(technicianAssignments.get(0));
+
+
+        // 2. Only allow cancel when current assignment is PENDING
+        if (technicianAssignment.getStatus() != AssignmentStatus.PENDING) {
+            throw new AssignmentException(
+                    "Khong the huy technician khi assignment khong o trang thai PENDING (status: " + technicianAssignment.getStatus() + ")",
+                    AssignmentErrorCode.UNAVAILABLE_STAFF
+            );
+        }
+
+
+        // 3. Cancel assignment
         technicianAssignment.setStatus(AssignmentStatus.CANCELLED);
         ticketAssignmentRepo.save(technicianAssignment);
     }
-    
+
+
     /**
      * Thay đổi technician (chỉ dành cho advisor).
      * Hủy technician cũ và assign technician mới với trạng thái PENDING.
@@ -231,14 +321,143 @@ public class TicketAssignmentService {
     public AssignStaffDto changeTechnician(Integer ticketId, Integer oldTechnicianId, Integer newTechnicianId, String note) {
         // 1. Hủy technician cũ (chỉ được hủy nếu đang PENDING)
         removeTechnician(ticketId, oldTechnicianId);
-        
+
         // 2. Assign technician mới
         AssignStaffDto newTechnicianDto = new AssignStaffDto();
         newTechnicianDto.setStaffId(newTechnicianId);
         newTechnicianDto.setRoleInTicket("TECHNICIAN");
         newTechnicianDto.setIsPrimary(false); // Mặc định không phải primary
         newTechnicianDto.setNote(note != null ? note : "Thay đổi technician bởi advisor");
-        
+
         return assignStaff(ticketId, newTechnicianDto);
     }
+    private AssignStaffDto enrichDtoWithStaffName(AssignStaffDto dto) {
+        if (dto == null || dto.getStaffId() == null) return dto;
+
+
+        StaffProfileJpa staff = staffProfileRepo.findByStaffId(dto.getStaffId());
+        if (staff != null && staff.getFullName() != null && !staff.getFullName().isBlank()) {
+            dto.setFullName(staff.getFullName());
+        }
+        return dto;
+    }
+
+
+    private List<AssignStaffDto> enrichDtosWithStaffName(List<AssignStaffDto> dtos) {
+        if (dtos == null || dtos.isEmpty()) return dtos;
+
+
+        Set<Integer> staffIds = dtos.stream()
+                .map(AssignStaffDto::getStaffId)
+                .filter(id -> id != null && id > 0)
+                .collect(Collectors.toSet());
+        if (staffIds.isEmpty()) return dtos;
+
+
+        Map<Integer, String> fullNameByStaffId = staffProfileRepo.findAllById(staffIds).stream()
+                .filter(s -> s.getStaffId() != null)
+                .collect(Collectors.toMap(
+                        StaffProfileJpa::getStaffId,
+                        s -> s.getFullName() == null ? "" : s.getFullName(),
+                        (a, b) -> a
+                ));
+
+
+        for (AssignStaffDto dto : dtos) {
+            if (dto == null || dto.getStaffId() == null) continue;
+            String fullName = fullNameByStaffId.get(dto.getStaffId());
+            if (fullName != null && !fullName.isBlank()) {
+                dto.setFullName(fullName);
+            }
+        }
+        return dtos;
+    }
+
+    // ===================== WORKLOAD METHODS =====================
+
+    /**
+     * Lấy workload của tất cả staff, có thể filter theo role.
+     */
+    @Transactional(readOnly = true)
+    public List<StaffWorkloadDto> getStaffWorkload(String role) {
+        List<StaffProfileJpa> staffList = role != null && !role.isBlank()
+                ? staffProfileRepo.findAll().stream()
+                    .filter(s -> s.getRoles() != null && s.getRoles().stream()
+                            .anyMatch(r -> role.equalsIgnoreCase(r.getRoleCode())))
+                    .toList()
+                : staffProfileRepo.findAll();
+
+        return staffList.stream()
+                .map(this::buildWorkloadDto)
+                .toList();
+    }
+
+    /**
+     * Lấy workload của một staff cụ thể.
+     */
+    @Transactional(readOnly = true)
+    public StaffWorkloadDto getStaffWorkload(Integer staffId) {
+        StaffProfileJpa staff = staffProfileRepo.findByStaffId(staffId);
+        if (staff == null) {
+            throw new AssignmentException("Staff không tồn tại!", AssignmentErrorCode.UNAVAILABLE_STAFF);
+        }
+        return buildWorkloadDto(staff);
+    }
+
+    /**
+     * Kiểm tra staff có thể assign thêm không.
+     * ticketId = 0 nghĩa là kiểm tra chung, không liên quan ticket cụ thể.
+     */
+    @Transactional(readOnly = true)
+    public boolean canAssignStaff(Integer staffId, Integer ticketId) {
+        if (ticketId != null && ticketId > 0) {
+            return ticketAssignmentRepo.isStaffAvailable(staffId)
+                    && !ticketAssignmentRepo.isStaffAssignedToTicket(staffId, ticketId);
+        }
+        return ticketAssignmentRepo.isStaffAvailable(staffId);
+    }
+
+    private StaffWorkloadDto buildWorkloadDto(StaffProfileJpa staff) {
+        List<ServiceTicketAssignment> assignments = ticketAssignmentRepo.findByStaffId(staff.getStaffId());
+
+        long active = assignments.stream()
+                .filter(a -> AssignmentStatus.ACTIVE == a.getStatus())
+                .count();
+        long pending = assignments.stream()
+                .filter(a -> AssignmentStatus.PENDING == a.getStatus())
+                .count();
+
+        boolean available = ticketAssignmentRepo.isStaffAvailable(staff.getStaffId());
+
+        List<String> roles = staff.getRoles() == null ? List.of()
+                : staff.getRoles().stream().map(r -> r.getRoleCode()).toList();
+
+        List<WorkloadTicketDto> currentTickets = assignments.stream()
+                .filter(a -> a.getStatus() == AssignmentStatus.ACTIVE || a.getStatus() == AssignmentStatus.PENDING)
+                .map(a -> {
+                    WorkloadTicketDto t = new WorkloadTicketDto();
+                    t.setRoleInTicket(a.getRoleInTicket());
+                    t.setAssignmentStatus(a.getStatus() != null ? a.getStatus().name() : null);
+                    t.setTicketCode(a.getTicketCode());
+                    t.setTicketStatus(a.getTicketStatus() != null ? a.getTicketStatus().name() : null);
+                    return t;
+                })
+                .toList();
+
+        StaffWorkloadDto dto = new StaffWorkloadDto();
+        dto.setStaffId(staff.getStaffId());
+        dto.setFullName(staff.getFullName());
+        dto.setPhone(staff.getPhone());
+        dto.setRoles(roles);
+        dto.setActiveAssignments((int) active);
+        dto.setPendingAssignments((int) pending);
+        dto.setTotalWorkload((int) (active + pending));
+        dto.setIsAvailable(available);
+        dto.setAvailabilityReason(available ? null : "Staff đang có assignment ACTIVE/PENDING");
+        dto.setCurrentTickets(currentTickets);
+        return dto;
+    }
 }
+
+
+

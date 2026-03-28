@@ -1,5 +1,6 @@
 package com.g42.platform.gms.service_ticket_management.application.service;
 
+
 import com.g42.platform.gms.service_ticket_management.api.dto.safety.AdvisorNoteItemRequest;
 import com.g42.platform.gms.service_ticket_management.api.dto.safety.AddCustomCategoryRequest;
 import com.g42.platform.gms.service_ticket_management.api.dto.safety.InspectionItemRequest;
@@ -39,6 +40,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -49,7 +51,7 @@ public class SafetyInspectionService {
     private final WorkCategoryRepo workCategoryRepo;
     private final TicketCustomCategoryRepo customCategoryRepo;
     private final ServiceTicketRepo serviceTicketRepo;
-        private final SafetyInspectionMapper apiMapper;
+    private final SafetyInspectionMapper apiMapper;
     private final WorkCategoryApiMapper workCategoryApiMapper;
     public SafetyInspectionResponse enableInspectionByCode(String ticketCode, Integer technicianId) {
         ServiceTicket serviceTicket = serviceTicketRepo.findByTicketCode(ticketCode)
@@ -57,11 +59,13 @@ public class SafetyInspectionService {
         return enableInspection(serviceTicket.getServiceTicketId(), technicianId);
     }
 
+
     public SafetyInspectionResponse skipInspectionByCode(String ticketCode) {
         ServiceTicket serviceTicket = serviceTicketRepo.findByTicketCode(ticketCode)
                 .orElseThrow(() -> new IllegalArgumentException("Service ticket not found with code: " + ticketCode));
         return skipInspection(serviceTicket.getServiceTicketId());
     }
+
 
     @Transactional(readOnly = true)
     public SafetyInspectionResponse getInspectionByTicketCode(String ticketCode) {
@@ -69,6 +73,7 @@ public class SafetyInspectionService {
                 .orElseThrow(() -> new IllegalArgumentException("Service ticket not found with code: " + ticketCode));
         return getInspectionByServiceTicket(serviceTicket.getServiceTicketId());
     }
+
 
     public SafetyInspectionResponse enableInspection(Integer serviceTicketId, Integer technicianId) {
         if (inspectionRepo.findByServiceTicketId(serviceTicketId).isPresent()) {
@@ -93,11 +98,12 @@ public class SafetyInspectionService {
         ServiceTicket ticket = serviceTicketRepo.findByServiceTicketId(serviceTicketId);
         if (ticket == null) throw new IllegalArgumentException("Service ticket not found: " + serviceTicketId);
         ticket.setSafetyInspectionEnabled(true);
-        ticket.setTicketStatus(TicketStatus.INSPECTION);
+        ticket.setTicketStatus(TicketStatus.DRAFT);
         ticket.setUpdatedAt(LocalDateTime.now());
         serviceTicketRepo.save(ticket);
         return getInspectionByServiceTicket(serviceTicketId);
     }
+
 
     public SafetyInspectionResponse skipInspection(Integer serviceTicketId) {
         if (inspectionRepo.findByServiceTicketId(serviceTicketId).isPresent()) {
@@ -109,30 +115,33 @@ public class SafetyInspectionService {
         domain.setInspectionStatus(InspectionStatus.SKIPPED);
         domain.initializeDefaults();
         SafetyInspection saved = inspectionRepo.save(domain);
-        
+
         // Update ServiceTicket to set safetyInspectionEnabled = false
         ServiceTicket ticket = serviceTicketRepo.findByServiceTicketId(serviceTicketId);
         if (ticket == null) throw new IllegalArgumentException("Service ticket not found: " + serviceTicketId);
         ticket.setSafetyInspectionEnabled(false);
         ticket.setUpdatedAt(LocalDateTime.now());
         serviceTicketRepo.save(ticket);
-        
+
         return apiMapper.toResponse(saved);
     }
 
-    /** Chỉ cho phép technician write khi ticket đang ở trạng thái INSPECTION */
-    private void requireTicketInInspectionStatus(Integer serviceTicketId) {
+
+    /** Cho phép chỉnh phiếu kiểm tra khi ticket ở DRAFT hoặc INSPECTION */
+    private void requireTicketEditableForInspection(Integer serviceTicketId) {
         ServiceTicket ticket = serviceTicketRepo.findByServiceTicketId(serviceTicketId);
         if (ticket == null) throw new IllegalArgumentException("Service ticket not found: " + serviceTicketId);
-        if (ticket.getTicketStatus() != TicketStatus.INSPECTION) {
+        TicketStatus status = ticket.getTicketStatus();
+        if (status != TicketStatus.DRAFT && status != TicketStatus.INSPECTION) {
             throw new IllegalStateException(
-                "Chỉ có thể chỉnh sửa phiếu kiểm tra khi ticket đang ở trạng thái INSPECTION. " +
-                "Trạng thái hiện tại: " + ticket.getTicketStatus());
+                    "Chi co the chinh sua phieu kiem tra khi ticket o DRAFT hoac INSPECTION. " +
+                            "Trang thai hien tai: " + status);
         }
     }
 
+
     public SafetyInspectionResponse saveInspectionData(SafetyInspectionRequest request, Integer technicianId) {
-        requireTicketInInspectionStatus(request.getServiceTicketId());
+        requireTicketEditableForInspection(request.getServiceTicketId());
         validateInspectionData(request);
         SafetyInspection domain = apiMapper.toDomain(request);
         domain.setTechnicianId(technicianId);
@@ -163,6 +172,7 @@ public class SafetyInspectionService {
         return getInspectionByServiceTicket(request.getServiceTicketId());
     }
 
+
     @Transactional(readOnly = true)
     public SafetyInspectionResponse getInspectionById(Integer inspectionId) {
         SafetyInspection domain = inspectionRepo.findById(inspectionId)
@@ -172,6 +182,7 @@ public class SafetyInspectionService {
         return apiMapper.toResponse(domain);
     }
 
+
     @Transactional(readOnly = true)
     public SafetyInspectionResponse getInspectionByServiceTicket(Integer serviceTicketId) {
         SafetyInspection domain = inspectionRepo.findByServiceTicketId(serviceTicketId)
@@ -180,6 +191,7 @@ public class SafetyInspectionService {
         domain.setItems(itemRepo.findItemsWithCategory(domain.getInspectionId()));
         return apiMapper.toResponse(domain);
     }
+
 
     public SafetyInspectionResponse updateInspectionData(Integer inspectionId, SafetyInspectionRequest request) {
         validateInspectionData(request);
@@ -219,6 +231,7 @@ public class SafetyInspectionService {
         }
     }
 
+
     private void updateItems(Integer inspectionId, List<InspectionItemRequest> requestItems) {
         List<SafetyInspectionItem> existingItems = itemRepo.findByInspectionId(inspectionId);
         if (requestItems == null || requestItems.isEmpty()) { itemRepo.deleteAll(existingItems); return; }
@@ -242,6 +255,7 @@ public class SafetyInspectionService {
         }
     }
 
+
     @Transactional(readOnly = true)
     public List<InspectionItemResponse> getInspectionItems(Integer inspectionId) {
         return itemRepo.findByInspectionIdWithCategory(inspectionId).stream().map(p -> {
@@ -253,13 +267,15 @@ public class SafetyInspectionService {
         }).toList();
     }
 
+
     @Transactional
     public List<InspectionItemResponse> upsertItems(Integer inspectionId, List<InspectionItemRequest> requests) {
         SafetyInspection inspection = inspectionRepo.findById(inspectionId)
                 .orElseThrow(() -> new IllegalArgumentException("Inspection not found: " + inspectionId));
-        requireTicketInInspectionStatus(inspection.getServiceTicketId());
+        requireTicketEditableForInspection(inspection.getServiceTicketId());
         return requests.stream().map(req -> upsertItemInternal(inspectionId, req)).toList();
     }
+
 
     private InspectionItemResponse upsertItemInternal(Integer inspectionId, InspectionItemRequest request) {
         if (request.getWorkCategoryId() == null && request.getCustomCategoryId() == null)
@@ -278,11 +294,13 @@ public class SafetyInspectionService {
         return buildItemResponse(itemRepo.save(item), inspectionId);
     }
 
+
     @Transactional(readOnly = true)
     public List<WorkCategoryResponse> getDefaultSafetyInspectionCategories() {
         List<WorkCategory> workCategories = workCategoryRepo.findDefaultCategories();
         return workCategoryApiMapper.toResponseList(workCategories);
     }
+
 
     public List<InspectionItemResponse> updateAdvisorNotes(Integer inspectionId, List<AdvisorNoteItemRequest> noteItems) {
         return noteItems.stream().map(ni -> {
@@ -303,11 +321,12 @@ public class SafetyInspectionService {
         }).toList();
     }
 
+
     @Transactional
     public InspectionItemResponse addCustomCategory(Integer inspectionId, AddCustomCategoryRequest request) {
         SafetyInspection inspection = inspectionRepo.findById(inspectionId)
                 .orElseThrow(() -> new IllegalArgumentException("Khong tim thay phieu kiem tra: " + inspectionId));
-        requireTicketInInspectionStatus(inspection.getServiceTicketId());
+        requireTicketEditableForInspection(inspection.getServiceTicketId());
         if (customCategoryRepo.existsByInspectionIdAndCategoryName(inspectionId, request.getCategoryName()))
             throw new IllegalArgumentException("Hang muc da ton tai trong phieu nay");
         TicketCustomCategory cat = new TicketCustomCategory();
@@ -323,6 +342,7 @@ public class SafetyInspectionService {
         return resp;
     }
 
+
     private InspectionItemResponse buildItemResponse(SafetyInspectionItem saved, Integer inspectionId) {
         List<SafetyInspectionItemWithCategory> withCat = itemRepo.findByInspectionIdWithCategory(inspectionId);
         return withCat.stream().filter(p -> p.getItemId().equals(saved.getItemId())).findFirst()
@@ -335,6 +355,7 @@ public class SafetyInspectionService {
                     r.setCustomCategoryId(saved.getCustomCategoryId());
                     r.setItemStatus(saved.getItemStatus()); r.setAdvisorNote(saved.getAdvisorNote()); return r; });
     }
+
 
     private void validateInspectionData(SafetyInspectionRequest request) {
         if (request.getServiceTicketId() == null) throw new IllegalArgumentException("Service ticket ID is required");
@@ -352,6 +373,7 @@ public class SafetyInspectionService {
         }
     }
 
+
     private void validateActualTire(String label, TireInputRequest.TireActualData tire) {
         if (tire == null) return;
         if (tire.getTreadDepth() != null && tire.getTreadDepth().compareTo(BigDecimal.ZERO) < 0)
@@ -360,6 +382,7 @@ public class SafetyInspectionService {
             throw new IllegalArgumentException(label + " pressure must be non-negative");
     }
 
+
     private List<TireDataRequest> expandTires(TireInputRequest input) {
         if (input == null) return List.of();
         String fs = input.getFrontTireSpecification(), rs = input.getRearTireSpecification();
@@ -367,12 +390,13 @@ public class SafetyInspectionService {
         BigDecimal fr = input.getFrontRecommendedPressure(), rr = input.getRearRecommendedPressure();
         BigDecimal sr = input.getSpareRecommendedPressure();
         return List.of(
-            buildTire(TirePosition.FRONT_LEFT, input.getFrontLeft(), fs, rec, fr),
-            buildTire(TirePosition.FRONT_RIGHT, input.getFrontRight(), fs, rec, fr),
-            buildTire(TirePosition.REAR_LEFT, input.getRearLeft(), rs, rec, rr),
-            buildTire(TirePosition.REAR_RIGHT, input.getRearRight(), rs, rec, rr),
-            buildTire(TirePosition.SPARE, input.getSpare(), null, null, sr));
+                buildTire(TirePosition.FRONT_LEFT, input.getFrontLeft(), fs, rec, fr),
+                buildTire(TirePosition.FRONT_RIGHT, input.getFrontRight(), fs, rec, fr),
+                buildTire(TirePosition.REAR_LEFT, input.getRearLeft(), rs, rec, rr),
+                buildTire(TirePosition.REAR_RIGHT, input.getRearRight(), rs, rec, rr),
+                buildTire(TirePosition.SPARE, input.getSpare(), null, null, sr));
     }
+
 
     private TireDataRequest buildTire(TirePosition pos, TireInputRequest.TireActualData actual,
                                       String spec, String recSize, BigDecimal recPressure) {
@@ -384,3 +408,4 @@ public class SafetyInspectionService {
         return req;
     }
 }
+
