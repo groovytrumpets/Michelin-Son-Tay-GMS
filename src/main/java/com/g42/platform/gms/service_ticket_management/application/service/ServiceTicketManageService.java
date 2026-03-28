@@ -253,12 +253,24 @@ public class ServiceTicketManageService {
 
     /**
      * Lễ tân thay đổi advisor cho ticket.
-     * Chỉ được phép thay đổi khi advisor hiện tại đang ở trạng thái PENDING (chưa bắt đầu làm việc).
+     * Điều kiện: ticket phải DRAFT và advisor hiện tại phải PENDING (chưa bắt đầu làm việc).
      */
     @Transactional
     public ServiceTicketDetailResponse changeAdvisor(String ticketCode, Integer newAdvisorId, String note) {
-        log.warn("Receptionist is not allowed to change advisor. ticketCode={}, newAdvisorId={}", ticketCode, newAdvisorId);
-        throw new CheckInException("Le tan khong co quyen doi advisor. Chi advisor moi duoc thuc hien.");
+        log.info("Receptionist changing advisor for ticket: {}, newAdvisorId: {}", ticketCode, newAdvisorId);
+
+        ServiceTicket ticket = serviceTicketRepo.findByTicketCode(ticketCode)
+                .orElseThrow(() -> new CheckInException("Không tìm thấy service ticket: " + ticketCode));
+
+        if (ticket.getTicketStatus() != TicketStatus.DRAFT) {
+            throw new CheckInException("Lễ tân chỉ được đổi advisor khi phiếu đang DRAFT. Hiện tại: " + ticket.getTicketStatus());
+        }
+
+        // Delegate sang TicketAssignmentService — sẽ validate advisor PENDING bên trong
+        ticketAssignmentService.changeAdvisor(ticket.getServiceTicketId(), newAdvisorId, note);
+
+        log.info("Advisor changed successfully for ticket: {}", ticketCode);
+        return getServiceTicketDetail(ticketCode);
     }
 
 
