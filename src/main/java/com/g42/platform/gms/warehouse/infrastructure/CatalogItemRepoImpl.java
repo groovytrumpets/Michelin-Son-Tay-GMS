@@ -134,4 +134,22 @@ public class CatalogItemRepoImpl implements CatalogItemRepo {
     public boolean exitByCategoryCode(String categoryCode) {
         return itemCategoryJpaRepo.existsByCategoryCode(categoryCode);
     }
+
+    @Override
+    public Specification saveSpec(Specification specification) {
+        SpecificationJpa specificationJpa = specificationJpaRepo.save(specificationJpaMapper.toJpa(specification));
+        return specificationJpaMapper.toDomain(specificationJpa);
+    }
+
+    @Override
+    public SpecAttribute saveSpecAttribute(SpecAttribute specAttribute) {
+        SpecAttributeJpa specAttributeJpa = specAttributeJpaRepo.save(specAttributeJpaMapper.toJpa(specAttribute));
+        return specAttributeJpaMapper.toDomain(specAttributeJpa);
+    }
+
+    @Override
+    public List<ItemCategory> getAllItemCategory() {
+        List<ItemCategoryJpa> itemCategoryJpas = itemCategoryJpaRepo.findAll();
+        return itemCategoryJpas.stream().map(itemCategoryJpaMapper::toDomain).toList();
+    }
 }

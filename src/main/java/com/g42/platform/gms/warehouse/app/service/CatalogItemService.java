@@ -25,6 +25,8 @@ public class CatalogItemService {
     private SpecAttributeDtoMapper specAttributeDtoMapper;
     @Autowired
     private CatalogDtoMapper catalogDtoMapper;
+    @Autowired
+    private ItemCateDtoMapper itemCateDtoMapper;
 
     public List<BrandHintDto> getAllBrands() {
         List<Brand> brandList = catalogItemRepo.getAllBrands();
@@ -130,4 +132,19 @@ public class CatalogItemService {
         return catalogItemRepo.saveItemCate(itemCategory);
     }
 
+    public Specification saveSpecs(Specification specification) {
+        if (specification.getItemId()==null) {
+            throw new WarehouseException("item Catalog required!",WarehouseErrorCode.INVALID_CATEGORY);
+        }
+        return catalogItemRepo.saveSpec(specification);
+    }
+
+    public SpecAttribute saveSpecAttribute(SpecAttribute specAttribute) {
+        return catalogItemRepo.saveSpecAttribute(specAttribute);
+    }
+
+    public List<ItemCategoryHintDto> getAllItemCategory() {
+        List<ItemCategory> itemCategories = catalogItemRepo.getAllItemCategory();
+        return itemCategories.stream().map(itemCateDtoMapper::toDto).toList();
+    }
 }

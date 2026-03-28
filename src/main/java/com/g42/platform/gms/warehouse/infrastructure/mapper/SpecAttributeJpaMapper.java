@@ -9,4 +9,6 @@ import org.mapstruct.Mapper;
 @Mapper(componentModel = "spring")
 public interface SpecAttributeJpaMapper {
     SpecAttribute toDomain(SpecAttributeJpa specAttributeJpa);
+
+    SpecAttributeJpa toJpa(SpecAttribute specAttribute);
 }
