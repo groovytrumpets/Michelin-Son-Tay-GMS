@@ -99,8 +99,9 @@ public class ServiceTicketRepoImpl implements ServiceTicketRepo {
     }
 
     @Override
-    public List<ServiceTicket> findByVehicleId(Integer vehicleId) {
-        return jpaRepo.findByVehicleId(vehicleId).stream().map(mapper::toDomain).toList();
+    public List<ServiceTicket> findAllByDate(LocalDateTime receivedAt) {
+        List<ServiceTicketJpa> serviceTicketJpas = jpaRepo.findAllByReceivedAt(receivedAt);
+        return serviceTicketJpas.stream().map(mapper::toDomain).toList();
     }
 
     @Override

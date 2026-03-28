@@ -45,9 +45,10 @@ public interface ServiceTicketRepository extends JpaRepository<ServiceTicketJpa,
 
     ServiceTicketJpa findByServiceTicketId(Integer serviceTicketId);
 
-    List<ServiceTicketJpa> findByVehicleId(Integer vehicleId);
+    List<ServiceTicketJpa> findAllByReceivedAt(LocalDateTime receivedAt);
+
     @Query("""
-        select max(st.queueNumber) from ServiceTicketManagement st where st.receivedAt>=:startOfToday and st.receivedAt<=:endOfToday
+    select max(st.queueNumber) from ServiceTicketManagement st where st.receivedAt >=:startOfToday and st.receivedAt <=:endOfToday
         """)
     Integer findMaxQueueNumberForToday(LocalDateTime startOfToday, LocalDateTime endOfToday);
 }

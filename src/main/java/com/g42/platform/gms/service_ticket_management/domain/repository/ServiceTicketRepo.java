@@ -36,7 +36,7 @@ public interface ServiceTicketRepo {
 
     Page<ServiceTicket> findByTechnicianCompleted(Integer technicianId, LocalDate startDate, LocalDate endDate, String licensePlate, Pageable pageable);
 
-    List<ServiceTicket> findByVehicleId(Integer vehicleId);
+    List<ServiceTicket> findAllByDate(LocalDateTime receivedAt);
 
     Integer findMaxQueueNumberForToday(LocalDateTime startOfToday, LocalDateTime endOfToday);
 }
