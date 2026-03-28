@@ -3,6 +3,7 @@ package com.g42.platform.gms.estimation.app.service;
 import com.g42.platform.gms.common.enums.EstimateEnum;
 import com.g42.platform.gms.estimation.api.dto.EstimateItemDto;
 import com.g42.platform.gms.estimation.api.dto.EstimateRespondDto;
+import com.g42.platform.gms.estimation.api.dto.WorkCataDto;
 import com.g42.platform.gms.estimation.api.dto.request.EstimateItemReqDto;
 import com.g42.platform.gms.estimation.api.dto.request.EstimateRequestDto;
 import com.g42.platform.gms.estimation.api.mapper.EstimateDtoMapper;
@@ -349,5 +350,17 @@ public class EstimateService {
         estimate.setStatus(EstimateEnum.APPROVED);
         Estimate saved = estimateRepository.save(estimate);
         return estimateDtoMapper.toEstimateDto(saved);
+    }
+
+    public EstimateRespondDto updateEstimateStatus(Integer estimateId, EstimateEnum status) {
+        Estimate estimate =  estimateRepository.findEstimateById(estimateId);
+        estimate.setStatus(status);
+        Estimate saved = estimateRepository.save(estimate);
+        return estimateDtoMapper.toEstimateDto(saved);
+    }
+
+    public List<WorkCataDto> getWorkCateList() {
+        List<WorkCategory> workCategories = workCategoryRepo.findAll();
+        return workCategories.stream().map(estimateDtoMapper::toWorkCateDto).toList();
     }
 }

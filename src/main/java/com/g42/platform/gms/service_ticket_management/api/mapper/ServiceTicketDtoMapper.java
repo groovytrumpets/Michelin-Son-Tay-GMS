@@ -1,6 +1,7 @@
 package com.g42.platform.gms.service_ticket_management.api.mapper;
 
 import com.g42.platform.gms.service_ticket_management.api.dto.checkin.ServiceTicketResponse;
+import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceTicketListResponse;
 import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicket;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -15,4 +16,6 @@ public interface ServiceTicketDtoMapper {
     @Mapping(target = "photos", ignore = true)
     @Mapping(target = "warnings", ignore = true)
     ServiceTicketResponse toResponse(ServiceTicket domain);
+
+    ServiceTicketListResponse toDto(ServiceTicket savedServiceTicket);
 }

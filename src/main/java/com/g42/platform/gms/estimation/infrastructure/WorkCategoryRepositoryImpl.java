@@ -40,5 +40,11 @@ public class WorkCategoryRepositoryImpl implements WorkCategoryRepository {
         WorkCategoryJpa workCategoryJpa = workCategoryRepositoryJpa.findByIdWork(categoryId);
         return workCategoryJpaMapper.toDomain(workCategoryJpa);
     }
+
+    @Override
+    public List<WorkCategory> findAll() {
+        List<WorkCategoryJpa> workCategoryJpas = workCategoryRepositoryJpa.findAll();
+        return workCategoryJpas.stream().map(workCategoryJpaMapper::toDomain).toList();
+    }
 }
 
