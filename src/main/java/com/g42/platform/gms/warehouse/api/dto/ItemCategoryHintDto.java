@@ -10,6 +10,7 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ItemCategoryHintDto {
+    private Integer itemCategoryId;
     private String categoryCode;
     private String categoryName;
     private String categoryType;

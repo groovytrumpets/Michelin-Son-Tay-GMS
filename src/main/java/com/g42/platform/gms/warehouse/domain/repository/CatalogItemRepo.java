@@ -47,4 +47,6 @@ public interface CatalogItemRepo {
     SpecAttribute getSpecAttributeById(Integer attributeId);
 
     CatalogItem getCatalogItemById(Integer itemId);
+
+    Integer findCategoryCode(String categoryCode);
 }
