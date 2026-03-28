@@ -175,4 +175,8 @@ public class CatalogItemService {
     public CatalogItem getCatalogDetailById(Integer catalogItemId) {
         return catalogItemRepo.getCatalogItemById(catalogItemId);
     }
+
+    public SpecAttributeDto getSpecsAttributeById(Integer attributeId) {
+        return specAttributeDtoMapper.toDto(catalogItemRepo.getSpecAttributeById(attributeId));
+    }
 }
