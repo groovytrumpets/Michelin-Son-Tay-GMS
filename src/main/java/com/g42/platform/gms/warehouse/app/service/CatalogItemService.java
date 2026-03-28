@@ -3,12 +3,15 @@ package com.g42.platform.gms.warehouse.app.service;
 import com.g42.platform.gms.warehouse.api.dto.*;
 import com.g42.platform.gms.warehouse.api.mapper.*;
 import com.g42.platform.gms.warehouse.domain.entity.*;
+import com.g42.platform.gms.warehouse.domain.enums.CatalogItemType;
 import com.g42.platform.gms.warehouse.domain.exception.WarehouseErrorCode;
 import com.g42.platform.gms.warehouse.domain.exception.WarehouseException;
 import com.g42.platform.gms.warehouse.domain.repository.CatalogItemRepo;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Service("catalogItemWarehouseService")
@@ -25,6 +28,8 @@ public class CatalogItemService {
     private SpecAttributeDtoMapper specAttributeDtoMapper;
     @Autowired
     private CatalogDtoMapper catalogDtoMapper;
+    @Autowired
+    private ItemCateDtoMapper itemCateDtoMapper;
 
     public List<BrandHintDto> getAllBrands() {
         List<Brand> brandList = catalogItemRepo.getAllBrands();
@@ -96,7 +101,9 @@ public class CatalogItemService {
 //                displayName.append(specStr).append(" ");
 //            }
             for (Specification specification : specs) {
-                displayName.append(specification.getSpecValue()).append("/ ");
+                displayName.append(specification.getSpecValue());
+                SpecAttribute specAttribute = catalogItemRepo.getSpecAttributeById(specification.getAttributeId());
+                displayName.append(specAttribute.getUnit()).append(" ");
             }
         }
 
@@ -130,4 +137,46 @@ public class CatalogItemService {
         return catalogItemRepo.saveItemCate(itemCategory);
     }
 
+    public Specification saveSpecs(Specification specification) {
+        if (specification.getItemId()==null) {
+            throw new WarehouseException("item Catalog required!",WarehouseErrorCode.PARENT_REQUIRE);
+        }
+        //todo: update catalogName
+        CatalogItem catalogItem = catalogItemRepo.getCatalogItemById(specification.getItemId());
+        Brand brand = catalogItemRepo.getBrandById(catalogItem.getBrandId());
+        ProductLine productLine = catalogItemRepo.getProductLineById(catalogItem.getProductLineId());
+        ItemCategory itemCategory = catalogItemRepo.getItemCategoryById(catalogItem.getItemCategoryId());
+        Specification savedSpec = catalogItemRepo.saveSpec(specification);
+        List<Specification> specifications = catalogItemRepo.getListOfSpecsByItem(catalogItem.getItemId());
+        String itemName = builDisplayName(catalogItem,brand,productLine,specifications,itemCategory);
+        catalogItem.setItemName(itemName);
+        CatalogItem saveCatalogItem = catalogItemRepo.saveCatalogItem(catalogItem);
+
+        return savedSpec;
+    }
+
+    public SpecAttribute saveSpecAttribute(SpecAttribute specAttribute) {
+        return catalogItemRepo.saveSpecAttribute(specAttribute);
+    }
+
+    public List<ItemCategoryHintDto> getAllItemCategory() {
+        List<ItemCategory> itemCategories = catalogItemRepo.getAllItemCategory();
+        return itemCategories.stream().map(itemCateDtoMapper::toDto).toList();
+    }
+
+    public List<SpecificationDto> getAllSpecsById(Integer catalogItemId) {
+        List<Specification> specifications = catalogItemRepo.getListOfSpecsByItem(catalogItemId);
+        return specifications.stream().map(specificationDtoMapper::toDto).toList();
+    }
+    public Integer findCodeByCategoryCode(String categoryCode) {
+        return catalogItemRepo.findCategoryCode(categoryCode);
+    }
+
+    public CatalogItem getCatalogDetailById(Integer catalogItemId) {
+        return catalogItemRepo.getCatalogItemById(catalogItemId);
+    }
+
+    public SpecAttributeDto getSpecsAttributeById(Integer attributeId) {
+        return specAttributeDtoMapper.toDto(catalogItemRepo.getSpecAttributeById(attributeId));
+    }
 }

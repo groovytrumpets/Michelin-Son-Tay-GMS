@@ -1,16 +1,11 @@
 package com.g42.platform.gms.warehouse.infrastructure;
 
-import com.g42.platform.gms.marketing.service_catalog.domain.entity.Service;
-import com.g42.platform.gms.marketing.service_catalog.infrastructure.entity.ServiceJpaEntity;
 import com.g42.platform.gms.marketing.service_catalog.infrastructure.repository.ServiceJpaRepository;
-import com.g42.platform.gms.warehouse.api.dto.CatalogCreateDto;
 import com.g42.platform.gms.warehouse.domain.entity.*;
-import com.g42.platform.gms.warehouse.domain.enums.CatalogItemType;
 import com.g42.platform.gms.warehouse.domain.repository.CatalogItemRepo;
 import com.g42.platform.gms.warehouse.infrastructure.entity.*;
 import com.g42.platform.gms.warehouse.infrastructure.mapper.*;
 import com.g42.platform.gms.warehouse.infrastructure.repository.*;
-import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
@@ -133,5 +128,43 @@ public class CatalogItemRepoImpl implements CatalogItemRepo {
     @Override
     public boolean exitByCategoryCode(String categoryCode) {
         return itemCategoryJpaRepo.existsByCategoryCode(categoryCode);
+    }
+
+    @Override
+    public Specification saveSpec(Specification specification) {
+        SpecificationJpa specificationJpa = specificationJpaRepo.save(specificationJpaMapper.toJpa(specification));
+        return specificationJpaMapper.toDomain(specificationJpa);
+    }
+
+    @Override
+    public SpecAttribute saveSpecAttribute(SpecAttribute specAttribute) {
+        SpecAttributeJpa specAttributeJpa = specAttributeJpaRepo.save(specAttributeJpaMapper.toJpa(specAttribute));
+        return specAttributeJpaMapper.toDomain(specAttributeJpa);
+    }
+
+    @Override
+    public List<ItemCategory> getAllItemCategory() {
+        List<ItemCategoryJpa> itemCategoryJpas = itemCategoryJpaRepo.findAll();
+        return itemCategoryJpas.stream().map(itemCategoryJpaMapper::toDomain).toList();
+    }
+
+    @Override
+    public SpecAttribute getSpecAttributeById(Integer attributeId) {
+        SpecAttributeJpa specAttributeJpa = specAttributeJpaRepo.findById(attributeId).orElse(null);
+        return specAttributeJpaMapper.toDomain(specAttributeJpa);
+    }
+
+    @Override
+    public CatalogItem getCatalogItemById(Integer itemId) {
+        CatalogItemJpa catalogItemJpa = catalogItemJpaRepo.findById(itemId).orElse(null);
+        return catalogItemJpaMapper.toDomain(catalogItemJpa);
+    }
+    @Override
+    public Integer findCategoryCode(String categoryCode) {
+        ItemCategoryJpa itemCategoryJpa = itemCategoryJpaRepo.findByCategoryCode(categoryCode);
+        if (itemCategoryJpa == null) {
+            return null;
+        }
+        return itemCategoryJpa.getItemCategoryId();
     }
 }

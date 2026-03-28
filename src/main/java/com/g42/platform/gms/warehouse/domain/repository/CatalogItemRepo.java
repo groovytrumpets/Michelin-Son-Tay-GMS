@@ -37,4 +37,16 @@ public interface CatalogItemRepo {
     CatalogItem saveCatalogItem(CatalogItem catalogItem);
 
     boolean exitByCategoryCode(String categoryCode);
+
+    Specification saveSpec(Specification specification);
+
+    SpecAttribute saveSpecAttribute(SpecAttribute specAttribute);
+
+    List<ItemCategory> getAllItemCategory();
+
+    SpecAttribute getSpecAttributeById(Integer attributeId);
+
+    CatalogItem getCatalogItemById(Integer itemId);
+
+    Integer findCategoryCode(String categoryCode);
 }
