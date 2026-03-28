@@ -151,9 +151,6 @@ public class CheckInService {
             odometerRepo.findLatestByVehicleId(vehicle.getVehicleId())
                 .ifPresent(r -> info.setLastOdometerReading(r.getReading()));
 
-            serviceTicketRepo.findByVehicleId(vehicle.getVehicleId()).stream()
-                .max(java.util.Comparator.comparing(ServiceTicket::getCreatedAt))
-                .ifPresent(t -> info.setLastServiceDate(t.getCreatedAt().toLocalDate()));
         }
 
         CustomerVehiclesResponse response = new CustomerVehiclesResponse();
