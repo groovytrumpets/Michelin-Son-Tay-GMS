@@ -171,4 +171,8 @@ public class CatalogItemService {
     public Integer findCodeByCategoryCode(String categoryCode) {
         return catalogItemRepo.findCategoryCode(categoryCode);
     }
+
+    public CatalogItem getCatalogDetailById(Integer catalogItemId) {
+        return catalogItemRepo.getCatalogItemById(catalogItemId);
+    }
 }
