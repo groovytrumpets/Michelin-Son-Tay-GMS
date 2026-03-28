@@ -31,9 +31,9 @@ public class WarehouseService {
         if (categoryCode != null) {
             resolvedCategoryId = catalogItemService.findCodeByCategoryCode(categoryCode);
         }
-        if (resolvedCategoryId == null) {
-            throw new WarehouseException("Item Category Code not found", WarehouseErrorCode.WRONG_CODE);
-        }
+//        if (resolvedCategoryId == null) {
+//            throw new WarehouseException("Item Category Code not found", WarehouseErrorCode.WRONG_CODE);
+//        }
         Page<CatalogItem> catalogItems = warehouseRepo.getListOfCatalogItems(page,size,itemType,isActive,search,brand,productLine,resolvedCategoryId,minPrice,maxPrice,sortBy);
 
         return catalogItems.map(catalogDtoMapper::toSumaryDto);
