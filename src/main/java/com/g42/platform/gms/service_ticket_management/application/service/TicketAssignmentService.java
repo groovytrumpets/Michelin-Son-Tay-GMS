@@ -87,6 +87,18 @@ public class TicketAssignmentService {
             throw new AssignmentException("Staff không có role " + dto.getRoleInTicket(), AssignmentErrorCode.UNAVAILABLE_STAFF);
         }
 
+        // Validate: TECHNICIAN không được assign khi đang bận (isBusy theo workload)
+        // ADVISOR không bị giới hạn workload
+        if ("TECHNICIAN".equals(dto.getRoleInTicket())) {
+            boolean busy = !ticketAssignmentRepo.isStaffAvailable(dto.getStaffId());
+            if (busy) {
+                throw new AssignmentException(
+                    "Kỹ thuật viên đang bận, không thể phân công thêm. Vui lòng chọn người khác.",
+                    AssignmentErrorCode.UNAVAILABLE_STAFF
+                );
+            }
+        }
+
 
         ServiceTicketAssignment assignment = new ServiceTicketAssignment();
         assignment.setServiceTicketId(ticketId);
