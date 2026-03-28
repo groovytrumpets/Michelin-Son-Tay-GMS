@@ -103,4 +103,9 @@ public class ServiceTicketRepoImpl implements ServiceTicketRepo {
         List<ServiceTicketJpa> serviceTicketJpas = jpaRepo.findAllByReceivedAt(receivedAt);
         return serviceTicketJpas.stream().map(mapper::toDomain).toList();
     }
+
+    @Override
+    public Integer findMaxQueueNumberForToday(LocalDateTime startOfToday, LocalDateTime endOfToday) {
+        return jpaRepo.findMaxQueueNumberForToday(startOfToday,endOfToday);
+    }
 }
