@@ -43,7 +43,7 @@ public class WorkCategoryRepositoryImpl implements WorkCategoryRepository {
 
     @Override
     public List<WorkCategory> findAll() {
-        List<WorkCategoryJpa> workCategoryJpas = workCategoryRepositoryJpa.findAll();
+        List<WorkCategoryJpa> workCategoryJpas = workCategoryRepositoryJpa.findAllByIsDefault(true);
         return workCategoryJpas.stream().map(workCategoryJpaMapper::toDomain).toList();
     }
 }
