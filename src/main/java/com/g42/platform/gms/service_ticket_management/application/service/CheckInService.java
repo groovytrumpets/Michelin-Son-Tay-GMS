@@ -151,9 +151,7 @@ public class CheckInService {
             odometerRepo.findLatestByVehicleId(vehicle.getVehicleId())
                 .ifPresent(r -> info.setLastOdometerReading(r.getReading()));
 
-            List<ServiceTicket> allTickets = serviceTicketRepo.findAll();
-            allTickets.stream()
-                .filter(t -> t.getVehicleId().equals(vehicle.getVehicleId()))
+            serviceTicketRepo.findByVehicleId(vehicle.getVehicleId()).stream()
                 .max(java.util.Comparator.comparing(ServiceTicket::getCreatedAt))
                 .ifPresent(t -> info.setLastServiceDate(t.getCreatedAt().toLocalDate()));
         }

@@ -96,4 +96,9 @@ public class ServiceTicketRepoImpl implements ServiceTicketRepo {
         }
         return jpaRepo.findAll(spec, pageable).map(mapper::toDomain);
     }
+
+    @Override
+    public List<ServiceTicket> findByVehicleId(Integer vehicleId) {
+        return jpaRepo.findByVehicleId(vehicleId).stream().map(mapper::toDomain).toList();
+    }
 }

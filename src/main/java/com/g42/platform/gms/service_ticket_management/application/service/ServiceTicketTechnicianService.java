@@ -14,10 +14,13 @@ import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import com.g42.platform.gms.service_ticket_management.domain.entity.OdometerReading;
 import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicket;
 import com.g42.platform.gms.service_ticket_management.domain.entity.VehicleConditionPhoto;
-import com.g42.platform.gms.service_ticket_management.domain.exception.CheckInException;
-import com.g42.platform.gms.service_ticket_management.domain.repository.OdometerReadingRepo;
+import com.g42.platform.gms.service_ticket_management.domain.entity.SafetyInspection;
+import com.g42.platform.gms.service_ticket_management.domain.enums.InspectionStatus;
+import com.g42.platform.gms.service_ticket_management.domain.repository.SafetyInspectionRepo;
 import com.g42.platform.gms.service_ticket_management.domain.repository.ServiceTicketRepo;
 import com.g42.platform.gms.service_ticket_management.domain.repository.VehicleConditionPhotoRepo;
+import com.g42.platform.gms.service_ticket_management.domain.repository.OdometerReadingRepo;
+import com.g42.platform.gms.service_ticket_management.domain.exception.CheckInException;
 import com.g42.platform.gms.service_ticket_management.api.mapper.ServiceTicketListMapper;
 import com.g42.platform.gms.service_ticket_management.api.mapper.ServiceTicketDetailMapper;
 import com.g42.platform.gms.vehicle.entity.Vehicle;
@@ -53,6 +56,7 @@ public class ServiceTicketTechnicianService {
     private final OdometerReadingRepo odometerRepo;
     private final VehicleConditionPhotoRepo photoRepo;
     private final StaffProfileRepo staffRepository;
+    private final SafetyInspectionRepo safetyInspectionRepo;
     private final ServiceTicketListMapper listMapper;
     private final ServiceTicketDetailMapper detailMapper;
     
@@ -196,28 +200,44 @@ public class ServiceTicketTechnicianService {
     }
 
     /**
-     * Technician bắt đầu kiểm tra an toàn — DRAFT → INSPECTION.
-     * Kỹ thuật viên nhận phiếu và bắt đầu quá trình kiểm tra.
+     * Technician bắt đầu nhận xe — DRAFT → INSPECTION (dù có hay không có kiểm tra an toàn).
+     * - safetyInspectionEnabled = true: technician cần điền form kiểm tra an toàn
+     * - safetyInspectionEnabled = false (skip): technician nhận xe, làm dịch vụ lẻ, không cần điền form
+     * Cả 2 trường hợp đều vào INSPECTION vì đây là bước technician đang làm việc với xe.
      */
     @Transactional
     public TechnicianTicketDetailResponse startInspection(String ticketCode, Integer staffId) {
-        log.info("Technician starting inspection on ticket: {}", ticketCode);
+        log.info("Technician starting work on ticket: {}", ticketCode);
 
         ServiceTicket ticket = serviceTicketRepo.findByTicketCode(ticketCode)
             .orElseThrow(() -> new CheckInException("Không tìm thấy service ticket: " + ticketCode));
 
         if (ticket.getTicketStatus() != TicketStatus.DRAFT) {
-            throw new CheckInException("Chỉ có thể bắt đầu kiểm tra khi phiếu đang ở trạng thái DRAFT");
+            throw new CheckInException("Chỉ có thể bắt đầu khi phiếu đang ở trạng thái DRAFT");
         }
 
+        SafetyInspection inspection = safetyInspectionRepo.findByServiceTicketId(ticket.getServiceTicketId())
+                .orElseThrow(() -> new CheckInException("Phiếu này chưa có thông tin kiểm tra an toàn"));
+
+        if (inspection.getInspectionStatus() == InspectionStatus.COMPLETED) {
+            throw new CheckInException("Phiếu này đã hoàn thành kiểm tra an toàn, không thể bắt đầu lại");
+        }
+
+        // Luôn chuyển sang INSPECTION khi technician bắt đầu nhận xe
+        // dù skip hay không skip safety inspection
         ticket.setTicketStatus(TicketStatus.INSPECTION);
         ticket.setUpdatedAt(java.time.LocalDateTime.now());
         serviceTicketRepo.save(ticket);
 
-        // Chuyển assignment của technician từ PENDING sang ACTIVE
+        if (inspection.getInspectionStatus() == InspectionStatus.SKIPPED) {
+            log.info("Ticket {} → INSPECTION (safety skipped, technician doing other services) by staffId {}", ticketCode, staffId);
+        } else {
+            log.info("Ticket {} → INSPECTION (safety pending) by technician {}", ticketCode, staffId);
+        }
+
+        // Activate assignment
         ticketAssignmentService.startWork(ticket.getServiceTicketId(), staffId);
 
-        log.info("Ticket {} status changed to INSPECTION by technician {}", ticketCode, staffId);
         return getTechnicianTicketDetail(ticketCode);
     }
 

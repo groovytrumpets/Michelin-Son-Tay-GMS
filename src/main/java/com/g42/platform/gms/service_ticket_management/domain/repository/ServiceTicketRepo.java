@@ -34,4 +34,6 @@ public interface ServiceTicketRepo {
     Page<ServiceTicket> findByAssignedStaff(Integer staffId, TicketStatus status, LocalDate date, String search, Pageable pageable);
 
     Page<ServiceTicket> findByTechnicianCompleted(Integer technicianId, LocalDate startDate, LocalDate endDate, String licensePlate, Pageable pageable);
+
+    List<ServiceTicket> findByVehicleId(Integer vehicleId);
 }
