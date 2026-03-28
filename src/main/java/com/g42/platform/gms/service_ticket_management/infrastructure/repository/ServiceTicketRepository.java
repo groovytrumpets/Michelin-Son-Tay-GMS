@@ -3,8 +3,10 @@ package com.g42.platform.gms.service_ticket_management.infrastructure.repository
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -44,4 +46,8 @@ public interface ServiceTicketRepository extends JpaRepository<ServiceTicketJpa,
     ServiceTicketJpa findByServiceTicketId(Integer serviceTicketId);
 
     List<ServiceTicketJpa> findByVehicleId(Integer vehicleId);
+    @Query("""
+        select max(st.queueNumber) from ServiceTicketManagement st where st.receivedAt>=:startOfToday and st.receivedAt<=:endOfToday
+        """)
+    Integer findMaxQueueNumberForToday(LocalDateTime startOfToday, LocalDateTime endOfToday);
 }
