@@ -23,7 +23,7 @@ public class ServiceTicketResponse {
     private Boolean immutable;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-
+    private Integer queueNumber;
     // Safety inspection
     private Boolean safetyInspectionEnabled;
 
