@@ -2,6 +2,8 @@ package com.g42.platform.gms.service_ticket_management.api.controller;
 
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
+import com.g42.platform.gms.common.enums.EstimateEnum;
+import com.g42.platform.gms.estimation.api.dto.EstimateRespondDto;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceTicketDetailResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceTicketListResponse;
 import com.g42.platform.gms.service_ticket_management.application.service.ServiceTicketManageService;
@@ -54,5 +56,11 @@ public class ServiceTicketManageController {
     public ResponseEntity<ApiResponse<ServiceTicketDetailResponse>> completeTicket(
             @PathVariable String ticketCode) {
         return ResponseEntity.ok(ApiResponses.success(serviceTicketManageService.completeTicket(ticketCode)));
+    }
+    @PutMapping("/{serviceTicketId}/{status}")
+    public ResponseEntity<ApiResponse<ServiceTicketListResponse>> updateEstimateApprove(@PathVariable Integer serviceTicketId, @PathVariable TicketStatus status){
+        return ResponseEntity.ok(
+                ApiResponses.success(serviceTicketManageService.updateServiceTicketStatus(serviceTicketId,status))
+        );
     }
 }
