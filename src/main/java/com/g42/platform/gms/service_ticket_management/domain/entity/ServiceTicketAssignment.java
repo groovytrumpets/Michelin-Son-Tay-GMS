@@ -1,15 +1,14 @@
 package com.g42.platform.gms.service_ticket_management.domain.entity;
 
-import jakarta.persistence.*;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
+import com.g42.platform.gms.service_ticket_management.domain.enums.AssignmentStatus;
+import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.annotations.ColumnDefault;
 
 import java.time.Instant;
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -22,6 +21,10 @@ public class ServiceTicketAssignment {
     private String roleInTicket;
     private Instant assignedAt;
     private Boolean isPrimary;
-    private String status;
+    private AssignmentStatus status;
     private String note;
+
+    // Read-only context từ ticket (chỉ dùng cho workload display)
+    private String ticketCode;
+    private TicketStatus ticketStatus;
 }

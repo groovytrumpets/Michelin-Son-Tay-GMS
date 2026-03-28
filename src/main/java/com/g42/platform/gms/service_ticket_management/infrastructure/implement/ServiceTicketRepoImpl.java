@@ -15,7 +15,6 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -99,13 +98,7 @@ public class ServiceTicketRepoImpl implements ServiceTicketRepo {
     }
 
     @Override
-    public List<ServiceTicket> findAllByDate(LocalDateTime receivedAt) {
-        List<ServiceTicketJpa> serviceTicketJpas = jpaRepo.findAllByReceivedAt(receivedAt);
-        return serviceTicketJpas.stream().map(mapper::toDomain).toList();
-    }
-
-    @Override
-    public Integer findMaxQueueNumberForToday(LocalDateTime startOfToday, LocalDateTime endOfToday) {
-        return jpaRepo.findMaxQueueNumberForToday(startOfToday,endOfToday);
+    public List<ServiceTicket> findByVehicleId(Integer vehicleId) {
+        return jpaRepo.findByVehicleId(vehicleId).stream().map(mapper::toDomain).toList();
     }
 }

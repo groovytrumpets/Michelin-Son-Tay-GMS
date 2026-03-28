@@ -1,11 +1,7 @@
 package com.g42.platform.gms.service_ticket_management.api.controller;
 
-import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedRespond;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
-import com.g42.platform.gms.common.enums.EstimateEnum;
-import com.g42.platform.gms.estimation.api.dto.EstimateRespondDto;
-import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceQueueResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceTicketDetailResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceTicketListResponse;
 import com.g42.platform.gms.service_ticket_management.application.service.ServiceTicketManageService;
@@ -16,7 +12,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
-import java.util.List;
 
 /**
  * Controller for receptionist view of service tickets.
@@ -60,15 +55,17 @@ public class ServiceTicketManageController {
             @PathVariable String ticketCode) {
         return ResponseEntity.ok(ApiResponses.success(serviceTicketManageService.completeTicket(ticketCode)));
     }
-    @PutMapping("/{serviceTicketId}/{status}")
-    public ResponseEntity<ApiResponse<ServiceTicketListResponse>> updateEstimateApprove(@PathVariable Integer serviceTicketId, @PathVariable TicketStatus status){
-        return ResponseEntity.ok(
-                ApiResponses.success(serviceTicketManageService.updateServiceTicketStatus(serviceTicketId,status))
-        );
-    }
-    @PutMapping("/swap")
-    public ResponseEntity<ApiResponse<List<ServiceQueueResponse>>> swapQueue(@RequestParam Integer serviceTicketId1,
-                                                                             @RequestParam Integer serviceTicketId2){
-        return ResponseEntity.ok(ApiResponses.success(serviceTicketManageService.setswapQueueByServiceTicketIds(serviceTicketId1, serviceTicketId2)));
+
+    /**
+     * Lễ tân thay đổi advisor cho ticket.
+     * Chỉ được phép thay đổi khi advisor hiện tại đang ở trạng thái PENDING.
+     */
+    @PutMapping("/tickets/{ticketCode}/change-advisor")
+    public ResponseEntity<ApiResponse<ServiceTicketDetailResponse>> changeAdvisor(
+            @PathVariable String ticketCode,
+            @RequestParam Integer newAdvisorId,
+            @RequestParam(required = false) String note) {
+        return ResponseEntity.ok(ApiResponses.success(
+            serviceTicketManageService.changeAdvisor(ticketCode, newAdvisorId, note)));
     }
 }
