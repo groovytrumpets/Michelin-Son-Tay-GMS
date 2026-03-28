@@ -3,6 +3,7 @@ package com.g42.platform.gms.estimation.api.controller;
 
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
+import com.g42.platform.gms.common.enums.EstimateEnum;
 import com.g42.platform.gms.estimation.api.dto.EstimateRespondDto;
 import com.g42.platform.gms.estimation.api.dto.request.EstimateItemReqDto;
 import com.g42.platform.gms.estimation.api.dto.request.EstimateRequestDto;
@@ -43,10 +44,10 @@ public class EstimateController {
                 ApiResponses.success(estimateService.updateEstimateItem(estimateItemId, request))
         );
     }
-    @PutMapping("/{estimateId}/approve")
-    public ResponseEntity<ApiResponse<EstimateRespondDto>> updateEstimateApprove(@PathVariable Integer estimateId){
+    @PutMapping("/{estimateId}/{status}")
+    public ResponseEntity<ApiResponse<EstimateRespondDto>> updateEstimateApprove(@PathVariable Integer estimateId,@PathVariable EstimateEnum status){
         return ResponseEntity.ok(
-                ApiResponses.success(estimateService.updateEstimateApprove(estimateId))
+                ApiResponses.success(estimateService.updateEstimateStatus(estimateId,status))
         );
     }
 

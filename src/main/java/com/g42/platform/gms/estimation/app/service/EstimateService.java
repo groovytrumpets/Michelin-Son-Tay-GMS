@@ -350,4 +350,11 @@ public class EstimateService {
         Estimate saved = estimateRepository.save(estimate);
         return estimateDtoMapper.toEstimateDto(saved);
     }
+
+    public EstimateRespondDto updateEstimateStatus(Integer estimateId, EstimateEnum status) {
+        Estimate estimate =  estimateRepository.findEstimateById(estimateId);
+        estimate.setStatus(status);
+        Estimate saved = estimateRepository.save(estimate);
+        return estimateDtoMapper.toEstimateDto(saved);
+    }
 }
