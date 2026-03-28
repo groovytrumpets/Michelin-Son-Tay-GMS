@@ -13,6 +13,7 @@ import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceQueu
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceTicketDetailResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceTicketListResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.UpdateServiceTicketRequest;
+import com.g42.platform.gms.service_ticket_management.api.mapper.ServiceTicketDtoMapper;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import com.g42.platform.gms.service_ticket_management.domain.entity.OdometerReading;
 import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicket;
@@ -64,6 +65,7 @@ public class ServiceTicketManageService {
     private final ServiceTicketListMapper listMapper;
     private final ServiceTicketDetailMapper detailMapper;
     private final TicketAssignmentService ticketAssignmentService;
+    private final ServiceTicketDtoMapper serviceTicketDtoMapper;
 
     /**
      * Get paginated list of service tickets with filters.
