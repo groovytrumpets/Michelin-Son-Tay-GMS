@@ -34,6 +34,7 @@ public class ServiceTicket {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime completedAt;
+    private Integer queueNumber;
     
     // List of photo IDs (not full objects - MapStruct will handle conversion)
     private List<Integer> photoIds = new ArrayList<>();
