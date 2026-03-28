@@ -168,4 +168,7 @@ public class CatalogItemService {
         List<Specification> specifications = catalogItemRepo.getListOfSpecsByItem(catalogItemId);
         return specifications.stream().map(specificationDtoMapper::toDto).toList();
     }
+    public Integer findCodeByCategoryCode(String categoryCode) {
+        return catalogItemRepo.findCategoryCode(categoryCode);
+    }
 }
