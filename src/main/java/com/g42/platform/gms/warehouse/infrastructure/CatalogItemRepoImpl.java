@@ -152,4 +152,16 @@ public class CatalogItemRepoImpl implements CatalogItemRepo {
         List<ItemCategoryJpa> itemCategoryJpas = itemCategoryJpaRepo.findAll();
         return itemCategoryJpas.stream().map(itemCategoryJpaMapper::toDomain).toList();
     }
+
+    @Override
+    public SpecAttribute getSpecAttributeById(Integer attributeId) {
+        SpecAttributeJpa specAttributeJpa = specAttributeJpaRepo.findById(attributeId).orElse(null);
+        return specAttributeJpaMapper.toDomain(specAttributeJpa);
+    }
+
+    @Override
+    public CatalogItem getCatalogItemById(Integer itemId) {
+        CatalogItemJpa catalogItemJpa = catalogItemJpaRepo.findById(itemId).orElse(null);
+        return catalogItemJpaMapper.toDomain(catalogItemJpa);
+    }
 }
