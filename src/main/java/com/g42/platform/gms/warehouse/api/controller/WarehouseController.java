@@ -5,9 +5,7 @@ import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.warehouse.api.dto.*;
 import com.g42.platform.gms.warehouse.app.service.CatalogItemService;
 import com.g42.platform.gms.warehouse.app.service.WarehouseService;
-import com.g42.platform.gms.warehouse.domain.entity.Brand;
-import com.g42.platform.gms.warehouse.domain.entity.ItemCategory;
-import com.g42.platform.gms.warehouse.domain.entity.ProductLine;
+import com.g42.platform.gms.warehouse.domain.entity.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -41,6 +39,11 @@ public class WarehouseController {
         List<SpecAttributeDto> promotionCreateDtoList = catalogItemService.getAllSpecAttributes();
         return ResponseEntity.ok(ApiResponses.success(promotionCreateDtoList));
     }
+    @GetMapping("/item-categpry/all")
+    public ResponseEntity<ApiResponse<List<ItemCategoryHintDto>>> getAllItemCategory() {
+        List<ItemCategoryHintDto> promotionCreateDtoList = catalogItemService.getAllItemCategory();
+        return ResponseEntity.ok(ApiResponses.success(promotionCreateDtoList));
+    }
     @PostMapping("/brand/create")
     public ResponseEntity<ApiResponse<Brand>> createBrand(@RequestBody Brand brand) {
         return ResponseEntity.ok(ApiResponses.success(catalogItemService.createNewBrand(brand)));
@@ -57,4 +60,13 @@ public class WarehouseController {
     public ResponseEntity<ApiResponse<ItemCategory>> createItemCategory(@RequestBody ItemCategory itemCategory) {
         return ResponseEntity.ok(ApiResponses.success(catalogItemService.saveItemCate(itemCategory)));
     }
+    @PostMapping("/specs/create")
+    public ResponseEntity<ApiResponse<Specification>> createSpec(@RequestBody Specification specification) {
+        return ResponseEntity.ok(ApiResponses.success(catalogItemService.saveSpecs(specification)));
+    }
+    @PostMapping("/specs-attribute/create")
+    public ResponseEntity<ApiResponse<SpecAttribute>> createSpecAttribute(@RequestBody SpecAttribute specAttribute) {
+        return ResponseEntity.ok(ApiResponses.success(catalogItemService.saveSpecAttribute(specAttribute)));
+    }
+
 }
