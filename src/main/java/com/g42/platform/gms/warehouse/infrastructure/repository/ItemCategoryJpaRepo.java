@@ -6,4 +6,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ItemCategoryJpaRepo extends JpaRepository<ItemCategoryJpa,Integer> {
     boolean existsByCategoryCode(String categoryCode);
+
+    ItemCategoryJpa findByCategoryCode(String categoryCode);
+
+    ItemCategoryJpa findByCategoryCodeContainingIgnoreCase(String categoryCode);
 }

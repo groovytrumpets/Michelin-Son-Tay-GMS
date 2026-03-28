@@ -32,15 +32,15 @@ public class WarehouseSearchController {
                                                                             @RequestParam(required = false) String search,
                                                                             @RequestParam(required = false) CatalogItemType itemType,
                                                                             @RequestParam(required = false) Boolean isActive,
-                                                                            @RequestParam(required = false) Integer brandId,
-                                                                            @RequestParam(required = false) Integer productLineId,
-                                                                            @RequestParam(required = false) Integer categoryId,
+                                                                            @RequestParam(required = false) Integer brand,
+                                                                            @RequestParam(required = false) Integer productLine,
+                                                                            @RequestParam(required = false) String categoryCode,
                                                                             @RequestParam(required = false) BigDecimal minPrice,
                                                                             @RequestParam(required = false) BigDecimal maxPrice,
                                                                             @RequestParam(required = false) String sortBy
                                                                             ){
         Page<CatalogSummaryDto> apiResponse = warehouseService.getListItems
-                (page,size,itemType,isActive,search,brandId,productLineId,categoryId,minPrice,maxPrice,sortBy);
+                (page,size,itemType,isActive,search,brand,productLine,categoryCode,minPrice,maxPrice,sortBy);
         return ResponseEntity.ok(ApiResponses.success(apiResponse));
     }
 }

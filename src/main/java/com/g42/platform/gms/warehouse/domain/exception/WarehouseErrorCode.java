@@ -7,5 +7,6 @@ public enum WarehouseErrorCode {
     DUPLICATE_SKU,
     WRONG_ENUM,
     INVALID_CATEGORY,
-    PARENT_REQUIRE;
+    PARENT_REQUIRE,
+    WRONG_CODE
 }
