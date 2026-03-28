@@ -75,4 +75,8 @@ public class CompleteCheckInAllRequest {
     // This will be used for both uploadedBy (photos) and recordedBy (odometer)
     @NotNull(message = "Staff ID là bắt buộc")
     private Integer staffId;
+
+    /** Advisor được phân công cho phiếu dịch vụ này (bắt buộc) */
+    @NotNull(message = "Advisor ID là bắt buộc")
+    private Integer advisorId;
 }
