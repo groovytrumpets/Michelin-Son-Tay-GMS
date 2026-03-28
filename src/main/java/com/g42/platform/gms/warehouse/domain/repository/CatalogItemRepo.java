@@ -43,4 +43,8 @@ public interface CatalogItemRepo {
     SpecAttribute saveSpecAttribute(SpecAttribute specAttribute);
 
     List<ItemCategory> getAllItemCategory();
+
+    SpecAttribute getSpecAttributeById(Integer attributeId);
+
+    CatalogItem getCatalogItemById(Integer itemId);
 }

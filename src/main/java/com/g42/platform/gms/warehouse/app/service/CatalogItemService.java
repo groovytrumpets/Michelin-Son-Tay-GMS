@@ -98,7 +98,9 @@ public class CatalogItemService {
 //                displayName.append(specStr).append(" ");
 //            }
             for (Specification specification : specs) {
-                displayName.append(specification.getSpecValue()).append("/ ");
+                displayName.append(specification.getSpecValue());
+                SpecAttribute specAttribute = catalogItemRepo.getSpecAttributeById(specification.getAttributeId());
+                displayName.append(specAttribute.getUnit()).append(" ");
             }
         }
 
@@ -134,9 +136,20 @@ public class CatalogItemService {
 
     public Specification saveSpecs(Specification specification) {
         if (specification.getItemId()==null) {
-            throw new WarehouseException("item Catalog required!",WarehouseErrorCode.INVALID_CATEGORY);
+            throw new WarehouseException("item Catalog required!",WarehouseErrorCode.PARENT_REQUIRE);
         }
-        return catalogItemRepo.saveSpec(specification);
+        //todo: update catalogName
+        CatalogItem catalogItem = catalogItemRepo.getCatalogItemById(specification.getItemId());
+        Brand brand = catalogItemRepo.getBrandById(catalogItem.getBrandId());
+        ProductLine productLine = catalogItemRepo.getProductLineById(catalogItem.getProductLineId());
+        ItemCategory itemCategory = catalogItemRepo.getItemCategoryById(catalogItem.getItemCategoryId());
+        Specification savedSpec = catalogItemRepo.saveSpec(specification);
+        List<Specification> specifications = catalogItemRepo.getListOfSpecsByItem(catalogItem.getItemId());
+        String itemName = builDisplayName(catalogItem,brand,productLine,specifications,itemCategory);
+        catalogItem.setItemName(itemName);
+        CatalogItem saveCatalogItem = catalogItemRepo.saveCatalogItem(catalogItem);
+
+        return savedSpec;
     }
 
     public SpecAttribute saveSpecAttribute(SpecAttribute specAttribute) {
@@ -146,5 +159,10 @@ public class CatalogItemService {
     public List<ItemCategoryHintDto> getAllItemCategory() {
         List<ItemCategory> itemCategories = catalogItemRepo.getAllItemCategory();
         return itemCategories.stream().map(itemCateDtoMapper::toDto).toList();
+    }
+
+    public List<SpecificationDto> getAllSpecsById(Integer catalogItemId) {
+        List<Specification> specifications = catalogItemRepo.getListOfSpecsByItem(catalogItemId);
+        return specifications.stream().map(specificationDtoMapper::toDto).toList();
     }
 }
