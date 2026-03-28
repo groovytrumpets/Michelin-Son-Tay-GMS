@@ -14,4 +14,6 @@ public interface WorkCategoryRepository {
     int findMaxDisplayOrder();
 
     WorkCategory findById(Integer categoryId);
+
+    List<WorkCategory> findAll();
 }

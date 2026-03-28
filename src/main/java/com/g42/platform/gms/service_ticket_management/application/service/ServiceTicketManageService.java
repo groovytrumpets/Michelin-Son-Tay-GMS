@@ -7,9 +7,11 @@ import com.g42.platform.gms.auth.repository.StaffProfileRepo;
 import com.g42.platform.gms.booking.customer.domain.entity.Booking;
 import com.g42.platform.gms.booking.customer.domain.repository.BookingRepository;
 import com.g42.platform.gms.catalog.repository.CatalogItemRepository;
+import com.g42.platform.gms.common.enums.EstimateEnum;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceTicketDetailResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceTicketListResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.UpdateServiceTicketRequest;
+import com.g42.platform.gms.service_ticket_management.api.mapper.ServiceTicketDtoMapper;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import com.g42.platform.gms.service_ticket_management.domain.entity.OdometerReading;
 import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicket;
@@ -55,7 +57,8 @@ public class ServiceTicketManageService {
     private final StaffProfileRepo staffRepository;
     private final ServiceTicketListMapper listMapper;
     private final ServiceTicketDetailMapper detailMapper;
-    
+    private final ServiceTicketDtoMapper serviceTicketDtoMapper;
+
     /**
      * Get paginated list of service tickets with filters.
      * 
@@ -191,4 +194,10 @@ public class ServiceTicketManageService {
         return getServiceTicketDetail(ticketCode);
     }
 
+    public ServiceTicketListResponse updateServiceTicketStatus(Integer serviceTicketId, TicketStatus status) {
+        ServiceTicket serviceTicket = serviceTicketRepo.findByServiceTicketId(serviceTicketId);
+        serviceTicket.setTicketStatus(status);
+        ServiceTicket savedServiceTicket = serviceTicketRepo.save(serviceTicket);
+        return serviceTicketDtoMapper.toDto(savedServiceTicket);
+    }
 }
