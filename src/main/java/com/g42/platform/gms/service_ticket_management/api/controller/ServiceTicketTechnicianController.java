@@ -94,6 +94,18 @@ public class ServiceTicketTechnicianController {
     }
 
     /**
+     * Technician bắt đầu kiểm tra an toàn — DRAFT → INSPECTION.
+     */
+    @PostMapping("/tickets/{ticketCode}/start-inspection")
+    public ResponseEntity<ApiResponse<TechnicianTicketDetailResponse>> startInspection(
+            @PathVariable String ticketCode,
+            @AuthenticationPrincipal StaffPrincipal principal) {
+
+        TechnicianTicketDetailResponse result = technicianService.startInspection(ticketCode, principal.getStaffId());
+        return ResponseEntity.ok(ApiResponses.success(result));
+    }
+
+    /**
      * Technician báo xong sửa xe — IN_PROGRESS → COMPLETED.
      */
     @PostMapping("/tickets/{ticketCode}/finish")

@@ -17,4 +17,8 @@ public class AvailableStaffDto {
     private String phone;
     private String avatar;
     private List<RoleDto> roles;
+
+    // Availability info — hiển thị để nhân viên biết, không chặn assign
+    private Boolean isBusy;           // true nếu đang có assignment ACTIVE/PENDING
+    private String busyNote;          // Mô tả đang làm gì (vd: "Đang làm dịch vụ khác")
 }

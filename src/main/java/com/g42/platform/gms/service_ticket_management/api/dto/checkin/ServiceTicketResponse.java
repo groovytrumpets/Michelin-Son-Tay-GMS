@@ -1,5 +1,6 @@
 package com.g42.platform.gms.service_ticket_management.api.dto.checkin;
 
+import com.g42.platform.gms.service_ticket_management.domain.enums.InspectionStatus;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import lombok.Data;
 
@@ -18,14 +19,20 @@ public class ServiceTicketResponse {
     private String ticketCode;
     private Integer bookingId;
     private Integer vehicleId;
+    private Integer customerId;
     private TicketStatus ticketStatus;
     private String checkInNotes;
     private Boolean immutable;
+    private LocalDateTime receivedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private Integer queueNumber;
     // Safety inspection
     private Boolean safetyInspectionEnabled;
+    private InspectionStatus inspectionStatus;
+
+    // Assigned advisor
+    private Integer advisorId;
 
     // Photo information
     private List<PhotoInfo> photos = new ArrayList<>();
