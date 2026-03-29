@@ -1,6 +1,12 @@
 package com.g42.platform.gms.warehouse.infrastructure;
 
+import com.g42.platform.gms.estimation.domain.entity.TaxRule;
+import com.g42.platform.gms.estimation.infrastructure.entity.TaxRuleJpa;
+import com.g42.platform.gms.estimation.infrastructure.entity.WorkCategoryJpa;
+import com.g42.platform.gms.estimation.infrastructure.repository.TaxRuleRepositoryJpa;
+import com.g42.platform.gms.estimation.infrastructure.repository.WorkCategoryRepositoryJpa;
 import com.g42.platform.gms.marketing.service_catalog.infrastructure.repository.ServiceJpaRepository;
+import com.g42.platform.gms.warehouse.api.dto.ItemCategoryReqDto;
 import com.g42.platform.gms.warehouse.api.dto.SpecificationRespondDto;
 import com.g42.platform.gms.warehouse.domain.entity.*;
 import com.g42.platform.gms.warehouse.domain.repository.CatalogItemRepo;
@@ -9,7 +15,9 @@ import com.g42.platform.gms.warehouse.infrastructure.mapper.*;
 import com.g42.platform.gms.warehouse.infrastructure.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -42,6 +50,10 @@ public class CatalogItemRepoImpl implements CatalogItemRepo {
     private ItemCategoryJpaMapper itemCategoryJpaMapper;
     @Autowired
     private ItemCategoryJpaRepo itemCategoryJpaRepo;
+    @Autowired
+    private WorkCategoryRepositoryJpa workCategoryJpaRepository;
+    @Autowired
+    private TaxRuleRepositoryJpa taxRepositoryJpa;
 
 
     @Override
@@ -99,8 +111,35 @@ public class CatalogItemRepoImpl implements CatalogItemRepo {
     }
 
     @Override
-    public ItemCategory saveItemCate(ItemCategory itemCategory) {
-        ItemCategoryJpa itemCategoryJpa = itemCategoryJpaRepo.save(itemCategoryJpaMapper.toJpa(itemCategory));
+    @Transactional
+    public ItemCategory saveItemCate(ItemCategoryReqDto itemCategory) {
+        ItemCategoryJpa itemCategoryJpa = itemCategoryJpaRepo.save(itemCategoryJpaMapper.toDto(itemCategory));
+        //todo: create workCategory default:
+        WorkCategoryJpa workCategoryJpa = new WorkCategoryJpa();
+        workCategoryJpa.setCategoryName(itemCategoryJpa.getCategoryName());
+        workCategoryJpa.setCategoryCode(itemCategoryJpa.getCategoryCode());
+        workCategoryJpa.setIsDefault(true);
+        workCategoryJpa.setIsActive(true);
+        int nextOrder = workCategoryJpaRepository.findMaxDisplayOrder()+1;
+        workCategoryJpa.setDisplayOrder(nextOrder);
+        //todo: createTaxRule
+        Integer finalTaxId = itemCategory.getTaxRuleId();
+        if (finalTaxId == null){
+            TaxRuleJpa taxFree = taxRepositoryJpa.findByTaxCode("FREE");
+            //todo:check if tax0Exsit and create Free tax
+            if (taxFree==null) {
+                TaxRuleJpa taxRule = new TaxRuleJpa();
+                taxRule.setTaxCode("FREE");
+                taxRule.setTaxName("Miễn thuế");
+                taxRule.setTaxRate(BigDecimal.ZERO);
+                finalTaxId = taxRepositoryJpa.save(taxRule).getTaxRuleId();
+            }else {
+                finalTaxId = taxFree.getTaxRuleId();
+            }
+        }
+        workCategoryJpa.setTaxRuleId(finalTaxId);
+
+        workCategoryJpaRepository.save(workCategoryJpa);
         return itemCategoryJpaMapper.toDomain(itemCategoryJpa);
     }
 

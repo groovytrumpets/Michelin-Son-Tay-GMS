@@ -125,7 +125,7 @@ public class CatalogItemService {
         return catalogItemRepo.saveProductLine(productLine);
     }
 
-    public ItemCategory saveItemCate(ItemCategory itemCategory) {
+    public ItemCategory saveItemCate(ItemCategoryReqDto itemCategory) {
         if (itemCategory.getCategoryType()==null) {
             throw new WarehouseException("Category must not null!",WarehouseErrorCode.WRONG_ENUM);
         }

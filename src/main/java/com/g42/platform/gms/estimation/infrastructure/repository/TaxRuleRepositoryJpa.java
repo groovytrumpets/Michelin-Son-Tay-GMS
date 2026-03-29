@@ -15,4 +15,7 @@ public interface TaxRuleRepositoryJpa extends JpaRepository<TaxRuleJpa, Integer>
 
     List<TaxRuleJpa> findAllByIsActive(Byte isActive);
 
+    boolean existsByTaxCode(String taxCode);
+
+    TaxRuleJpa findByTaxCode(String taxCode);
 }

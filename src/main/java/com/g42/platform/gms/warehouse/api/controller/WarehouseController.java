@@ -67,7 +67,7 @@ public class WarehouseController {
         return ResponseEntity.ok(ApiResponses.success(catalogItemService.saveProductLine(productLine)));
     }
     @PostMapping("/itemCategory/create")
-    public ResponseEntity<ApiResponse<ItemCategory>> createItemCategory(@RequestBody ItemCategory itemCategory) {
+    public ResponseEntity<ApiResponse<ItemCategory>> createItemCategory(@RequestBody ItemCategoryReqDto itemCategory) {
         return ResponseEntity.ok(ApiResponses.success(catalogItemService.saveItemCate(itemCategory)));
     }
     @PostMapping("/specs/create")

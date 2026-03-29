@@ -1,5 +1,6 @@
 package com.g42.platform.gms.warehouse.domain.repository;
 
+import com.g42.platform.gms.warehouse.api.dto.ItemCategoryReqDto;
 import com.g42.platform.gms.warehouse.api.dto.SpecificationRespondDto;
 import com.g42.platform.gms.warehouse.domain.entity.*;
 import jakarta.validation.constraints.NotNull;
@@ -29,7 +30,7 @@ public interface CatalogItemRepo {
 
     boolean exitBySku(String sku);
 
-    ItemCategory saveItemCate(ItemCategory itemCategory);
+    ItemCategory saveItemCate(ItemCategoryReqDto itemCategory);
 
     ProductLine getProductLineById(Integer productLineId);
 
