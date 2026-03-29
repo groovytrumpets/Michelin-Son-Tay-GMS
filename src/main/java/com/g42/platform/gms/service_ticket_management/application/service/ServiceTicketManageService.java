@@ -315,6 +315,13 @@ public class ServiceTicketManageService {
             throw new AssignmentException("Swap service ticket queue null", AssignmentErrorCode.INVALID_SERVICE_TICKET_ID);
         }
     }
+
+    public ServiceTicketListResponse updateServiceTicketStatus(Integer serviceTicketId, TicketStatus status) {
+        ServiceTicket serviceTicket = serviceTicketRepo.findByServiceTicketId(serviceTicketId);
+        serviceTicket.setTicketStatus(status);
+        ServiceTicket savedServiceTicket = serviceTicketRepo.save(serviceTicket);
+        return serviceTicketDtoMapper.toDto(savedServiceTicket);
+    }
 }
 
 
