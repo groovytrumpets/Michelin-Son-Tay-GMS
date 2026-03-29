@@ -60,6 +60,18 @@ public class SafetyInspectionController {
     }
 
     /**
+     * Reopen an existing safety inspection record for editing.
+     * This puts inspection back to PENDING and ticket back to DRAFT.
+     */
+    @PostMapping("/{ticketCode}/reopen")
+    public ResponseEntity<ApiResponse<SafetyInspectionResponse>> reopenInspection(
+            @PathVariable String ticketCode) {
+
+        SafetyInspectionResponse response = safetyInspectionService.reopenInspectionByCode(ticketCode);
+        return ResponseEntity.ok(ApiResponses.success(response, "Đã mở lại phiếu kiểm tra an toàn"));
+    }
+
+    /**
      * Get safety inspection details by inspection ID
      */
     @GetMapping("/{inspectionId}")

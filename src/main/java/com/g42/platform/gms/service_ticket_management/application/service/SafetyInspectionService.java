@@ -67,6 +67,13 @@ public class SafetyInspectionService {
     }
 
 
+    public SafetyInspectionResponse reopenInspectionByCode(String ticketCode) {
+        ServiceTicket serviceTicket = serviceTicketRepo.findByTicketCode(ticketCode)
+                .orElseThrow(() -> new IllegalArgumentException("Service ticket not found with code: " + ticketCode));
+        return reopenInspection(serviceTicket.getServiceTicketId());
+    }
+
+
     @Transactional(readOnly = true)
     public SafetyInspectionResponse getInspectionByTicketCode(String ticketCode) {
         ServiceTicket serviceTicket = serviceTicketRepo.findByTicketCode(ticketCode)
@@ -124,6 +131,23 @@ public class SafetyInspectionService {
         serviceTicketRepo.save(ticket);
 
         return apiMapper.toResponse(saved);
+    }
+
+
+    public SafetyInspectionResponse reopenInspection(Integer serviceTicketId) {
+        SafetyInspection inspection = inspectionRepo.findByServiceTicketId(serviceTicketId)
+                .orElseThrow(() -> new IllegalArgumentException("Inspection not found for service ticket: " + serviceTicketId));
+        inspection.setInspectionStatus(InspectionStatus.PENDING);
+        inspection.setUpdatedAt(LocalDateTime.now());
+        inspectionRepo.save(inspection);
+
+        ServiceTicket ticket = serviceTicketRepo.findByServiceTicketId(serviceTicketId);
+        if (ticket == null) throw new IllegalArgumentException("Service ticket not found: " + serviceTicketId);
+        ticket.setTicketStatus(TicketStatus.DRAFT);
+        ticket.setUpdatedAt(LocalDateTime.now());
+        serviceTicketRepo.save(ticket);
+
+        return getInspectionByServiceTicket(serviceTicketId);
     }
 
 
