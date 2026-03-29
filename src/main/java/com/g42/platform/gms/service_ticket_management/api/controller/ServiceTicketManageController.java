@@ -52,14 +52,11 @@ public class ServiceTicketManageController {
     }
 
     /**
-     * Lễ tân xác nhận thanh toán — COMPLETED → PAID, trigger ZNS feedback.
-     * Endpoint này do bạn tôi implement phần thanh toán.
+     * Endpoint này đã được thay thế bởi luồng billing.
+     * Khi billing thanh toán xong sẽ tự động chuyển PAID + assignment DONE.
+     * Giữ lại để backward compatibility, không expose ra nữa.
      */
-    @PostMapping("/tickets/{ticketCode}/complete")
-    public ResponseEntity<ApiResponse<ServiceTicketDetailResponse>> completeTicket(
-            @PathVariable String ticketCode) {
-        return ResponseEntity.ok(ApiResponses.success(serviceTicketManageService.completeTicket(ticketCode)));
-    }
+    // @PostMapping("/tickets/{ticketCode}/complete") -- disabled, use billing flow instead
 
     /**
      * Lễ tân thay đổi advisor cho ticket.

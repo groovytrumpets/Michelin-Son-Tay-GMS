@@ -252,13 +252,14 @@ public class TicketAssignmentService {
 
         ServiceTicketAssignment currentAdvisor = currentAssignments.get(0);
 
-        // 2. Kiểm tra điều kiện thay đổi: chỉ được thay khi advisor đang PENDING (chưa bắt đầu làm việc)
+        // 2. Kiểm tra điều kiện thay đổi: lễ tân chỉ được đổi khi advisor PENDING
         if (currentAdvisor.getStatus() != AssignmentStatus.PENDING) {
-            throw new AssignmentException("Không thể thay đổi advisor khi đã bắt đầu làm việc (status: " + currentAdvisor.getStatus() + ")",
-                    AssignmentErrorCode.UNAVAILABLE_STAFF);
+            throw new AssignmentException(
+                "Lễ tân chỉ được đổi advisor khi advisor chưa bắt đầu làm việc (PENDING). Hiện tại: " + currentAdvisor.getStatus(),
+                AssignmentErrorCode.UNAVAILABLE_STAFF);
         }
 
-        // 3. Validate advisor mới phải rảnh và có role ADVISOR
+        // 3. Validate advisor mới phải có role ADVISOR
         boolean newAdvisorHasRole = staffProfileRepo.existsByStaffIdAndRole(newAdvisorId, "ADVISOR");
         if (!newAdvisorHasRole) {
             throw new AssignmentException("Staff không có role ADVISOR", AssignmentErrorCode.UNAVAILABLE_STAFF);
@@ -268,7 +269,9 @@ public class TicketAssignmentService {
         currentAdvisor.setStatus(AssignmentStatus.CANCELLED);
         ticketAssignmentRepo.save(currentAdvisor);
 
-        // 5. Tạo assignment mới với trạng thái PENDING
+        // 5. Tạo assignment mới với PENDING (lễ tân đổi thì advisor mới bắt đầu từ PENDING)
+        AssignmentStatus newStatus = AssignmentStatus.PENDING;
+
         ServiceTicketAssignment newAssignment = new ServiceTicketAssignment();
         newAssignment.setServiceTicketId(ticketId);
         newAssignment.setStaffId(newAdvisorId);
@@ -276,7 +279,51 @@ public class TicketAssignmentService {
         newAssignment.setIsPrimary(true);
         newAssignment.setNote(note != null ? note : "Thay đổi advisor bởi lễ tân");
         newAssignment.setAssignedAt(Instant.now());
-        newAssignment.setStatus(AssignmentStatus.PENDING); // Bắt đầu với PENDING
+        newAssignment.setStatus(newStatus);
+
+        ServiceTicketAssignment saved = ticketAssignmentRepo.save(newAssignment);
+        return enrichDtoWithStaffName(dtoMapper.toDto(saved));
+    }
+
+    /**
+     * Advisor tự đổi sang advisor khác — khi đang PENDING hoặc ACTIVE.
+     * Advisor mới kế thừa status của advisor cũ (PENDING → PENDING, ACTIVE → ACTIVE).
+     */
+    @Transactional
+    public AssignStaffDto changeAdvisorByAdvisor(Integer ticketId, Integer newAdvisorId, String note) {
+        List<ServiceTicketAssignment> currentAssignments = ticketAssignmentRepo.findByTicketIdAndRole(ticketId, "ADVISOR");
+        if (currentAssignments.isEmpty()) {
+            throw new AssignmentException("Ticket chưa có advisor!", AssignmentErrorCode.INVALID_SERVICE_TICKET_ID);
+        }
+
+        ServiceTicketAssignment currentAdvisor = currentAssignments.get(0);
+
+        // Advisor được đổi khi PENDING hoặc ACTIVE
+        if (currentAdvisor.getStatus() != AssignmentStatus.PENDING
+                && currentAdvisor.getStatus() != AssignmentStatus.ACTIVE) {
+            throw new AssignmentException(
+                "Advisor chỉ có thể đổi người khi đang PENDING hoặc ACTIVE. Hiện tại: " + currentAdvisor.getStatus(),
+                AssignmentErrorCode.UNAVAILABLE_STAFF);
+        }
+
+        boolean newAdvisorHasRole = staffProfileRepo.existsByStaffIdAndRole(newAdvisorId, "ADVISOR");
+        if (!newAdvisorHasRole) {
+            throw new AssignmentException("Staff không có role ADVISOR", AssignmentErrorCode.UNAVAILABLE_STAFF);
+        }
+
+        // Lưu status trước khi cancel để advisor mới kế thừa
+        AssignmentStatus inheritedStatus = currentAdvisor.getStatus();
+        currentAdvisor.setStatus(AssignmentStatus.CANCELLED);
+        ticketAssignmentRepo.save(currentAdvisor);
+
+        ServiceTicketAssignment newAssignment = new ServiceTicketAssignment();
+        newAssignment.setServiceTicketId(ticketId);
+        newAssignment.setStaffId(newAdvisorId);
+        newAssignment.setRoleInTicket("ADVISOR");
+        newAssignment.setIsPrimary(true);
+        newAssignment.setNote(note != null ? note : "Thay đổi advisor bởi advisor");
+        newAssignment.setAssignedAt(Instant.now());
+        newAssignment.setStatus(inheritedStatus); // PENDING → PENDING, ACTIVE → ACTIVE
 
         ServiceTicketAssignment saved = ticketAssignmentRepo.save(newAssignment);
         return enrichDtoWithStaffName(dtoMapper.toDto(saved));
@@ -284,11 +331,11 @@ public class TicketAssignmentService {
 
     /**
      * Hủy assignment technician (chỉ dành cho advisor).
-     * Chỉ được phép hủy khi technician đang ở trạng thái PENDING.
+     * Cho phép hủy khi PENDING hoặc ACTIVE.
+     * Trả về status của technician bị hủy để caller có thể kế thừa.
      */
     @Transactional
-    public void removeTechnician(Integer ticketId, Integer technicianId) {
-        // 1. Find current TECHNICIAN assignment (prefer latest PENDING)
+    public AssignmentStatus removeTechnician(Integer ticketId, Integer technicianId) {
         List<ServiceTicketAssignment> assignments = ticketAssignmentRepo.findByTicketId(ticketId);
         List<ServiceTicketAssignment> technicianAssignments = assignments.stream()
                 .filter(a -> a.getStaffId().equals(technicianId) && "TECHNICIAN".equals(a.getRoleInTicket()))
@@ -298,50 +345,64 @@ public class TicketAssignmentService {
                 ).reversed())
                 .toList();
 
-
         if (technicianAssignments.isEmpty()) {
             throw new AssignmentException("Khong tim thay assignment technician!", AssignmentErrorCode.INVALID_SERVICE_TICKET_ID);
         }
 
-
+        // Ưu tiên PENDING, nếu không có thì lấy ACTIVE
         Optional<ServiceTicketAssignment> pendingAssignment = technicianAssignments.stream()
                 .filter(a -> a.getStatus() == AssignmentStatus.PENDING)
                 .findFirst();
-        ServiceTicketAssignment technicianAssignment = pendingAssignment.orElse(technicianAssignments.get(0));
+        Optional<ServiceTicketAssignment> activeAssignment = technicianAssignments.stream()
+                .filter(a -> a.getStatus() == AssignmentStatus.ACTIVE)
+                .findFirst();
 
+        ServiceTicketAssignment technicianAssignment = pendingAssignment
+                .orElse(activeAssignment.orElse(null));
 
-        // 2. Only allow cancel when current assignment is PENDING
-        if (technicianAssignment.getStatus() != AssignmentStatus.PENDING) {
+        if (technicianAssignment == null) {
             throw new AssignmentException(
-                    "Khong the huy technician khi assignment khong o trang thai PENDING (status: " + technicianAssignment.getStatus() + ")",
-                    AssignmentErrorCode.UNAVAILABLE_STAFF
+                "Không thể hủy technician khi không ở trạng thái PENDING hoặc ACTIVE",
+                AssignmentErrorCode.UNAVAILABLE_STAFF
             );
         }
 
+        if (technicianAssignment.getStatus() != AssignmentStatus.PENDING
+                && technicianAssignment.getStatus() != AssignmentStatus.ACTIVE) {
+            throw new AssignmentException(
+                "Không thể hủy technician khi assignment không ở trạng thái PENDING hoặc ACTIVE (status: " + technicianAssignment.getStatus() + ")",
+                AssignmentErrorCode.UNAVAILABLE_STAFF
+            );
+        }
 
-        // 3. Cancel assignment
+        AssignmentStatus previousStatus = technicianAssignment.getStatus();
         technicianAssignment.setStatus(AssignmentStatus.CANCELLED);
         ticketAssignmentRepo.save(technicianAssignment);
+        return previousStatus; // trả về để changeTechnician kế thừa
     }
 
 
     /**
      * Thay đổi technician (chỉ dành cho advisor).
-     * Hủy technician cũ và assign technician mới với trạng thái PENDING.
+     * Hủy technician cũ và assign technician mới — kế thừa status (PENDING → PENDING, ACTIVE → ACTIVE).
      */
     @Transactional
     public AssignStaffDto changeTechnician(Integer ticketId, Integer oldTechnicianId, Integer newTechnicianId, String note) {
-        // 1. Hủy technician cũ (chỉ được hủy nếu đang PENDING)
-        removeTechnician(ticketId, oldTechnicianId);
+        // 1. Hủy technician cũ, lấy status để kế thừa
+        AssignmentStatus inheritedStatus = removeTechnician(ticketId, oldTechnicianId);
 
-        // 2. Assign technician mới
-        AssignStaffDto newTechnicianDto = new AssignStaffDto();
-        newTechnicianDto.setStaffId(newTechnicianId);
-        newTechnicianDto.setRoleInTicket("TECHNICIAN");
-        newTechnicianDto.setIsPrimary(false); // Mặc định không phải primary
-        newTechnicianDto.setNote(note != null ? note : "Thay đổi technician bởi advisor");
+        // 2. Assign technician mới với status kế thừa
+        ServiceTicketAssignment newAssignment = new ServiceTicketAssignment();
+        newAssignment.setServiceTicketId(ticketId);
+        newAssignment.setStaffId(newTechnicianId);
+        newAssignment.setRoleInTicket("TECHNICIAN");
+        newAssignment.setIsPrimary(false);
+        newAssignment.setNote(note != null ? note : "Thay đổi technician bởi advisor");
+        newAssignment.setAssignedAt(Instant.now());
+        newAssignment.setStatus(inheritedStatus); // PENDING → PENDING, ACTIVE → ACTIVE
 
-        return assignStaff(ticketId, newTechnicianDto);
+        ServiceTicketAssignment saved = ticketAssignmentRepo.save(newAssignment);
+        return enrichDtoWithStaffName(dtoMapper.toDto(saved));
     }
     private AssignStaffDto enrichDtoWithStaffName(AssignStaffDto dto) {
         if (dto == null || dto.getStaffId() == null) return dto;
