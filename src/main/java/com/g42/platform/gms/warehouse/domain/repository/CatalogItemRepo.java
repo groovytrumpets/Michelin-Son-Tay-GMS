@@ -58,4 +58,6 @@ public interface CatalogItemRepo {
     Map<Integer, String> findAllLinesByIds(Set<Integer> lineIds);
 
     List<SpecificationRespondDto> getAllSpecsByItemId(Integer catalogItemId);
+
+    Map<Integer, String> findAllCatesByIds(Set<Integer> categoryIds);
 }
