@@ -151,9 +151,6 @@ public class CheckInService {
             odometerRepo.findLatestByVehicleId(vehicle.getVehicleId())
                 .ifPresent(r -> info.setLastOdometerReading(r.getReading()));
 
-            serviceTicketRepo.findByVehicleId(vehicle.getVehicleId()).stream()
-                .max(java.util.Comparator.comparing(ServiceTicket::getCreatedAt))
-                .ifPresent(t -> info.setLastServiceDate(t.getCreatedAt().toLocalDate()));
         }
 
         CustomerVehiclesResponse response = new CustomerVehiclesResponse();
@@ -254,12 +251,20 @@ public class CheckInService {
 
             log.info("Saved odometer reading: {} km, rollbackDetected={}", request.getOdometerReading(), rollbackDetected);
         }
+        //11. set queue
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime startOfToday = now.toLocalDate().atStartOfDay();
+        LocalDateTime endOfToday = now.toLocalDate().atTime(LocalTime.MAX);
+
+        Integer currentMaxQueue = serviceTicketRepo.findMaxQueueNumberForToday(startOfToday, endOfToday);
+        int nextQueueNumber = (currentMaxQueue == null) ? 1 : (currentMaxQueue + 1);
 
         // 6. Update Service Ticket to DRAFT
         ticketDomain.setTicketStatus(TicketStatus.DRAFT);
         ticketDomain.setCheckInNotes(request.getCheckInNotes());
         ticketDomain.setReceivedAt(LocalDateTime.now());
         ticketDomain.setUpdatedAt(LocalDateTime.now());
+        ticketDomain.setQueueNumber(nextQueueNumber);
         ServiceTicket savedTicketAll = serviceTicketRepo.save(ticketDomain);
         log.info("Updated ticket status to DRAFT: {}", savedTicketAll.getTicketCode());
 

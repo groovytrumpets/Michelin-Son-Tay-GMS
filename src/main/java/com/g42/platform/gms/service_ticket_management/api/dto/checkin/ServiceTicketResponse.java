@@ -26,7 +26,7 @@ public class ServiceTicketResponse {
     private LocalDateTime receivedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-
+    private Integer queueNumber;
     // Safety inspection
     private Boolean safetyInspectionEnabled;
     private InspectionStatus inspectionStatus;

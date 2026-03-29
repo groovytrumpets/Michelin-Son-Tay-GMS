@@ -14,13 +14,11 @@ import java.util.List;
 
 @Mapper(componentModel = "spring")
 public interface EstimateDtoMapper {
-    @Mapping(target = "subTotal", expression = "java(estimateItem.getSubTotal())")
     @Mapping(target = "estimateItemId", source = "id")
-    @Mapping(target = "taxRuleId", source = "taxRuleId")
-    @Mapping(target = "taxCode", ignore = true)   // set thủ công trong service
-    @Mapping(target = "taxRate", ignore = true)
+    @Mapping(target = "workCategory", ignore = true)
+    @Mapping(target = "subTotal", source = "totalPrice")
     EstimateItemDto toEstimateItemDto(EstimateItem estimateItem);
-    @Mapping(target = "subTotal", expression = "java(estimateItem.getSubTotal())")
+    @Mapping(target = "subTotal", source = "totalPrice")
     List<EstimateItemDto> toEstimateItemDto(List<EstimateItem> estimateItems);
     @Mapping(target = "estimateId", source = "id")
     EstimateRespondDto toEstimateDto(Estimate estimate);

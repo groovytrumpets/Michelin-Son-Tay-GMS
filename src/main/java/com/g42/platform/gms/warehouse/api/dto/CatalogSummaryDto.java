@@ -7,15 +7,15 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class CatalogItemDto {
+public class CatalogSummaryDto {
     private Integer itemId;
     private String itemName;
     private CatalogItemType itemType;
-    private Boolean isActive;
     private Integer warrantyDurationMonths;
     private Long serviceServiceId;
     private String sku;
@@ -24,10 +24,5 @@ public class CatalogItemDto {
     private String description;
     private String imageUrl;
     private String unit;
-    private Integer comboDurationMonths;
-    private String comboDescription;
     private Boolean isRecurring;
-    private Integer brandId;
-    private Integer productLineId;
-    private Integer itemCategoryId;
 }

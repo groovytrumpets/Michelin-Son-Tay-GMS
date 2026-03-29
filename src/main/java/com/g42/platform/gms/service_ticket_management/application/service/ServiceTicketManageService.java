@@ -8,13 +8,18 @@ import com.g42.platform.gms.auth.repository.StaffProfileRepo;
 import com.g42.platform.gms.booking.customer.domain.entity.Booking;
 import com.g42.platform.gms.booking.customer.domain.repository.BookingRepository;
 import com.g42.platform.gms.catalog.repository.CatalogItemRepository;
+import com.g42.platform.gms.common.enums.EstimateEnum;
+import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceQueueResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceTicketDetailResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceTicketListResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.UpdateServiceTicketRequest;
+import com.g42.platform.gms.service_ticket_management.api.mapper.ServiceTicketDtoMapper;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import com.g42.platform.gms.service_ticket_management.domain.entity.OdometerReading;
 import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicket;
 import com.g42.platform.gms.service_ticket_management.domain.entity.VehicleConditionPhoto;
+import com.g42.platform.gms.service_ticket_management.domain.exception.AssignmentErrorCode;
+import com.g42.platform.gms.service_ticket_management.domain.exception.AssignmentException;
 import com.g42.platform.gms.service_ticket_management.domain.exception.CheckInException;
 import com.g42.platform.gms.service_ticket_management.domain.repository.OdometerReadingRepo;
 import com.g42.platform.gms.service_ticket_management.domain.repository.ServiceTicketRepo;
@@ -34,6 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -59,6 +65,7 @@ public class ServiceTicketManageService {
     private final ServiceTicketListMapper listMapper;
     private final ServiceTicketDetailMapper detailMapper;
     private final TicketAssignmentService ticketAssignmentService;
+    private final ServiceTicketDtoMapper serviceTicketDtoMapper;
 
     /**
      * Get paginated list of service tickets with filters.
@@ -282,7 +289,39 @@ public class ServiceTicketManageService {
         ticketAssignmentService.markAssignmentDone(ticketId);
     }
 
+    public List<ServiceQueueResponse> setswapQueueByServiceTicketIds(Integer serviceTicketId1, Integer serviceTicketId2) {
+        ServiceTicket serviceTicket1 = serviceTicketRepo.findByServiceTicketId(serviceTicketId1);
+        ServiceTicket serviceTicket2 = serviceTicketRepo.findByServiceTicketId(serviceTicketId2);
+        compare2serviceTicket(serviceTicket1,serviceTicket2);
+        Integer swap = serviceTicket1.getQueueNumber();
+        serviceTicket1.setQueueNumber(serviceTicket2.getQueueNumber());
+        serviceTicket2.setQueueNumber(swap);
+        serviceTicketRepo.save(serviceTicket1);
+        serviceTicketRepo.save(serviceTicket2);
+        return getServiceTicketsByDate(serviceTicket1.getReceivedAt());
+    }
 
+    private List<ServiceQueueResponse> getServiceTicketsByDate(LocalDateTime receivedAt) {
+        List<ServiceTicket> serviceTickets = serviceTicketRepo.findAllByDate(receivedAt);
+        return serviceTickets.stream().map(serviceTicketDtoMapper::toQueueDto).toList();
+    }
+
+    private void compare2serviceTicket(ServiceTicket serviceTicket1, ServiceTicket serviceTicket2) {
+        //todo: check validate service ticket
+        if (!serviceTicket1.getReceivedAt().equals(serviceTicket2.getReceivedAt())) {
+            throw new AssignmentException("Swap service ticket not match create Date", AssignmentErrorCode.INVALID_SERVICE_TICKET_ID);
+        }
+        if (serviceTicket1.getQueueNumber()==null || serviceTicket2.getQueueNumber()==null) {
+            throw new AssignmentException("Swap service ticket queue null", AssignmentErrorCode.INVALID_SERVICE_TICKET_ID);
+        }
+    }
+
+    public ServiceTicketListResponse updateServiceTicketStatus(Integer serviceTicketId, TicketStatus status) {
+        ServiceTicket serviceTicket = serviceTicketRepo.findByServiceTicketId(serviceTicketId);
+        serviceTicket.setTicketStatus(status);
+        ServiceTicket savedServiceTicket = serviceTicketRepo.save(serviceTicket);
+        return serviceTicketDtoMapper.toDto(savedServiceTicket);
+    }
 }
 
 

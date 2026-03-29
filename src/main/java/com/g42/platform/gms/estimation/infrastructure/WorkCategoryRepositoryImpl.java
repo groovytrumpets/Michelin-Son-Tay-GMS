@@ -34,5 +34,17 @@ public class WorkCategoryRepositoryImpl implements WorkCategoryRepository {
     public int findMaxDisplayOrder() {
         return workCategoryRepositoryJpa.findMaxDisplayOrder();
     }
+
+    @Override
+    public WorkCategory findById(Integer categoryId) {
+        WorkCategoryJpa workCategoryJpa = workCategoryRepositoryJpa.findByIdWork(categoryId);
+        return workCategoryJpaMapper.toDomain(workCategoryJpa);
+    }
+
+    @Override
+    public List<WorkCategory> findAll() {
+        List<WorkCategoryJpa> workCategoryJpas = workCategoryRepositoryJpa.findAllByIsDefault(true);
+        return workCategoryJpas.stream().map(workCategoryJpaMapper::toDomain).toList();
+    }
 }
 

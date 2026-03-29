@@ -9,4 +9,6 @@ import org.mapstruct.Mapper;
 @Mapper(componentModel = "spring")
 public interface SpecificationJpaMapper {
     Specification toDomain(SpecificationJpa specificationJpa);
+
+    SpecificationJpa toJpa(Specification specification);
 }
