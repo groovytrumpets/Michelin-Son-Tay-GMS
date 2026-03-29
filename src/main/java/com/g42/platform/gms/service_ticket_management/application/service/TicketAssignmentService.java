@@ -281,6 +281,46 @@ public class TicketAssignmentService {
         ServiceTicketAssignment saved = ticketAssignmentRepo.save(newAssignment);
         return enrichDtoWithStaffName(dtoMapper.toDto(saved));
     }
+    /**
+         * Advisor tự đổi sang advisor khác — chỉ khi đang ACTIVE.
+         * Advisor mới vào thẳng ACTIVE vì đang trong luồng làm việc.
+         */
+        @Transactional
+        public AssignStaffDto changeAdvisorByAdvisor(Integer ticketId, Integer newAdvisorId, String note) {
+            List<ServiceTicketAssignment> currentAssignments = ticketAssignmentRepo.findByTicketIdAndRole(ticketId, "ADVISOR");
+            if (currentAssignments.isEmpty()) {
+                throw new AssignmentException("Ticket chưa có advisor!", AssignmentErrorCode.INVALID_SERVICE_TICKET_ID);
+            }
+
+            ServiceTicketAssignment currentAdvisor = currentAssignments.get(0);
+
+            // Advisor chỉ tự đổi khi đang ACTIVE
+            if (currentAdvisor.getStatus() != AssignmentStatus.ACTIVE) {
+                throw new AssignmentException(
+                    "Advisor chỉ có thể đổi người khi đang ACTIVE. Hiện tại: " + currentAdvisor.getStatus(),
+                    AssignmentErrorCode.UNAVAILABLE_STAFF);
+            }
+
+            boolean newAdvisorHasRole = staffProfileRepo.existsByStaffIdAndRole(newAdvisorId, "ADVISOR");
+            if (!newAdvisorHasRole) {
+                throw new AssignmentException("Staff không có role ADVISOR", AssignmentErrorCode.UNAVAILABLE_STAFF);
+            }
+
+            currentAdvisor.setStatus(AssignmentStatus.CANCELLED);
+            ticketAssignmentRepo.save(currentAdvisor);
+
+            ServiceTicketAssignment newAssignment = new ServiceTicketAssignment();
+            newAssignment.setServiceTicketId(ticketId);
+            newAssignment.setStaffId(newAdvisorId);
+            newAssignment.setRoleInTicket("ADVISOR");
+            newAssignment.setIsPrimary(true);
+            newAssignment.setNote(note != null ? note : "Thay đổi advisor bởi advisor");
+            newAssignment.setAssignedAt(Instant.now());
+            newAssignment.setStatus(AssignmentStatus.ACTIVE); // Advisor mới vào thẳng ACTIVE
+
+            ServiceTicketAssignment saved = ticketAssignmentRepo.save(newAssignment);
+            return enrichDtoWithStaffName(dtoMapper.toDto(saved));
+        }
 
     /**
      * Hủy assignment technician (chỉ dành cho advisor).

@@ -266,7 +266,7 @@ public class ServiceTicketManageService {
             throw new CheckInException("Lễ tân chỉ được đổi advisor khi phiếu đang DRAFT. Hiện tại: " + ticket.getTicketStatus());
         }
 
-        // Delegate sang TicketAssignmentService — sẽ validate advisor PENDING bên trong
+        // Delegate sang TicketAssignmentService — validate advisor PENDING (lễ tân chỉ đổi khi PENDING)
         ticketAssignmentService.changeAdvisor(ticket.getServiceTicketId(), newAdvisorId, note);
 
         log.info("Advisor changed successfully for ticket: {}", ticketCode);
