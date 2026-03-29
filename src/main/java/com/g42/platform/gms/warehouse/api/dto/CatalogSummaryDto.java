@@ -27,4 +27,5 @@ public class CatalogSummaryDto {
     private Boolean isRecurring;
     private String brand;
     private String productLine;
+    private String itemCategoryCode;
 }

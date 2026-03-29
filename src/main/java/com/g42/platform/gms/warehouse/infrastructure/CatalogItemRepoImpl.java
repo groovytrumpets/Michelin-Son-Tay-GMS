@@ -185,4 +185,9 @@ public class CatalogItemRepoImpl implements CatalogItemRepo {
     public List<SpecificationRespondDto> getAllSpecsByItemId(Integer catalogItemId) {
         return specificationJpaRepo.findSpecsByItemId(catalogItemId);
     }
+
+    @Override
+    public Map<Integer, String> findAllCatesByIds(Set<Integer> categoryIds) {
+        return itemCategoryJpaRepo.findCateByIds(categoryIds);
+    }
 }
