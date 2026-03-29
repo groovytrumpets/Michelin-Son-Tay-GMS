@@ -167,9 +167,12 @@ public class SafetyInspectionService {
     public SafetyInspectionResponse saveInspectionData(SafetyInspectionRequest request, Integer technicianId) {
         requireTicketEditableForInspection(request.getServiceTicketId());
         validateInspectionData(request);
+        InspectionStatus requestedStatus = request.getInspectionStatus() != null
+                ? request.getInspectionStatus()
+                : InspectionStatus.COMPLETED;
         SafetyInspection domain = apiMapper.toDomain(request);
         domain.setTechnicianId(technicianId);
-        domain.setInspectionStatus(InspectionStatus.COMPLETED);
+        domain.setInspectionStatus(requestedStatus);
         Optional<SafetyInspection> existing = inspectionRepo.findByServiceTicketId(request.getServiceTicketId());
         SafetyInspection saved;
         if (existing.isPresent()) {
@@ -177,7 +180,7 @@ public class SafetyInspectionService {
             e.setGeneralNotes(request.getGeneralNotes());
             e.setTechnicianNotes(request.getTechnicianNotes());
             e.setTechnicianId(technicianId);
-            e.setInspectionStatus(InspectionStatus.COMPLETED);
+            e.setInspectionStatus(requestedStatus);
             e.setUpdatedAt(LocalDateTime.now());
             saved = inspectionRepo.save(e);
         } else {
@@ -188,7 +191,9 @@ public class SafetyInspectionService {
         updateItems(saved.getInspectionId(), request.getItems());
         // Technician submit xong → ticket về DRAFT
         ServiceTicket ticket = serviceTicketRepo.findByServiceTicketId(request.getServiceTicketId());
-        if (ticket != null && ticket.getTicketStatus() == TicketStatus.INSPECTION) {
+        if (ticket != null
+                && requestedStatus == InspectionStatus.COMPLETED
+                && ticket.getTicketStatus() == TicketStatus.INSPECTION) {
             ticket.setTicketStatus(TicketStatus.DRAFT);
             ticket.setUpdatedAt(LocalDateTime.now());
             serviceTicketRepo.save(ticket);
@@ -219,15 +224,26 @@ public class SafetyInspectionService {
 
     public SafetyInspectionResponse updateInspectionData(Integer inspectionId, SafetyInspectionRequest request) {
         validateInspectionData(request);
+        InspectionStatus requestedStatus = request.getInspectionStatus() != null
+                ? request.getInspectionStatus()
+                : InspectionStatus.COMPLETED;
         SafetyInspection inspection = inspectionRepo.findById(inspectionId)
                 .orElseThrow(() -> new IllegalArgumentException("Inspection not found: " + inspectionId));
         inspection.setGeneralNotes(request.getGeneralNotes());
         inspection.setTechnicianNotes(request.getTechnicianNotes());
-        inspection.setInspectionStatus(InspectionStatus.COMPLETED);
+        inspection.setInspectionStatus(requestedStatus);
         inspection.setUpdatedAt(LocalDateTime.now());
         SafetyInspection saved = inspectionRepo.save(inspection);
         updateTires(inspectionId, expandTires(request.getTires()));
         updateItems(inspectionId, request.getItems());
+        if (requestedStatus == InspectionStatus.COMPLETED) {
+            ServiceTicket ticket = serviceTicketRepo.findByServiceTicketId(saved.getServiceTicketId());
+            if (ticket != null && ticket.getTicketStatus() == TicketStatus.INSPECTION) {
+                ticket.setTicketStatus(TicketStatus.DRAFT);
+                ticket.setUpdatedAt(LocalDateTime.now());
+                serviceTicketRepo.save(ticket);
+            }
+        }
         return getInspectionByServiceTicket(saved.getServiceTicketId());
     }
     private void updateTires(Integer inspectionId, List<TireDataRequest> requestTires) {
