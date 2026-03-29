@@ -13,10 +13,13 @@ import com.g42.platform.gms.billing.domain.exception.BillingException;
 import com.g42.platform.gms.billing.domain.repository.BillingRepository;
 import com.g42.platform.gms.billing.domain.repository.PaymentTransationRepo;
 import com.g42.platform.gms.common.enums.EstimateEnum;
+import com.g42.platform.gms.estimation.app.service.EstimateService;
 import com.g42.platform.gms.estimation.domain.entity.Estimate;
 import com.g42.platform.gms.estimation.domain.repository.EstimateRepository;
 import com.g42.platform.gms.promotion.domain.entity.Promotion;
 import com.g42.platform.gms.promotion.domain.repository.PromotionRepo;
+import com.g42.platform.gms.service_ticket_management.application.service.ServiceTicketManageService;
+import com.g42.platform.gms.service_ticket_management.application.service.TicketAssignmentService;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
 import com.g42.platform.gms.service_ticket_management.infrastructure.repository.ServiceTicketRepository;
@@ -44,7 +47,14 @@ public class BillingService {
     private PromotionRepo promotionRepo;
     @Autowired
     private PaymentTransationRepo paymentTransationRepo;
-        //todo: get available promotion
+    @Autowired
+    private ServiceTicketManageService serviceTicketManageService;
+    @Autowired
+    private EstimateService estimateService;
+    @Autowired
+    private TicketAssignmentService ticketAssignmentService;
+
+    //todo: get available promotion
     @Transactional
     public ServiceBillDto createNewBilling(ServiceBillDto serviceBillDto) {
         ServiceBill serviceBill = serviceBillDtoMapper.mapToEntity(serviceBillDto);
@@ -108,6 +118,8 @@ public class BillingService {
         serviceTicketJpa.setTicketStatus(TicketStatus.PAID);
         serviceTicketJpa.setDeliveredAt(LocalDateTime.now());
         serviceTicketRepository.save(serviceTicketJpa);
+        //todo: change status of assignment
+        ticketAssignmentService.markAssignmentDone(serviceBill.getServiceTicketId());
         return serviceBillDtoMapper.mapPaymentToDto(paymentTransaction);
     }
 }

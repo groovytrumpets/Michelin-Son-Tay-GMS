@@ -37,5 +37,12 @@ public class TaxRuleRepositoryImpl implements TaxRuleRepository {
                 .map(taxJpaMapper::toDomain)
                 .toList();
     }
+
+    @Override
+    public TaxRule save(TaxRule taxRule) {
+        TaxRuleJpa taxRuleJpa = taxJpaMapper.toJpa(taxRule);
+        taxRepositoryJpa.save(taxRuleJpa);
+        return taxJpaMapper.toDomain(taxRuleJpa);
+    }
 }
 

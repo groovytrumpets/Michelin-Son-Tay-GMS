@@ -14,6 +14,7 @@ public final class FileUploadConstants {
     
     // File size limits
     public static final long MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+    public static final long MAX_VIDEO_SIZE_BYTES = 100 * 1024 * 1024; // 5MB
     public static final int MAX_IMAGE_SIZE_MB = 5;
     
     // Allowed image types

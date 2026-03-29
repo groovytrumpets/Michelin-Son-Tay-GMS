@@ -12,4 +12,6 @@ public interface ServiceRepository {
     Service findServiceDetailById(Long serviceId);
 
     Long[] getCatalogIdByServiceId(Long[] serviceId);
+
+    Service save(Service service);
 }

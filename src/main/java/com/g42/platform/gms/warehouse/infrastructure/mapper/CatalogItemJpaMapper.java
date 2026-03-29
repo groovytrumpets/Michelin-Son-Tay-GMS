@@ -7,4 +7,5 @@ import org.mapstruct.Mapper;
 @Mapper(componentModel = "spring")
 public interface CatalogItemJpaMapper {
     CatalogItem toDomain(CatalogItemJpa catalogItemJpa );
+    CatalogItemJpa toJpa(CatalogItem catalogItem);
 }

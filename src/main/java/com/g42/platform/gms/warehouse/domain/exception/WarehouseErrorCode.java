@@ -1,11 +1,12 @@
 package com.g42.platform.gms.warehouse.domain.exception;
 
 public enum WarehouseErrorCode {
-    INVALID_ENUM_APPLY_TO,
-    INVALID_ENUM_TYPE,
-    INVALID_ENUM_TARGET_TYPE,
-    INVALID_CONTACT_INFO,
-    INVALID_PHONE,
-    INVALID_DOB,
-    INVALID_CUSTOMER_PROFILE,
+    INVALID_BRAND,
+    INVALID_PRODUCT_LINE,
+    SERVICE_NOT_FOUND,
+    DUPLICATE_SKU,
+    WRONG_ENUM,
+    INVALID_CATEGORY,
+    PARENT_REQUIRE,
+    WRONG_CODE
 }

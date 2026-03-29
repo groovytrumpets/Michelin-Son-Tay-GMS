@@ -149,14 +149,16 @@ public class ServiceTicketAdvisorService {
 
     /**
      * Advisor thay đổi advisor phụ trách ticket.
-     * Chỉ được phép thay đổi khi advisor hiện tại đang ở trạng thái ACTIVE.
+     * Chỉ được phép thay đổi khi advisor hiện tại đang ở trạng thái PENDING.
      */
     @Transactional
     public ServiceTicketDetailResponse changeAdvisor(String ticketCode, Integer newAdvisorId, String note) {
         log.info("Advisor changing advisor to {} for ticket: {}", newAdvisorId, ticketCode);
 
+
         ServiceTicket ticket = findTicket(ticketCode);
-        ticketAssignmentService.changeAdvisorByAdvisor(ticket.getServiceTicketId(), newAdvisorId, note);
+        ticketAssignmentService.changeAdvisor(ticket.getServiceTicketId(), newAdvisorId, note);
+
 
         log.info("Advisor changed successfully for ticket: {}", ticketCode);
         return manageService.getServiceTicketDetail(ticketCode);
