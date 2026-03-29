@@ -4,6 +4,7 @@ import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedRespond;
 import com.g42.platform.gms.booking_management.domain.enums.BookingEnum;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
+import com.g42.platform.gms.warehouse.api.dto.CatalogDetailDto;
 import com.g42.platform.gms.warehouse.api.dto.CatalogItemDto;
 import com.g42.platform.gms.warehouse.api.dto.CatalogSummaryDto;
 import com.g42.platform.gms.warehouse.api.dto.SpecificationDto;
@@ -48,8 +49,8 @@ public class WarehouseSearchController {
         return ResponseEntity.ok(ApiResponses.success(apiResponse));
     }
     @GetMapping("/catalog-items/detail/{catalogItemId}")
-    public ResponseEntity<ApiResponse<CatalogItemDto>> getCatalogDetailById(@PathVariable Integer catalogItemId) {
-        CatalogItem catalogItem = catalogItemService.getCatalogDetailById(catalogItemId);
-        return ResponseEntity.ok(ApiResponses.success(catalogDtoMapper.toDto(catalogItem)));
+    public ResponseEntity<ApiResponse<CatalogDetailDto>> getCatalogDetailById(@PathVariable Integer catalogItemId) {
+        CatalogDetailDto catalogItem = catalogItemService.getCatalogDetailById(catalogItemId);
+        return ResponseEntity.ok(ApiResponses.success(catalogItem));
     }
 }

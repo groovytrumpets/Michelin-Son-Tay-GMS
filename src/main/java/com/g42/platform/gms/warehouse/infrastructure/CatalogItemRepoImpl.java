@@ -1,6 +1,7 @@
 package com.g42.platform.gms.warehouse.infrastructure;
 
 import com.g42.platform.gms.marketing.service_catalog.infrastructure.repository.ServiceJpaRepository;
+import com.g42.platform.gms.warehouse.api.dto.SpecificationRespondDto;
 import com.g42.platform.gms.warehouse.domain.entity.*;
 import com.g42.platform.gms.warehouse.domain.repository.CatalogItemRepo;
 import com.g42.platform.gms.warehouse.infrastructure.entity.*;
@@ -10,6 +11,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Repository
 public class CatalogItemRepoImpl implements CatalogItemRepo {
@@ -166,5 +169,20 @@ public class CatalogItemRepoImpl implements CatalogItemRepo {
             return null;
         }
         return itemCategoryJpa.getItemCategoryId();
+    }
+
+    @Override
+    public Map<Integer, String> getAllBrandByIds(Set<Integer> brandIds) {
+        return brandJpaRepo.getBrandMapByIds(brandIds);
+    }
+
+    @Override
+    public Map<Integer, String> findAllLinesByIds(Set<Integer> lineIds) {
+        return productLineJpaRepo.findAllLinesByIds(lineIds);
+    }
+
+    @Override
+    public List<SpecificationRespondDto> getAllSpecsByItemId(Integer catalogItemId) {
+        return specificationJpaRepo.findSpecsByItemId(catalogItemId);
     }
 }

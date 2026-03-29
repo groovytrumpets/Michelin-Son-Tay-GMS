@@ -172,8 +172,18 @@ public class CatalogItemService {
         return catalogItemRepo.findCategoryCode(categoryCode);
     }
 
-    public CatalogItem getCatalogDetailById(Integer catalogItemId) {
-        return catalogItemRepo.getCatalogItemById(catalogItemId);
+    public CatalogDetailDto getCatalogDetailById(Integer catalogItemId) {
+        CatalogItem catalogItem = catalogItemRepo.getCatalogItemById(catalogItemId);
+        CatalogDetailDto catalogDetailDto = catalogDtoMapper.toDetailDto(catalogItem);
+        catalogDetailDto.setSpecifications(catalogItemRepo.getAllSpecsByItemId(catalogItemId));
+        if (catalogItem.getBrandId() != 0) {
+            System.out.println(catalogItem.getBrandId()+" DEBUG");
+        catalogDetailDto.setBrandId(catalogItemRepo.getBrandById(catalogItem.getBrandId()).getBrandName());
+        }
+        if (catalogItem.getProductLineId() != 0) {
+        catalogDetailDto.setProductLine(catalogItemRepo.getProductLineById(catalogItem.getProductLineId()).getLineName());
+        }
+        return catalogDetailDto;
     }
 
     public SpecAttributeDto getSpecsAttributeById(Integer attributeId) {

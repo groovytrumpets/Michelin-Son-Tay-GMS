@@ -1,10 +1,13 @@
 package com.g42.platform.gms.warehouse.domain.repository;
 
+import com.g42.platform.gms.warehouse.api.dto.SpecificationRespondDto;
 import com.g42.platform.gms.warehouse.domain.entity.*;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Repository
 public interface CatalogItemRepo {
@@ -49,4 +52,10 @@ public interface CatalogItemRepo {
     CatalogItem getCatalogItemById(Integer itemId);
 
     Integer findCategoryCode(String categoryCode);
+
+    Map<Integer, String> getAllBrandByIds(Set<Integer> brandIds);
+
+    Map<Integer, String> findAllLinesByIds(Set<Integer> lineIds);
+
+    List<SpecificationRespondDto> getAllSpecsByItemId(Integer catalogItemId);
 }
