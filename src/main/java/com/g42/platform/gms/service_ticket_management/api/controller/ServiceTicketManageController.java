@@ -78,4 +78,10 @@ public class ServiceTicketManageController {
                                                                              @RequestParam Integer serviceTicketId2){
         return ResponseEntity.ok(ApiResponses.success(serviceTicketManageService.setswapQueueByServiceTicketIds(serviceTicketId1, serviceTicketId2)));
     }
+    @PutMapping("/{serviceTicketId}/{status}")
+    public ResponseEntity<ApiResponse<ServiceTicketListResponse>> updateEstimateApprove(@PathVariable Integer serviceTicketId, @PathVariable TicketStatus status){
+        return ResponseEntity.ok(
+                ApiResponses.success(serviceTicketManageService.updateServiceTicketStatus(serviceTicketId,status))
+        );
+    }
 }
