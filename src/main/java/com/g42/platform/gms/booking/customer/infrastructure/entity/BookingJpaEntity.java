@@ -22,7 +22,7 @@ public class BookingJpaEntity {
     @Column(name = "booking_code", length = 20, unique = true)
     private String bookingCode;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne 
     @JoinColumn(name = "customer_id", nullable = true)
     private CustomerProfile customer;
 
