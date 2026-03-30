@@ -15,7 +15,7 @@ public interface BookingMapper {
 
     @Mappings({
             @Mapping(target = "customerId", source = "customer.customerId"),
-            @Mapping(target = "serviceIds", expression = "java(mapServiceIds(jpa.getServices()))")
+            @Mapping(target = "catalogItemIds", expression = "java(mapCatalogItemIds(jpa.getServices()))")
     })
     Booking toDomain(BookingJpaEntity jpa);
 
@@ -27,19 +27,19 @@ public interface BookingMapper {
     BookingJpaEntity toJpa(Booking domain);
 
     // Helper method for MapStruct
-    default List<Integer> mapServiceIds(List<CatalogItemJpaEntity> services) {
+    default List<Integer> mapCatalogItemIds(List<CatalogItemJpaEntity> services) {
         if (services == null) {
             return null;
         }
         
-        List<Integer> serviceIds = new ArrayList<>();
+        List<Integer> catalogItemIds = new ArrayList<>();
         for (CatalogItemJpaEntity service : services) {
             Integer itemId = service.getItemId();
             if (itemId != null) {
-                serviceIds.add(itemId);
+                catalogItemIds.add(itemId);
             }
         }
         
-        return serviceIds;
+        return catalogItemIds;
     }
 }

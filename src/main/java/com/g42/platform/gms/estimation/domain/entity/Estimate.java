@@ -11,7 +11,9 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
 
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 
 @Getter
 @Setter
@@ -20,11 +22,20 @@ import java.time.Instant;
 public class Estimate {
 
     private Integer id;
-    private ServiceTicketJpa serviceTicket;
+    private Integer serviceTicketId;
     private EstimateTypeEnum estimateType;
     private EstimateEnum status;
     private Instant createdAt;
     private Instant approvedAt;
     private Integer version;
     private Integer revisedFromId;
+    private BigDecimal totalPrice;
+    private List<EstimateItem> items;
+
+//    public BigDecimal getTotalPrices() {
+//        if (items == null || items.isEmpty()) return BigDecimal.ZERO;
+//        return items.stream()
+//                .map(EstimateItem::getSubTotal)
+//                .reduce(BigDecimal.ZERO, BigDecimal::add);
+//    }
 }

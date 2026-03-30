@@ -32,7 +32,7 @@ public class EstimateItemJpa {
     @Column(name = "item_id")
     private Integer itemId;
 
-    @NotNull
+
     @Column(name = "quantity", nullable = false)
     private Integer quantity;
 
@@ -49,6 +49,23 @@ public class EstimateItemJpa {
 
     @Column(name = "warehouse_id")
     private Integer warehouseId;
+    @NotNull
+    @Column(name = "work_category_idwork_category", nullable = false)
+    private Integer workCategoryId;
+    @NotNull
+
+    @Column(name = "total_price", precision = 12, scale = 2)
+    private BigDecimal totalPrice;
+    @ColumnDefault("0")
+    @Column(name = "is_checked")
+    private Boolean isChecked;
+    @ColumnDefault("0")
+    @Column(name = "is_removed")
+    private Boolean isRemoved;
+    @Column(name = "tax_amount", precision = 12, scale = 2)
+    private BigDecimal taxAmount;
+    @Column(name = "applied_tax_rate", precision = 5, scale = 2)
+    private BigDecimal appliedTaxRate;
 
 
 }

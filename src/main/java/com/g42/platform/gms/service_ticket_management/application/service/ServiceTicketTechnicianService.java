@@ -11,14 +11,16 @@ import com.g42.platform.gms.service_ticket_management.api.dto.technician.Technic
 import com.g42.platform.gms.service_ticket_management.api.dto.technician.TechnicianTicketListResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.technician.UpdateTechnicianNotesRequest;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
+import com.g42.platform.gms.service_ticket_management.domain.entity.OdometerReading;
+import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicket;
+import com.g42.platform.gms.service_ticket_management.domain.entity.VehicleConditionPhoto;
+import com.g42.platform.gms.service_ticket_management.domain.entity.SafetyInspection;
+import com.g42.platform.gms.service_ticket_management.domain.enums.InspectionStatus;
+import com.g42.platform.gms.service_ticket_management.domain.repository.SafetyInspectionRepo;
+import com.g42.platform.gms.service_ticket_management.domain.repository.ServiceTicketRepo;
+import com.g42.platform.gms.service_ticket_management.domain.repository.VehicleConditionPhotoRepo;
+import com.g42.platform.gms.service_ticket_management.domain.repository.OdometerReadingRepo;
 import com.g42.platform.gms.service_ticket_management.domain.exception.CheckInException;
-import com.g42.platform.gms.service_ticket_management.infrastructure.entity.OdometerHistoryJpa;
-import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
-import com.g42.platform.gms.service_ticket_management.infrastructure.entity.VehicleConditionPhotoJpa;
-import com.g42.platform.gms.service_ticket_management.infrastructure.repository.OdometerHistoryRepository;
-import com.g42.platform.gms.service_ticket_management.infrastructure.repository.ServiceTicketRepository;
-import com.g42.platform.gms.service_ticket_management.infrastructure.repository.VehicleConditionPhotoRepository;
-import com.g42.platform.gms.service_ticket_management.infrastructure.specification.ServiceTicketSpecification;
 import com.g42.platform.gms.service_ticket_management.api.mapper.ServiceTicketListMapper;
 import com.g42.platform.gms.service_ticket_management.api.mapper.ServiceTicketDetailMapper;
 import com.g42.platform.gms.vehicle.entity.Vehicle;
@@ -29,12 +31,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -47,63 +47,57 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class ServiceTicketTechnicianService {
     
-    private final ServiceTicketRepository serviceTicketRepository;
+    private final ServiceTicketRepo serviceTicketRepo;
     private final CustomerProfileRepository customerRepository;
     private final VehicleRepository vehicleRepository;
     private final BookingRepository bookingRepository;
+    private final TicketAssignmentService ticketAssignmentService;
     private final CatalogItemRepository catalogRepository;
-    private final OdometerHistoryRepository odometerRepository;
-    private final VehicleConditionPhotoRepository photoRepository;
+    private final OdometerReadingRepo odometerRepo;
+    private final VehicleConditionPhotoRepo photoRepo;
     private final StaffProfileRepo staffRepository;
+    private final SafetyInspectionRepo safetyInspectionRepo;
     private final ServiceTicketListMapper listMapper;
     private final ServiceTicketDetailMapper detailMapper;
     
     /**
-     * Get paginated list of service tickets for technician.
+     * Get paginated list of service tickets assigned to a specific technician.
      * 
-     * @param page Page number (0-indexed)
-     * @param size Page size
-     * @param date Filter by received date
-     * @param status Filter by ticket status
-     * @param search Search by ticket code, customer name, phone, or license plate
+     * @param staffId  ID của kỹ thuật viên (lấy từ JWT)
+     * @param page     Page number (0-indexed)
+     * @param size     Page size
+     * @param date     Filter by received date
+     * @param status   Filter by ticket status
+     * @param search   Search by ticket code, customer name, phone, or license plate
      * @return Page of TechnicianTicketListResponse
      */
     @Transactional(readOnly = true)
     public Page<TechnicianTicketListResponse> getTechnicianTicketList(
+            Integer staffId,
             int page, 
             int size, 
             LocalDate date, 
             TicketStatus status, 
             String search) {
         
-        log.info("Getting technician ticket list: page={}, size={}, date={}, status={}, search={}", 
-            page, size, date, status, search);
+        log.info("Getting technician ticket list: staffId={}, page={}, size={}, date={}, status={}, search={}", 
+            staffId, page, size, date, status, search);
         
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "receivedAt"));
         
-        Specification<ServiceTicketJpa> specification = Specification.anyOf();
-        specification = specification.and(ServiceTicketSpecification.filter(date, status));
-        
-        if (search != null && !search.isBlank()) {
-            specification = specification.and(ServiceTicketSpecification.search(search));
-        }
-        
-        Page<ServiceTicketJpa> ticketPage = serviceTicketRepository.findAll(specification, pageable);
+        Page<ServiceTicket> ticketPage = serviceTicketRepo.findByAssignedStaff(staffId, status, date, search, pageable);
         return ticketPage.map(this::mapToListResponse);
     }
-    
-    /**
-     * Map ServiceTicketJpa to TechnicianTicketListResponse using MapStruct.
-     */
-    private TechnicianTicketListResponse mapToListResponse(ServiceTicketJpa ticket) {
+
+    private TechnicianTicketListResponse mapToListResponse(ServiceTicket ticket) {
         CustomerProfile customer = customerRepository.findById(ticket.getCustomerId()).orElse(null);
         Vehicle vehicle = vehicleRepository.findById(ticket.getVehicleId()).orElse(null);
-        
+
         Booking booking = null;
         if (ticket.getBookingId() != null) {
             booking = bookingRepository.findById(ticket.getBookingId()).orElse(null);
         }
-        
+
         return listMapper.toTechnicianListResponse(ticket, customer, vehicle, booking);
     }
     
@@ -116,13 +110,12 @@ public class ServiceTicketTechnicianService {
     @Transactional(readOnly = true)
     public TechnicianTicketDetailResponse getTechnicianTicketDetail(String ticketCode) {
         log.info("Getting technician ticket detail: {}", ticketCode);
-        
-        ServiceTicketJpa ticket = serviceTicketRepository.findByTicketCode(ticketCode)
+
+        ServiceTicket ticket = serviceTicketRepo.findByTicketCode(ticketCode)
             .orElseThrow(() -> new CheckInException("Không tìm thấy service ticket: " + ticketCode));
-        
+
         TechnicianTicketDetailResponse response = new TechnicianTicketDetailResponse();
-        
-        // Basic ticket info
+
         response.setServiceTicketId(ticket.getServiceTicketId());
         response.setTicketCode(ticket.getTicketCode());
         response.setTicketStatus(ticket.getTicketStatus());
@@ -152,26 +145,24 @@ public class ServiceTicketTechnicianService {
                 response.setServiceCategory(booking.getServiceCategory());
                 
                 // Services
-                if (booking.getServiceIds() != null) {
+                if (booking.getCatalogItemIds() != null) {
                     List<com.g42.platform.gms.booking.customer.infrastructure.entity.CatalogItemJpaEntity> catalogItems = 
-                        catalogRepository.findAllById(booking.getServiceIds());
+                        catalogRepository.findAllById(booking.getCatalogItemIds());
                     response.setServices(detailMapper.toTechnicianServiceInfoList(catalogItems));
                 }
             }
         }
         
         // Odometer
-        Optional<OdometerHistoryJpa> latestOdometer = odometerRepository.findLatestByVehicleId(ticket.getVehicleId());
+        Optional<OdometerReading> latestOdometer = odometerRepo.findLatestByVehicleId(ticket.getVehicleId());
         if (latestOdometer.isPresent()) {
             response.setOdometerReading(latestOdometer.get().getReading());
         }
         
         // Photos
-        List<VehicleConditionPhotoJpa> photos = photoRepository.findAll().stream()
-            .filter(photo -> photo.getServiceTicketId().equals(ticket.getServiceTicketId()))
-            .toList();
+        List<VehicleConditionPhoto> photos = photoRepo.findByServiceTicketId(ticket.getServiceTicketId());
         response.setPhotos(detailMapper.toTechnicianPhotoInfoList(photos));
-        
+
         // Staff info
         if (ticket.getCreatedBy() != null) {
             response.setCreatedBy(ticket.getCreatedBy());
@@ -180,38 +171,98 @@ public class ServiceTicketTechnicianService {
                 response.setCreatedByName(staff.get().getFullName());
             }
         }
-        
+
         log.info("Technician ticket detail retrieved: {}", ticketCode);
         return response;
     }
-    
-    /**
-     * Update technician notes.
-     * Chỉ cho phép update khi ticket chưa COMPLETED hoặc CANCELLED.
-     * 
-     * @param ticketCode Ticket code
-     * @param request Update request
-     * @return Updated TechnicianTicketDetailResponse
-     */
+
     @Transactional
     public TechnicianTicketDetailResponse updateTechnicianNotes(String ticketCode, UpdateTechnicianNotesRequest request) {
         log.info("Updating technician notes for ticket: {}", ticketCode);
-        
-        ServiceTicketJpa ticket = serviceTicketRepository.findByTicketCode(ticketCode)
+
+        ServiceTicket ticket = serviceTicketRepo.findByTicketCode(ticketCode)
             .orElseThrow(() -> new CheckInException("Không tìm thấy service ticket: " + ticketCode));
-        
-        if (ticket.getTicketStatus() == TicketStatus.COMPLETED) {
+
+        if (ticket.getTicketStatus() == TicketStatus.COMPLETED
+                || ticket.getTicketStatus() == TicketStatus.PAID) {
             throw new CheckInException("Không thể chỉnh sửa service ticket đã hoàn thành");
         }
-        
+
         if (ticket.getTicketStatus() == TicketStatus.CANCELLED) {
             throw new CheckInException("Không thể chỉnh sửa service ticket đã hủy");
         }
-        
+
         ticket.setTechnicianNotes(request.getTechnicianNotes());
-        serviceTicketRepository.save(ticket);
-        
+        serviceTicketRepo.save(ticket);
+
         log.info("Technician notes updated successfully: {}", ticketCode);
         return getTechnicianTicketDetail(ticketCode);
     }
+
+    /**
+     * Technician bắt đầu nhận xe — DRAFT → INSPECTION (dù có hay không có kiểm tra an toàn).
+     * - safetyInspectionEnabled = true: technician cần điền form kiểm tra an toàn
+     * - safetyInspectionEnabled = false (skip): technician nhận xe, làm dịch vụ lẻ, không cần điền form
+     * Cả 2 trường hợp đều vào INSPECTION vì đây là bước technician đang làm việc với xe.
+     */
+    @Transactional
+    public TechnicianTicketDetailResponse startInspection(String ticketCode, Integer staffId) {
+        log.info("Technician starting work on ticket: {}", ticketCode);
+
+        ServiceTicket ticket = serviceTicketRepo.findByTicketCode(ticketCode)
+            .orElseThrow(() -> new CheckInException("Không tìm thấy service ticket: " + ticketCode));
+
+        if (ticket.getTicketStatus() != TicketStatus.DRAFT) {
+            throw new CheckInException("Chỉ có thể bắt đầu khi phiếu đang ở trạng thái DRAFT");
+        }
+
+        SafetyInspection inspection = safetyInspectionRepo.findByServiceTicketId(ticket.getServiceTicketId())
+                .orElseThrow(() -> new CheckInException("Phiếu này chưa có thông tin kiểm tra an toàn"));
+
+        if (inspection.getInspectionStatus() == InspectionStatus.COMPLETED) {
+            throw new CheckInException("Phiếu này đã hoàn thành kiểm tra an toàn, không thể bắt đầu lại");
+        }
+
+        // Luôn chuyển sang INSPECTION khi technician bắt đầu nhận xe
+        // dù skip hay không skip safety inspection
+        ticket.setTicketStatus(TicketStatus.INSPECTION);
+        ticket.setUpdatedAt(java.time.LocalDateTime.now());
+        serviceTicketRepo.save(ticket);
+
+        if (inspection.getInspectionStatus() == InspectionStatus.SKIPPED) {
+            log.info("Ticket {} → INSPECTION (safety skipped, technician doing other services) by staffId {}", ticketCode, staffId);
+        } else {
+            log.info("Ticket {} → INSPECTION (safety pending) by technician {}", ticketCode, staffId);
+        }
+
+        // Activate assignment
+        ticketAssignmentService.startWork(ticket.getServiceTicketId(), staffId);
+
+        return getTechnicianTicketDetail(ticketCode);
+    }
+
+    /**
+     * Technician báo xong sửa xe — IN_PROGRESS → COMPLETED.
+     * Chỉ là signal "xe xong", lễ tân sẽ xác nhận thanh toán sau.
+     */
+    @Transactional
+    public TechnicianTicketDetailResponse finishWork(String ticketCode) {
+        log.info("Technician finishing work on ticket: {}", ticketCode);
+
+        ServiceTicket ticket = serviceTicketRepo.findByTicketCode(ticketCode)
+            .orElseThrow(() -> new CheckInException("Không tìm thấy service ticket: " + ticketCode));
+
+        if (ticket.getTicketStatus() != TicketStatus.IN_PROGRESS) {
+            throw new CheckInException("Chỉ có thể báo hoàn thành khi phiếu đang ở trạng thái IN_PROGRESS");
+        }
+
+        ticket.setTicketStatus(TicketStatus.COMPLETED);
+        ticket.setCompletedAt(java.time.LocalDateTime.now());
+        ticket.setUpdatedAt(java.time.LocalDateTime.now());
+        serviceTicketRepo.save(ticket);
+
+        log.info("Ticket {} marked as COMPLETED by technician", ticketCode);
+        return getTechnicianTicketDetail(ticketCode);
+    }
+
 }

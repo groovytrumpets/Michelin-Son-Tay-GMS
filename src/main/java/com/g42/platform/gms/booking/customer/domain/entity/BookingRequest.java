@@ -28,7 +28,7 @@ public class BookingRequest {
     private LocalDateTime createdAt;
     private LocalDateTime expiresAt;
     private String clientIp;
-    private List<Integer> serviceIds = new ArrayList<>();
+    private List<Integer> catalogItemIds = new ArrayList<>();
     
     public void initializeDefaults() {
         if (createdAt == null) {

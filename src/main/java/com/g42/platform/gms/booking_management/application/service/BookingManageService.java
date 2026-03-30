@@ -4,6 +4,7 @@ package com.g42.platform.gms.booking_management.application.service;
 
 import com.g42.platform.gms.booking.customer.api.dto.BookingResponse;
 import com.g42.platform.gms.booking.customer.domain.enums.BookingRequestStatus;
+import com.g42.platform.gms.booking.customer.domain.exception.BookingException;
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedDetailResponse;
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedRespond;
 import com.g42.platform.gms.booking_management.api.dto.requesting.*;
@@ -20,6 +21,7 @@ import com.g42.platform.gms.booking_management.domain.repository.BookingManageRe
 import com.g42.platform.gms.booking_management.infrastructure.entity.BookingJpa;
 import com.g42.platform.gms.booking_management.infrastructure.mapper.TimeSlotMMapper;
 import com.g42.platform.gms.marketing.service_catalog.domain.exception.ServiceException;
+import com.g42.platform.gms.notification.infrastructure.ZaloNotificationSender;
 import lombok.AllArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
@@ -27,7 +29,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 @AllArgsConstructor
@@ -89,6 +93,9 @@ public class BookingManageService {
         //todo: update booking request status
         boolean confirmed = request.confirm();
         bookingRepository.setConfirmStatus(request);
+        //todo: Zalo notify
+        ZaloNotificationSender zaloNotificationSender = new ZaloNotificationSender();
+        zaloNotificationSender.sendBookingConfirm(request.getPhone(),request.getFullName(),request.getServices().stream().map(CatalogItem::getItemName).toList(),request.getRequestCode(),request.getLocalDateTime(),"Michelin Sơn Tây");
 return confirmed;
     }
     private final TimeSlotMMapper  timeSlotMMapper;
@@ -127,7 +134,7 @@ return confirmed;
         bookingRepository.setRequestBooking(request);
         return new ActionBookingRespond("SUCCESS","SUCCESS");
     }
-
+    @Transactional
     public Boolean updateBookingRequest(String requestId, BookingRequestUpdateReq actionBookingRequest) {
         BookingRequest request = bookingRepository.getBookingRequestById(requestId);
         if (request==null){
@@ -148,5 +155,64 @@ return confirmed;
 
         bookingRepository.setRequestBooking(request);
         return true;
+    }
+
+    public Boolean reorderQueue(ReorderQueueRequest request) {
+        return bookingRepository.reorderQueue(request);
+    }
+
+    public List<BookedRespond> getBookingBySlot(LocalDate date, LocalTime slot) {
+        List<Booking> bookings = bookingRepository.getBookingBySlot(date,slot);
+        return bookings.stream().map(bookingManageDtoMapper::toBookedRespond).toList();
+    }
+    @Transactional
+    public List<BookedRespond> setQueue(Integer bookingId, Integer queueNumber) {
+        Booking booking = bookingRepository.getBookedById(bookingId);
+        booking.setQueueOrder(queueNumber);
+        Booking savedBook = bookingRepository.save(booking);
+        if (savedBook.getQueueOrder()==null){
+            throw new BookingStaffException("Booking not found",BookingStaffErrorCode.BOOKING_CANT_EDIT);
+        }
+        return getBookingBySlot(booking.getScheduledDate(), booking.getScheduledTime());
+    }
+    @Transactional
+    public List<BookedRespond> setQueueAutoBySlotDate(LocalDate date, LocalTime slot) {
+        List<Booking> bookings = new ArrayList<>(bookingRepository.getBookingBySlot(date, slot));
+        bookings.sort(
+                Comparator.comparing(
+                        Booking::getEstimateTime,
+                        Comparator.nullsLast(Integer::compareTo)
+                )
+        );
+        int queue = 1;
+        for (Booking booking : bookings) {
+            booking.setQueueOrder(queue++);
+        }
+        return bookings.stream().map(bookingManageDtoMapper::toBookedRespond).toList();
+    }
+    @Transactional
+    public List<BookedRespond> setswapQueueByBookingIds(Integer bookingId1, Integer bookingId2) {
+        Booking booking1 = bookingRepository.getBookedById(bookingId1);
+        Booking booking2 = bookingRepository.getBookedById(bookingId2);
+        compare2BookingsSlot(booking1,booking2);
+        Integer swap = booking1.getQueueOrder();
+        booking1.setQueueOrder(booking2.getQueueOrder());
+        booking2.setQueueOrder(swap);
+        bookingRepository.save(booking1);
+        bookingRepository.save(booking2);
+        return getBookingBySlot(booking1.getScheduledDate(), booking1.getScheduledTime());
+    }
+
+    private void compare2BookingsSlot(Booking booking1, Booking booking2) {
+        //todo:check booking swapAble
+        if (!booking1.getScheduledDate().equals(booking2.getScheduledDate())) {
+        throw new BookingStaffException("Swap Booking not match Date",BookingStaffErrorCode.BOOKING_SWAP_ERROR);
+        }
+        if (!booking1.getScheduledTime().equals(booking2.getScheduledTime())) {
+            throw new BookingStaffException("Swap Booking not match Time",BookingStaffErrorCode.BOOKING_SWAP_ERROR);
+        }
+        if (booking1.getQueueOrder()==null || booking2.getQueueOrder()==null){
+            throw new BookingStaffException("Swap Booking queue NULL",BookingStaffErrorCode.BOOKING_SWAP_NULL);
+        }
     }
 }

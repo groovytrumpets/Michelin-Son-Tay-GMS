@@ -28,8 +28,13 @@ public class ServiceTicket {
     private Boolean isDeleted;
     private String checkInNotes;
     private Boolean immutable;
+    private Boolean safetyInspectionEnabled;
+    private Boolean isPrinted;
+    private LocalDateTime printedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private LocalDateTime completedAt;
+    private Integer queueNumber;
     
     // List of photo IDs (not full objects - MapStruct will handle conversion)
     private List<Integer> photoIds = new ArrayList<>();

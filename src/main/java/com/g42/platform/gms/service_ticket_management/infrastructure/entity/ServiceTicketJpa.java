@@ -58,23 +58,39 @@ public class ServiceTicketJpa {
     @Column(name = "delivered_at")
     private LocalDateTime deliveredAt;
     
+    @Column(name = "completed_at")
+    private LocalDateTime completedAt;
+    
     @Column(name = "is_deleted")
     private Boolean isDeleted = false;
     
     @Column(name = "check_in_notes", columnDefinition = "TEXT")
     private String checkInNotes;
-    
+
+    @Column(name = "safety_inspection_enabled")
+    private Boolean safetyInspectionEnabled = false;
+
+    @Column(name = "is_printed")
+    private Boolean isPrinted = false;
+
+    @Column(name = "printed_at")
+    private LocalDateTime printedAt;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
     
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
     
-    // Note: assigned_to, started_at, completed_at will be added in Phase 2 (Technician Assignment)
-    
+    // Relationships
     @OneToMany(mappedBy = "serviceTicketId", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<VehicleConditionPhotoJpa> conditionPhotos = new ArrayList<>();
     
+    @OneToMany(mappedBy = "serviceTicketId", fetch = FetchType.LAZY)
+    private List<ServiceTicketAssignmentJpa> assignments = new ArrayList<>();
+    @Column(name = "queue_number")
+    private Integer queueNumber;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();

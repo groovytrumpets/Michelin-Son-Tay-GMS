@@ -30,15 +30,15 @@ public abstract class BookingRequestDtoMapper {
     
     @AfterMapping
     protected void populateServices(@MappingTarget BookingRequestResponse response, BookingRequest domain) {
-        List<Integer> serviceIds = domain.getServiceIds();
+        List<Integer> catalogItemIds = domain.getCatalogItemIds();
         
-        if (serviceIds == null || serviceIds.isEmpty()) {
+        if (catalogItemIds == null || catalogItemIds.isEmpty()) {
             response.setServices(new ArrayList<>());
             response.setTotalEstimatedTime(0);
             return;
         }
         
-        List<CatalogItemJpaEntity> items = catalogItemRepository.findAllById(serviceIds);
+        List<CatalogItemJpaEntity> items = catalogItemRepository.findAllById(catalogItemIds);
         
         List<ServiceItemDto> serviceDtos = new ArrayList<>();
         int totalTime = 0;
@@ -61,7 +61,6 @@ public abstract class BookingRequestDtoMapper {
         dto.setItemId(item.getItemId());
         dto.setItemName(item.getItemName());
         dto.setItemType(item.getItemType());
-        dto.setEstimatedPrice(item.getEstimatedPrice());
         
         if (item.getServiceService() != null) {
             dto.setEstimateTime(item.getServiceService().getEstimateTime());

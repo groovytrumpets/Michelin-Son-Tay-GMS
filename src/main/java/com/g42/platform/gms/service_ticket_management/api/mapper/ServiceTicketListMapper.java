@@ -4,20 +4,14 @@ import com.g42.platform.gms.auth.entity.CustomerProfile;
 import com.g42.platform.gms.booking.customer.domain.entity.Booking;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceTicketListResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.technician.TechnicianTicketListResponse;
-import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
+import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicket;
 import com.g42.platform.gms.vehicle.entity.Vehicle;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
-/**
- * Mapper cho Service Ticket List Response (shared cho cả Manage và Technician view).
- */
 @Mapper(componentModel = "spring")
 public interface ServiceTicketListMapper {
-    
-    /**
-     * Map to ServiceTicketListResponse (Receptionist view).
-     */
+
     @Mapping(target = "serviceTicketId", source = "ticket.serviceTicketId")
     @Mapping(target = "ticketCode", source = "ticket.ticketCode")
     @Mapping(target = "ticketStatus", source = "ticket.ticketStatus")
@@ -37,14 +31,11 @@ public interface ServiceTicketListMapper {
     @Mapping(target = "scheduledTime", source = "booking.scheduledTime")
     @Mapping(target = "serviceCategory", source = "booking.serviceCategory")
     @Mapping(target = "isGuest", source = "booking.isGuest")
-    ServiceTicketListResponse toManageListResponse(ServiceTicketJpa ticket,
+    ServiceTicketListResponse toManageListResponse(ServiceTicket ticket,
                                                     CustomerProfile customer,
                                                     Vehicle vehicle,
                                                     Booking booking);
-    
-    /**
-     * Map to TechnicianTicketListResponse (Technician view).
-     */
+
     @Mapping(target = "serviceTicketId", source = "ticket.serviceTicketId")
     @Mapping(target = "ticketCode", source = "ticket.ticketCode")
     @Mapping(target = "ticketStatus", source = "ticket.ticketStatus")
@@ -63,7 +54,7 @@ public interface ServiceTicketListMapper {
     @Mapping(target = "bookingCode", source = "booking.bookingCode")
     @Mapping(target = "scheduledDate", source = "booking.scheduledDate")
     @Mapping(target = "scheduledTime", source = "booking.scheduledTime")
-    TechnicianTicketListResponse toTechnicianListResponse(ServiceTicketJpa ticket,
+    TechnicianTicketListResponse toTechnicianListResponse(ServiceTicket ticket,
                                                            CustomerProfile customer,
                                                            Vehicle vehicle,
                                                            Booking booking);

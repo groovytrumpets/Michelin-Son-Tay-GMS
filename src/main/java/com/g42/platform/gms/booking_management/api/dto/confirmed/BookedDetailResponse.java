@@ -22,10 +22,11 @@ public class BookedDetailResponse {
     private CustomerDto customer;
     private LocalDate scheduledDate;
     private LocalTime scheduledTime;
-    private String serviceCategory;
+    private Integer queueOrder;
     private BookingEnum status;
     private String description;
     private Boolean isGuest;
     private LocalDateTime createdAt;
+    private Integer estimateTime;
     private List<CatalogItemRes> items;
 }

@@ -16,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 
 @RestController
@@ -76,6 +77,31 @@ public class BookingManageController {
     @PutMapping("/booking-request/{requestId}/update")
     public ResponseEntity<ApiResponse<Boolean>> updateBookingRequest(@PathVariable String requestId, @RequestBody BookingRequestUpdateReq actionBookingRequest){
         return ResponseEntity.ok(ApiResponses.success(bookingService.updateBookingRequest(requestId, actionBookingRequest)));
+    }
+    @PutMapping("/reorder")
+    public ResponseEntity<ApiResponse<Boolean>> reorderQueue(@RequestBody ReorderQueueRequest request){
+        return ResponseEntity.ok(ApiResponses.success(bookingService.reorderQueue(request)));
+    }
+    @GetMapping("/slot")
+    public ResponseEntity<ApiResponse<List<BookedRespond>>> getBookingBySlot(
+            @RequestParam LocalDate date,
+            @RequestParam LocalTime slot) {
+        return ResponseEntity.ok(ApiResponses.success(bookingService.getBookingBySlot(date, slot)));
+    }
+    @PutMapping("/set-queue")
+    public ResponseEntity<ApiResponse<List<BookedRespond>>> setQueue(@RequestParam Integer bookingId,
+                                                                     @RequestParam Integer queueNumber){
+        return ResponseEntity.ok(ApiResponses.success(bookingService.setQueue(bookingId, queueNumber)));
+    }
+    @PutMapping("/set-queue-auto")
+    public ResponseEntity<ApiResponse<List<BookedRespond>>> setQueueAuto(@RequestParam LocalDate date,
+                                                                         @RequestParam LocalTime slot){
+        return ResponseEntity.ok(ApiResponses.success(bookingService.setQueueAutoBySlotDate(date, slot)));
+    }
+    @PutMapping("/swap")
+    public ResponseEntity<ApiResponse<List<BookedRespond>>> swapQueue(@RequestParam Integer bookingId1,
+                                                                         @RequestParam Integer bookingId2){
+        return ResponseEntity.ok(ApiResponses.success(bookingService.setswapQueueByBookingIds(bookingId1, bookingId2)));
     }
 //
 //    @GetMapping("/booking-request")

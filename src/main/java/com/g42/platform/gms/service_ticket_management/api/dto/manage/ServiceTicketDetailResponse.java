@@ -51,10 +51,15 @@ public class ServiceTicketDetailResponse {
     // Staff info
     private Integer createdBy;
     private String createdByName;
+
+    // Assignment info — advisor phụ trách
+    private String advisorName;
+    private Integer advisorId;
     
     // Flags
     private Boolean immutable;
     private Boolean isGuest;
+    private Boolean safetyInspectionEnabled;
     
     @Data
     @NoArgsConstructor

@@ -1,0 +1,11 @@
+package com.g42.platform.gms.billing.domain.exception;
+
+public enum BillingErrorCode {
+    INVALID_PAYMENT_STATUS,
+    INVALID_BILLING_STATUS,
+    ESTIMATE_404,
+    SERVICE_TICKET_404,
+    ESTIMATE_NOT_MATCH_SERVICE_TICKET,
+    ESTIMATE_STATUS_NOT_MATCH,
+    SERVICE_TICKET_STATUS_NOT_MATCH,
+}

@@ -1,13 +1,13 @@
 package com.g42.platform.gms.customer.infrastructure.spectification;
 
+import com.g42.platform.gms.auth.entity.CustomerStatus;
 import com.g42.platform.gms.booking.customer.domain.enums.BookingRequestStatus;
 import com.g42.platform.gms.booking_management.infrastructure.entity.BookingJpa;
 import com.g42.platform.gms.booking_management.infrastructure.entity.BookingRequestJpa;
 import com.g42.platform.gms.customer.domain.entity.CustomerProfile;
+import com.g42.platform.gms.customer.infrastructure.entity.CustomerAuthJpa;
 import com.g42.platform.gms.customer.infrastructure.entity.CustomerProfileJpa;
-import jakarta.persistence.criteria.Join;
-import jakarta.persistence.criteria.JoinType;
-import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.*;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDate;
@@ -15,8 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class CustomerProfileSpecification {
-    public static Specification<CustomerProfileJpa> filter(LocalDate date,
-                                                           Boolean isGuest) {
+    public static Specification<CustomerProfileJpa> filter(LocalDate date, String status) {
         return (root, query, cb) -> {
 
             List<Predicate> predicates = new ArrayList<>();
@@ -27,10 +26,12 @@ public class CustomerProfileSpecification {
                 );
             }
 
-            if (isGuest != null) {
-                predicates.add(
-                        cb.equal(root.get("isGuest"), isGuest)
-                );
+            if (status != null) {
+                Subquery<Integer> subquery = query.subquery(Integer.class);
+                Root<CustomerAuthJpa> authRoot = subquery.from(CustomerAuthJpa.class);
+                subquery.select(authRoot.get("customerId"))
+                        .where(cb.equal(authRoot.get("status"), CustomerStatus.valueOf(status)));
+                predicates.add(root.get("customerId").in(subquery));
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));
@@ -44,7 +45,7 @@ public class CustomerProfileSpecification {
 
             List<Predicate> predicates = new ArrayList<>();
 
-            predicates.add(cb.like(cb.lower(root.get("customerId")), like));
+            predicates.add(cb.like(root.get("customerId").as(String.class), like));
             predicates.add(cb.like(cb.lower(root.get("fullName")), like));
             predicates.add(cb.like(root.get("phone").as(String.class), like));
             predicates.add(cb.like(root.get("email").as(String.class), like));

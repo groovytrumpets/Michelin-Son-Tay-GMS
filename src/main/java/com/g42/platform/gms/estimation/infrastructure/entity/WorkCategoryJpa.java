@@ -5,13 +5,17 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.ColumnDefault;
 
 @Getter
 @Setter
 @Entity
 @Table(name = "work_category", schema = "michelin_garage")
 public class WorkCategoryJpa {
+
+
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "idwork_category", nullable = false)
     private Integer id;
 
@@ -29,9 +33,12 @@ public class WorkCategoryJpa {
 
     @Column(name = "is_active")
     private Boolean isActive;
-
-    @Column(name = "estimate_item_estimate_item_id", nullable = false)
-    private Integer estimateItemEstimateItem;
+    @ColumnDefault("0")
+    @Column(name = "is_default")
+    private Boolean isDefault;
+    @NotNull
+    @Column(name = "tax_rule_idtax_rule", nullable = false)
+    private Integer taxRuleId;
 
 
 }

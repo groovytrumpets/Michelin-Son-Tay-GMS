@@ -4,7 +4,10 @@ import com.g42.platform.gms.estimation.domain.entity.Estimate;
 import com.g42.platform.gms.estimation.infrastructure.entity.EstimateJpa;
 import org.mapstruct.Mapper;
 
+import java.util.Optional;
+
 @Mapper(componentModel = "spring")
 public interface EstimateJpaMapper {
     Estimate toDomain(EstimateJpa estimateJpa);
+    EstimateJpa toJpa(Estimate estimate);
 }

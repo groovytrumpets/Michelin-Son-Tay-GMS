@@ -1,5 +1,6 @@
 package com.g42.platform.gms.estimation.domain.entity;
 
+import com.g42.platform.gms.estimation.infrastructure.entity.TaxRuleJpa;
 import jakarta.persistence.Column;
 import jakarta.persistence.Id;
 import jakarta.validation.constraints.NotNull;
@@ -21,4 +22,6 @@ public class WorkCategory {
     private Integer displayOrder;
     private Boolean isActive;
     private Integer estimateItemEstimateItem;
+    private Boolean isDefault;
+    private Integer taxRuleId;
 }

@@ -1,5 +1,6 @@
 package com.g42.platform.gms.customer.domain.entity;
 
+import com.g42.platform.gms.auth.entity.CustomerStatus;
 import com.g42.platform.gms.auth.entity.Gender;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -22,6 +23,7 @@ public class CustomerProfile {
     private LocalDate dob;
     private Gender gender;
     private String avatar;
+    private CustomerStatus status;
     private LocalDateTime firstBookingAt;
     private LocalDateTime createdAt;
 }

@@ -7,4 +7,6 @@ import org.mapstruct.Mapper;
 @Mapper(componentModel = "spring")
 public interface EstimateItemJpaMapper {
     EstimateItem toDomain(EstimateItemJpa estimateItemJpa);
+
+    EstimateItemJpa toJpa(EstimateItem estimateItem);
 }

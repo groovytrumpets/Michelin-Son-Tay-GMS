@@ -1,5 +1,6 @@
 package com.g42.platform.gms.service_ticket_management.api.controller;
 
+import com.g42.platform.gms.auth.entity.StaffPrincipal;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.service_ticket_management.api.dto.technician.TechnicianTicketDetailResponse;
@@ -10,6 +11,8 @@ import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -36,26 +39,29 @@ public class ServiceTicketTechnicianController {
      * @return Page of TechnicianTicketListResponse
      */
     @GetMapping("/tickets")
+    @PreAuthorize("hasRole('TECHNICIAN')")
     public ResponseEntity<ApiResponse<Page<TechnicianTicketListResponse>>> getTechnicianTicketList(
+            @AuthenticationPrincipal StaffPrincipal principal,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) LocalDate date,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String search) {
         
+        Integer staffId = principal.getStaffId();
+
         // Parse status string to enum (case-insensitive)
         TicketStatus ticketStatus = null;
         if (status != null && !status.isBlank()) {
             try {
                 ticketStatus = TicketStatus.valueOf(status.toUpperCase());
             } catch (IllegalArgumentException e) {
-                // Invalid status value - ignore and return all
                 ticketStatus = null;
             }
         }
         
         Page<TechnicianTicketListResponse> tickets = technicianService.getTechnicianTicketList(
-            page, size, date, ticketStatus, search);
+            staffId, page, size, date, ticketStatus, search);
         
         return ResponseEntity.ok(ApiResponses.success(tickets));
     }
@@ -77,18 +83,36 @@ public class ServiceTicketTechnicianController {
     
     /**
      * Update technician notes.
-     * 
-     * @param ticketCode Ticket code (ST_XXXXXX or MST_XXXXXX)
-     * @param request Update request with technicianNotes
-     * @return Updated TechnicianTicketDetailResponse
      */
     @PutMapping("/tickets/{ticketCode}/notes")
     public ResponseEntity<ApiResponse<TechnicianTicketDetailResponse>> updateTechnicianNotes(
             @PathVariable String ticketCode,
             @RequestBody @jakarta.validation.Valid UpdateTechnicianNotesRequest request) {
-        
+
         TechnicianTicketDetailResponse updated = technicianService.updateTechnicianNotes(ticketCode, request);
-        
         return ResponseEntity.ok(ApiResponses.success(updated));
+    }
+
+    /**
+     * Technician bắt đầu kiểm tra an toàn — DRAFT → INSPECTION.
+     */
+    @PostMapping("/tickets/{ticketCode}/start-inspection")
+    public ResponseEntity<ApiResponse<TechnicianTicketDetailResponse>> startInspection(
+            @PathVariable String ticketCode,
+            @AuthenticationPrincipal StaffPrincipal principal) {
+
+        TechnicianTicketDetailResponse result = technicianService.startInspection(ticketCode, principal.getStaffId());
+        return ResponseEntity.ok(ApiResponses.success(result));
+    }
+
+    /**
+     * Technician báo xong sửa xe — IN_PROGRESS → COMPLETED.
+     */
+    @PostMapping("/tickets/{ticketCode}/finish")
+    public ResponseEntity<ApiResponse<TechnicianTicketDetailResponse>> finishWork(
+            @PathVariable String ticketCode) {
+
+        TechnicianTicketDetailResponse result = technicianService.finishWork(ticketCode);
+        return ResponseEntity.ok(ApiResponses.success(result));
     }
 }

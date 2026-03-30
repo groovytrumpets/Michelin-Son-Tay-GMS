@@ -1,13 +1,17 @@
 package com.g42.platform.gms.customer.infrastructure;
 
 import com.g42.platform.gms.auth.entity.CustomerStatus;
+import com.g42.platform.gms.auth.mapper.CustomerProfileMapper;
 import com.g42.platform.gms.booking_management.infrastructure.specification.BookingRequestSpecification;
 import com.g42.platform.gms.customer.api.dto.CustomerCreateDto;
 import com.g42.platform.gms.customer.domain.entity.CustomerAuth;
 import com.g42.platform.gms.customer.domain.entity.CustomerProfile;
+import com.g42.platform.gms.customer.domain.exception.CustomerErrorCode;
+import com.g42.platform.gms.customer.domain.exception.CustomerException;
 import com.g42.platform.gms.customer.domain.repository.CustomerRepo;
 import com.g42.platform.gms.customer.infrastructure.entity.CustomerAuthJpa;
 import com.g42.platform.gms.customer.infrastructure.entity.CustomerProfileJpa;
+import com.g42.platform.gms.customer.infrastructure.mapper.CustomerAuthJpaMapper;
 import com.g42.platform.gms.customer.infrastructure.mapper.CustomerJpaMapper;
 import com.g42.platform.gms.customer.infrastructure.repository.CustomerAuthJpaRepo;
 import com.g42.platform.gms.customer.infrastructure.repository.CustomerProfileJpaRepo;
@@ -23,6 +27,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Repository
 @AllArgsConstructor
@@ -34,10 +39,17 @@ public class CustomerRepoImpl implements CustomerRepo {
     @Autowired
     CustomerJpaMapper customerJpaMapper;
     @Autowired
+    CustomerAuthJpaMapper customerAuthJpaMapper;
+    @Autowired
     private PasswordEncoder passwordEncoder;
+    @Autowired
+    private CustomerProfileMapper customerProfileMapper;
 
     @Override
     public CustomerProfile createNewCustomerProfile(CustomerCreateDto customerDto) {
+        if (customerDto.getPhone()==null){
+            throw new CustomerException("Phone must not null!", CustomerErrorCode.INVALID_PHONE);
+        }
     //todo: create new acc based on customerDto
         CustomerProfileJpa entity = new CustomerProfileJpa();
         entity.setFullName(customerDto.getFullName());
@@ -46,32 +58,70 @@ public class CustomerRepoImpl implements CustomerRepo {
         entity.setGender(customerDto.getGender());
         entity.setAvatar(customerDto.getAvatar());
 
-        // Convert String -> LocalDate
+
         if (customerDto.getDob() != null && !customerDto.getDob().isBlank()) {
             entity.setDob(LocalDate.parse(customerDto.getDob()));
-            // format phải là yyyy-MM-dd
         }
         return customerJpaMapper.toDomain(customerProfileJpaRepo.save(entity));
     }
 
     @Override
     public CustomerAuth createNewCustomerAuth(CustomerCreateDto customerCreateDto, CustomerProfile customerProfile) {
+        if (customerProfile.getCustomerId()==null){throw new CustomerException("Customer Id must not null!", CustomerErrorCode.INVALID_CUSTOMER_PROFILE);}
         CustomerAuthJpa customerAuthJpa = new CustomerAuthJpa();
         customerAuthJpa.setStatus(CustomerStatus.ACTIVE);
         customerAuthJpa.setPinHash(passwordEncoder.encode(customerCreateDto.getPin()));
         customerAuthJpa.setCustomerId(customerProfile.getCustomerId());
-        return null;
+        customerAuthJpa.setCreatedAt(LocalDateTime.now());
+        return customerAuthJpaMapper.toJpa(customerAuthJpaRepo.save(customerAuthJpa));
     }
 
     @Override
-    public Page<CustomerProfile> getListOfCustomers(int page,int size, LocalDate date, Boolean isGuest, String search) {
+    public Page<CustomerProfile> getListOfCustomers(int page,int size, LocalDate date, Boolean isGuest, String search, String status) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         Specification<CustomerProfileJpa> specification = Specification.unrestricted();
-        specification = specification.and(CustomerProfileSpecification.filter(date,isGuest));
+        specification = specification.and(CustomerProfileSpecification.filter(date,status));
         if (search != null && !search.isBlank()) {
             specification = specification.and(CustomerProfileSpecification.searchProfiles(search));
         }
         Page<CustomerProfileJpa> customerProfileJpas = customerProfileJpaRepo.findAll(specification, pageable);
-        return customerProfileJpas.map(customerJpaMapper::toDomain);
+        return customerProfileJpas.map(jpa -> {
+            CustomerProfile profile = customerJpaMapper.toDomain(jpa);
+            CustomerAuthJpa auth = customerAuthJpaRepo.findByCustomerId(jpa.getCustomerId());
+            if (auth != null) profile.setStatus(auth.getStatus());
+            return profile;
+        });
+    }
+
+    @Override
+    public CustomerProfile findProflieById(Integer customerId) {
+        CustomerProfileJpa customerProfileJpa = customerProfileJpaRepo.findByCustomerId(customerId);
+        CustomerAuthJpa customerAuthJpa = customerAuthJpaRepo.findByCustomerId(customerId);
+        if (customerProfileJpa==null||customerAuthJpa==null) throw new CustomerException("Customer not found!", CustomerErrorCode.INVALID_CUSTOMER_PROFILE);
+
+        return customerJpaMapper.toDomain(customerProfileJpa);
+    }
+
+    @Override
+    public CustomerAuth findAuthById(Integer customerId) {
+        CustomerAuthJpa customerAuthJpa = customerAuthJpaRepo.findByCustomerId(customerId);
+        return customerAuthJpaMapper.toJpa(customerAuthJpa);
+    }
+
+    @Override
+    public boolean updateCustomer(Integer customerId, CustomerProfile customerProfile, CustomerAuth customerAuth) {
+        CustomerProfileJpa customerProfileJpa = customerProfileJpaRepo.save(customerJpaMapper.toJpa(customerProfile));
+        CustomerAuthJpa customerAuthJpa = customerAuthJpaRepo.save(customerAuthJpaMapper.toDomain(customerAuth));
+        return (customerAuthJpa!=null && customerProfileJpa!=null);
+
+    }
+
+    @Override
+    public CustomerProfile findCustomerById(Integer customerId) {
+        CustomerProfileJpa jpa = customerProfileJpaRepo.findByCustomerId(customerId);
+        CustomerProfile profile = customerJpaMapper.toDomain(jpa);
+        CustomerAuthJpa auth = customerAuthJpaRepo.findByCustomerId(customerId);
+        if (auth != null) profile.setStatus(auth.getStatus());
+        return profile;
     }
 }

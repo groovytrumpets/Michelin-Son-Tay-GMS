@@ -11,31 +11,23 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.List;
+
 @Repository
 public interface BookingManageJpaRepository extends JpaRepository<BookingJpa, Integer>, JpaSpecificationExecutor<BookingJpa> {
     BookingJpa getBookingJpaByBookingId(Integer bookingId);
 
-    @Query("""
-    SELECT new com.g42.platform.gms.booking_management.api.dto.confirmed.BookedRespond(
-        b.bookingId,b.bookingCode,
-        new com.g42.platform.gms.booking_management.api.dto.CustomerDto(
-            c.fullName,
-            c.phone,
-            null
-        ),
-        b.scheduledDate,
-        b.scheduledTime,
-        b.serviceCategory,
-        b.status,
-        b.description,
-        b.isGuest,
-        b.createdAt
-    )
-    FROM BookingJpa b
-    LEFT JOIN CustomerProfile c
-        ON b.customerId = c.customerId
-""")
-    Page<BookedRespond> findAllBooked(Specification<BookingJpa> specification, Pageable pageable);
-
     BookingJpa getBookingJpaByBookingCode(String bookingCode);
+    @Query("""
+    select b from BookingJpa b join BookingSlotReservationJpa bs on b.bookingId = bs.booking.bookingId where
+        bs.reservedDate=:date
+        and bs.startTime=:slot
+    """)
+    List<BookingJpa> findAllBookingBySlotDate(LocalDate date, LocalTime slot);
+    @Query("""
+    select max(b.queueOrder)from BookingJpa b where b.scheduledDate=:scheduledDate and b.scheduledTime=:scheduledTime
+    """)
+    Integer findMaxQueueOrderBySLotDate(LocalDate scheduledDate, LocalTime scheduledTime);
 }

@@ -2,6 +2,7 @@ package com.g42.platform.gms.service_ticket_management.infrastructure.specificat
 
 import com.g42.platform.gms.auth.entity.CustomerProfile;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
+import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketAssignmentJpa;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
 import com.g42.platform.gms.vehicle.entity.Vehicle;
 import jakarta.persistence.criteria.Predicate;
@@ -52,6 +53,27 @@ public class ServiceTicketSpecification {
         };
     }
     
+    /**
+     * Filter service tickets theo staffId (qua bảng service_ticket_assignment).
+     *
+     * @param staffId ID của kỹ thuật viên
+     * @return Specification
+     */
+    public static Specification<ServiceTicketJpa> assignedToStaff(Integer staffId) {
+        return (root, query, cb) -> {
+            Subquery<Integer> subquery = query.subquery(Integer.class);
+            var assignmentRoot = subquery.from(ServiceTicketAssignmentJpa.class);
+            subquery.select(assignmentRoot.get("serviceTicketId"))
+                .where(
+                    cb.and(
+                        cb.equal(assignmentRoot.get("staffId"), staffId),
+                        cb.notEqual(assignmentRoot.get("status"), com.g42.platform.gms.service_ticket_management.domain.enums.AssignmentStatus.CANCELLED)
+                    )
+                );
+            return root.get("serviceTicketId").in(subquery);
+        };
+    }
+
     /**
      * Search service tickets theo keyword.
      * Tìm kiếm trong: ticket code, customer name, customer phone, license plate.
