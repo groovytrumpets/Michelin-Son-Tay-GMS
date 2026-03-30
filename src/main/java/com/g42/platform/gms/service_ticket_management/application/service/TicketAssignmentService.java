@@ -43,11 +43,12 @@ public class TicketAssignmentService {
 
     @Transactional(readOnly = true)
     public List<AvailableStaffDto> getAvailableStaff(Integer ticketId, String role) {
-        // Lấy tất cả staff có role — không lọc bận/rảnh
+        // Lấy tất cả staff có role, sắp xếp theo workload tăng dần (ít việc lên trước)
         List<StaffProfileJpa> staffList = staffProfileRepo.findAllByRole(role);
 
         return staffList.stream()
                 .map(staff -> toAvailableStaffDto(staff, ticketId))
+                .sorted(Comparator.comparingInt(dto -> (dto.getTotalWorkload() == null ? 0 : dto.getTotalWorkload())))
                 .toList();
     }
 
@@ -71,52 +72,37 @@ public class TicketAssignmentService {
             }
         }
 
-
-        // Validate: mỗi ticket chỉ có 1 primary technician
-        boolean wantPrimary = dto.getIsPrimary() != null && dto.getIsPrimary();
-        if (wantPrimary) {
-            if (ticketAssignmentRepo.existsPrimaryByTicketId(ticketId)) {
-                throw new AssignmentException("Ticket đã có technician chính!", AssignmentErrorCode.INVALID_SERVICE_TICKET_ID);
-            }
-        }
-
-
         // Validate: staff phải có đúng role tương ứng với roleInTicket
         boolean staffHasRole = staffProfileRepo.existsByStaffIdAndRole(dto.getStaffId(), dto.getRoleInTicket());
         if (!staffHasRole) {
             throw new AssignmentException("Staff không có role " + dto.getRoleInTicket(), AssignmentErrorCode.UNAVAILABLE_STAFF);
         }
 
-        // Validate: TECHNICIAN không được assign khi đang bận (isBusy theo workload)
-        // ADVISOR không bị giới hạn workload
+        // Validate: technician không được assign vào cùng 1 ticket 2 lần
         if ("TECHNICIAN".equals(dto.getRoleInTicket())) {
-            boolean busy = !ticketAssignmentRepo.isStaffAvailable(dto.getStaffId());
-            if (busy) {
+            if (ticketAssignmentRepo.isStaffAssignedToTicket(dto.getStaffId(), ticketId)) {
                 throw new AssignmentException(
-                    "Kỹ thuật viên đang bận, không thể phân công thêm. Vui lòng chọn người khác.",
+                    "Kỹ thuật viên đã được phân công vào phiếu này rồi!",
                     AssignmentErrorCode.UNAVAILABLE_STAFF
                 );
             }
         }
-
 
         ServiceTicketAssignment assignment = new ServiceTicketAssignment();
         assignment.setServiceTicketId(ticketId);
         assignment.setStaffId(dto.getStaffId());
         assignment.setRoleInTicket(dto.getRoleInTicket());
 
-
-        boolean isPrimary = dto.getIsPrimary() != null && dto.getIsPrimary();
+        // Chỉ advisor mới là primary, technician luôn false
+        boolean isPrimary = isAdvisorRole;
         assignment.setIsPrimary(isPrimary);
         assignment.setNote(dto.getNote());
         assignment.setAssignedAt(Instant.now());
-        assignment.setStatus(AssignmentStatus.PENDING); // Bắt đầu với PENDING, chưa làm việc
-
+        assignment.setStatus(AssignmentStatus.PENDING);
 
         ServiceTicketAssignment saved = ticketAssignmentRepo.save(assignment);
 
         // Nếu assign technician thành công, chuyển advisor từ PENDING sang ACTIVE
-        // Nhưng technician vẫn ở PENDING cho đến khi bắt đầu làm việc thực sự
         if ("TECHNICIAN".equals(dto.getRoleInTicket())) {
             activateAdvisorAssignment(ticketId);
         }
@@ -179,14 +165,13 @@ public class TicketAssignmentService {
         dto.setPhone(staff.getPhone());
         dto.setAvatar(staff.getAvatar());
 
-        // Kiểm tra bận/rảnh để hiển thị note — không chặn assign
-        boolean busy = !ticketAssignmentRepo.isStaffAvailable(staff.getStaffId());
-        dto.setIsBusy(busy);
-        if (busy) {
-            long activeCount = ticketAssignmentRepo.findByStaffId(staff.getStaffId()).stream()
-                    .filter(a -> a.getStatus() == AssignmentStatus.ACTIVE || a.getStatus() == AssignmentStatus.PENDING)
-                    .count();
-            dto.setBusyNote("Đang làm " + activeCount + " dịch vụ khác");
+        long activeCount = ticketAssignmentRepo.findByStaffId(staff.getStaffId()).stream()
+                .filter(a -> a.getStatus() == AssignmentStatus.ACTIVE || a.getStatus() == AssignmentStatus.PENDING)
+                .count();
+        dto.setTotalWorkload((int) activeCount);
+        dto.setIsBusy(activeCount > 0);
+        if (activeCount > 0) {
+            dto.setBusyNote("Đang làm " + activeCount + " dịch vụ");
         }
         return dto;
     }
