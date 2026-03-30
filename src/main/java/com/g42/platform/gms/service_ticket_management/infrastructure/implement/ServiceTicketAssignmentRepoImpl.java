@@ -70,7 +70,8 @@ public class ServiceTicketAssignmentRepoImpl implements TicketAssignmentRepo {
 
     @Override
     public boolean isStaffAssignedToTicket(Integer staffId, Integer ticketId) {
-        return ticketAssignmentJpaRepo.existsByStaffIdAndServiceTicketId(staffId, ticketId);
+        // Chỉ check ACTIVE/PENDING — bỏ qua CANCELLED/DONE để cho phép assign lại sau khi cancel
+        return ticketAssignmentJpaRepo.existsActiveAssignmentByStaffAndTicket(staffId, ticketId);
     }
 
     @Override
