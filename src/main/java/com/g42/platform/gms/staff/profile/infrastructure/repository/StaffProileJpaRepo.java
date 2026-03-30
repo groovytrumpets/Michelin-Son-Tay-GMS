@@ -96,11 +96,13 @@ public interface StaffProileJpaRepo extends JpaRepository<StaffProfileJpa, Integ
 """)
     boolean existsByStaffIdAndRole(@Param("staffId") Integer staffId, @Param("role") String role);
 
-    /** Lấy tất cả staff có role cụ thể (không lọc bận/rảnh). */
+    /** Lấy tất cả staff có role cụ thể và tài khoản đang ACTIVE. */
     @Query("""
    SELECT DISTINCT sp FROM StaffProfileJpa sp
    JOIN FETCH sp.roles r
+   LEFT JOIN sp.staffAuth sa
    WHERE r.roleCode = :role
+   AND (sa IS NULL OR sa.status = 'ACTIVE')
 """)
     List<StaffProfileJpa> findAllByRole(@Param("role") String role);
 }
