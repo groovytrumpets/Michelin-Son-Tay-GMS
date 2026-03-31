@@ -9,8 +9,8 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class ItemCategoryHintDto {
-    private Integer itemCategoryId;
+public class WorkCategoryHintDto {
+    private Integer workCategoryId;
     private String categoryCode;
     private String categoryName;
     private String categoryType;

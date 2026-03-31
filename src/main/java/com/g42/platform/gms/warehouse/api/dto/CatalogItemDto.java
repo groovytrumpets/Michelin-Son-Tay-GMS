@@ -29,5 +29,5 @@ public class CatalogItemDto {
     private Boolean isRecurring;
     private Integer brandId;
     private Integer productLineId;
-    private Integer itemCategoryId;
+    private Integer workCategoryId;
 }
