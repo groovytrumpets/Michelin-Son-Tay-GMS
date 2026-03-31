@@ -95,7 +95,9 @@ public class EstimateService {
         estimate.setServiceTicketId(request.getServiceTicketId());
         estimate.setEstimateType(request.getEstimateType());
         estimate.setStatus(EstimateEnum.DRAFT);
-        estimate.setVersion(1);
+        //todo: check version
+        int latestEstimateVersion = estimateRepository.findLatestEstimate(request.getServiceTicketId());
+        estimate.setVersion(latestEstimateVersion);
         estimate.setTotalPrice(BigDecimal.ZERO);
         Estimate saved = estimateRepository.save(estimate);
 

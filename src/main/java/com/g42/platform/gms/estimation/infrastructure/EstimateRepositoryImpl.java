@@ -39,5 +39,11 @@ public class EstimateRepositoryImpl implements EstimateRepository {
     public Estimate findEstimateByServiceIdAndLatestVerson(Integer serviceTicketId) {
         return estimateRepositoryJpa.findTopByServiceTicketIdOrderByVersionDesc(serviceTicketId).map(estimateJpaMapper::toDomain).orElse(null);
     }
+
+    @Override
+    public int findLatestEstimate(Integer serviceTicketId) {
+        int currentEstimateVersion = estimateRepositoryJpa.findLatestEstimate(serviceTicketId);
+        return currentEstimateVersion+1;
+    }
 }
 
