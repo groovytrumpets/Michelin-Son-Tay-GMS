@@ -21,6 +21,9 @@ public class StaffProfile {
     private String avatar;
     private java.sql.Timestamp createdAt;
 
+    @Column(name = "employee_no", unique = true)
+    private String employeeNo;
+
     @OneToOne(mappedBy = "staffProfile")
     private StaffAuth staffauth;
 
