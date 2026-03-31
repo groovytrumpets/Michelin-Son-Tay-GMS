@@ -8,8 +8,11 @@ import com.g42.platform.gms.service_ticket_management.api.dto.assign.WorkloadTic
 import com.g42.platform.gms.service_ticket_management.api.mapper.assignment.TicketAssignmentDtoMapper;
 import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicketAssignment;
 import com.g42.platform.gms.service_ticket_management.domain.enums.AssignmentStatus;
+import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicket;
+import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import com.g42.platform.gms.service_ticket_management.domain.exception.AssignmentErrorCode;
 import com.g42.platform.gms.service_ticket_management.domain.exception.AssignmentException;
+import com.g42.platform.gms.service_ticket_management.domain.repository.ServiceTicketRepo;
 import com.g42.platform.gms.service_ticket_management.domain.repository.TicketAssignmentRepo;
 import com.g42.platform.gms.staff.profile.infrastructure.entity.StaffProfileJpa;
 import com.g42.platform.gms.staff.profile.infrastructure.repository.StaffProileJpaRepo;
@@ -39,6 +42,7 @@ public class TicketAssignmentService {
     private final TicketAssignmentRepo ticketAssignmentRepo;
     private final TicketAssignmentDtoMapper dtoMapper;
     private final StaffProileJpaRepo staffProfileRepo;
+    private final ServiceTicketRepo serviceTicketRepo;
 
 
     @Transactional(readOnly = true)
@@ -64,6 +68,9 @@ public class TicketAssignmentService {
 
     @Transactional
     public AssignStaffDto assignStaff(Integer ticketId, AssignStaffDto dto) {
+        // Guard: không cho assign khi phiếu đã kết thúc
+        requireTicketEditable(ticketId);
+
         // Validate: mỗi ticket chỉ có 1 advisor
         boolean isAdvisorRole = "ADVISOR".equals(dto.getRoleInTicket());
         if (isAdvisorRole) {
@@ -229,6 +236,7 @@ public class TicketAssignmentService {
      */
     @Transactional
     public AssignStaffDto changeAdvisor(Integer ticketId, Integer newAdvisorId, String note) {
+        requireTicketEditable(ticketId);
         // 1. Tìm assignment advisor hiện tại
         List<ServiceTicketAssignment> currentAssignments = ticketAssignmentRepo.findByTicketIdAndRole(ticketId, "ADVISOR");
         if (currentAssignments.isEmpty()) {
@@ -276,6 +284,7 @@ public class TicketAssignmentService {
      */
     @Transactional
     public AssignStaffDto changeAdvisorByAdvisor(Integer ticketId, Integer newAdvisorId, String note) {
+        requireTicketEditable(ticketId);
         List<ServiceTicketAssignment> currentAssignments = ticketAssignmentRepo.findByTicketIdAndRole(ticketId, "ADVISOR");
         if (currentAssignments.isEmpty()) {
             throw new AssignmentException("Ticket chưa có advisor!", AssignmentErrorCode.INVALID_SERVICE_TICKET_ID);
@@ -321,6 +330,7 @@ public class TicketAssignmentService {
      */
     @Transactional
     public AssignmentStatus removeTechnician(Integer ticketId, Integer technicianId) {
+        requireTicketEditable(ticketId);
         List<ServiceTicketAssignment> assignments = ticketAssignmentRepo.findByTicketId(ticketId);
         List<ServiceTicketAssignment> technicianAssignments = assignments.stream()
                 .filter(a -> a.getStaffId().equals(technicianId) && "TECHNICIAN".equals(a.getRoleInTicket()))
@@ -473,6 +483,24 @@ public class TicketAssignmentService {
                     && !ticketAssignmentRepo.isStaffAssignedToTicket(staffId, ticketId);
         }
         return ticketAssignmentRepo.isStaffAvailable(staffId);
+    }
+
+    /**
+     * Kiểm tra ticket có thể chỉnh sửa assignment không.
+     * Không cho phép khi phiếu đã COMPLETED, PAID hoặc CANCELLED.
+     */
+    private void requireTicketEditable(Integer ticketId) {
+        ServiceTicket ticket = serviceTicketRepo.findByServiceTicketId(ticketId);
+        if (ticket == null) {
+            throw new AssignmentException("Không tìm thấy phiếu dịch vụ!", AssignmentErrorCode.INVALID_SERVICE_TICKET_ID);
+        }
+        TicketStatus status = ticket.getTicketStatus();
+        if (status == TicketStatus.COMPLETED || status == TicketStatus.PAID || status == TicketStatus.CANCELLED) {
+            throw new AssignmentException(
+                "Không thể thay đổi phân công khi phiếu đã " + status,
+                AssignmentErrorCode.INVALID_SERVICE_TICKET_ID
+            );
+        }
     }
 
     private StaffWorkloadDto buildWorkloadDto(StaffProfileJpa staff) {

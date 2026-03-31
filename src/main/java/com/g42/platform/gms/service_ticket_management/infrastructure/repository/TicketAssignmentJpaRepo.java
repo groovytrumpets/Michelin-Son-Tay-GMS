@@ -53,6 +53,16 @@ public interface TicketAssignmentJpaRepo extends JpaRepository<ServiceTicketAssi
 
     boolean existsByStaffIdAndServiceTicketId(Integer staffId, Integer serviceTicketId);
 
+    /** Kiểm tra staff có assignment TECHNICIAN ACTIVE hoặc PENDING trong ticket cụ thể không. */
+    @Query("""
+       SELECT COUNT(sta) > 0 FROM ServiceTicketAssignmentJpa sta
+       WHERE sta.staffId = :staffId
+       AND sta.serviceTicketId = :ticketId
+       AND sta.roleInTicket = 'TECHNICIAN'
+       AND (sta.status = 'ACTIVE' OR sta.status = 'PENDING')
+   """)
+    boolean existsActiveAssignmentByStaffAndTicket(@Param("staffId") Integer staffId, @Param("ticketId") Integer ticketId);
+
 
     /**
      * Check if staff has any active assignment in tickets with busy status (DRAFT, IN_PROGRESS, INSPECTION)
