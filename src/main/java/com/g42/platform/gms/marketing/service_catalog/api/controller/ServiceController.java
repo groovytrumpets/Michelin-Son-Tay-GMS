@@ -24,7 +24,7 @@ import java.util.List;
 public class ServiceController {
     @Autowired
     private final ServiceCatalogService serviceCatalogService;
-    @GetMapping("")
+    @GetMapping("/")
     public ResponseEntity<ApiResponse<List<ServiceSumaryRespond>>> getLandingServices() {
         List<ServiceSumaryRespond> respondList = serviceCatalogService.getListActiveServices();
         return ResponseEntity.ok(ApiResponses.success(respondList));
