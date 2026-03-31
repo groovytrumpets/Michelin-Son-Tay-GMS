@@ -32,7 +32,7 @@ public class ZaloOAuthService {
         zaloTokenRepo.save(zaloToken);
         return "https://oauth.zaloapp.com/v4/oa/permission"
                 + "?app_id=1162973287649757116"
-                + "&redirect_uri=https://michelinsontay.vn/zalo/callback"
+                + "&redirect_uri=https://sontaygarage.vn/zalo/callback"
                 + "&code_challenge=" + challenge
                 + "&code_challenge_method=S256";
     }
