@@ -22,4 +22,14 @@ public interface EstimateRepositoryJpa extends JpaRepository<EstimateJpa, Intege
     select coalesce(max(e.version),0) from EstimateJpa e where e.serviceTicketId =:serviceTicketId
     """)
     int findLatestEstimate(Integer serviceTicketId);
+    @Query("""
+    SELECT e FROM EstimateJpa e 
+    WHERE e.serviceTicketId IN :ticketIds 
+      AND e.version = (
+          SELECT MAX(e2.version) 
+          FROM EstimateJpa e2 
+          WHERE e2.serviceTicketId = e.serviceTicketId
+      )
+""")
+    List<EstimateJpa> findByServiceTicketIdsAndVersionTop(List<Integer> ticketIds);
 }

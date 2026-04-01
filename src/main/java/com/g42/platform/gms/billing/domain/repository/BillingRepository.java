@@ -8,4 +8,6 @@ public interface BillingRepository {
     ServiceBill createNewBilling(ServiceBill serviceBill);
 
     ServiceBill getBillingByBillingId(Integer billId);
+
+    void save(ServiceBill serviceBill);
 }

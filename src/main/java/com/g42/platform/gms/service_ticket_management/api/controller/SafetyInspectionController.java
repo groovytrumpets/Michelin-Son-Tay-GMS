@@ -186,5 +186,12 @@ public class SafetyInspectionController {
                 inspectionId, request.getItems());
         return ResponseEntity.ok(ApiResponses.success(responses, "Đã cập nhật ghi chú advisor thành công"));
     }
+    @PutMapping("/{serviceTicketId}/update-recommend")
+    public ResponseEntity<ApiResponse<String>> updateSafetyInspection(
+            @PathVariable Integer serviceTicketId,
+            @RequestParam String recommend){
+        String rcm = safetyInspectionService.saveRecommend(serviceTicketId,recommend);
+        return ResponseEntity.ok(ApiResponses.success(rcm));
+    }
 
 }
