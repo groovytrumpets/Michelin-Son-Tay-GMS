@@ -32,4 +32,10 @@ public class SafetyInspectionRepoImpl implements SafetyInspectionRepo {
         SafetyInspectionJpa jpa = mapper.toJpa(inspection);
         return mapper.toDomain(jpaRepo.save(jpa));
     }
+
+    @Override
+    public SafetyInspection findByIdService(Integer serviceTicketId) {
+        SafetyInspectionJpa safetyInspectionJpa = jpaRepo.findByServiceTicketId2(serviceTicketId);
+        return mapper.toDomain(safetyInspectionJpa);
+    }
 }

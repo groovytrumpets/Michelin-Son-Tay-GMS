@@ -16,4 +16,9 @@ public class CustomerInternalApiImpl implements CustomerInternalApi {
     public List<CustomerProfile> findAllByIds(List<Integer> customerIds) {
         return customerProfileRepository.findAllById(customerIds);
     }
+
+    @Override
+    public CustomerProfile findById(Integer customerId) {
+        return customerProfileRepository.findById(customerId).get();
+    }
 }

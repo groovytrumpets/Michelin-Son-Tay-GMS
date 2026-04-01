@@ -431,5 +431,17 @@ public class SafetyInspectionService {
         req.setTireSpecification(spec); req.setRecommendedTireSize(recSize); req.setRecommendedPressure(recPressure);
         return req;
     }
+
+    public String saveRecommend(Integer serviceTicketId, String recommend) {
+        SafetyInspection safetyInspection = inspectionRepo.findByIdService(serviceTicketId);
+        safetyInspection.setGeneralNotes(recommend);
+        SafetyInspection saved = inspectionRepo.save(safetyInspection);
+        return saved.getGeneralNotes();
+
+    }
+
+    public SafetyInspection findByServiceTicketId(Integer previousId) {
+        return inspectionRepo.findByIdService(previousId);
+    }
 }
 

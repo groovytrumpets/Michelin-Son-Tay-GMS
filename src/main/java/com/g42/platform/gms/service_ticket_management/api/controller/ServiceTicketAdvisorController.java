@@ -153,5 +153,9 @@ public class ServiceTicketAdvisorController {
         return ResponseEntity.ok(ApiResponses.success(
                 advisorService.changeTechnician(ticketCode, oldTechnicianId, newTechnicianId, note)));
     }
+    @GetMapping("/recommend/{serviceTicketId}")
+    public ResponseEntity<ApiResponse<String>> getRecommend(@PathVariable Integer serviceTicketId) {
+        return ResponseEntity.ok(ApiResponses.success(manageService.getCustomerPerviousRecomment(serviceTicketId)));
+    }
 }
 

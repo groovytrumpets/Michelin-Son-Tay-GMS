@@ -114,4 +114,10 @@ public class ServiceTicketRepoImpl implements ServiceTicketRepo {
         List<ServiceTicketJpa> serviceTicketJpas = jpaRepo.findServiceTicketJpasByReceivedAtBetween(start,end);
         return  serviceTicketJpas.stream().map(mapper::toDomain).toList();
     }
+
+    @Override
+    public ServiceTicket findPerviousCustomerService(Integer customerId, Integer serviceTicketId) {
+        ServiceTicketJpa serviceTicketJpa = jpaRepo.findFirstByCustomerIdAndServiceTicketIdNotOrderByReceivedAtDesc(customerId, serviceTicketId);
+        return mapper.toDomain(serviceTicketJpa);
+    }
 }
