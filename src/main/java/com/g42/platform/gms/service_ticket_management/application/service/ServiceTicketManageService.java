@@ -9,6 +9,7 @@ import com.g42.platform.gms.booking.customer.domain.entity.Booking;
 import com.g42.platform.gms.booking.customer.domain.repository.BookingRepository;
 import com.g42.platform.gms.catalog.repository.CatalogItemRepository;
 import com.g42.platform.gms.common.enums.EstimateEnum;
+import com.g42.platform.gms.common.service.ExcelService;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceQueueResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceTicketDetailResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceTicketListResponse;
@@ -321,6 +322,26 @@ public class ServiceTicketManageService {
         serviceTicket.setTicketStatus(status);
         ServiceTicket savedServiceTicket = serviceTicketRepo.save(serviceTicket);
         return serviceTicketDtoMapper.toDto(savedServiceTicket);
+    }
+    @Transactional
+    public byte[] exportTicketToExcel(){
+        List<ServiceTicket> serviceTickets = serviceTicketRepo.findAll();
+        String[] headers={
+                "STT",
+                "Mã Phiếu",
+                "Trạng Thái",
+                "Ngày Tạo",
+                "Yêu cầu của khách"
+
+        };
+        int[] stt = {1};
+        return ExcelService.exportToExcel(serviceTickets,headers,serviceTicket -> new Object[]{
+                stt[0]++,
+                serviceTicket.getTicketCode(),
+                serviceTicket.getTicketStatus(),
+                serviceTicket.getCreatedAt(),
+                serviceTicket.getCustomerRequest()
+        });
     }
 }
 

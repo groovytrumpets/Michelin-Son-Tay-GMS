@@ -12,6 +12,8 @@ import com.g42.platform.gms.service_ticket_management.application.service.Servic
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -80,5 +82,15 @@ public class ServiceTicketManageController {
         return ResponseEntity.ok(
                 ApiResponses.success(serviceTicketManageService.updateServiceTicketStatus(serviceTicketId,status))
         );
+    }
+
+    @GetMapping("/export")
+    public ResponseEntity<byte[]> exportServiceTicketList(){
+        byte [] excelConetnt = serviceTicketManageService.exportTicketToExcel();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+        headers.setContentDispositionFormData("attachment","Danh_Sach_Phieu_Dich_Vu.xlsx");
+
+        return ResponseEntity.ok().headers(headers).body(excelConetnt);
     }
 }
