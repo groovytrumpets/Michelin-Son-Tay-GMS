@@ -1,6 +1,7 @@
 package com.g42.platform.gms.service_ticket_management.application.service;
 
 
+import com.g42.platform.gms.auth.api.internal.CustomerInternalApi;
 import com.g42.platform.gms.auth.entity.CustomerProfile;
 import com.g42.platform.gms.auth.entity.StaffProfile;
 import com.g42.platform.gms.auth.repository.CustomerProfileRepository;
@@ -8,12 +9,12 @@ import com.g42.platform.gms.auth.repository.StaffProfileRepo;
 import com.g42.platform.gms.booking.customer.domain.entity.Booking;
 import com.g42.platform.gms.booking.customer.domain.repository.BookingRepository;
 import com.g42.platform.gms.catalog.repository.CatalogItemRepository;
-import com.g42.platform.gms.common.enums.EstimateEnum;
 import com.g42.platform.gms.common.service.ExcelService;
+import com.g42.platform.gms.estimation.api.internal.EstimateInternalApi;
+import com.g42.platform.gms.estimation.domain.entity.Estimate;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceQueueResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceTicketDetailResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceTicketListResponse;
-import com.g42.platform.gms.service_ticket_management.api.dto.manage.UpdateServiceTicketRequest;
 import com.g42.platform.gms.service_ticket_management.api.mapper.ServiceTicketDtoMapper;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import com.g42.platform.gms.service_ticket_management.domain.entity.OdometerReading;
@@ -27,6 +28,7 @@ import com.g42.platform.gms.service_ticket_management.domain.repository.ServiceT
 import com.g42.platform.gms.service_ticket_management.domain.repository.VehicleConditionPhotoRepo;
 import com.g42.platform.gms.service_ticket_management.api.mapper.ServiceTicketListMapper;
 import com.g42.platform.gms.service_ticket_management.api.mapper.ServiceTicketDetailMapper;
+import com.g42.platform.gms.vehicle.api.internal.VehicleInternalApi;
 import com.g42.platform.gms.vehicle.entity.Vehicle;
 import com.g42.platform.gms.vehicle.repository.VehicleRepository;
 import lombok.RequiredArgsConstructor;
@@ -41,9 +43,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 
 /**
@@ -67,6 +70,9 @@ public class ServiceTicketManageService {
     private final ServiceTicketDetailMapper detailMapper;
     private final TicketAssignmentService ticketAssignmentService;
     private final ServiceTicketDtoMapper serviceTicketDtoMapper;
+    private final CustomerInternalApi customerInternalApi;
+    private final VehicleInternalApi vehicleInternalApi;
+    private final EstimateInternalApi estimateInternalApi;
 
     /**
      * Get paginated list of service tickets with filters.
@@ -324,23 +330,78 @@ public class ServiceTicketManageService {
         return serviceTicketDtoMapper.toDto(savedServiceTicket);
     }
     @Transactional
-    public byte[] exportTicketToExcel(){
-        List<ServiceTicket> serviceTickets = serviceTicketRepo.findAll();
+    public byte[] exportTicketToExcel(LocalDate startDate, LocalDate endDate){
+        if (startDate == null) {
+            startDate = LocalDate.of(2020, 1, 1);
+        }
+        if (endDate == null) {
+            endDate = LocalDate.now();
+        }
+        LocalDateTime start = startDate.atStartOfDay();
+        LocalDateTime end = endDate.atTime(23, 59, 59);
+        List<ServiceTicket> serviceTickets = serviceTicketRepo.findBetween(start,end);
+
+        List<Integer> customerIds = serviceTickets.stream().map(ServiceTicket::getCustomerId).distinct().toList();
+        List<Integer> vehicleIds = serviceTickets.stream().map(ServiceTicket::getVehicleId).distinct().toList();
+        List<Integer> ticketIds = serviceTickets.stream().map(ServiceTicket::getServiceTicketId).toList();
+
+        List<CustomerProfile> customerProfiles = customerInternalApi.findAllByIds(customerIds);
+        List<Vehicle> vehicles = vehicleInternalApi.findAllByIds(vehicleIds);
+        List<Estimate> estimates = estimateInternalApi.findAllByServiceTicketId(ticketIds);
+
+        Map<Integer, CustomerProfile> customerMap = customerProfiles.stream()
+                .collect(Collectors.toMap(CustomerProfile::getCustomerId, c -> c));
+        Map<Integer, Vehicle> vehicleMap = vehicles.stream()
+                .collect(Collectors.toMap(Vehicle::getVehicleId, v -> v));
+        Map<Integer, Estimate> estimateMap = estimates.stream()
+                .collect(Collectors.toMap(
+                        Estimate::getServiceTicketId,
+                        e -> e,
+                        (existing, replacement) -> replacement
+                ));
+
+        for (ServiceTicket ticket : serviceTickets) {
+
+        }
         String[] headers={
                 "STT",
-                "Mã Phiếu",
-                "Trạng Thái",
-                "Ngày Tạo",
-                "Yêu cầu của khách"
+                "Họ tên",
+                "Số điện thoại",
+                "Tổng tiền",
+                "Note cầu của khách",
+                "Biển số",
+                "Hãng xe",
+                "Kiểu xe",
+                "Kilomet",
+                "Ngày nhận xe",
+                "Ngày giao xe",
+                "Lưu ý",
+
+
 
         };
         int[] stt = {1};
-        return ExcelService.exportToExcel(serviceTickets,headers,serviceTicket -> new Object[]{
-                stt[0]++,
-                serviceTicket.getTicketCode(),
-                serviceTicket.getTicketStatus(),
-                serviceTicket.getCreatedAt(),
-                serviceTicket.getCustomerRequest()
+        return ExcelService.exportToExcel(serviceTickets, headers, ticket -> {
+            // Lấy thông tin từ Map
+            CustomerProfile customer = customerMap.get(ticket.getCustomerId());
+            Vehicle vehicle = vehicleMap.get(ticket.getVehicleId());
+            Estimate estimate = estimateMap.get(ticket.getServiceTicketId());
+
+            // Khởi tạo mảng Object có độ dài đúng 12 phần tử khớp với headers
+            return new Object[]{
+                    stt[0]++,                                                                   // 0: STT
+                    customer != null ? customer.getFullName() : "",                             // 1: Họ tên
+                    customer != null ? customer.getPhone() : "",                                // 2: SĐT
+                    estimate != null ? estimate.getTotalPrice() : 0,                            // 3: Tổng tiền
+                    ticket.getCustomerRequest() != null ? ticket.getCustomerRequest() : "",     // 4: Note
+                    vehicle != null ? vehicle.getLicensePlate() : "",                           // 5: Biển số
+                    vehicle != null ? vehicle.getBrand() : "",                                  // 6: Hãng xe
+                    vehicle != null ? vehicle.getModel() : "",                                  // 7: Kiểu xe
+                    "",                                                                         // 8: Kilomet (nếu có truy vấn odometer thì điền, không thì để rỗng)
+                    ticket.getReceivedAt() != null ? ticket.getReceivedAt().toLocalDate() : "", // 9: Ngày nhận
+                    ticket.getDeliveredAt() != null ? ticket.getDeliveredAt().toLocalDate() : "",// 10: Ngày giao
+                    ticket.getCheckInNotes() != null ? ticket.getCheckInNotes() : ""            // 11: Lưu ý
+            };
         });
     }
 }

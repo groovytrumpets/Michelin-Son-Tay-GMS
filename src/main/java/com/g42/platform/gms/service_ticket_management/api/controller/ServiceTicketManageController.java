@@ -88,9 +88,9 @@ public class ServiceTicketManageController {
 
     @GetMapping("/export")
     public ResponseEntity<byte[]> exportServiceTicketList(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate){
-        byte [] excelConetnt = serviceTicketManageService.exportTicketToExcel();
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate){
+        byte [] excelConetnt = serviceTicketManageService.exportTicketToExcel(startDate, endDate);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
         headers.setContentDispositionFormData("attachment","Danh_Sach_Phieu_Dich_Vu.xlsx");
