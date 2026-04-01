@@ -12,12 +12,14 @@ import com.g42.platform.gms.service_ticket_management.application.service.Servic
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -85,7 +87,9 @@ public class ServiceTicketManageController {
     }
 
     @GetMapping("/export")
-    public ResponseEntity<byte[]> exportServiceTicketList(){
+    public ResponseEntity<byte[]> exportServiceTicketList(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate){
         byte [] excelConetnt = serviceTicketManageService.exportTicketToExcel();
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));

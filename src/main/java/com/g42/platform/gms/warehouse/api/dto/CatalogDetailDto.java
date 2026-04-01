@@ -35,7 +35,7 @@ public class CatalogDetailDto {
     private String brandId;
     private String productLine;
     private String madeIn;
-    private Integer taxRuleId;
+    private TaxRuleDto taxRule;
     private Integer workCategoryId;
     private String partNumber;
     private String barcode;
