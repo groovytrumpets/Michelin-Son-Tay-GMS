@@ -9,6 +9,7 @@ import com.g42.platform.gms.warehouse.infrastructure.mapper.*;
 import com.g42.platform.gms.warehouse.infrastructure.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -97,9 +98,10 @@ public class CatalogItemRepoImpl implements CatalogItemRepo {
     public boolean exitBySku(String sku) {
         return catalogItemJpaRepo.existsBySku(sku);
     }
-
     @Override
+    @Transactional
     public WorkCategory saveItemCate(WorkCategory itemCategory) {
+
         WorkCategoryJpaEntity itemCategoryJpa = itemCategoryJpaRepo.save(itemCategoryJpaMapper.toJpa(itemCategory));
         return itemCategoryJpaMapper.toDomain(itemCategoryJpa);
     }
@@ -189,5 +191,10 @@ public class CatalogItemRepoImpl implements CatalogItemRepo {
     @Override
     public Map<Integer, String> findAllCatesByIds(Set<Integer> categoryIds) {
         return itemCategoryJpaRepo.findCateByIds(categoryIds);
+    }
+
+    @Override
+    public int findCategoryMaxOrder() {
+        return itemCategoryJpaRepo.findMaxDisplayOrder();
     }
 }
