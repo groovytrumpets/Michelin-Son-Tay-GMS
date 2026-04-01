@@ -41,4 +41,6 @@ public interface ServiceTicketRepo {
     Integer findMaxQueueNumberForToday(LocalDateTime startOfToday, LocalDateTime endOfToday);
 
     List<ServiceTicket> findBetween(LocalDateTime start, LocalDateTime end);
+
+    ServiceTicket findPerviousCustomerService(Integer customerId, Integer serviceTicketId);
 }

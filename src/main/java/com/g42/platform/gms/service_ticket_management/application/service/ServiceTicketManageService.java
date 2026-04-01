@@ -16,6 +16,7 @@ import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceQueu
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceTicketDetailResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceTicketListResponse;
 import com.g42.platform.gms.service_ticket_management.api.mapper.ServiceTicketDtoMapper;
+import com.g42.platform.gms.service_ticket_management.domain.entity.SafetyInspection;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import com.g42.platform.gms.service_ticket_management.domain.entity.OdometerReading;
 import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicket;
@@ -73,6 +74,7 @@ public class ServiceTicketManageService {
     private final CustomerInternalApi customerInternalApi;
     private final VehicleInternalApi vehicleInternalApi;
     private final EstimateInternalApi estimateInternalApi;
+    private final SafetyInspectionService safetyInspectionService;
 
     /**
      * Get paginated list of service tickets with filters.
@@ -403,6 +405,22 @@ public class ServiceTicketManageService {
                     ticket.getCheckInNotes() != null ? ticket.getCheckInNotes() : ""            // 11: Lưu ý
             };
         });
+    }
+
+    public String getCustomerPerviousRecomment(Integer serviceTicketId) {
+        ServiceTicket serviceTicket = serviceTicketRepo.findByServiceTicketId(serviceTicketId);
+        CustomerProfile customerProfile = customerInternalApi.findById(serviceTicket.getCustomerId());
+        /* todo: get previous custumer service ticket id */
+        Integer previousId = serviceTicketRepo.findPerviousCustomerService(customerProfile.getCustomerId(),serviceTicketId).getServiceTicketId();
+        System.out.println("DEBUG: "+previousId);
+        if (previousId != null) {
+            //todo: get recomment
+            SafetyInspection safetyInspection = safetyInspectionService.findByServiceTicketId(previousId);
+            if (safetyInspection != null) {
+            return safetyInspection.getGeneralNotes();
+            }
+        }
+        return null;
     }
 }
 

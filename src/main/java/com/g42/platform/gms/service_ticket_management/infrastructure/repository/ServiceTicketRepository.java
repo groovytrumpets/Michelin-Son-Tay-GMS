@@ -53,4 +53,8 @@ public interface ServiceTicketRepository extends JpaRepository<ServiceTicketJpa,
     Integer findMaxQueueNumberForToday(LocalDateTime startOfToday, LocalDateTime endOfToday);
 
     List<ServiceTicketJpa> findServiceTicketJpasByReceivedAtBetween(LocalDateTime receivedAtAfter, LocalDateTime receivedAtBefore);
+
+    ServiceTicketJpa findFirstByCustomerIdAndServiceTicketIdNot(Integer customerId, Integer serviceTicketId);
+
+    ServiceTicketJpa findFirstByCustomerIdAndServiceTicketIdNotOrderByReceivedAtDesc(Integer customerId, Integer serviceTicketId);
 }

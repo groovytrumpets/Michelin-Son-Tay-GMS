@@ -7,4 +7,6 @@ import java.util.List;
 public interface CustomerInternalApi {
 
     List<CustomerProfile> findAllByIds(List<Integer> customerIds);
+
+    CustomerProfile findById(Integer customerId);
 }
