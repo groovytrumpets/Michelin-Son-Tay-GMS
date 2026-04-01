@@ -1,6 +1,7 @@
 package com.g42.platform.gms.warehouse.app.service;
 
 import com.g42.platform.gms.estimation.api.internal.TaxRuleInternalApi;
+import com.g42.platform.gms.estimation.api.mapper.TaxRuleDtoMapper;
 import com.g42.platform.gms.warehouse.api.dto.*;
 import com.g42.platform.gms.warehouse.api.mapper.*;
 import com.g42.platform.gms.warehouse.domain.entity.*;
@@ -11,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Service("catalogItemWarehouseService")
@@ -31,6 +33,8 @@ public class CatalogItemService {
     private WorkCateDtoMapper itemCateDtoMapper;
     @Autowired
     private TaxRuleInternalApi taxRuleInternalApi;
+    @Autowired
+    private TaxRuleDtoMapper taxRuleDtoMapper;
 
     public List<BrandHintDto> getAllBrands() {
         List<Brand> brandList = catalogItemRepo.getAllBrands();
@@ -135,7 +139,6 @@ public class CatalogItemService {
         }
         if (catalogItemRepo.exitByCategoryCode(itemCategory.getCategoryCode()))
             throw new WarehouseException("Category code must be UNIQUE!",WarehouseErrorCode.INVALID_CATEGORY);
-        itemCategory.setIsDefault(true);
         itemCategory.setIsActive(true);
         int nextOrder = catalogItemRepo.findCategoryMaxOrder()+1;
         itemCategory.setDisplayOrder(nextOrder);
@@ -198,6 +201,12 @@ public class CatalogItemService {
         if (catalogItem.getProductLineId() != 0) {
         catalogDetailDto.setProductLine(catalogItemRepo.getProductLineById(catalogItem.getProductLineId()).getLineName());
         }
+        if (catalogItem.getTaxRuleId() !=null){
+        TaxRuleDto taxValue = taxRuleDtoMapper.toTaxRuleDtoWarehouse
+                (taxRuleInternalApi.getTaxRuleById(catalogItem.getTaxRuleId()));
+            catalogDetailDto.setTaxRule(taxValue);
+        }
+
         return catalogDetailDto;
     }
 
