@@ -15,6 +15,8 @@ import com.g42.platform.gms.estimation.domain.repository.EstimateItemRepository;
 import com.g42.platform.gms.estimation.domain.repository.EstimateRepository;
 import com.g42.platform.gms.estimation.domain.repository.TaxRuleRepository;
 import com.g42.platform.gms.estimation.domain.repository.WorkCategoryRepository;
+import com.g42.platform.gms.warehouse.api.dto.CatalogItemDto;
+import com.g42.platform.gms.warehouse.api.internal.WarehouseInternalApi;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +33,8 @@ public class EstimateService {
     private final WorkCategoryRepository workCategoryRepo;
     private final EstimateDtoMapper estimateDtoMapper;
     private final TaxRuleRepository taxRuleRepository;
+
+    private final WarehouseInternalApi warehouseInternalApi;
 
 
     public List<EstimateRespondDto> getEstimateByCode(Integer serviceTicketId) {
@@ -202,16 +206,24 @@ public class EstimateService {
             item.setIsChecked(req.getIsChecked() != null ? req.getIsChecked() : false);
 
             TaxRule taxRule = null;
-            if (workCategory != null && workCategory.getTaxRuleId() != null) {
-                taxRule = taxRuleRepository.findById(workCategory.getTaxRuleId());
-            }
-            //todo: vat calculate
             Integer ruleId = null;
-            if (workCategory != null) {
+            //todo: check item taxt
+            //check item have tax?
+            if (req.getItemId()!=null){
+                CatalogItemDto itemDto = warehouseInternalApi.getItemInfo(req.getItemId());
+                if (itemDto != null && itemDto.getTaxRuleId() != null) {
+                    ruleId = itemDto.getTaxRuleId();
+                }
+            }
+            //if item tax null, check category tax
+            if (ruleId == null && workCategory != null && workCategory.getTaxRuleId() != null) {
                 ruleId = workCategory.getTaxRuleId();
-            } else {
+            }
+            //if category tax null, check input tax
+            if (ruleId == null && req.getTaxRuleId() != null) {
                 ruleId = req.getTaxRuleId();
             }
+            //todo: vat calculate
             BigDecimal quantity = BigDecimal.valueOf(req.getQuantity());
             BigDecimal unitPrice = req.getUnitPrice();
 

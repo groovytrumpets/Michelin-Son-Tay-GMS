@@ -28,6 +28,7 @@ public class CatalogItemDto {
     private String comboDescription;
     private Boolean isRecurring;
     private Integer brandId;
+    private Integer taxRuleId;
     private Integer productLineId;
     private Integer workCategoryId;
 }
