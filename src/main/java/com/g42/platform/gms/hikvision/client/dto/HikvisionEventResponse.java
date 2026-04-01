@@ -1,6 +1,7 @@
 package com.g42.platform.gms.hikvision.client.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 import java.util.List;
@@ -9,12 +10,19 @@ import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class HikvisionEventResponse {
 
-    private AcsEventCond AcsEventCond;
+    // Hikvision returns: {"AcsEvent": {"InfoList": [...], "totalMatches": N, ...}}
+    @JsonProperty("AcsEvent")
+    private AcsEvent acsEvent;
 
     @Data
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class AcsEventCond {
-        private List<HikvisionEvent> InfoList;
-        private Integer total;
+    public static class AcsEvent {
+        @JsonProperty("InfoList")
+        private List<HikvisionEvent> infoList;
+
+        private Integer totalMatches;
+        private Integer numOfMatches;
+        private String responseStatusStrg;
+        private String searchID;
     }
 }

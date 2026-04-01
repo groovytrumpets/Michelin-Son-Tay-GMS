@@ -6,13 +6,13 @@ import com.g42.platform.gms.hikvision.client.dto.HikvisionEventResponse;
 import com.g42.platform.gms.hikvision.config.HikvisionProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
+import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.springframework.stereotype.Component;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
@@ -32,17 +32,34 @@ public class HikvisionApiClient {
 
     /**
      * Fetch authentication events (major=5, minor=38) from Hikvision device
-     * within the given time window.
+     * within the given time window using POST with JSON body.
      */
     public List<HikvisionEvent> fetchEvents(LocalDateTime from, LocalDateTime to) {
-        String startTime = URLEncoder.encode(from.format(HIKVISION_FORMATTER) + "+07:00", StandardCharsets.UTF_8);
-        String endTime = URLEncoder.encode(to.format(HIKVISION_FORMATTER) + "+07:00", StandardCharsets.UTF_8);
+        String url = String.format("https://%s:%d/ISAPI/AccessControl/AcsEvent?format=json",
+                props.getHost(), props.getPort());
 
-        String url = String.format("http://%s:%d/ISAPI/AccessControl/AcsEvent?format=json" +
-                        "&major=5&minor=38&startTime=%s&endTime=%s",
-                props.getHost(), props.getPort(), startTime, endTime);
+        String startTime = from.format(HIKVISION_FORMATTER) + "+07:00";
+        String endTime = to.format(HIKVISION_FORMATTER) + "+07:00";
 
-        HttpGet request = new HttpGet(url);
+        // Hikvision requires POST with JSON body for event search
+        // Note: major/minor filtering in body is not supported by all devices
+        // We fetch all events and filter client-side
+        String requestBody = String.format("""
+                {
+                  "AcsEventCond": {
+                    "searchID": "1",
+                    "searchResultPosition": 0,
+                    "maxResults": 100,
+                    "major": 0,
+                    "minor": 0,
+                    "startTime": "%s",
+                    "endTime": "%s"
+                  }
+                }
+                """, startTime, endTime);
+
+        HttpPost request = new HttpPost(url);
+        request.setEntity(new StringEntity(requestBody, ContentType.APPLICATION_JSON));
 
         try {
             return hikvisionHttpClient.execute(request, response -> {
@@ -52,16 +69,19 @@ public class HikvisionApiClient {
                     return Collections.emptyList();
                 }
 
-                String body = EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
+                String body = EntityUtils.toString(response.getEntity(), java.nio.charset.StandardCharsets.UTF_8);
                 HikvisionEventResponse eventResponse = objectMapper.readValue(body, HikvisionEventResponse.class);
 
-                if (eventResponse.getAcsEventCond() == null
-                        || eventResponse.getAcsEventCond().getInfoList() == null) {
+                if (eventResponse.getAcsEvent() == null
+                        || eventResponse.getAcsEvent().getInfoList() == null) {
                     return Collections.emptyList();
                 }
 
-                List<HikvisionEvent> events = eventResponse.getAcsEventCond().getInfoList();
-                log.debug("Fetched {} events from Hikvision device", events.size());
+                List<HikvisionEvent> events = eventResponse.getAcsEvent().getInfoList().stream()
+                        .filter(e -> e.getMajor() != null && e.getMajor() == 5
+                                && e.getMinor() != null && e.getMinor() == 38)
+                        .toList();
+                log.debug("Fetched {} attendance events from Hikvision device", events.size());
                 return events;
             });
         } catch (Exception e) {

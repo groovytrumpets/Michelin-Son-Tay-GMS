@@ -52,7 +52,21 @@ public class HikvisionSyncScheduler {
 
         LocalDateTime from = lastSyncTime.get();
         LocalDateTime to = LocalDateTime.now();
+        doSync(from, to);
+        lastSyncTime.set(to);
+    }
 
+    /**
+     * Manually trigger sync from a specific time (for testing or catch-up).
+     */
+    public void syncFrom(LocalDateTime from) {
+        LocalDateTime to = LocalDateTime.now();
+        log.info("HikvisionSyncScheduler: manual sync triggered from={} to={}", from, to);
+        doSync(from, to);
+        lastSyncTime.set(to);
+    }
+
+    private void doSync(LocalDateTime from, LocalDateTime to) {
         log.info("HikvisionSyncScheduler: starting sync from={} to={}", from, to);
 
         List<HikvisionEvent> events = apiClient.fetchEvents(from, to);
@@ -65,7 +79,5 @@ public class HikvisionSyncScheduler {
         } else {
             log.info("HikvisionSyncScheduler: no new events found");
         }
-
-        lastSyncTime.set(to);
     }
 }

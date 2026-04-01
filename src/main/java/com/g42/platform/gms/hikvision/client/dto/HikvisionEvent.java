@@ -1,14 +1,24 @@
 package com.g42.platform.gms.hikvision.client.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 @Data
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class HikvisionEvent {
     private String employeeNoString;
-    private String dateTime; // ISO 8601: "2024-01-15T08:30:00+07:00"
+
+    // Hikvision device returns "time" field (not "dateTime")
+    @JsonProperty("time")
+    private String dateTime;
+
     private String name;
     private Integer major;
     private Integer minor;
+    private Integer cardType;
+    private Integer cardReaderNo;
+    private Integer doorNo;
+    private String userType;
+    private String currentVerifyMode;
 }
