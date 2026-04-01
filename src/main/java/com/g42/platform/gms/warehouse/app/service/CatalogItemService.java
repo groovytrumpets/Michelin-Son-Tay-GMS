@@ -1,18 +1,16 @@
 package com.g42.platform.gms.warehouse.app.service;
 
+import com.g42.platform.gms.estimation.api.internal.TaxRuleInternalApi;
 import com.g42.platform.gms.warehouse.api.dto.*;
 import com.g42.platform.gms.warehouse.api.mapper.*;
 import com.g42.platform.gms.warehouse.domain.entity.*;
-import com.g42.platform.gms.warehouse.domain.enums.CatalogItemType;
 import com.g42.platform.gms.warehouse.domain.exception.WarehouseErrorCode;
 import com.g42.platform.gms.warehouse.domain.exception.WarehouseException;
 import com.g42.platform.gms.warehouse.domain.repository.CatalogItemRepo;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 @Service("catalogItemWarehouseService")
@@ -31,6 +29,8 @@ public class CatalogItemService {
     private CatalogDtoMapper catalogDtoMapper;
     @Autowired
     private WorkCateDtoMapper itemCateDtoMapper;
+    @Autowired
+    private TaxRuleInternalApi taxRuleInternalApi;
 
     public List<BrandHintDto> getAllBrands() {
         List<Brand> brandList = catalogItemRepo.getAllBrands();
@@ -125,7 +125,7 @@ public class CatalogItemService {
         }
         return catalogItemRepo.saveProductLine(productLine);
     }
-
+    @Transactional
     public WorkCategory saveItemCate(WorkCategory itemCategory) {
         if (itemCategory.getCategoryType()==null) {
             throw new WarehouseException("Category must not null!",WarehouseErrorCode.WRONG_ENUM);
@@ -136,6 +136,19 @@ public class CatalogItemService {
         if (catalogItemRepo.exitByCategoryCode(itemCategory.getCategoryCode()))
             throw new WarehouseException("Category code must be UNIQUE!",WarehouseErrorCode.INVALID_CATEGORY);
         itemCategory.setIsDefault(true);
+        itemCategory.setIsActive(true);
+        int nextOrder = catalogItemRepo.findCategoryMaxOrder()+1;
+        itemCategory.setDisplayOrder(nextOrder);
+
+        Integer finalTaxId = itemCategory.getTaxRuleId();
+        if (finalTaxId == null){
+            finalTaxId = taxRuleInternalApi.getTaxCodeFreeId("FREE");
+            if (finalTaxId==null) {
+                finalTaxId = taxRuleInternalApi.createNewFreeTax();
+
+            }
+        }
+        itemCategory.setTaxRuleId(finalTaxId);
         return catalogItemRepo.saveItemCate(itemCategory);
     }
     @Transactional

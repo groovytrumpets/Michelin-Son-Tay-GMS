@@ -17,6 +17,8 @@ public interface WorkCategoryJpaEntityRepo extends JpaRepository<WorkCategoryJpa
     WorkCategoryJpaEntity findByCategoryCode(String categoryCode);
 
     WorkCategoryJpaEntity findByCategoryCodeContainingIgnoreCase(String categoryCode);
+    @Query("SELECT COALESCE(MAX(wc.displayOrder), 0) FROM WorkCategoryJpa wc")
+    int findMaxDisplayOrder();
 
 
     interface ItemCategoryProjection{

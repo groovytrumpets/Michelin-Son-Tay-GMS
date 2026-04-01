@@ -60,4 +60,6 @@ public interface CatalogItemRepo {
     List<SpecificationRespondDto> getAllSpecsByItemId(Integer catalogItemId);
 
     Map<Integer, String> findAllCatesByIds(Set<Integer> categoryIds);
+
+    int findCategoryMaxOrder();
 }
