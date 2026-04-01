@@ -28,4 +28,8 @@ public class CatalogSummaryDto {
     private String brand;
     private String productLine;
     private String itemCategoryCode;
+    private String madeIn;
+    private Integer taxRuleId;
+    private String partNumber;
+    private String barcode;
 }
