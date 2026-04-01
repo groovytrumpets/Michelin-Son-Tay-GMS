@@ -315,7 +315,7 @@ public class ServiceTicketManageService {
 
     private void compare2serviceTicket(ServiceTicket serviceTicket1, ServiceTicket serviceTicket2) {
         //todo: check validate service ticket
-        if (!serviceTicket1.getReceivedAt().equals(serviceTicket2.getReceivedAt())) {
+        if (!serviceTicket1.getReceivedAt().toLocalDate().equals(serviceTicket2.getReceivedAt().toLocalDate())) {
             throw new AssignmentException("Swap service ticket not match create Date", AssignmentErrorCode.INVALID_SERVICE_TICKET_ID);
         }
         if (serviceTicket1.getQueueNumber()==null || serviceTicket2.getQueueNumber()==null) {
