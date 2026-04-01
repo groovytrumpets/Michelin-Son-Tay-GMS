@@ -34,6 +34,10 @@ public class CatalogCreateDto {
     private Integer brandId;
     private Integer productLineId;
     @NotNull
-    private Integer itemCategoryId;
+    private String madeIn;
+    private Integer taxRuleId;
+    private Integer workCategoryId;
+    private String partNumber;
+    private String barcode;
 
 }

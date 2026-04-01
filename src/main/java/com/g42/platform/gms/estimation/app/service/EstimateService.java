@@ -6,6 +6,7 @@ import com.g42.platform.gms.estimation.api.dto.EstimateRespondDto;
 import com.g42.platform.gms.estimation.api.dto.WorkCataDto;
 import com.g42.platform.gms.estimation.api.dto.request.EstimateItemReqDto;
 import com.g42.platform.gms.estimation.api.dto.request.EstimateRequestDto;
+import com.g42.platform.gms.estimation.api.internal.TaxRuleInternalApi;
 import com.g42.platform.gms.estimation.api.mapper.EstimateDtoMapper;
 import com.g42.platform.gms.estimation.domain.entity.Estimate;
 import com.g42.platform.gms.estimation.domain.entity.EstimateItem;
@@ -15,6 +16,8 @@ import com.g42.platform.gms.estimation.domain.repository.EstimateItemRepository;
 import com.g42.platform.gms.estimation.domain.repository.EstimateRepository;
 import com.g42.platform.gms.estimation.domain.repository.TaxRuleRepository;
 import com.g42.platform.gms.estimation.domain.repository.WorkCategoryRepository;
+import com.g42.platform.gms.warehouse.api.dto.CatalogItemDto;
+import com.g42.platform.gms.warehouse.api.internal.WarehouseInternalApi;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +34,9 @@ public class EstimateService {
     private final WorkCategoryRepository workCategoryRepo;
     private final EstimateDtoMapper estimateDtoMapper;
     private final TaxRuleRepository taxRuleRepository;
+
+    private final WarehouseInternalApi warehouseInternalApi;
+    private final TaxRuleInternalApi taxRuleInternalApi;
 
 
     public List<EstimateRespondDto> getEstimateByCode(Integer serviceTicketId) {
@@ -95,7 +101,9 @@ public class EstimateService {
         estimate.setServiceTicketId(request.getServiceTicketId());
         estimate.setEstimateType(request.getEstimateType());
         estimate.setStatus(EstimateEnum.DRAFT);
-        estimate.setVersion(1);
+        //todo: check version
+        int latestEstimateVersion = estimateRepository.findLatestEstimate(request.getServiceTicketId());
+        estimate.setVersion(latestEstimateVersion);
         estimate.setTotalPrice(BigDecimal.ZERO);
         Estimate saved = estimateRepository.save(estimate);
 
@@ -169,8 +177,8 @@ public class EstimateService {
                                             Integer estimateId) {
         return itemRequests.stream().map(req -> {
             Integer categoryId = req.getWorkCategoryId();
-            WorkCategory workCategory = new WorkCategory();
-            // Tạo work_category mới nếu không có sẵn
+            WorkCategory workCategory = null;
+
             if (categoryId == null && req.getNewCategoryName() != null) {
             System.out.println("DEBUG CREATING CATA: ");
                 WorkCategory newCategory = new WorkCategory();
@@ -180,11 +188,17 @@ public class EstimateService {
                 );
                 newCategory.setIsDefault(false);
                 newCategory.setIsActive(true);
-                newCategory.setTaxRuleId(req.getTaxRuleId() != null ? req.getTaxRuleId() : 1);
+                Integer finalTaxId = req.getTaxRuleId();
+                if (finalTaxId == null) {
+                    finalTaxId = taxRuleInternalApi.getTaxCodeFreeId("FREE");
+                    if (finalTaxId==null) finalTaxId=taxRuleInternalApi.createNewFreeTax();
+                }
+                newCategory.setTaxRuleId(finalTaxId);
+
                 int nextOrder = workCategoryRepo.findMaxDisplayOrder()+1;
                 newCategory.setDisplayOrder(nextOrder);
-                WorkCategory saved = workCategoryRepo.save(newCategory);
-                categoryId = saved.getId();
+                workCategory= workCategoryRepo.save(newCategory);
+                categoryId = workCategory.getId();
             }else if (categoryId != null) {
                 // Nếu có categoryId, bốc từ DB lên để tý lấy ID thuế của nó
                 workCategory = workCategoryRepo.findById(categoryId);
@@ -200,16 +214,24 @@ public class EstimateService {
             item.setIsChecked(req.getIsChecked() != null ? req.getIsChecked() : false);
 
             TaxRule taxRule = null;
-            if (workCategory != null && workCategory.getTaxRuleId() != null) {
-                taxRule = taxRuleRepository.findById(workCategory.getTaxRuleId());
-            }
-            //todo: vat calculate
             Integer ruleId = null;
-            if (workCategory != null) {
+            //todo: check item taxt
+            //check item have tax?
+            if (req.getItemId()!=null){
+                CatalogItemDto itemDto = warehouseInternalApi.getItemInfo(req.getItemId());
+                if (itemDto != null && itemDto.getTaxRuleId() != null) {
+                    ruleId = itemDto.getTaxRuleId();
+                }
+            }
+            //if item tax null, check category tax
+            if (ruleId == null && workCategory != null && workCategory.getTaxRuleId() != null) {
                 ruleId = workCategory.getTaxRuleId();
-            } else {
+            }
+            //if category tax null, check input tax
+            if (ruleId == null && req.getTaxRuleId() != null) {
                 ruleId = req.getTaxRuleId();
             }
+            //todo: vat calculate
             BigDecimal quantity = BigDecimal.valueOf(req.getQuantity());
             BigDecimal unitPrice = req.getUnitPrice();
 
