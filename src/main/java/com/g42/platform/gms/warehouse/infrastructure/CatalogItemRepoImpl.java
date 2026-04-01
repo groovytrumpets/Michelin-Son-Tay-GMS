@@ -9,6 +9,7 @@ import com.g42.platform.gms.warehouse.infrastructure.mapper.*;
 import com.g42.platform.gms.warehouse.infrastructure.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -39,9 +40,9 @@ public class CatalogItemRepoImpl implements CatalogItemRepo {
     @Autowired
     private ServiceJpaRepository serviceJpaRepository;
     @Autowired
-    private ItemCategoryJpaMapper itemCategoryJpaMapper;
+    private WorkCategoryEntityJpaMapper itemCategoryJpaMapper;
     @Autowired
-    private ItemCategoryJpaRepo itemCategoryJpaRepo;
+    private WorkCategoryJpaEntityRepo itemCategoryJpaRepo;
 
 
     @Override
@@ -97,10 +98,11 @@ public class CatalogItemRepoImpl implements CatalogItemRepo {
     public boolean exitBySku(String sku) {
         return catalogItemJpaRepo.existsBySku(sku);
     }
-
     @Override
-    public ItemCategory saveItemCate(ItemCategory itemCategory) {
-        ItemCategoryJpa itemCategoryJpa = itemCategoryJpaRepo.save(itemCategoryJpaMapper.toJpa(itemCategory));
+    @Transactional
+    public WorkCategory saveItemCate(WorkCategory itemCategory) {
+
+        WorkCategoryJpaEntity itemCategoryJpa = itemCategoryJpaRepo.save(itemCategoryJpaMapper.toJpa(itemCategory));
         return itemCategoryJpaMapper.toDomain(itemCategoryJpa);
     }
 
@@ -117,8 +119,8 @@ public class CatalogItemRepoImpl implements CatalogItemRepo {
     }
 
     @Override
-    public ItemCategory getItemCategoryById(Integer itemCategoryId) {
-        ItemCategoryJpa itemCategoryJpa = itemCategoryJpaRepo.findById(itemCategoryId).orElse(null);
+    public WorkCategory getItemCategoryById(Integer itemCategoryId) {
+        WorkCategoryJpaEntity itemCategoryJpa = itemCategoryJpaRepo.findById(itemCategoryId).orElse(null);
         return itemCategoryJpaMapper.toDomain(itemCategoryJpa);
     }
 
@@ -146,8 +148,8 @@ public class CatalogItemRepoImpl implements CatalogItemRepo {
     }
 
     @Override
-    public List<ItemCategory> getAllItemCategory() {
-        List<ItemCategoryJpa> itemCategoryJpas = itemCategoryJpaRepo.findAll();
+    public List<WorkCategory> getAllItemCategory() {
+        List<WorkCategoryJpaEntity> itemCategoryJpas = itemCategoryJpaRepo.findAll();
         return itemCategoryJpas.stream().map(itemCategoryJpaMapper::toDomain).toList();
     }
 
@@ -164,11 +166,11 @@ public class CatalogItemRepoImpl implements CatalogItemRepo {
     }
     @Override
     public Integer findCategoryCode(String categoryCode) {
-        ItemCategoryJpa itemCategoryJpa = itemCategoryJpaRepo.findByCategoryCode(categoryCode);
-        if (itemCategoryJpa == null) {
+        WorkCategoryJpaEntity workCategoryJpaEntity = itemCategoryJpaRepo.findByCategoryCode(categoryCode);
+        if (workCategoryJpaEntity == null) {
             return null;
         }
-        return itemCategoryJpa.getItemCategoryId();
+        return workCategoryJpaEntity.getWorkCategoryId();
     }
 
     @Override
@@ -189,5 +191,10 @@ public class CatalogItemRepoImpl implements CatalogItemRepo {
     @Override
     public Map<Integer, String> findAllCatesByIds(Set<Integer> categoryIds) {
         return itemCategoryJpaRepo.findCateByIds(categoryIds);
+    }
+
+    @Override
+    public int findCategoryMaxOrder() {
+        return itemCategoryJpaRepo.findMaxDisplayOrder();
     }
 }

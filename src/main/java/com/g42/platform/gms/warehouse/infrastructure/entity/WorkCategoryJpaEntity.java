@@ -1,4 +1,4 @@
-package com.g42.platform.gms.estimation.infrastructure.entity;
+package com.g42.platform.gms.warehouse.infrastructure.entity;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
@@ -11,13 +11,13 @@ import org.hibernate.annotations.ColumnDefault;
 @Setter
 @Entity
 @Table(name = "work_category", schema = "michelin_garage")
-public class WorkCategoryJpa {
+public class WorkCategoryJpaEntity {
 
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "idwork_category", nullable = false)
-    private Integer id;
+    private Integer workCategoryId;
 
     @Size(max = 50)
     @Column(name = "category_code", length = 50)

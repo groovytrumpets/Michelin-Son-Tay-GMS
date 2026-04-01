@@ -1,17 +1,16 @@
 package com.g42.platform.gms.warehouse.app.service;
 
+import com.g42.platform.gms.estimation.api.internal.TaxRuleInternalApi;
 import com.g42.platform.gms.warehouse.api.dto.*;
 import com.g42.platform.gms.warehouse.api.mapper.*;
 import com.g42.platform.gms.warehouse.domain.entity.*;
-import com.g42.platform.gms.warehouse.domain.enums.CatalogItemType;
 import com.g42.platform.gms.warehouse.domain.exception.WarehouseErrorCode;
 import com.g42.platform.gms.warehouse.domain.exception.WarehouseException;
 import com.g42.platform.gms.warehouse.domain.repository.CatalogItemRepo;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 @Service("catalogItemWarehouseService")
@@ -29,7 +28,9 @@ public class CatalogItemService {
     @Autowired
     private CatalogDtoMapper catalogDtoMapper;
     @Autowired
-    private ItemCateDtoMapper itemCateDtoMapper;
+    private WorkCateDtoMapper itemCateDtoMapper;
+    @Autowired
+    private TaxRuleInternalApi taxRuleInternalApi;
 
     public List<BrandHintDto> getAllBrands() {
         List<Brand> brandList = catalogItemRepo.getAllBrands();
@@ -54,12 +55,12 @@ public class CatalogItemService {
     public Brand createNewBrand(Brand brand) {
         return catalogItemRepo.createBrand(brand);
     }
-
+    @Transactional
     public CatalogItemDto createNewCatalog(CatalogCreateDto createDto) {
         validateCatalogItemDto(createDto);
         Brand brand = catalogItemRepo.getBrandById(createDto.getBrandId());
         ProductLine productLine = catalogItemRepo.getProductLineById(createDto.getProductLineId());
-        ItemCategory itemCategory = catalogItemRepo.getItemCategoryById(createDto.getItemCategoryId());
+        WorkCategory itemCategory = catalogItemRepo.getItemCategoryById(createDto.getWorkCategoryId());
         CatalogItem catalogItem = catalogItemRepo.createCatalog(catalogDtoMapper.toDomain(createDto));
         List<Specification> specifications = catalogItemRepo.getListOfSpecsByItem(catalogItem.getItemId());
         String itemName = builDisplayName(catalogDtoMapper.toDomain(createDto),brand,productLine,specifications,itemCategory);
@@ -82,7 +83,7 @@ public class CatalogItemService {
         }
         //todo:validate catalog category items
     }
-    private String builDisplayName(CatalogItem catalogItem, Brand brand, ProductLine productLine, List<Specification> specs,ItemCategory itemCategory) {
+    private String builDisplayName(CatalogItem catalogItem, Brand brand, ProductLine productLine, List<Specification> specs,WorkCategory itemCategory) {
         StringBuilder displayName = new StringBuilder();
 
         //type
@@ -124,8 +125,8 @@ public class CatalogItemService {
         }
         return catalogItemRepo.saveProductLine(productLine);
     }
-
-    public ItemCategory saveItemCate(ItemCategory itemCategory) {
+    @Transactional
+    public WorkCategory saveItemCate(WorkCategory itemCategory) {
         if (itemCategory.getCategoryType()==null) {
             throw new WarehouseException("Category must not null!",WarehouseErrorCode.WRONG_ENUM);
         }
@@ -134,9 +135,23 @@ public class CatalogItemService {
         }
         if (catalogItemRepo.exitByCategoryCode(itemCategory.getCategoryCode()))
             throw new WarehouseException("Category code must be UNIQUE!",WarehouseErrorCode.INVALID_CATEGORY);
+        itemCategory.setIsDefault(true);
+        itemCategory.setIsActive(true);
+        int nextOrder = catalogItemRepo.findCategoryMaxOrder()+1;
+        itemCategory.setDisplayOrder(nextOrder);
+
+        Integer finalTaxId = itemCategory.getTaxRuleId();
+        if (finalTaxId == null){
+            finalTaxId = taxRuleInternalApi.getTaxCodeFreeId("FREE");
+            if (finalTaxId==null) {
+                finalTaxId = taxRuleInternalApi.createNewFreeTax();
+
+            }
+        }
+        itemCategory.setTaxRuleId(finalTaxId);
         return catalogItemRepo.saveItemCate(itemCategory);
     }
-
+    @Transactional
     public Specification saveSpecs(Specification specification) {
         if (specification.getItemId()==null) {
             throw new WarehouseException("item Catalog required!",WarehouseErrorCode.PARENT_REQUIRE);
@@ -145,7 +160,7 @@ public class CatalogItemService {
         CatalogItem catalogItem = catalogItemRepo.getCatalogItemById(specification.getItemId());
         Brand brand = catalogItemRepo.getBrandById(catalogItem.getBrandId());
         ProductLine productLine = catalogItemRepo.getProductLineById(catalogItem.getProductLineId());
-        ItemCategory itemCategory = catalogItemRepo.getItemCategoryById(catalogItem.getItemCategoryId());
+        WorkCategory itemCategory = catalogItemRepo.getItemCategoryById(catalogItem.getWorkCategoryId());
         Specification savedSpec = catalogItemRepo.saveSpec(specification);
         List<Specification> specifications = catalogItemRepo.getListOfSpecsByItem(catalogItem.getItemId());
         String itemName = builDisplayName(catalogItem,brand,productLine,specifications,itemCategory);
@@ -159,8 +174,8 @@ public class CatalogItemService {
         return catalogItemRepo.saveSpecAttribute(specAttribute);
     }
 
-    public List<ItemCategoryHintDto> getAllItemCategory() {
-        List<ItemCategory> itemCategories = catalogItemRepo.getAllItemCategory();
+    public List<WorkCategoryHintDto> getAllItemCategory() {
+        List<WorkCategory> itemCategories = catalogItemRepo.getAllItemCategory();
         return itemCategories.stream().map(itemCateDtoMapper::toDto).toList();
     }
 

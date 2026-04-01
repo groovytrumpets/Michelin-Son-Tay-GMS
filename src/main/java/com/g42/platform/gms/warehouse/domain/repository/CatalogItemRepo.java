@@ -29,13 +29,13 @@ public interface CatalogItemRepo {
 
     boolean exitBySku(String sku);
 
-    ItemCategory saveItemCate(ItemCategory itemCategory);
+    WorkCategory saveItemCate(WorkCategory itemCategory);
 
     ProductLine getProductLineById(Integer productLineId);
 
     List<Specification> getListOfSpecsByItem(Integer itemId);
 
-    ItemCategory getItemCategoryById(@NotNull Integer itemCategoryId);
+    WorkCategory getItemCategoryById(@NotNull Integer itemCategoryId);
 
     CatalogItem saveCatalogItem(CatalogItem catalogItem);
 
@@ -45,7 +45,7 @@ public interface CatalogItemRepo {
 
     SpecAttribute saveSpecAttribute(SpecAttribute specAttribute);
 
-    List<ItemCategory> getAllItemCategory();
+    List<WorkCategory> getAllItemCategory();
 
     SpecAttribute getSpecAttributeById(Integer attributeId);
 
@@ -60,4 +60,6 @@ public interface CatalogItemRepo {
     List<SpecificationRespondDto> getAllSpecsByItemId(Integer catalogItemId);
 
     Map<Integer, String> findAllCatesByIds(Set<Integer> categoryIds);
+
+    int findCategoryMaxOrder();
 }
