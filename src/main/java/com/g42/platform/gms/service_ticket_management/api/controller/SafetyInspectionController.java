@@ -161,6 +161,18 @@ public class SafetyInspectionController {
     }
 
     /**
+     * Xóa mềm hạng mục tùy chỉnh (đặt status = DELETED).
+     */
+    @DeleteMapping("/{inspectionId}/custom-categories/{categoryId}")
+    public ResponseEntity<ApiResponse<Void>> deleteCustomCategory(
+            @PathVariable Integer inspectionId,
+            @PathVariable Integer categoryId) {
+
+        safetyInspectionService.deleteCustomCategory(inspectionId, categoryId);
+        return ResponseEntity.ok(ApiResponses.success(null, "Đã xóa hạng mục tùy chỉnh"));
+    }
+
+    /**
      * Bulk update itemStatus cho nhiều hạng mục cùng lúc (tech điền).
      * Hỗ trợ cả default (workCategoryId) và custom (customCategoryId).
      */

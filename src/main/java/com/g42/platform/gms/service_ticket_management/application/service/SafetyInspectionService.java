@@ -366,6 +366,23 @@ public class SafetyInspectionService {
         return resp;
     }
 
+    @Transactional
+    public void deleteCustomCategory(Integer inspectionId, Integer categoryId) {
+        SafetyInspection inspection = inspectionRepo.findById(inspectionId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy phiếu kiểm tra: " + inspectionId));
+        requireTicketEditableForInspection(inspection.getServiceTicketId());
+
+        TicketCustomCategory cat = customCategoryRepo.findById(categoryId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy hạng mục: " + categoryId));
+
+        if (!cat.getInspectionId().equals(inspectionId)) {
+            throw new IllegalArgumentException("Hạng mục không thuộc phiếu kiểm tra này");
+        }
+
+        cat.setStatus("DELETED");
+        customCategoryRepo.save(cat);
+    }
+
 
     private InspectionItemResponse buildItemResponse(SafetyInspectionItem saved, Integer inspectionId) {
         List<SafetyInspectionItemWithCategory> withCat = itemRepo.findByInspectionIdWithCategory(inspectionId);
