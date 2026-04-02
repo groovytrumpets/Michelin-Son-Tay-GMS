@@ -118,6 +118,8 @@ public class BillingService {
         serviceTicketJpa.setTicketStatus(TicketStatus.PAID);
         serviceTicketJpa.setDeliveredAt(LocalDateTime.now());
         serviceTicketRepository.save(serviceTicketJpa);
+        serviceBill.setPaymentStatus(PaymentStatus.PAID.name());
+        billingRepository.save(serviceBill);
         //todo: change status of assignment
         ticketAssignmentService.markAssignmentDone(serviceBill.getServiceTicketId());
         return serviceBillDtoMapper.mapPaymentToDto(paymentTransaction);

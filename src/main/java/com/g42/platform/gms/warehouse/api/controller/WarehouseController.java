@@ -50,8 +50,8 @@ public class WarehouseController {
         return ResponseEntity.ok(ApiResponses.success(specAttributeDto));
     }
     @GetMapping("/item-categoy/all")
-    public ResponseEntity<ApiResponse<List<ItemCategoryHintDto>>> getAllItemCategory() {
-        List<ItemCategoryHintDto> promotionCreateDtoList = catalogItemService.getAllItemCategory();
+    public ResponseEntity<ApiResponse<List<WorkCategoryHintDto>>> getAllItemCategory() {
+        List<WorkCategoryHintDto> promotionCreateDtoList = catalogItemService.getAllItemCategory();
         return ResponseEntity.ok(ApiResponses.success(promotionCreateDtoList));
     }
     @PostMapping("/brand/create")
@@ -67,7 +67,7 @@ public class WarehouseController {
         return ResponseEntity.ok(ApiResponses.success(catalogItemService.saveProductLine(productLine)));
     }
     @PostMapping("/itemCategory/create")
-    public ResponseEntity<ApiResponse<ItemCategory>> createItemCategory(@RequestBody ItemCategory itemCategory) {
+    public ResponseEntity<ApiResponse<WorkCategory>> createItemCategory(@RequestBody WorkCategory itemCategory) {
         return ResponseEntity.ok(ApiResponses.success(catalogItemService.saveItemCate(itemCategory)));
     }
     @PostMapping("/specs/create")

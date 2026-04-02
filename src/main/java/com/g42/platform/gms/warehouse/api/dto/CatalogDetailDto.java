@@ -34,6 +34,10 @@ public class CatalogDetailDto {
     private Boolean isRecurring;
     private String brandId;
     private String productLine;
-    private Integer itemCategory;
+    private String madeIn;
+    private TaxRuleDto taxRule;
+    private Integer workCategoryId;
+    private String partNumber;
+    private String barcode;
     private List<SpecificationRespondDto> specifications;
 }
