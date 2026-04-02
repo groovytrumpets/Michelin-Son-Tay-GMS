@@ -411,7 +411,8 @@ public class ServiceTicketManageService {
         ServiceTicket serviceTicket = serviceTicketRepo.findByServiceTicketId(serviceTicketId);
         CustomerProfile customerProfile = customerInternalApi.findById(serviceTicket.getCustomerId());
         /* todo: get previous custumer service ticket id */
-        Integer previousId = serviceTicketRepo.findPerviousCustomerService(customerProfile.getCustomerId(),serviceTicketId).getServiceTicketId();
+        Integer previousId = serviceTicketRepo.findPerviousCustomerService(customerProfile.getCustomerId(),serviceTicketId
+        ,serviceTicket.getVehicleId()).getServiceTicketId();
         System.out.println("DEBUG: "+previousId);
         if (previousId != null) {
             //todo: get recomment

@@ -116,8 +116,10 @@ public class ServiceTicketRepoImpl implements ServiceTicketRepo {
     }
 
     @Override
-    public ServiceTicket findPerviousCustomerService(Integer customerId, Integer serviceTicketId) {
+    public ServiceTicket findPerviousCustomerService(Integer customerId, Integer serviceTicketId,Integer vehicleId) {
         ServiceTicketJpa serviceTicketJpa = jpaRepo.findFirstByCustomerIdAndServiceTicketIdNotOrderByReceivedAtDesc(customerId, serviceTicketId);
-        return mapper.toDomain(serviceTicketJpa);
+
+        ServiceTicketJpa serviceTicketJpa2 = jpaRepo.findFirstByCustomerIdAndVehicleIdAndServiceTicketIdNotOrderByReceivedAtDesc(customerId,vehicleId, serviceTicketId);
+        return mapper.toDomain(serviceTicketJpa2);
     }
 }
