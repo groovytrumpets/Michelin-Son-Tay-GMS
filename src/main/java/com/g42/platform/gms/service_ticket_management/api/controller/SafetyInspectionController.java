@@ -205,5 +205,11 @@ public class SafetyInspectionController {
         String rcm = safetyInspectionService.saveRecommend(serviceTicketId,recommend);
         return ResponseEntity.ok(ApiResponses.success(rcm));
     }
+    @GetMapping("/{serviceTicketId}/curent-recommend")
+    public ResponseEntity<ApiResponse<String>> viewCurentSafetyInspectionRcm(
+            @PathVariable Integer serviceTicketId){
+        String rcm = safetyInspectionService.getRecommend(serviceTicketId);
+        return ResponseEntity.ok(ApiResponses.success(rcm));
+    }
 
 }

@@ -460,5 +460,9 @@ public class SafetyInspectionService {
     public SafetyInspection findByServiceTicketId(Integer previousId) {
         return inspectionRepo.findByIdService(previousId);
     }
+
+    public String getRecommend(Integer serviceTicketId) {
+        return inspectionRepo.getRcmByServiceId(serviceTicketId);
+    }
 }
 

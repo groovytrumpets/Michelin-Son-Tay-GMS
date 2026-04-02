@@ -81,7 +81,7 @@ public class BillingService {
         serviceTicketRepository.save(serviceTicket);
         estimate.setStatus(EstimateEnum.ARCHIVED);
         estimateRepository.save(estimate);
-        serviceBill.setBillStatus(BillingStatus.DRAFT.name());
+        serviceBill.setPaidAt(Instant.now());
         ServiceBill saved = billingRepository.createNewBilling(serviceBill);
         return serviceBillDtoMapper.mapToDto(saved);
     }
@@ -101,7 +101,7 @@ public class BillingService {
         if (serviceTicket.getTicketStatus() != TicketStatus.COMPLETED) {
             throw new BillingException("Service Ticket not done or wrong status!", BillingErrorCode.SERVICE_TICKET_STATUS_NOT_MATCH);
         }
-        if (estimate.getStatus() != EstimateEnum.APPROVED) {
+        if (estimate.getStatus() != EstimateEnum.ARCHIVED) {
             throw new BillingException("Estimate not approved, wrong status!", BillingErrorCode.ESTIMATE_STATUS_NOT_MATCH);
         }
         if (!estimate.getServiceTicketId().equals(serviceTicket.getServiceTicketId())) {

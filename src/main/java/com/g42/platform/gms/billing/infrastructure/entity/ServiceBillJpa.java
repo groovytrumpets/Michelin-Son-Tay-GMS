@@ -35,10 +35,6 @@ public class ServiceBillJpa {
     @Column(name = "final_amount", precision = 12, scale = 2)
     private BigDecimal finalAmount;
 
-    @Size(max = 50)
-    @Column(name = "payment_method", length = 50)
-    private String paymentMethod;
-
     @NotNull
     @ColumnDefault("'UNPAID'")
     @Lob
@@ -48,19 +44,9 @@ public class ServiceBillJpa {
 
     @Column(name = "paid_at")
     private Instant paidAt;
-    @Enumerated(EnumType.STRING)
-    @ColumnDefault("'DRAFT'")
-    @Lob
-    @Column(name = "bill_status")
-    private BillingStatus billStatus;
 
     @Column(name = "warehouse_id")
     private Integer warehouseId;
-
-    @NotNull
-    @ColumnDefault("1")
-    @Column(name = "version", nullable = false)
-    private Integer version;
 
     @Column(name = "estimate_id", nullable = false)
     private Integer estimateId;
