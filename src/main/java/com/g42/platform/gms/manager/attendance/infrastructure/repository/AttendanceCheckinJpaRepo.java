@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -35,4 +36,7 @@ public interface AttendanceCheckinJpaRepo extends JpaRepository<AttendanceChecki
            "AND YEAR(ac.attendance_date) = :year AND MONTH(ac.attendance_date) = :month",
            nativeQuery = true)
     Double sumMonthlyHours(@Param("staffId") Integer staffId, @Param("year") int year, @Param("month") int month);
+
+    @Query("SELECT MAX(a.createdAt) FROM ManagerAttendanceCheckinJpa a WHERE a.notes = :notes")
+    Optional<LocalDateTime> findMaxCreatedAtByNotes(@Param("notes") String notes);
 }

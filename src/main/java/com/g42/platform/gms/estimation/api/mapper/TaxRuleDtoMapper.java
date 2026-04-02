@@ -18,4 +18,6 @@ import java.util.List;
 public interface TaxRuleDtoMapper {
     TaxRuleDto toTaxRuleDto(TaxRule taxRule);
     TaxRule toTaxRule(TaxCreateDto taxCreateDto);
+
+    com.g42.platform.gms.warehouse.api.dto.TaxRuleDto toTaxRuleDtoWarehouse(TaxRule taxRuleById);
 }

@@ -1,6 +1,7 @@
 package com.g42.platform.gms.service_ticket_management.domain.entity;
 
 import com.g42.platform.gms.service_ticket_management.domain.enums.AssignmentStatus;
+import com.g42.platform.gms.service_ticket_management.domain.enums.RoleInTicket;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -18,7 +19,7 @@ public class ServiceTicketAssignment {
     private Integer assignmentId;
     private Integer serviceTicketId;
     private Integer staffId;
-    private String roleInTicket;
+    private RoleInTicket roleInTicket;
     private Instant assignedAt;
     private Boolean isPrimary;
     private AssignmentStatus status;
