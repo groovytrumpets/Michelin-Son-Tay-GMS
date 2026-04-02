@@ -2,6 +2,7 @@ package com.g42.platform.gms.service_ticket_management.infrastructure.implement;
 
 
 import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicketAssignment;
+import com.g42.platform.gms.service_ticket_management.domain.enums.RoleInTicket;
 import com.g42.platform.gms.service_ticket_management.domain.repository.TicketAssignmentRepo;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketAssignmentJpa;
 import com.g42.platform.gms.service_ticket_management.infrastructure.mapper.TicketAssignmentJpaMapper;
@@ -50,7 +51,7 @@ public class ServiceTicketAssignmentRepoImpl implements TicketAssignmentRepo {
 
 
     @Override
-    public boolean existsByTicketIdAndRole(Integer ticketId, String role) {
+    public boolean existsByTicketIdAndRole(Integer ticketId, RoleInTicket role) {
         return ticketAssignmentJpaRepo.existsByServiceTicketIdAndRoleInTicket(ticketId, role);
     }
 
@@ -75,7 +76,7 @@ public class ServiceTicketAssignmentRepoImpl implements TicketAssignmentRepo {
     }
 
     @Override
-    public List<ServiceTicketAssignment> findByTicketIdAndRole(Integer ticketId, String role) {
+    public List<ServiceTicketAssignment> findByTicketIdAndRole(Integer ticketId, RoleInTicket role) {
         return ticketAssignmentJpaRepo.findByTicketIdAndRole(ticketId, role).stream()
                 .map(mapper::toDomain)
                 .toList();
