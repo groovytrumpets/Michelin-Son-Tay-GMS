@@ -7,6 +7,8 @@ import com.g42.platform.gms.service_ticket_management.infrastructure.repository.
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
+import java.util.Optional;
+
 @Repository
 @RequiredArgsConstructor
 public class TicketCustomCategoryRepoImpl implements TicketCustomCategoryRepo {
@@ -22,5 +24,10 @@ public class TicketCustomCategoryRepoImpl implements TicketCustomCategoryRepo {
     @Override
     public TicketCustomCategory save(TicketCustomCategory customCategory) {
         return mapper.toDomain(jpaRepo.save(mapper.toJpa(customCategory)));
+    }
+
+    @Override
+    public Optional<TicketCustomCategory> findById(Integer id) {
+        return jpaRepo.findById(id).map(mapper::toDomain);
     }
 }
