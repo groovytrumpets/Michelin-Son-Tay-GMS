@@ -38,4 +38,10 @@ public class SafetyInspectionRepoImpl implements SafetyInspectionRepo {
         SafetyInspectionJpa safetyInspectionJpa = jpaRepo.findByServiceTicketId2(serviceTicketId);
         return mapper.toDomain(safetyInspectionJpa);
     }
+
+    @Override
+    public String getRcmByServiceId(Integer serviceTicketId) {
+        SafetyInspectionJpa safetyInspectionJpa = jpaRepo.findByServiceTicketId2(serviceTicketId);
+        return safetyInspectionJpa.getGeneralNotes();
+    }
 }
