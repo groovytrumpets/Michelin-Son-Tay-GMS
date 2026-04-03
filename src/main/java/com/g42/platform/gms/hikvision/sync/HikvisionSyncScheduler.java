@@ -3,81 +3,61 @@ package com.g42.platform.gms.hikvision.sync;
 import com.g42.platform.gms.hikvision.client.HikvisionApiClient;
 import com.g42.platform.gms.hikvision.client.dto.HikvisionEvent;
 import com.g42.platform.gms.hikvision.config.HikvisionProperties;
-import com.g42.platform.gms.manager.attendance.infrastructure.repository.AttendanceCheckinJpaRepo;
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Scheduled task that pulls attendance events from Hikvision device every 5 minutes.
- *
- * Sync_State: lastSyncTime is stored in-memory (AtomicReference).
- * On startup: initialized from MAX(created_at) WHERE notes='Auto sync from Hikvision'.
- * Fallback: now() - 1 hour if no records exist.
+ * Scheduled task that syncs attendance events from Hikvision by date.
+ * Auto-scheduler runs daily at 00:05 to sync the previous day.
+ * Manual trigger accepts a specific date.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class HikvisionSyncScheduler {
 
-    private static final String AUTO_SYNC_NOTE = "Auto sync from Hikvision";
-
     private final HikvisionApiClient apiClient;
     private final HikvisionEventProcessor eventProcessor;
     private final HikvisionProperties props;
-    private final AttendanceCheckinJpaRepo checkinRepo;
 
-    private final AtomicReference<LocalDateTime> lastSyncTime = new AtomicReference<>();
-
-    @PostConstruct
-    void initLastSyncTime() {
-        LocalDateTime initialTime = checkinRepo.findMaxCreatedAtByNotes(AUTO_SYNC_NOTE)
-                .orElse(LocalDateTime.now().minusHours(1));
-        lastSyncTime.set(initialTime);
-        log.info("HikvisionSyncScheduler: initialized lastSyncTime={}, syncEnabled={}", initialTime, props.isSyncEnabled());
-    }
-
-    @Scheduled(fixedDelay = 300_000)
-    void runSync() {
+    /** Runs every day at 00:05 to sync yesterday's attendance */
+    @Scheduled(cron = "0 5 0 * * *")
+    void runDailySync() {
         if (!props.isSyncEnabled()) {
             log.debug("HikvisionSyncScheduler: sync is disabled — skipping");
             return;
         }
+        syncDate(LocalDate.now().minusDays(1));
+    }
 
-        LocalDateTime from = lastSyncTime.get();
-        LocalDateTime to = LocalDateTime.now();
-        doSync(from, to);
-        lastSyncTime.set(to);
+    /** Runs every 10 minutes during working hours (6:30–18:30) to keep today's data fresh */
+    @Scheduled(cron = "0 */10 6-18 * * *")
+    void runIntradaySync() {
+        if (!props.isSyncEnabled()) return;
+        syncDate(LocalDate.now());
     }
 
     /**
-     * Manually trigger sync from a specific time (for testing or catch-up).
+     * Manually trigger sync for a specific date.
      */
-    public void syncFrom(LocalDateTime from) {
-        LocalDateTime to = LocalDateTime.now();
-        log.info("HikvisionSyncScheduler: manual sync triggered from={} to={}", from, to);
-        doSync(from, to);
-        lastSyncTime.set(to);
-    }
+    public void syncDate(LocalDate date) {
+        log.info("HikvisionSyncScheduler: starting sync for date={}", date);
 
-    private void doSync(LocalDateTime from, LocalDateTime to) {
-        log.info("HikvisionSyncScheduler: starting sync from={} to={}", from, to);
-
-        List<HikvisionEvent> events = apiClient.fetchEvents(from, to);
-        log.info("HikvisionSyncScheduler: fetched {} events", events.size());
+        List<HikvisionEvent> events = apiClient.fetchEvents(date.atStartOfDay(), date.atTime(23, 59, 59));
+        log.info("HikvisionSyncScheduler: fetched {} events for date={}", events.size(), date);
 
         if (!events.isEmpty()) {
-            int successCount = eventProcessor.processEvents(events);
+            int recordsWritten = eventProcessor.processEvents(events);
             log.info("HikvisionSyncScheduler: sync complete — {} events processed, {} records written",
-                    events.size(), successCount);
+                    events.size(), recordsWritten);
         } else {
-            log.info("HikvisionSyncScheduler: no new events found");
+            log.info("HikvisionSyncScheduler: no events found for date={}", date);
         }
     }
 }

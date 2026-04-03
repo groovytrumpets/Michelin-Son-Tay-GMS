@@ -13,6 +13,7 @@ import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -30,6 +31,10 @@ public class HikvisionApiClient {
     private static final DateTimeFormatter HIKVISION_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
     private static final int PAGE_SIZE = 50;
+
+    public List<HikvisionEvent> fetchEventsByDate(LocalDate date) {
+        return fetchEvents(date.atStartOfDay(), date.atTime(23, 59, 59));
+    }
 
     public List<HikvisionEvent> fetchEvents(LocalDateTime from, LocalDateTime to) {
         String url = String.format("https://%s:%d/ISAPI/AccessControl/AcsEvent?format=json",
@@ -80,7 +85,9 @@ public class HikvisionApiClient {
 
                 int fetched = page.getInfoList().size();
                 position += fetched;
-                hasMore = "MORE".equalsIgnoreCase(page.getResponseStatusStrg()) && fetched == PAGE_SIZE;
+                hasMore = "MORE".equalsIgnoreCase(page.getResponseStatusStrg())
+                        && page.getTotalMatches() != null
+                        && position < page.getTotalMatches();
 
             } catch (Exception e) {
                 log.error("Hikvision fetch error at pos {}: {}", pos, e.getMessage(), e);
