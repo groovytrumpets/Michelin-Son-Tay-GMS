@@ -1,11 +1,13 @@
 package com.g42.platform.gms.manager.attendance.api.controller;
 
+import com.g42.platform.gms.manager.attendance.api.dto.StaffShiftAttendanceResponse;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.manager.attendance.api.dto.AttendanceCheckinResponse;
 import com.g42.platform.gms.manager.attendance.api.dto.CheckinRequest;
 import com.g42.platform.gms.manager.attendance.api.dto.CheckoutRequest;
 import com.g42.platform.gms.manager.attendance.api.dto.TodaySummaryResponse;
+import com.g42.platform.gms.manager.attendance.api.dto.UpdateAttendanceRequest;
 import com.g42.platform.gms.manager.attendance.application.service.AttendanceManageService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +25,18 @@ import java.util.List;
 public class AttendanceManageController {
 
     private final AttendanceManageService service;
+
+    /**
+     * Lấy danh sách ca trong ngày cho 1 nhân viên kèm trạng thái check-in/out.
+     * Dùng cho màn điểm danh thủ công: chọn nhân viên → hiển thị các ca → check-in/out từng ca.
+     */
+    @GetMapping("/staff/{staffId}/shifts")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADVISOR')")
+    public ResponseEntity<ApiResponse<StaffShiftAttendanceResponse>> getStaffShiftAttendance(
+            @PathVariable Integer staffId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return ResponseEntity.ok(ApiResponses.success(service.getStaffShiftAttendance(staffId, date)));
+    }
 
     /**
      * Lấy danh sách điểm danh theo khoảng ngày, có thể filter theo staffId
@@ -76,6 +90,18 @@ public class AttendanceManageController {
             @PathVariable Integer checkinId,
             @RequestBody CheckoutRequest request) {
         return ResponseEntity.ok(ApiResponses.success(service.checkOut(checkinId, request)));
+    }
+
+    /**
+     * Cập nhật bản ghi điểm danh (quản lí sửa giờ check-in/out)
+     * Notes tự động set "Edited by manager" nếu không truyền
+     */
+    @PutMapping("/{checkinId}")
+    @PreAuthorize("hasRole('MANAGER')")
+    public ResponseEntity<ApiResponse<AttendanceCheckinResponse>> updateAttendance(
+            @PathVariable Integer checkinId,
+            @RequestBody UpdateAttendanceRequest request) {
+        return ResponseEntity.ok(ApiResponses.success(service.updateAttendance(checkinId, request)));
     }
 
     /**
