@@ -17,4 +17,12 @@ public class NotificationService {
     public void sendBookingCf(String phone, String name, List<String> productName, String orderCode, LocalDateTime bookingTime, String garageLocation) {
         notificationSender.sendBookingConfirm(phone, name, productName,orderCode,bookingTime,garageLocation);
     }
+
+    public void sendOtpViaZalo(String number,String otp) {
+        notificationSender.sendOtpVerify(number,otp);
+    }
+
+    public void sendFeedbackViaZalo(String number, String name, String code) {
+        notificationSender.sendFeedback(number,name,code);
+    }
 }

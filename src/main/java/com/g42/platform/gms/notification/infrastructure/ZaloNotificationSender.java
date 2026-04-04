@@ -3,7 +3,6 @@ package com.g42.platform.gms.notification.infrastructure;
 import com.g42.platform.gms.notification.domain.NotificationSender;
 import com.g42.platform.gms.notification.infrastructure.entity.ZaloToken;
 import com.g42.platform.gms.notification.infrastructure.repository.ZaloTokenRepo;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -13,9 +12,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -97,6 +94,77 @@ public class ZaloNotificationSender implements NotificationSender {
         templateData.put("booking_time", formattedTime);
         templateData.put("location", garageLocation);
 
+        body.put("template_data", templateData);
+
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+
+        ResponseEntity<String> response = restTemplate.postForEntity(
+                url,
+                request,
+                String.class
+        );
+
+        System.out.println(response.getBody());
+    }
+
+    @Override
+    public void sendOtpVerify(String number, String otp) {
+        String url = "https://business.openapi.zalo.me/message/template";
+        ZaloToken zaloToken = zaloTokenRepo.getZaloTokenByState("active");
+//        String accessToken = zaloToken.getAccessToken();
+
+        String templateId = "547094";
+
+        RestTemplate restTemplate = new RestTemplate();
+
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("access_token", zaloToken.getAccessToken());
+
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("phone", convertPhone(number));
+        body.put("template_id", templateId);
+
+        Map<String, Object> templateData = new HashMap<>();
+        templateData.put("otp", otp);
+        body.put("template_data", templateData);
+
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+
+        ResponseEntity<String> response = restTemplate.postForEntity(
+                url,
+                request,
+                String.class
+        );
+
+        System.out.println(response.getBody());
+    }
+
+    @Override
+    public void sendFeedback(String number, String name, String code) {
+        String url = "https://business.openapi.zalo.me/message/template";
+        ZaloToken zaloToken = zaloTokenRepo.getZaloTokenByState("active");
+//        String accessToken = zaloToken.getAccessToken();
+
+        String templateId = "547146";
+
+        RestTemplate restTemplate = new RestTemplate();
+
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("access_token", zaloToken.getAccessToken());
+
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("phone", convertPhone(number));
+        body.put("template_id", templateId);
+
+        Map<String, Object> templateData = new HashMap<>();
+        templateData.put("customer_name", name);
+        templateData.put("service_code",code);
         body.put("template_data", templateData);
 
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);

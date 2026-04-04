@@ -34,6 +34,16 @@ public class NotificationTestController {
         );
         return "OK";
     }
+    @PostMapping("/otp")
+    public String sendOtp(){
+        notificationSender.sendOtpViaZalo("0386037357","123456");
+        return "OK";
+    }
+    @PostMapping("/feedback")
+    public String sendFeedback(){
+        notificationSender.sendFeedbackViaZalo("0386037357","Nguyen Van A","123456");
+        return "OK";
+    }
     private ZaloOAuthService zaloOAuthService;
     @GetMapping("/login")
     public void connectZalo(HttpServletResponse response) throws IOException {
