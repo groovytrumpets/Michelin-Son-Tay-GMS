@@ -20,4 +20,5 @@ public class StaffProfileDto {
     private String status;
     private java.sql.Date dob;
     private List<RoleDto> roles;
+    private String employeeNo;
 }

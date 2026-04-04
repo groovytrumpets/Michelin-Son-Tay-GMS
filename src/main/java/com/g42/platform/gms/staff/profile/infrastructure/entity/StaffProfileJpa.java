@@ -20,6 +20,8 @@ public class StaffProfileJpa {
     private java.sql.Date dob;
     private String avatar;
     private java.sql.Timestamp createdAt;
+    @Column(name = "employee_no", unique = true)
+    private String employeeNo;
     @OneToOne(mappedBy = "staffProfile", fetch = FetchType.LAZY)
     private StaffAuthJpa staffAuth;
     @ManyToMany(fetch = FetchType.LAZY)
