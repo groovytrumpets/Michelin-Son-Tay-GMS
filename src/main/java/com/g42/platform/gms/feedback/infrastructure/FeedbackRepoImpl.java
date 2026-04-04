@@ -25,7 +25,7 @@ public class FeedbackRepoImpl implements FeedbackRepo {
 
     @Override
     public Page<Feedback> getListOfFeedback(int page, int size, String search, Integer starRating, LocalDateTime start, LocalDateTime end) {
-        Sort sort = Sort.by(Sort.Direction.ASC, "createdAt");
+        Sort sort = Sort.by(Sort.Direction.DESC, "createdAt");
         Pageable pageable = PageRequest.of(page, size, sort);
         Specification <FeedbackJpa> specification = Specification.unrestricted();
         specification = specification.and(FeedbackSpecification.filterFeedback(starRating,start,end));

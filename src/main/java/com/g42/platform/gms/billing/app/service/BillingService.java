@@ -1,5 +1,6 @@
 package com.g42.platform.gms.billing.app.service;
 
+import com.g42.platform.gms.auth.api.internal.CustomerInternalApi;
 import com.g42.platform.gms.billing.api.dto.PaymentTransactionDto;
 import com.g42.platform.gms.billing.api.dto.ServiceBillDto;
 import com.g42.platform.gms.billing.api.mapper.ServiceBillDtoMapper;
@@ -13,11 +14,14 @@ import com.g42.platform.gms.billing.domain.exception.BillingException;
 import com.g42.platform.gms.billing.domain.repository.BillingRepository;
 import com.g42.platform.gms.billing.domain.repository.PaymentTransationRepo;
 import com.g42.platform.gms.common.enums.EstimateEnum;
+import com.g42.platform.gms.customer.domain.entity.CustomerProfile;
 import com.g42.platform.gms.estimation.app.service.EstimateService;
 import com.g42.platform.gms.estimation.domain.entity.Estimate;
 import com.g42.platform.gms.estimation.domain.repository.EstimateRepository;
+import com.g42.platform.gms.notification.infrastructure.ZaloNotificationSender;
 import com.g42.platform.gms.promotion.domain.entity.Promotion;
 import com.g42.platform.gms.promotion.domain.repository.PromotionRepo;
+import com.g42.platform.gms.service_ticket_management.api.internal.ServiceTicketInternalApi;
 import com.g42.platform.gms.service_ticket_management.application.service.ServiceTicketManageService;
 import com.g42.platform.gms.service_ticket_management.application.service.TicketAssignmentService;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
@@ -53,6 +57,12 @@ public class BillingService {
     private EstimateService estimateService;
     @Autowired
     private TicketAssignmentService ticketAssignmentService;
+    @Autowired
+    private ServiceTicketInternalApi serviceTicketInternalApi;
+    @Autowired
+    private CustomerInternalApi customerInternalApi;
+    @Autowired
+    private ZaloNotificationSender zaloNotificationSender;
 
     //todo: get available promotion
     @Transactional
@@ -108,7 +118,7 @@ public class BillingService {
             throw new BillingException("Service Ticket and Estimate not match", BillingErrorCode.ESTIMATE_NOT_MATCH_SERVICE_TICKET);
         }
     }
-
+    @Transactional
     public PaymentTransactionDto createNewPayment(PaymentTransactionDto dto) {
         PaymentTransaction paymentTransactionDto = serviceBillDtoMapper.mapPaymentToEntity(dto);
         paymentTransactionDto.setPaidAt(Instant.now());
@@ -119,8 +129,17 @@ public class BillingService {
         serviceTicketJpa.setDeliveredAt(LocalDateTime.now());
         serviceTicketRepository.save(serviceTicketJpa);
         serviceBill.setPaymentStatus(PaymentStatus.PAID.name());
+        //todo: send feedback
+        String code = serviceTicketInternalApi.getCodeByServiceTicketId(serviceBill.getServiceTicketId());
+        String phone = customerInternalApi.getCustomerPhoneByServiceTicketId(serviceBill.getServiceTicketId());
+        String name = customerInternalApi.getNameByServiceTicketId(serviceBill.getServiceTicketId());
+
+        if (phone!=null) {
+        zaloNotificationSender.sendFeedback(phone,name,code);
+        }
         billingRepository.save(serviceBill);
         //todo: change status of assignment
+
         ticketAssignmentService.markAssignmentDone(serviceBill.getServiceTicketId());
         return serviceBillDtoMapper.mapPaymentToDto(paymentTransaction);
     }
