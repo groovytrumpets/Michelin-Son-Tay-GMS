@@ -61,7 +61,7 @@ public class ZaloTokenAutoRefresher {
             // 3. Kiểm tra xem có trường access_token không
             if (response.getStatusCode() == HttpStatus.OK && jsonNode.has("access_token")) {
 
-                // Lấy giá trị dưới dạng Text
+
                 currentToken.setAccessToken(jsonNode.get("access_token").asText());
                 currentToken.setRefreshToken(jsonNode.get("refresh_token").asText());
                 long expiresInSeconds = jsonNode.get("expires_in").asLong();
