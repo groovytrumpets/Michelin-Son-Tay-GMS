@@ -161,6 +161,7 @@ public class ZaloNotificationSender implements NotificationSender {
         Map<String, Object> body = new HashMap<>();
         body.put("phone", convertPhone(number));
         body.put("template_id", templateId);
+        body.put("tracking_id", code);
 
         Map<String, Object> templateData = new HashMap<>();
         templateData.put("customer_name", name);
