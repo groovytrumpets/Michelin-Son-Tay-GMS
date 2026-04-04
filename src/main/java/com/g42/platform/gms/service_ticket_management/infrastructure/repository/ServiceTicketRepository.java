@@ -61,5 +61,5 @@ public interface ServiceTicketRepository extends JpaRepository<ServiceTicketJpa,
 
     ServiceTicketJpa findFirstByCustomerIdAndVehicleIdAndServiceTicketIdNotOrderByReceivedAtDesc(Integer customerId, Integer vehicleId, Integer serviceTicketId);
 
-    ServiceJpaEntity findServiceTicketJpasByTicketCode(String ticketCode);
+    ServiceTicketJpa findServiceTicketJpasByTicketCode(String ticketCode);
 }

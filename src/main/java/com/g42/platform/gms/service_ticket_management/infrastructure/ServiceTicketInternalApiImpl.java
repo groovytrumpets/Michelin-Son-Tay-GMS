@@ -15,11 +15,11 @@ public class ServiceTicketInternalApiImpl implements ServiceTicketInternalApi {
     @Override
     public Integer getServiceIdByCode(String trackingId) {
         try {
-        ServiceJpaEntity serviceJpaEntity = serviceTicketRepository.findServiceTicketJpasByTicketCode(trackingId);
+        ServiceTicketJpa serviceJpaEntity = serviceTicketRepository.findServiceTicketJpasByTicketCode(trackingId);
         if (serviceJpaEntity == null) {
             return -1;
         }
-        return Integer.parseInt(serviceJpaEntity.getServiceId().toString());
+        return Integer.parseInt(serviceJpaEntity.getServiceTicketId().toString());
 
         }catch (Exception e) {
             System.err.println("Exception in ServiceTicketInternalApiImpl.getServiceIdByCode: "+e.getMessage());
