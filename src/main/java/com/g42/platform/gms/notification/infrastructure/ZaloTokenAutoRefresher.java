@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
 
@@ -26,6 +27,7 @@ public class ZaloTokenAutoRefresher {
     private String secretKey;
     @Scheduled(fixedRate = 72000000)
 //    @Scheduled(fixedRate = 60000)
+    @Transactional
     public void refreshZaloTokenAutomatically() {
         System.out.println("[System] Start Refreshing Zalo Token...");
 

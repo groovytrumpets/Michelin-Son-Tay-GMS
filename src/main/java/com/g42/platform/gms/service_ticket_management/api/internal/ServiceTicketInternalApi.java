@@ -5,4 +5,6 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface ServiceTicketInternalApi {
     Integer getServiceIdByCode(String trackingId);
+
+    String getCodeByServiceTicketId(Integer serviceTicketId);
 }

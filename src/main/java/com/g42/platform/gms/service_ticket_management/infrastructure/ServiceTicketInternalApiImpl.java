@@ -2,6 +2,7 @@ package com.g42.platform.gms.service_ticket_management.infrastructure;
 
 import com.g42.platform.gms.marketing.service_catalog.infrastructure.entity.ServiceJpaEntity;
 import com.g42.platform.gms.service_ticket_management.api.internal.ServiceTicketInternalApi;
+import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
 import com.g42.platform.gms.service_ticket_management.infrastructure.repository.ServiceTicketRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
@@ -24,5 +25,10 @@ public class ServiceTicketInternalApiImpl implements ServiceTicketInternalApi {
             System.err.println("Exception in ServiceTicketInternalApiImpl.getServiceIdByCode: "+e.getMessage());
             return -1;
         }
+    }
+
+    @Override
+    public String getCodeByServiceTicketId(Integer serviceTicketId) {
+        return serviceTicketRepository.findByServiceTicketId(serviceTicketId).getTicketCode();
     }
 }

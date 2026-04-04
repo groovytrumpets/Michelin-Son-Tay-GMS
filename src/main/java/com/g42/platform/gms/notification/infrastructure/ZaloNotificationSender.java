@@ -3,12 +3,14 @@ package com.g42.platform.gms.notification.infrastructure;
 import com.g42.platform.gms.notification.domain.NotificationSender;
 import com.g42.platform.gms.notification.infrastructure.entity.ZaloToken;
 import com.g42.platform.gms.notification.infrastructure.repository.ZaloTokenRepo;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
@@ -18,9 +20,9 @@ import java.util.List;
 import java.util.Map;
 
 @Component
+@RequiredArgsConstructor
 public class ZaloNotificationSender implements NotificationSender {
-    @Autowired
-    private ZaloTokenRepo zaloTokenRepo;
+    private final ZaloTokenRepo zaloTokenRepo;
     public void sendBookingRequested(String phone, String customerName, List<String> productName, String orderCode, String bookingStatus, String bookingTime, String garageLocation) {
         String template_id = "546766";
         String url = "https://business.openapi.zalo.me/message/template";
@@ -62,10 +64,11 @@ public class ZaloNotificationSender implements NotificationSender {
 
         System.out.println(response.getBody());
     }
+    @Transactional
     public void sendBookingConfirm(String phone, String customerName, List<String> productName, String orderCode, LocalDateTime bookingTime, String garageLocation) {
         String template_id = "546916";
         String url = "https://business.openapi.zalo.me/message/template";
-        ZaloToken zaloToken = zaloTokenRepo.getZaloTokenByState("active");
+        ZaloToken zaloToken = zaloTokenRepo.getZaloTokensByState("active");
 //        String accessToken = zaloToken.getAccessToken();
 
         String templateId = "546916";
