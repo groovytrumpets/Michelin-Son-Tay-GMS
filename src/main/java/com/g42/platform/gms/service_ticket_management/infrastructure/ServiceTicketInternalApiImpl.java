@@ -29,6 +29,10 @@ public class ServiceTicketInternalApiImpl implements ServiceTicketInternalApi {
 
     @Override
     public String getCodeByServiceTicketId(Integer serviceTicketId) {
-        return serviceTicketRepository.findByServiceTicketId(serviceTicketId).getTicketCode();
+        ServiceTicketJpa serviceTicketJpa = serviceTicketRepository.findByServiceTicketId(serviceTicketId);
+        if (serviceTicketJpa == null) {
+            System.err.println("Cannot found ID: " + serviceTicketId);
+        }
+        return serviceTicketJpa.getTicketCode();
     }
 }
