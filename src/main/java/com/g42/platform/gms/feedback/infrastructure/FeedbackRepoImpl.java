@@ -33,8 +33,8 @@ public class FeedbackRepoImpl implements FeedbackRepo {
             specification = specification.and((root, query, cb) -> {
                 String searchPattern = "%" + search.toLowerCase().trim() + "%";
                 return cb.or(
-                        cb.like(cb.lower(root.get("comment")), searchPattern),
-                        cb.like(cb.lower(root.get("detailFeedback")), searchPattern)
+                        cb.like(cb.lower(root.get("comment").as(String.class)), searchPattern),
+                        cb.like(cb.lower(root.get("detailFeedback").as(String.class)), searchPattern)
                 );
             });
         }
