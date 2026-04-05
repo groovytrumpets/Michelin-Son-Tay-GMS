@@ -1,6 +1,5 @@
 package com.g42.platform.gms.marketing.service_catalog.application.service;
 
-import com.g42.platform.gms.auth.exception.AuthException;
 import com.g42.platform.gms.common.service.ImageUploadService;
 import com.g42.platform.gms.marketing.service_catalog.api.dto.ServiceCreateRequest;
 import com.g42.platform.gms.marketing.service_catalog.api.dto.ServiceDetailRespond;
@@ -11,12 +10,15 @@ import com.g42.platform.gms.marketing.service_catalog.domain.enums.MediaType;
 import com.g42.platform.gms.marketing.service_catalog.domain.exception.ServiceErrorCode;
 import com.g42.platform.gms.marketing.service_catalog.domain.exception.ServiceException;
 import com.g42.platform.gms.marketing.service_catalog.domain.repository.ServiceRepository;
+import com.g42.platform.gms.warehouse.domain.enums.CatalogItemType;
 import lombok.AllArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,7 +33,6 @@ public class ServiceCatalogService {
 
     public List<ServiceSumaryRespond> getListActiveServices() {
         LocalDateTime now = LocalDateTime.now();
-
         return serviceRepository.findAllActive().stream().filter(service -> service.isVisibleNow(now)).map(serviceDtoMapper::toDto).toList();
     }
 
@@ -121,5 +122,11 @@ public class ServiceCatalogService {
         }
 
         return serviceDtoMapper.toDetailDto(serviceRepository.save(service));
+    }
+
+    public Page<ServiceSumaryRespond> getListProducts(int page, int size, CatalogItemType itemType, String search, String sortBy, BigDecimal minPrice, BigDecimal maxPrice, String categoryCode, Integer brandId, Integer productLineId) {
+        Page<com.g42.platform.gms.marketing.service_catalog.domain.entity.Service> services =
+                serviceRepository.getListOfProductsByCatalogItem(page,size,itemType,search,sortBy,maxPrice,minPrice,categoryCode,brandId,productLineId);
+        return services.map(serviceDtoMapper::toDto);
     }
 }
