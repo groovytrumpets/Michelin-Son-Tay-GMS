@@ -55,5 +55,10 @@ public class StaffAuthController {
         AuthResponse response = staffAuthService.verifyOtp(request);
         return ResponseEntity.ok(ApiResponses.success(response));
     }
+    @PostMapping("/setup-pass")
+    public ResponseEntity<ApiResponse<Void>> setupPin(@RequestBody SetupPinRequest request) {
+        staffAuthService.setupPassword(request);
+        return ResponseEntity.ok(ApiResponses.successMessage("PIN setup successfully. Please login."));
+    }
 
 }

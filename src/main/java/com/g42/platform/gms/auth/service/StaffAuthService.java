@@ -16,6 +16,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +38,8 @@ public class StaffAuthService {
     private static final int MAX_LOGIN_ATTEMPTS = 10;
     @Autowired
     private OtpService otpService;
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     public Iterable<StaffAuthDto> getAllStaffAuth() {
         return staffAuthRepo.findAll().stream().map(staffAuthMapper::toDto).toList();
@@ -132,5 +135,23 @@ public class StaffAuthService {
             throw new AuthException(AuthErrorCode.INVALID_OTP.name(), "Mã OTP không chính xác hoặc đã hết hạn");
         }
         return new AuthResponse("OTP_VERIFIED", "STAFF", null);
+    }
+
+    public void setupPassword(SetupPinRequest request) {
+        if (!request.getPin().equals(request.getConfirmPin())) {
+            throw new AuthException(AuthErrorCode.PIN_MISMATCH.name(), "PIN xác nhận không khớp");
+        }
+        StaffProfile staffProfile = staffProfileRepo.findByPhone(request.getPhone());
+        if (staffProfile == null) {
+            throw new AuthException(AuthErrorCode.USER_NOT_FOUND.name(), "STAFF_NOT_FOUND");
+        }
+        StaffAuth staffAuth = staffAuthRepo.findByStaffProfile(staffProfile);
+        if (staffAuth == null) {
+            throw new AuthException(AuthErrorCode.USER_NOT_FOUND.name(), "STAFF_NOT_FOUND");
+        }
+        staffAuth.setPasswordHash(passwordEncoder.encode(request.getPin()));
+        staffAuth.setStatus("ACTIVE");
+        staffAuth.setFailedLoginCount(0);
+        staffAuthRepo.save(staffAuth);
     }
 }
