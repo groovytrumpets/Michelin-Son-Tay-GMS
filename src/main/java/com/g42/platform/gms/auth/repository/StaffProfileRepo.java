@@ -21,4 +21,7 @@ public interface StaffProfileRepo extends JpaRepository<StaffProfile,Integer> {
 
     Optional<StaffProfile> findByEmployeeNo(String employeeNo);
 
+    StaffProfile findByPhone(String phone);
+    @Query("SELECT sp FROM StaffProfile sp WHERE sp.phone LIKE %:phone%")
+    StaffProfile findByPhoneEquals(@Param("phone")String phone);
 }

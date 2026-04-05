@@ -34,6 +34,9 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
         String email = (String) oAuth2User.getAttribute("email");
         String googleId = (String) oAuth2User.getAttribute("sub");
 
+        String frontendLoginUrl = "http://localhost:5173/login";
+        String frontendHomeUrl = "http://localhost:5173/dashboard";
+
         StaffAuth staffAuth = staffAuthRepo.searchByEmail(email);
         if (staffAuth == null) {
             System.out.println("ERROR: Staff not found!");
@@ -43,10 +46,12 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
             response.getWriter().write(
                     new ObjectMapper().writeValueAsString(responseResponseEntity)
             );
+            response.sendRedirect(frontendLoginUrl + "?error=USER_NOT_FOUND");
             return;
         }
         if (staffAuth.getStatus().equals("LOCKED")){
             response.sendError(HttpServletResponse.SC_FORBIDDEN, "Account locked");
+            response.sendRedirect(frontendLoginUrl + "?error=ACCOUNT_LOCKED");
             return;
         }
 
@@ -63,5 +68,6 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
         response.getWriter().write(
                 new ObjectMapper().writeValueAsString(responseResponseEntity)
         );
+        response.sendRedirect(frontendHomeUrl + "?token=" + jwt);
     }
 }
