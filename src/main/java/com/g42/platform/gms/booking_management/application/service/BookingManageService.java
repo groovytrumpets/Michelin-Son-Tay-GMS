@@ -41,6 +41,7 @@ public class BookingManageService {
     private final BookingManageDtoMapper bookingManageDtoMapper;
     private final BookingMDetailDtoMapper  bookingMDetailDtoMapper;
     private final BookingMRequestDtoMapper  bookingMRequestDtoMapper;
+    private final ZaloNotificationSender zaloNotificationSender;
 
     public Page<BookedRespond> getListBooked(int page, int size, LocalDate date, Boolean isGuest, BookingEnum status, String search) {
         Page<BookedRespond> bookingPage = bookingRepository.getBookedList(page,size,date,isGuest,status,search);
@@ -94,7 +95,6 @@ public class BookingManageService {
         boolean confirmed = request.confirm();
         bookingRepository.setConfirmStatus(request);
         //todo: Zalo notify
-        ZaloNotificationSender zaloNotificationSender = new ZaloNotificationSender();
         zaloNotificationSender.sendBookingConfirm(request.getPhone(),request.getFullName(),request.getServices().stream().map(CatalogItem::getItemName).toList(),request.getRequestCode(),request.getLocalDateTime(),"Michelin Sơn Tây");
 return confirmed;
     }

@@ -1,6 +1,7 @@
 package com.g42.platform.gms.common.service;
 
 import com.g42.platform.gms.auth.exception.AuthException; // Hoặc tạo Exception chung
+import com.g42.platform.gms.notification.infrastructure.ZaloNotificationSender;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -18,6 +19,7 @@ public class OtpService {
     private final PasswordEncoder passwordEncoder;
     private final Map<String, OtpEntry> otpCache = new ConcurrentHashMap<>();
     private final SecureRandom secureRandom = new SecureRandom();
+    private final ZaloNotificationSender zaloNotificationSender;
 
     private static final int MAX_ATTEMPTS = 3;
 
@@ -43,6 +45,7 @@ public class OtpService {
         ));
 
         System.out.println("🔥🔥🔥 [COMMON OTP] Gửi đến " + phone + ": " + otp);
+        zaloNotificationSender.sendOtpVerify(phone, otp);
         // Sau này tích hợp SMS API tại đây
     }
 

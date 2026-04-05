@@ -17,4 +17,9 @@ public class AvailableStaffDto {
     private String phone;
     private String avatar;
     private List<RoleDto> roles;
+
+    // Workload info — hiển thị để advisor biết, sắp xếp theo workload tăng dần
+    private Integer totalWorkload;    // Tổng số phiếu đang làm (ACTIVE + PENDING)
+    private Boolean isBusy;           // true nếu đang có assignment ACTIVE/PENDING
+    private String busyNote;          // Mô tả đang làm gì (vd: "Đang làm 2 dịch vụ")
 }

@@ -2,6 +2,9 @@ package com.g42.platform.gms.warehouse.domain.entity;
 
 import com.g42.platform.gms.marketing.service_catalog.infrastructure.entity.ServiceJpaEntity;
 import com.g42.platform.gms.warehouse.domain.enums.CatalogItemType;
+import com.g42.platform.gms.warehouse.domain.exception.WarehouseErrorCode;
+import com.g42.platform.gms.warehouse.domain.exception.WarehouseException;
+import com.g42.platform.gms.warehouse.infrastructure.entity.WorkCategoryJpaEntity;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -33,4 +36,20 @@ public class CatalogItem {
     private Boolean isRecurring;
     private Integer brandId;
     private Integer productLineId;
+    private String madeIn;
+    private Integer taxRuleId;
+    private Integer workCategoryId;
+    private String partNumber;
+    private String barcode;
+
+    public void validateBrandConsistency(Brand brand, ProductLine productLine) {
+        if (!productLine.getBrandId().equals(brand.getBrandId())) {
+            throw new WarehouseException("Product line không thuộc brand", WarehouseErrorCode.INVALID_PRODUCT_LINE);
+        }
+    }
+    public void validateService() {
+        if (serviceServiceId == null&&itemType==CatalogItemType.SERVICE) {
+        throw new WarehouseException("Phải tạo cả service, không tìm thấy service!", WarehouseErrorCode.SERVICE_NOT_FOUND);
+        }
+    }
 }

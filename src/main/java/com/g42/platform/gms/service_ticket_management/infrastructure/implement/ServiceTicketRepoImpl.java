@@ -15,6 +15,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -95,5 +96,30 @@ public class ServiceTicketRepoImpl implements ServiceTicketRepo {
             spec = spec.and(WorkHistorySpecification.byLicensePlate(licensePlate));
         }
         return jpaRepo.findAll(spec, pageable).map(mapper::toDomain);
+    }
+
+    @Override
+    public List<ServiceTicket> findAllByDate(LocalDateTime receivedAt) {
+        List<ServiceTicketJpa> serviceTicketJpas = jpaRepo.findAllByReceivedAt(receivedAt);
+        return serviceTicketJpas.stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
+    public Integer findMaxQueueNumberForToday(LocalDateTime startOfToday, LocalDateTime endOfToday) {
+        return jpaRepo.findMaxQueueNumberForToday(startOfToday,endOfToday);
+    }
+
+    @Override
+    public List<ServiceTicket> findBetween(LocalDateTime start, LocalDateTime end) {
+        List<ServiceTicketJpa> serviceTicketJpas = jpaRepo.findServiceTicketJpasByReceivedAtBetween(start,end);
+        return  serviceTicketJpas.stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
+    public ServiceTicket findPerviousCustomerService(Integer customerId, Integer serviceTicketId,Integer vehicleId) {
+        ServiceTicketJpa serviceTicketJpa = jpaRepo.findFirstByCustomerIdAndServiceTicketIdNotOrderByReceivedAtDesc(customerId, serviceTicketId);
+
+        ServiceTicketJpa serviceTicketJpa2 = jpaRepo.findFirstByCustomerIdAndVehicleIdAndServiceTicketIdNotOrderByReceivedAtDesc(customerId,vehicleId, serviceTicketId);
+        return mapper.toDomain(serviceTicketJpa2);
     }
 }

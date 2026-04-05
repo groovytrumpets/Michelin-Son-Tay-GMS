@@ -18,9 +18,9 @@ public class EstimateItemDto {
     private Integer quantity;
     private BigDecimal unitPrice;
     private BigDecimal subTotal;
-    private Integer taxRuleId;
+    private BigDecimal taxAmount;
+    private BigDecimal appliedTaxRate;
     private String taxCode;
-    private BigDecimal taxRate;
     private Boolean isChecked;
     private Boolean isRemoved;
     private BigDecimal unitPriceWithVat;

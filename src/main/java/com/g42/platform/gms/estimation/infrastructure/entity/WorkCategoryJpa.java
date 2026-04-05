@@ -36,6 +36,12 @@ public class WorkCategoryJpa {
     @ColumnDefault("0")
     @Column(name = "is_default")
     private Boolean isDefault;
+    @NotNull
+    @Column(name = "tax_rule_idtax_rule", nullable = false)
+    private Integer taxRuleId;
+    @Lob
+    @Column(name = "category_type")
+    private String categoryType;
 
 
 }

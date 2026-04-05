@@ -1,10 +1,14 @@
 package com.g42.platform.gms.service_ticket_management.infrastructure.repository;
 
+import com.g42.platform.gms.marketing.service_catalog.infrastructure.entity.ServiceJpaEntity;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -41,4 +45,21 @@ public interface ServiceTicketRepository extends JpaRepository<ServiceTicketJpa,
     Optional<ServiceTicketJpa> findByBookingId(Integer bookingId);
 
     ServiceTicketJpa findByServiceTicketId(Integer serviceTicketId);
+
+    List<ServiceTicketJpa> findAllByReceivedAt(LocalDateTime receivedAt);
+
+    @Query("""
+    select max(st.queueNumber) from ServiceTicketManagement st where st.receivedAt >=:startOfToday and st.receivedAt <=:endOfToday
+        """)
+    Integer findMaxQueueNumberForToday(LocalDateTime startOfToday, LocalDateTime endOfToday);
+
+    List<ServiceTicketJpa> findServiceTicketJpasByReceivedAtBetween(LocalDateTime receivedAtAfter, LocalDateTime receivedAtBefore);
+
+    ServiceTicketJpa findFirstByCustomerIdAndServiceTicketIdNot(Integer customerId, Integer serviceTicketId);
+
+    ServiceTicketJpa findFirstByCustomerIdAndServiceTicketIdNotOrderByReceivedAtDesc(Integer customerId, Integer serviceTicketId);
+
+    ServiceTicketJpa findFirstByCustomerIdAndVehicleIdAndServiceTicketIdNotOrderByReceivedAtDesc(Integer customerId, Integer vehicleId, Integer serviceTicketId);
+
+    ServiceTicketJpa findServiceTicketJpasByTicketCode(String ticketCode);
 }

@@ -60,6 +60,18 @@ public class SafetyInspectionController {
     }
 
     /**
+     * Reopen an existing safety inspection record for editing.
+     * This puts inspection back to PENDING and ticket back to DRAFT.
+     */
+    @PostMapping("/{ticketCode}/reopen")
+    public ResponseEntity<ApiResponse<SafetyInspectionResponse>> reopenInspection(
+            @PathVariable String ticketCode) {
+
+        SafetyInspectionResponse response = safetyInspectionService.reopenInspectionByCode(ticketCode);
+        return ResponseEntity.ok(ApiResponses.success(response, "Đã mở lại phiếu kiểm tra an toàn"));
+    }
+
+    /**
      * Get safety inspection details by inspection ID
      */
     @GetMapping("/{inspectionId}")
@@ -149,6 +161,18 @@ public class SafetyInspectionController {
     }
 
     /**
+     * Xóa mềm hạng mục tùy chỉnh (đặt status = DELETED).
+     */
+    @DeleteMapping("/{inspectionId}/custom-categories/{categoryId}")
+    public ResponseEntity<ApiResponse<Void>> deleteCustomCategory(
+            @PathVariable Integer inspectionId,
+            @PathVariable Integer categoryId) {
+
+        safetyInspectionService.deleteCustomCategory(inspectionId, categoryId);
+        return ResponseEntity.ok(ApiResponses.success(null, "Đã xóa hạng mục tùy chỉnh"));
+    }
+
+    /**
      * Bulk update itemStatus cho nhiều hạng mục cùng lúc (tech điền).
      * Hỗ trợ cả default (workCategoryId) và custom (customCategoryId).
      */
@@ -173,6 +197,19 @@ public class SafetyInspectionController {
         List<InspectionItemResponse> responses = safetyInspectionService.updateAdvisorNotes(
                 inspectionId, request.getItems());
         return ResponseEntity.ok(ApiResponses.success(responses, "Đã cập nhật ghi chú advisor thành công"));
+    }
+    @PutMapping("/{serviceTicketId}/update-recommend")
+    public ResponseEntity<ApiResponse<String>> updateSafetyInspection(
+            @PathVariable Integer serviceTicketId,
+            @RequestParam String recommend){
+        String rcm = safetyInspectionService.saveRecommend(serviceTicketId,recommend);
+        return ResponseEntity.ok(ApiResponses.success(rcm));
+    }
+    @GetMapping("/{serviceTicketId}/curent-recommend")
+    public ResponseEntity<ApiResponse<String>> viewCurentSafetyInspectionRcm(
+            @PathVariable Integer serviceTicketId){
+        String rcm = safetyInspectionService.getRecommend(serviceTicketId);
+        return ResponseEntity.ok(ApiResponses.success(rcm));
     }
 
 }

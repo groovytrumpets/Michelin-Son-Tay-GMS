@@ -1,20 +1,19 @@
 package com.g42.platform.gms.warehouse.infrastructure;
 
-import com.g42.platform.gms.marketing.service_catalog.domain.entity.Service;
-import com.g42.platform.gms.marketing.service_catalog.infrastructure.entity.ServiceJpaEntity;
 import com.g42.platform.gms.marketing.service_catalog.infrastructure.repository.ServiceJpaRepository;
-import com.g42.platform.gms.warehouse.api.dto.CatalogCreateDto;
+import com.g42.platform.gms.warehouse.api.dto.SpecificationRespondDto;
 import com.g42.platform.gms.warehouse.domain.entity.*;
-import com.g42.platform.gms.warehouse.domain.enums.CatalogItemType;
 import com.g42.platform.gms.warehouse.domain.repository.CatalogItemRepo;
 import com.g42.platform.gms.warehouse.infrastructure.entity.*;
 import com.g42.platform.gms.warehouse.infrastructure.mapper.*;
 import com.g42.platform.gms.warehouse.infrastructure.repository.*;
-import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Repository
 public class CatalogItemRepoImpl implements CatalogItemRepo {
@@ -40,6 +39,10 @@ public class CatalogItemRepoImpl implements CatalogItemRepo {
     private SpecificationJpaMapper specificationJpaMapper;
     @Autowired
     private ServiceJpaRepository serviceJpaRepository;
+    @Autowired
+    private WorkCategoryEntityJpaMapper itemCategoryJpaMapper;
+    @Autowired
+    private WorkCategoryJpaEntityRepo itemCategoryJpaRepo;
 
 
     @Override
@@ -82,5 +85,116 @@ public class CatalogItemRepoImpl implements CatalogItemRepo {
     public CatalogItem createCatalog(CatalogItem catalogItem) {
         CatalogItemJpa catalogItemJpa = catalogItemJpaRepo.save(catalogItemJpaMapper.toJpa(catalogItem));
         return catalogItemJpaMapper.toDomain(catalogItemJpa);
+    }
+
+
+    @Override
+    public ProductLine saveProductLine(ProductLine productLine) {
+        ProductLineJpa productLineJpa = productLineJpaRepo.save(productLineJpaMapper.toJpa(productLine));
+        return  productLineJpaMapper.toDomain(productLineJpa);
+    }
+
+    @Override
+    public boolean exitBySku(String sku) {
+        return catalogItemJpaRepo.existsBySku(sku);
+    }
+    @Override
+    @Transactional
+    public WorkCategory saveItemCate(WorkCategory itemCategory) {
+
+        WorkCategoryJpaEntity itemCategoryJpa = itemCategoryJpaRepo.save(itemCategoryJpaMapper.toJpa(itemCategory));
+        return itemCategoryJpaMapper.toDomain(itemCategoryJpa);
+    }
+
+    @Override
+    public ProductLine getProductLineById(Integer productLineId) {
+        ProductLineJpa itemJpa = productLineJpaRepo.findById(productLineId).orElse(null);
+        return productLineJpaMapper.toDomain(itemJpa);
+    }
+
+    @Override
+    public List<Specification> getListOfSpecsByItem(Integer itemId) {
+        List<SpecificationJpa> specificationJpas = specificationJpaRepo.findAllByItemId(itemId);
+        return specificationJpas.stream().map(specificationJpaMapper::toDomain).toList();
+    }
+
+    @Override
+    public WorkCategory getItemCategoryById(Integer itemCategoryId) {
+        WorkCategoryJpaEntity itemCategoryJpa = itemCategoryJpaRepo.findById(itemCategoryId).orElse(null);
+        return itemCategoryJpaMapper.toDomain(itemCategoryJpa);
+    }
+
+    @Override
+    public CatalogItem saveCatalogItem(CatalogItem catalogItem) {
+        CatalogItemJpa catalogItemJpa = catalogItemJpaRepo.save(catalogItemJpaMapper.toJpa(catalogItem));
+        return catalogItemJpaMapper.toDomain(catalogItemJpa);
+    }
+
+    @Override
+    public boolean exitByCategoryCode(String categoryCode) {
+        return itemCategoryJpaRepo.existsByCategoryCode(categoryCode);
+    }
+
+    @Override
+    public Specification saveSpec(Specification specification) {
+        SpecificationJpa specificationJpa = specificationJpaRepo.save(specificationJpaMapper.toJpa(specification));
+        return specificationJpaMapper.toDomain(specificationJpa);
+    }
+
+    @Override
+    public SpecAttribute saveSpecAttribute(SpecAttribute specAttribute) {
+        SpecAttributeJpa specAttributeJpa = specAttributeJpaRepo.save(specAttributeJpaMapper.toJpa(specAttribute));
+        return specAttributeJpaMapper.toDomain(specAttributeJpa);
+    }
+
+    @Override
+    public List<WorkCategory> getAllItemCategory() {
+        List<WorkCategoryJpaEntity> itemCategoryJpas = itemCategoryJpaRepo.findAll();
+        return itemCategoryJpas.stream().map(itemCategoryJpaMapper::toDomain).toList();
+    }
+
+    @Override
+    public SpecAttribute getSpecAttributeById(Integer attributeId) {
+        SpecAttributeJpa specAttributeJpa = specAttributeJpaRepo.findById(attributeId).orElse(null);
+        return specAttributeJpaMapper.toDomain(specAttributeJpa);
+    }
+
+    @Override
+    public CatalogItem getCatalogItemById(Integer itemId) {
+        CatalogItemJpa catalogItemJpa = catalogItemJpaRepo.findById(itemId).orElse(null);
+        return catalogItemJpaMapper.toDomain(catalogItemJpa);
+    }
+    @Override
+    public Integer findCategoryCode(String categoryCode) {
+        WorkCategoryJpaEntity workCategoryJpaEntity = itemCategoryJpaRepo.findByCategoryCode(categoryCode);
+        if (workCategoryJpaEntity == null) {
+            return null;
+        }
+        return workCategoryJpaEntity.getWorkCategoryId();
+    }
+
+    @Override
+    public Map<Integer, String> getAllBrandByIds(Set<Integer> brandIds) {
+        return brandJpaRepo.getBrandMapByIds(brandIds);
+    }
+
+    @Override
+    public Map<Integer, String> findAllLinesByIds(Set<Integer> lineIds) {
+        return productLineJpaRepo.findAllLinesByIds(lineIds);
+    }
+
+    @Override
+    public List<SpecificationRespondDto> getAllSpecsByItemId(Integer catalogItemId) {
+        return specificationJpaRepo.findSpecsByItemId(catalogItemId);
+    }
+
+    @Override
+    public Map<Integer, String> findAllCatesByIds(Set<Integer> categoryIds) {
+        return itemCategoryJpaRepo.findCateByIds(categoryIds);
+    }
+
+    @Override
+    public int findCategoryMaxOrder() {
+        return itemCategoryJpaRepo.findMaxDisplayOrder();
     }
 }
