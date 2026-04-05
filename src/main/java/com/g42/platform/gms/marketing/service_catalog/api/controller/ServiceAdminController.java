@@ -8,10 +8,7 @@ import com.g42.platform.gms.marketing.service_catalog.application.service.Servic
 import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.ModelAttribute;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
 @RestController
@@ -23,5 +20,9 @@ public class ServiceAdminController {
     @PostMapping("create")
     public ResponseEntity<ApiResponse<ServiceDetailRespond>> createService(@ModelAttribute ServiceCreateRequest request) throws IOException {
         return ResponseEntity.ok(ApiResponses.success(serviceCatalogService.createNewService(request)));
+    }
+    @PutMapping("update/{serviceId}")
+    public ResponseEntity<ApiResponse<ServiceDetailRespond>> updateService(@ModelAttribute ServiceCreateRequest request,@PathVariable Long serviceId) throws IOException {
+        return ResponseEntity.ok(ApiResponses.success(serviceCatalogService.updateService(request,serviceId)));
     }
 }
