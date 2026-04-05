@@ -1,16 +1,14 @@
 package com.g42.platform.gms.auth.service;
 
 import com.g42.platform.gms.auth.constant.AuthErrorCode;
-import com.g42.platform.gms.auth.dto.AuthResponse;
-import com.g42.platform.gms.auth.dto.LoginRequest;
-import com.g42.platform.gms.auth.dto.StaffAuthDto;
-import com.g42.platform.gms.auth.dto.StaffAuthResponse;
+import com.g42.platform.gms.auth.dto.*;
 import com.g42.platform.gms.auth.entity.*;
 import com.g42.platform.gms.auth.exception.AuthException;
 import com.g42.platform.gms.auth.mapper.StaffAuthMapper;
 import com.g42.platform.gms.auth.repository.StaffAuthRepo;
 import com.g42.platform.gms.auth.repository.StaffProfileRepo;
 import com.g42.platform.gms.auth.repository.StaffRoleRepository;
+import com.g42.platform.gms.common.service.OtpService;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -37,6 +35,8 @@ public class StaffAuthService {
     private JWTService jwtService;
     private final StaffAuthMapper staffAuthMapper; //Mapper giúp biến entity thành dto
     private static final int MAX_LOGIN_ATTEMPTS = 10;
+    @Autowired
+    private OtpService otpService;
 
     public Iterable<StaffAuthDto> getAllStaffAuth() {
         return staffAuthRepo.findAll().stream().map(staffAuthMapper::toDto).toList();
@@ -97,5 +97,40 @@ public class StaffAuthService {
             throw new AuthException(AuthErrorCode.USER_NOT_FOUND.name(), "Sai thông tin đăng nhập, tài khoản có thể bị khóa sau 10 lần thử");
     }
 
+@Transactional
+    public void requestOtpPhone(String phone) {
+        StaffAuth staffAuth = null;
+        StaffProfile staffProfile = null;
+        if (phone.contains("@")) {
+            System.out.println("DEBUG Email: " + phone);
+            staffAuth = staffAuthRepo.findByEmail(phone);
+            if (staffAuth != null) staffProfile = staffProfileRepo.
+                    getStaffProfileByStaffauth_StaffAuthId(staffAuth.getStaffAuthId());
+        }else {
+            System.out.println("DEBUG PHONE: " + phone);
+            staffProfile = staffProfileRepo.findByPhone(phone);
+            if (staffProfile != null){
 
+            System.out.println("DEBUG PHONE: " + staffProfile.getFullName()+", "+staffProfile.getPhone());
+            staffAuth = staffAuthRepo.findByStaffProfile(staffProfile);
+            }
+        }
+        if (staffAuth == null||staffProfile == null) {
+            throw new AuthException("Staff Not Found","STAFF404");
+        }
+        if (staffAuth.getStatus().equals("LOCKED")){
+            throw new AuthException("Staff Account Locked","STAFF_LOCKED");
+        }
+        otpService.generateAndSendOtp(staffProfile.getPhone());
+
+    }
+
+    public AuthResponse verifyOtp(VerifyOtpRequest request) {
+        try {
+            otpService.validateOtp(request.getPhone(), request.getOtp());
+        } catch (RuntimeException e) {
+            throw new AuthException(AuthErrorCode.INVALID_OTP.name(), "Mã OTP không chính xác hoặc đã hết hạn");
+        }
+        return new AuthResponse("OTP_VERIFIED", "STAFF", null);
+    }
 }
