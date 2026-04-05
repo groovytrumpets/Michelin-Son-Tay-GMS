@@ -85,4 +85,41 @@ public class ServiceCatalogService {
 
         return serviceDtoMapper.toDetailDto(serviceRepository.save(service));
     }
+
+    public ServiceDetailRespond updateService(ServiceCreateRequest request, Long serviceId) throws IOException {
+
+        com.g42.platform.gms.marketing.service_catalog.domain.entity.Service
+                service = serviceDtoMapper.toEntity(request);
+        service.setServiceId(serviceId);
+        if (request.getThumbnailFile() != null && !request.getThumbnailFile().isEmpty()) {
+            String thumnailUrl = imageUploadService.uploadImage(request.getThumbnailFile(),"garage/services/thumbnails");
+            service.setMediaThumbnail(thumnailUrl);
+        }
+        if (request.getMediaFiles() != null && !request.getMediaFiles().isEmpty()) {
+            List<ServiceMedia> mediaList = new ArrayList<>();
+            int displayOrder=1;
+            for (MultipartFile file : request.getMediaFiles()) {
+                if (!file.isEmpty()) {
+
+
+                    String contentType = file.getContentType();
+                    ServiceMedia mediaEntity = new ServiceMedia();
+                    mediaEntity.setDisplayOrder(displayOrder++);
+                    if (contentType != null && contentType.startsWith("video")) {
+                        String mediaUrl = imageUploadService.uploadVideo(file, "garage/services/video");
+                        mediaEntity.setMediaUrl(mediaUrl);
+                        mediaEntity.setMediaType(MediaType.VIDEO);
+                    } else {String mediaUrl = imageUploadService.uploadImage(file, "garage/services/gallery");
+
+                        mediaEntity.setMediaUrl(mediaUrl);
+                        mediaEntity.setMediaType(MediaType.IMAGE);
+                    }
+                    mediaList.add(mediaEntity);
+                }
+            }
+            service.setMedia(mediaList);
+        }
+
+        return serviceDtoMapper.toDetailDto(serviceRepository.save(service));
+    }
 }
