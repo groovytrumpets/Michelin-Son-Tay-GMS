@@ -69,6 +69,10 @@ public class ZaloNotificationSender implements NotificationSender {
         String template_id = "546916";
         String url = "https://business.openapi.zalo.me/message/template";
         ZaloToken zaloToken = zaloTokenRepo.getZaloTokensByState("active");
+        if (zaloToken == null||zaloToken.getAccessToken()==null||zaloToken.getAccessToken().isEmpty()) {
+            System.err.println("ZaloToken is null, tried send Confirm Booking: "+orderCode);
+            return;
+        }
 //        String accessToken = zaloToken.getAccessToken();
 
         String templateId = "546916";
@@ -114,6 +118,10 @@ public class ZaloNotificationSender implements NotificationSender {
     public void sendOtpVerify(String number, String otp) {
         String url = "https://business.openapi.zalo.me/message/template";
         ZaloToken zaloToken = zaloTokenRepo.getZaloTokenByState("active");
+        if (zaloToken == null||zaloToken.getAccessToken()==null||zaloToken.getAccessToken().isEmpty()) {
+            System.err.println("ZaloToken is null, tried send otp: "+otp);
+            return;
+        }
 //        String accessToken = zaloToken.getAccessToken();
 
         String templateId = "547094";
@@ -150,7 +158,10 @@ public class ZaloNotificationSender implements NotificationSender {
         String url = "https://business.openapi.zalo.me/message/template";
         ZaloToken zaloToken = zaloTokenRepo.getZaloTokenByState("active");
 //        String accessToken = zaloToken.getAccessToken();
-
+        if (zaloToken == null||zaloToken.getAccessToken()==null||zaloToken.getAccessToken().isEmpty()) {
+            System.err.println("ZaloToken is null, tried send feedback: "+code);
+            return;
+        }
         String templateId = "547146";
 
         RestTemplate restTemplate = new RestTemplate();
