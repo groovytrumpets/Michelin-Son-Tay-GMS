@@ -10,6 +10,7 @@ import com.g42.platform.gms.marketing.service_catalog.domain.enums.MediaType;
 import com.g42.platform.gms.marketing.service_catalog.domain.exception.ServiceErrorCode;
 import com.g42.platform.gms.marketing.service_catalog.domain.exception.ServiceException;
 import com.g42.platform.gms.marketing.service_catalog.domain.repository.ServiceRepository;
+import com.g42.platform.gms.warehouse.api.internal.WarehouseInternalApi;
 import com.g42.platform.gms.warehouse.domain.enums.CatalogItemType;
 import lombok.AllArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -30,6 +31,7 @@ public class ServiceCatalogService {
     private final ServiceRepository serviceRepository;
     private final ServiceDtoMapper serviceDtoMapper;
     private final ImageUploadService imageUploadService;
+    private final WarehouseInternalApi warehouseInternalApi;
 
     public List<ServiceSumaryRespond> getListActiveServices() {
         LocalDateTime now = LocalDateTime.now();
@@ -52,7 +54,7 @@ public class ServiceCatalogService {
         return serviceRepository.getCatalogIdByServiceId(serviceId);
     }
     @Transactional
-    public ServiceDetailRespond createNewService(ServiceCreateRequest request) throws IOException {
+    public ServiceDetailRespond createNewService(ServiceCreateRequest request, Integer catalogId) throws IOException {
         com.g42.platform.gms.marketing.service_catalog.domain.entity.Service
                 service = serviceDtoMapper.toEntity(request);
         if (request.getThumbnailFile() != null && !request.getThumbnailFile().isEmpty()) {
@@ -69,6 +71,47 @@ public class ServiceCatalogService {
                     String contentType = file.getContentType();
                         ServiceMedia mediaEntity = new ServiceMedia();
                         mediaEntity.setDisplayOrder(displayOrder++);
+                    if (contentType != null && contentType.startsWith("video")) {
+                        String mediaUrl = imageUploadService.uploadVideo(file, "garage/services/video");
+                        mediaEntity.setMediaUrl(mediaUrl);
+                        mediaEntity.setMediaType(MediaType.VIDEO);
+                    } else {String mediaUrl = imageUploadService.uploadImage(file, "garage/services/gallery");
+
+                        mediaEntity.setMediaUrl(mediaUrl);
+                        mediaEntity.setMediaType(MediaType.IMAGE);
+                    }
+                    mediaList.add(mediaEntity);
+                }
+            }
+            service.setMedia(mediaList);
+        }
+        //todo: save catalog
+        com.g42.platform.gms.marketing.service_catalog.domain.entity.Service
+                serviceSaved = serviceRepository.save(service);
+        warehouseInternalApi.updateCatalogBlogService(serviceSaved,catalogId);
+
+        return serviceDtoMapper.toDetailDto(serviceSaved);
+    }
+
+    public ServiceDetailRespond updateService(ServiceCreateRequest request, Long serviceId) throws IOException {
+
+        com.g42.platform.gms.marketing.service_catalog.domain.entity.Service
+                service = serviceDtoMapper.toEntity(request);
+        service.setServiceId(serviceId);
+        if (request.getThumbnailFile() != null && !request.getThumbnailFile().isEmpty()) {
+            String thumnailUrl = imageUploadService.uploadImage(request.getThumbnailFile(),"garage/services/thumbnails");
+            service.setMediaThumbnail(thumnailUrl);
+        }
+        if (request.getMediaFiles() != null && !request.getMediaFiles().isEmpty()) {
+            List<ServiceMedia> mediaList = new ArrayList<>();
+            int displayOrder=1;
+            for (MultipartFile file : request.getMediaFiles()) {
+                if (!file.isEmpty()) {
+
+
+                    String contentType = file.getContentType();
+                    ServiceMedia mediaEntity = new ServiceMedia();
+                    mediaEntity.setDisplayOrder(displayOrder++);
                     if (contentType != null && contentType.startsWith("video")) {
                         String mediaUrl = imageUploadService.uploadVideo(file, "garage/services/video");
                         mediaEntity.setMediaUrl(mediaUrl);

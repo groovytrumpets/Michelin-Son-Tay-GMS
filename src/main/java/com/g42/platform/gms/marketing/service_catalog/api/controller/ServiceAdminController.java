@@ -17,9 +17,13 @@ import java.io.IOException;
 public class ServiceAdminController {
     @Autowired
     private final ServiceCatalogService serviceCatalogService;
-    @PostMapping("create")
-    public ResponseEntity<ApiResponse<ServiceDetailRespond>> createService(@ModelAttribute ServiceCreateRequest request) throws IOException {
-        return ResponseEntity.ok(ApiResponses.success(serviceCatalogService.createNewService(request)));
+    @PostMapping("create/{catalogId}")
+    public ResponseEntity<ApiResponse<ServiceDetailRespond>> createService(@ModelAttribute ServiceCreateRequest request,@PathVariable Integer catalogId) throws IOException {
+        return ResponseEntity.ok(ApiResponses.success(serviceCatalogService.createNewService(request,catalogId)));
+    }
+    @PutMapping("update/{serviceId}")
+    public ResponseEntity<ApiResponse<ServiceDetailRespond>> updateService(@ModelAttribute ServiceCreateRequest request,@PathVariable Long serviceId) throws IOException {
+        return ResponseEntity.ok(ApiResponses.success(serviceCatalogService.updateService(request,serviceId)));
     }
     @PutMapping("update/{serviceId}")
     public ResponseEntity<ApiResponse<ServiceDetailRespond>> updateService(@ModelAttribute ServiceCreateRequest request,@PathVariable Long serviceId) throws IOException {

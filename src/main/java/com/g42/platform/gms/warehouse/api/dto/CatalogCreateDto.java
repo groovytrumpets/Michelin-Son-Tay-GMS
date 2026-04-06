@@ -33,7 +33,6 @@ public class CatalogCreateDto {
     private Boolean isRecurring;
     private Integer brandId;
     private Integer productLineId;
-    @NotNull
     private String madeIn;
     private Integer taxRuleId;
     private Integer workCategoryId;
