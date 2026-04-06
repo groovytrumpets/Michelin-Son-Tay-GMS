@@ -25,8 +25,4 @@ public class ServiceAdminController {
     public ResponseEntity<ApiResponse<ServiceDetailRespond>> updateService(@ModelAttribute ServiceCreateRequest request,@PathVariable Long serviceId) throws IOException {
         return ResponseEntity.ok(ApiResponses.success(serviceCatalogService.updateService(request,serviceId)));
     }
-    @PutMapping("update/{serviceId}")
-    public ResponseEntity<ApiResponse<ServiceDetailRespond>> updateService(@ModelAttribute ServiceCreateRequest request,@PathVariable Long serviceId) throws IOException {
-        return ResponseEntity.ok(ApiResponses.success(serviceCatalogService.updateService(request,serviceId)));
-    }
 }
