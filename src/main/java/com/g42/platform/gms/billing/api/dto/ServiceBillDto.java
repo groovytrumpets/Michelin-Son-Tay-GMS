@@ -14,12 +14,9 @@ public class ServiceBillDto {
     private BigDecimal subTotal;
     private BigDecimal discountAmount;
     private BigDecimal finalAmount;
-    private String paymentMethod;
     private String paymentStatus;
     private Instant paidAt;
-    private String billStatus;
     private Integer warehouseId;
-    private Integer version;
     private Integer estimateId;
     private Integer promotionId;
 }

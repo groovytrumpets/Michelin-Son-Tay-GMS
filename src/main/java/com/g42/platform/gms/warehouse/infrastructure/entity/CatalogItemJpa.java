@@ -1,5 +1,7 @@
 package com.g42.platform.gms.warehouse.infrastructure.entity;
 
+import com.g42.platform.gms.estimation.infrastructure.entity.TaxRuleJpa;
+import com.g42.platform.gms.estimation.infrastructure.entity.WorkCategoryJpa;
 import com.g42.platform.gms.marketing.service_catalog.infrastructure.entity.ServiceJpaEntity;
 import com.g42.platform.gms.warehouse.domain.enums.CatalogItemType;
 import jakarta.persistence.*;
@@ -30,7 +32,7 @@ public class CatalogItemJpa {
     @ColumnDefault("0")
     @Column(name = "warranty_duration_months")
     private Integer warrantyDurationMonths;
-    @Column(name = "service_service_id", nullable = false)
+    @Column(name = "service_service_id", nullable = true)
     private Long serviceId;
 
     private String sku;
@@ -56,13 +58,24 @@ public class CatalogItemJpa {
     @Column(name = "is_recurring")
     private Boolean isRecurring;
 
-    @Column(name = "brand_id", nullable = false)
+    @Column(name = "brand_id", nullable = true)
     private Integer brandId;
 
-    @Column(name = "product_line_id", nullable = false)
+    @Column(name = "product_line_id", nullable = true)
     private Integer productLineId;
+    @Size(max = 100)
+    @Column(name = "made_in", length = 100)
+    private String madeIn;
+    @Column(name = "tax_rule_id")
+    private Integer taxRuleId;
     @NotNull
-    @Column(name = "item_category_id", nullable = false)
-    private Integer itemCategoryId;
+    @Column(name = "work_category_id", nullable = false)
+    private Integer workCategoryId;
+    @Size(max = 50)
+    @Column(name = "part_number", length = 50)
+    private String partNumber;
+    @Size(max = 50)
+    @Column(name = "barcode", length = 50)
+    private String barcode;
 
 }

@@ -64,7 +64,12 @@ public class ServiceTicketSpecification {
             Subquery<Integer> subquery = query.subquery(Integer.class);
             var assignmentRoot = subquery.from(ServiceTicketAssignmentJpa.class);
             subquery.select(assignmentRoot.get("serviceTicketId"))
-                .where(cb.equal(assignmentRoot.get("staffId"), staffId));
+                .where(
+                    cb.and(
+                        cb.equal(assignmentRoot.get("staffId"), staffId),
+                        cb.notEqual(assignmentRoot.get("status"), com.g42.platform.gms.service_ticket_management.domain.enums.AssignmentStatus.CANCELLED)
+                    )
+                );
             return root.get("serviceTicketId").in(subquery);
         };
     }

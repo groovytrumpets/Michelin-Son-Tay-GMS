@@ -14,4 +14,8 @@ public interface SafetyInspectionRepo {
     Optional<SafetyInspection> findById(Integer inspectionId);
 
     SafetyInspection save(SafetyInspection inspection);
+
+    SafetyInspection findByIdService(Integer serviceTicketId);
+
+    String getRcmByServiceId(Integer serviceTicketId);
 }

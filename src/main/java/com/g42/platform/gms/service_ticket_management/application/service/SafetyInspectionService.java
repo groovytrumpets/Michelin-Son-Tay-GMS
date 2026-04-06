@@ -67,6 +67,13 @@ public class SafetyInspectionService {
     }
 
 
+    public SafetyInspectionResponse reopenInspectionByCode(String ticketCode) {
+        ServiceTicket serviceTicket = serviceTicketRepo.findByTicketCode(ticketCode)
+                .orElseThrow(() -> new IllegalArgumentException("Service ticket not found with code: " + ticketCode));
+        return reopenInspection(serviceTicket.getServiceTicketId());
+    }
+
+
     @Transactional(readOnly = true)
     public SafetyInspectionResponse getInspectionByTicketCode(String ticketCode) {
         ServiceTicket serviceTicket = serviceTicketRepo.findByTicketCode(ticketCode)
@@ -124,6 +131,23 @@ public class SafetyInspectionService {
         serviceTicketRepo.save(ticket);
 
         return apiMapper.toResponse(saved);
+    }
+
+
+    public SafetyInspectionResponse reopenInspection(Integer serviceTicketId) {
+        SafetyInspection inspection = inspectionRepo.findByServiceTicketId(serviceTicketId)
+                .orElseThrow(() -> new IllegalArgumentException("Inspection not found for service ticket: " + serviceTicketId));
+        inspection.setInspectionStatus(InspectionStatus.PENDING);
+        inspection.setUpdatedAt(LocalDateTime.now());
+        inspectionRepo.save(inspection);
+
+        ServiceTicket ticket = serviceTicketRepo.findByServiceTicketId(serviceTicketId);
+        if (ticket == null) throw new IllegalArgumentException("Service ticket not found: " + serviceTicketId);
+        ticket.setTicketStatus(TicketStatus.DRAFT);
+        ticket.setUpdatedAt(LocalDateTime.now());
+        serviceTicketRepo.save(ticket);
+
+        return getInspectionByServiceTicket(serviceTicketId);
     }
 
 
@@ -342,6 +366,23 @@ public class SafetyInspectionService {
         return resp;
     }
 
+    @Transactional
+    public void deleteCustomCategory(Integer inspectionId, Integer categoryId) {
+        SafetyInspection inspection = inspectionRepo.findById(inspectionId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy phiếu kiểm tra: " + inspectionId));
+        requireTicketEditableForInspection(inspection.getServiceTicketId());
+
+        TicketCustomCategory cat = customCategoryRepo.findById(categoryId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy hạng mục: " + categoryId));
+
+        if (!cat.getInspectionId().equals(inspectionId)) {
+            throw new IllegalArgumentException("Hạng mục không thuộc phiếu kiểm tra này");
+        }
+
+        cat.setStatus("DELETED");
+        customCategoryRepo.save(cat);
+    }
+
 
     private InspectionItemResponse buildItemResponse(SafetyInspectionItem saved, Integer inspectionId) {
         List<SafetyInspectionItemWithCategory> withCat = itemRepo.findByInspectionIdWithCategory(inspectionId);
@@ -406,6 +447,22 @@ public class SafetyInspectionService {
             req.setPressureUnit(actual.getPressureUnit()); }
         req.setTireSpecification(spec); req.setRecommendedTireSize(recSize); req.setRecommendedPressure(recPressure);
         return req;
+    }
+
+    public String saveRecommend(Integer serviceTicketId, String recommend) {
+        SafetyInspection safetyInspection = inspectionRepo.findByIdService(serviceTicketId);
+        safetyInspection.setGeneralNotes(recommend);
+        SafetyInspection saved = inspectionRepo.save(safetyInspection);
+        return saved.getGeneralNotes();
+
+    }
+
+    public SafetyInspection findByServiceTicketId(Integer previousId) {
+        return inspectionRepo.findByIdService(previousId);
+    }
+
+    public String getRecommend(Integer serviceTicketId) {
+        return inspectionRepo.getRcmByServiceId(serviceTicketId);
     }
 }
 
