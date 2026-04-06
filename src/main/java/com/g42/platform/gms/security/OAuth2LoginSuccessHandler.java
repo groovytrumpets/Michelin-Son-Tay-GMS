@@ -39,19 +39,12 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
 
         StaffAuth staffAuth = staffAuthRepo.searchByEmail(email);
         if (staffAuth == null) {
-            System.out.println("ERROR: Staff not found!");
-            //todo: notify that staff 404
-            ResponseEntity<ApiResponse<AuthResponse>> responseResponseEntity = ResponseEntity.ok(ApiResponses.error(AuthErrorCode.USER_NOT_FOUND.name(),"Tài khoản chưa có trong hệ thống"));
-            response.setContentType("application/json");
-            response.getWriter().write(
-                    new ObjectMapper().writeValueAsString(responseResponseEntity)
-            );
-            response.sendRedirect(frontendLoginUrl + "?error=USER_NOT_FOUND");
+            System.err.println("ERROR: Unauthorized Google Login attempt - " + email);
+            getRedirectStrategy().sendRedirect(request, response, frontendLoginUrl + "?error=USER_NOT_FOUND");
             return;
         }
         if (staffAuth.getStatus().equals("LOCKED")){
-            response.sendError(HttpServletResponse.SC_FORBIDDEN, "Account locked");
-            response.sendRedirect(frontendLoginUrl + "?error=ACCOUNT_LOCKED");
+            getRedirectStrategy().sendRedirect(request, response, frontendLoginUrl + "?error=ACCOUNT_LOCKED");
             return;
         }
 
@@ -60,14 +53,7 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
         staffAuth.setAuthProvider("GOOGLE");
         staffAuthRepo.save(staffAuth);
         String jwt = jwtService.generateStaffJWToken(staffAuth.getStaffAuthId());
-//        response.sendRedirect("http://localhost:3000/oauth2/success?token=" + jwt);
-        AuthResponse authResponse = new AuthResponse("GOOGLE OAUTH2 SUCCESS","STAFF",jwt);
 
-        ResponseEntity<ApiResponse<AuthResponse>> responseResponseEntity = ResponseEntity.ok(ApiResponses.success(authResponse));
-        response.setContentType("application/json");
-        response.getWriter().write(
-                new ObjectMapper().writeValueAsString(responseResponseEntity)
-        );
         response.sendRedirect(frontendHomeUrl + "?token=" + jwt);
     }
 }

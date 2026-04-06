@@ -11,6 +11,10 @@ import com.g42.platform.gms.auth.repository.StaffProfileRepo;
 
 import com.g42.platform.gms.auth.entity.StaffAuth;
 import com.g42.platform.gms.auth.repository.StaffRoleRepository;
+import com.g42.platform.gms.security.OAuth2LoginSuccessHandler;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.security.web.RedirectStrategy;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,6 +26,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.core.user.OAuth2User;
 
 import java.util.List;
 import java.util.Optional;
@@ -43,7 +48,14 @@ public class StaffAuthServiceTest {
     @InjectMocks
     private StaffAuthService staffAuthService;
     @Mock private StaffRoleRepository staffRoleRepo;
+    @Mock private HttpServletRequest request;
+    @Mock private HttpServletResponse response;
+    @Mock private Authentication authentication;
+    @Mock private OAuth2User oAuth2User;
+    @Mock private RedirectStrategy redirectStrategy;
 
+    @InjectMocks
+    private OAuth2LoginSuccessHandler handler;
     @Test
     @DisplayName("UTCID08")
     void loginSuccessReturnToken(){
@@ -264,5 +276,47 @@ public class StaffAuthServiceTest {
         assertNotNull(staffAuthResponse);
         assertEquals("LOGIN_SUCCESS", staffAuthResponse.getMessage());
         assertEquals("mock_token_123", staffAuthResponse.getToken());
+    }
+    @Test
+    @DisplayName("UTCID13")
+    void onAuthSuccess_WhenEmailNotFound_ShouldRedirectToLoginWithError() throws Exception {
+        String email = "abc@email";
+
+        when(authentication.getPrincipal()).thenReturn(oAuth2User);
+        when(oAuth2User.getAttribute("email")).thenReturn(email);
+        when(oAuth2User.getAttribute("sub")).thenReturn("google_id_123");
+
+        when(staffAuthRepo.searchByEmail(email)).thenReturn(null);
+
+        handler.setRedirectStrategy(redirectStrategy);
+
+        handler.onAuthenticationSuccess(request, response, authentication);
+
+        verify(redirectStrategy).sendRedirect(request, response, "http://localhost:5173/login?error=USER_NOT_FOUND");
+
+        verify(staffAuthRepo, never()).save(any());
+    }
+    @Test
+    @DisplayName("UTCID11")
+    void onAuthSuccess_WhenValidEmail_ShouldRedirectToDashboardWithToken() throws Exception {
+        String validEmail = "abc@email.com";
+        StaffAuth mockAuth = new StaffAuth();
+        mockAuth.setStaffAuthId(1);
+        mockAuth.setStatus("ACTIVE");
+
+        when(authentication.getPrincipal()).thenReturn(oAuth2User);
+        when(oAuth2User.getAttribute("email")).thenReturn(validEmail);
+        when(oAuth2User.getAttribute("sub")).thenReturn("google_id_456");
+
+        when(staffAuthRepo.searchByEmail(validEmail)).thenReturn(mockAuth);
+        when(jwtService.generateStaffJWToken(1)).thenReturn("super_secret_token_123");
+
+        handler.setRedirectStrategy(redirectStrategy);
+
+        handler.onAuthenticationSuccess(request, response, authentication);
+
+        verify(staffAuthRepo).save(mockAuth);
+
+        verify(response).sendRedirect("http://localhost:5173/dashboard?token=super_secret_token_123");
     }
 }
