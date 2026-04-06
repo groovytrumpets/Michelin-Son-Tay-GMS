@@ -25,35 +25,71 @@ import java.io.IOException;
 @AllArgsConstructor
 public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
 
-    private final JWTService  jwtService;
+    private final JWTService jwtService;
     private final StaffAuthRepo staffAuthRepo;
 
+    //    @Override
+//    public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException, ServletException {
+//        OAuth2User oAuth2User = (OAuth2User) authentication.getPrincipal();
+//        String email = (String) oAuth2User.getAttribute("email");
+//        String googleId = (String) oAuth2User.getAttribute("sub");
+//
+//        String frontendLoginUrl = "http://localhost:5173/login";
+//        String frontendHomeUrl = "http://localhost:5173/dashboard";
+//
+//        StaffAuth staffAuth = staffAuthRepo.searchByEmail(email);
+//        if (staffAuth == null) {
+//            System.err.println("ERROR: Unauthorized Google Login attempt - " + email);
+//            getRedirectStrategy().sendRedirect(request, response, frontendLoginUrl + "?error=USER_NOT_FOUND");
+//            return;
+//        }
+//        if (staffAuth.getStatus().equals("LOCKED")){
+//            getRedirectStrategy().sendRedirect(request, response, frontendLoginUrl + "?error=ACCOUNT_LOCKED");
+//            return;
+//        }
+//
+//        staffAuth.setGoogle_id(googleId);
+//        System.err.println("GOOGLE ID: "+googleId);
+//        staffAuth.setAuthProvider("GOOGLE");
+//        staffAuthRepo.save(staffAuth);
+//        String jwt = jwtService.generateStaffJWToken(staffAuth.getStaffAuthId());
+//
+//        response.sendRedirect(frontendHomeUrl + "?token=" + jwt);
+//    }
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException, ServletException {
         OAuth2User oAuth2User = (OAuth2User) authentication.getPrincipal();
         String email = (String) oAuth2User.getAttribute("email");
         String googleId = (String) oAuth2User.getAttribute("sub");
 
-        String frontendLoginUrl = "http://localhost:5173/login";
-        String frontendHomeUrl = "http://localhost:5173/dashboard";
-
         StaffAuth staffAuth = staffAuthRepo.searchByEmail(email);
         if (staffAuth == null) {
-            System.err.println("ERROR: Unauthorized Google Login attempt - " + email);
-            getRedirectStrategy().sendRedirect(request, response, frontendLoginUrl + "?error=USER_NOT_FOUND");
+            System.out.println("ERROR: Staff not found!");
+            //todo: notify that staff 404
+            ResponseEntity<ApiResponse<AuthResponse>> responseResponseEntity = ResponseEntity.ok(ApiResponses.error(AuthErrorCode.USER_NOT_FOUND.name(), "Tài khoản chưa có trong hệ thống"));
+            response.setContentType("application/json;charset=UTF-8");
+            response.getWriter().write(
+                    new ObjectMapper().writeValueAsString(responseResponseEntity)
+            );
             return;
         }
-        if (staffAuth.getStatus().equals("LOCKED")){
-            getRedirectStrategy().sendRedirect(request, response, frontendLoginUrl + "?error=ACCOUNT_LOCKED");
+        if (staffAuth.getStatus().equals("LOCKED")) {
+            response.sendError(HttpServletResponse.SC_FORBIDDEN, "Account locked");
             return;
         }
 
         staffAuth.setGoogle_id(googleId);
-        System.err.println("GOOGLE ID: "+googleId);
+        System.err.println("GOOGLE ID: " + googleId);
         staffAuth.setAuthProvider("GOOGLE");
         staffAuthRepo.save(staffAuth);
         String jwt = jwtService.generateStaffJWToken(staffAuth.getStaffAuthId());
+//        response.sendRedirect("http://localhost:3000/oauth2/success?token=" + jwt);
+        AuthResponse authResponse = new AuthResponse("GOOGLE OAUTH2 SUCCESS", "STAFF", jwt);
 
-        response.sendRedirect(frontendHomeUrl + "?token=" + jwt);
+        ResponseEntity<ApiResponse<AuthResponse>> responseResponseEntity = ResponseEntity.ok(ApiResponses.success(authResponse));
+        response.setContentType("application/json");
+        response.getWriter().write(
+                new ObjectMapper().writeValueAsString(responseResponseEntity)
+        );
     }
 }
