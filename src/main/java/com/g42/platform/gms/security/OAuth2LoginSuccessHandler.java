@@ -3,8 +3,11 @@ package com.g42.platform.gms.security;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.g42.platform.gms.auth.constant.AuthErrorCode;
 import com.g42.platform.gms.auth.dto.AuthResponse;
+import com.g42.platform.gms.auth.dto.StaffAuthResponse;
 import com.g42.platform.gms.auth.entity.StaffAuth;
+import com.g42.platform.gms.auth.entity.StaffProfile;
 import com.g42.platform.gms.auth.repository.StaffAuthRepo;
+import com.g42.platform.gms.auth.repository.StaffRoleRepository;
 import com.g42.platform.gms.auth.service.JWTService;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
@@ -20,6 +23,7 @@ import org.springframework.security.web.authentication.SimpleUrlAuthenticationSu
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.util.List;
 
 @Component
 @AllArgsConstructor
@@ -27,6 +31,7 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
 
     private final JWTService jwtService;
     private final StaffAuthRepo staffAuthRepo;
+    private final StaffRoleRepository staffRoleRepository;
 
     //    @Override
 //    public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException, ServletException {
@@ -82,11 +87,18 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
         System.err.println("GOOGLE ID: " + googleId);
         staffAuth.setAuthProvider("GOOGLE");
         staffAuthRepo.save(staffAuth);
+        StaffProfile staffProfile = staffAuth.getStaffProfile();
         String jwt = jwtService.generateStaffJWToken(staffAuth.getStaffAuthId());
 //        response.sendRedirect("http://localhost:3000/oauth2/success?token=" + jwt);
         AuthResponse authResponse = new AuthResponse("GOOGLE OAUTH2 SUCCESS", "STAFF", jwt);
+        List<String> roles = staffRoleRepository
+                .getStaffRoleByStaff_StaffId(staffProfile.getStaffId())
+                .stream()
+                .map(staffRole -> staffRole.getRole().getRoleCode())
+                .toList();
+        StaffAuthResponse authResponse1 = new StaffAuthResponse(staffProfile.getStaffId(),staffProfile.getFullName(),staffProfile.getAvatar(),"",roles,jwt);
 
-        ResponseEntity<ApiResponse<AuthResponse>> responseResponseEntity = ResponseEntity.ok(ApiResponses.success(authResponse));
+        ResponseEntity<ApiResponse<StaffAuthResponse>> responseResponseEntity = ResponseEntity.ok(ApiResponses.success(authResponse1));
         response.setContentType("application/json");
         response.getWriter().write(
                 new ObjectMapper().writeValueAsString(responseResponseEntity)
