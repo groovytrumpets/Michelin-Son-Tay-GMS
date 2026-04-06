@@ -41,9 +41,6 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
         String email = (String) oAuth2User.getAttribute("email");
         String googleId = (String) oAuth2User.getAttribute("sub");
 
-        String frontendLoginUrl = "http://localhost:5173/login";
-        String frontendHomeUrl = "http://localhost:5173/dashboard";
-
         StaffAuth staffAuth = staffAuthRepo.searchByEmail(email);
         if (staffAuth == null) {
             System.err.println("ERROR: Unauthorized Google Login attempt - " + email);
@@ -56,9 +53,10 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
         }
 
         staffAuth.setGoogle_id(googleId);
-        System.err.println("GOOGLE ID: "+googleId);
+        System.err.println("GOOGLE ID: " + googleId);
         staffAuth.setAuthProvider("GOOGLE");
         staffAuthRepo.save(staffAuth);
+        StaffProfile staffProfile = staffAuth.getStaffProfile();
         String jwt = jwtService.generateStaffJWToken(staffAuth.getStaffAuthId());
 
         StaffProfile staffProfile = staffAuth.getStaffProfile();
