@@ -319,4 +319,24 @@ public class StaffAuthServiceTest {
 
         verify(response).sendRedirect("http://localhost:5173/dashboard?token=super_secret_token_123");
     }
+    @Test
+    @DisplayName("UTCID12")
+    void onAuthSuccess_WhenEmaiAcclLocked() throws Exception {
+        String validEmail = "abc@email.com";
+        String targetUrl = "http://localhost:5173/login?error=ACCOUNT_LOCKED";
+        StaffAuth mockAuth = new StaffAuth();
+        mockAuth.setStaffAuthId(1);
+        mockAuth.setStatus("LOCKED");
+
+        when(authentication.getPrincipal()).thenReturn(oAuth2User);
+        when(oAuth2User.getAttribute("email")).thenReturn(validEmail);
+
+        when(staffAuthRepo.searchByEmail(validEmail)).thenReturn(mockAuth);
+        when(response.encodeRedirectURL(targetUrl)).thenReturn(targetUrl);
+
+        handler.onAuthenticationSuccess(request, response, authentication);
+
+        verify(response).sendRedirect(targetUrl);
+        verify(staffAuthRepo, never()).save(any());
+    }
 }
