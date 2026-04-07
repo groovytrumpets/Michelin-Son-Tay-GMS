@@ -1,6 +1,7 @@
 package com.g42.platform.gms.warehouse.infrastructure.entity;
 
 import com.g42.platform.gms.warehouse.domain.enums.ReturnEntryStatus;
+import com.g42.platform.gms.warehouse.domain.enums.ReturnType;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -39,6 +40,16 @@ public class ReturnEntryJpa {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private ReturnEntryStatus status = ReturnEntryStatus.DRAFT;
+
+    /**
+     * Loại phiếu hoàn:
+     * CUSTOMER_RETURN → cộng inventory (hàng về kho)
+     * SUPPLIER_RETURN → trừ inventory (hàng rời kho về NCC)
+     * EXCHANGE → cộng hàng lỗi + trừ hàng mới xuất
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "return_type", nullable = false)
+    private ReturnType returnType = ReturnType.CUSTOMER_RETURN;
 
     @Column(name = "confirmed_by")
     private Integer confirmedBy;

@@ -3,6 +3,7 @@ package com.g42.platform.gms.warehouse.api.controller.returns;
 import com.g42.platform.gms.auth.entity.StaffPrincipal;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
+import com.g42.platform.gms.warehouse.api.dto.request.CreateReturnEntryFormRequest;
 import com.g42.platform.gms.warehouse.api.dto.request.CreateReturnEntryRequest;
 import com.g42.platform.gms.warehouse.api.dto.response.ReturnEntryResponse;
 import com.g42.platform.gms.warehouse.app.service.returns.ReturnEntryService;
@@ -30,6 +31,19 @@ public class ReturnEntryController {
             @AuthenticationPrincipal StaffPrincipal principal) {
         return ResponseEntity.ok(ApiResponses.success(
                 returnEntryService.create(request, principal.getStaffId())));
+    }
+
+    /**
+     * Tạo phiếu hoàn + ảnh lỗi từng item trong 1 form (multipart/form-data).
+     * items: JSON string. file_0..file_4: ảnh lỗi theo index item.
+     */
+    @PostMapping(value = "/with-attachments", consumes = "multipart/form-data")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<ReturnEntryResponse>> createWithAttachments(
+            @Valid @ModelAttribute CreateReturnEntryFormRequest request,
+            @AuthenticationPrincipal StaffPrincipal principal) throws IOException {
+        return ResponseEntity.ok(ApiResponses.success(
+                returnEntryService.createWithAttachments(request, principal.getStaffId())));
     }
 
     /**

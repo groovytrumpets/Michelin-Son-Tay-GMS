@@ -30,4 +30,11 @@ public class ReturnEntryItemJpa {
     /** Mô tả tình trạng lỗi cụ thể của sản phẩm này */
     @Column(name = "condition_note", columnDefinition = "TEXT", nullable = false)
     private String conditionNote;
+
+    /**
+     * true = đây là item đổi mới (xuất ra cho khách), chỉ dùng khi returnType = EXCHANGE.
+     * false (default) = item trả về.
+     */
+    @Column(name = "is_exchange_item", nullable = false)
+    private boolean exchangeItem = false;
 }
