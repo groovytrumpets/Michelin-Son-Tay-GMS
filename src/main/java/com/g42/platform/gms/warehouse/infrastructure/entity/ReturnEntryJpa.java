@@ -8,6 +8,12 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Phiếu hoàn hàng (header).
+ * Một phiếu hoàn có thể gồm nhiều sản phẩm → return_entry_item.
+ * Mỗi sản phẩm có ảnh lỗi riêng qua warehouse_attachment
+ * (ref_type = RETURN_ENTRY_ITEM, ref_id = return_item_id).
+ */
 @Entity
 @Table(name = "return_entry")
 @Data
@@ -24,17 +30,8 @@ public class ReturnEntryJpa {
     @Column(name = "warehouse_id", nullable = false)
     private Integer warehouseId;
 
-    @Column(name = "item_id", nullable = false)
-    private Integer itemId;
-
-    @Column(name = "quantity", nullable = false)
-    private Integer quantity;
-
     @Column(name = "return_reason", columnDefinition = "TEXT", nullable = false)
     private String returnReason;
-
-    @Column(name = "condition_note", columnDefinition = "TEXT", nullable = false)
-    private String conditionNote;
 
     @Column(name = "source_issue_id")
     private Integer sourceIssueId;
@@ -58,8 +55,8 @@ public class ReturnEntryJpa {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    @OneToMany(mappedBy = "returnId", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<ReturnEntryAttachmentJpa> attachments = new ArrayList<>();
+    @OneToMany(mappedBy = "returnId", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    private List<ReturnEntryItemJpa> items = new ArrayList<>();
 
     @PrePersist
     protected void onCreate() {

@@ -3,7 +3,6 @@ package com.g42.platform.gms.warehouse.infrastructure.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -28,9 +27,6 @@ public class InventoryJpa {
 
     @Column(name = "reserved_quantity", nullable = false)
     private Integer reservedQuantity = 0;
-
-    @Column(name = "import_price", precision = 12, scale = 2)
-    private BigDecimal importPrice;
 
     @Column(name = "min_stock_level")
     private Integer minStockLevel = 0;

@@ -21,6 +21,10 @@ public class StockIssueItemJpa {
     @Column(name = "item_id", nullable = false)
     private Integer itemId;
 
+    /** Lô nhập kho tương ứng (FIFO) — ref đến stock_entry_item */
+    @Column(name = "entry_item_id", nullable = false)
+    private Integer entryItemId;
+
     @Column(name = "quantity", nullable = false)
     private Integer quantity;
 

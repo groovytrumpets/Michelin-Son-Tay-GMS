@@ -1,0 +1,33 @@
+package com.g42.platform.gms.warehouse.infrastructure.entity;
+
+import jakarta.persistence.*;
+import lombok.Data;
+
+/**
+ * Chi tiết từng sản phẩm trong phiếu hoàn hàng.
+ * Mỗi item có condition_note riêng và có thể upload ảnh lỗi riêng
+ * qua warehouse_attachment (ref_type = RETURN_ENTRY_ITEM, ref_id = return_item_id).
+ */
+@Entity
+@Table(name = "return_entry_item")
+@Data
+public class ReturnEntryItemJpa {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "return_item_id")
+    private Integer returnItemId;
+
+    @Column(name = "return_id", nullable = false)
+    private Integer returnId;
+
+    @Column(name = "item_id", nullable = false)
+    private Integer itemId;
+
+    @Column(name = "quantity", nullable = false)
+    private Integer quantity;
+
+    /** Mô tả tình trạng lỗi cụ thể của sản phẩm này */
+    @Column(name = "condition_note", columnDefinition = "TEXT", nullable = false)
+    private String conditionNote;
+}

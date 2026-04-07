@@ -4,12 +4,16 @@ import com.g42.platform.gms.warehouse.domain.enums.StockEntryStatus;
 import jakarta.persistence.*;
 import lombok.Data;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Phiếu nhập kho (header).
+ * Một phiếu có thể nhập nhiều phụ tùng khác nhau → stock_entry_item.
+ * Ảnh chứng từ → warehouse_attachment (ref_type = STOCK_ENTRY, ref_id = entry_id).
+ */
 @Entity
 @Table(name = "stock_entry")
 @Data
@@ -25,15 +29,6 @@ public class StockEntryJpa {
 
     @Column(name = "warehouse_id", nullable = false)
     private Integer warehouseId;
-
-    @Column(name = "item_id", nullable = false)
-    private Integer itemId;
-
-    @Column(name = "quantity", nullable = false)
-    private Integer quantity;
-
-    @Column(name = "import_price", nullable = false, precision = 12, scale = 2)
-    private BigDecimal importPrice;
 
     @Column(name = "supplier_name", nullable = false)
     private String supplierName;
@@ -63,8 +58,8 @@ public class StockEntryJpa {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    @OneToMany(mappedBy = "entryId", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<StockEntryAttachmentJpa> attachments = new ArrayList<>();
+    @OneToMany(mappedBy = "entryId", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    private List<StockEntryItemJpa> items = new ArrayList<>();
 
     @PrePersist
     protected void onCreate() {
