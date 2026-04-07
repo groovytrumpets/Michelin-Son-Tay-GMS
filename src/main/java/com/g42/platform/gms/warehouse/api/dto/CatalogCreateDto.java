@@ -26,7 +26,6 @@ public class CatalogCreateDto {
     private Boolean showPrice;
     private String description;
     private String imageUrl;
-    @NotBlank
     private String unit;
     private Integer comboDurationMonths;
     private String comboDescription;
