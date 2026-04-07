@@ -94,7 +94,7 @@ public class CatalogItemService {
             displayName.append(itemCategory.getCategoryName()).append(" ");
         }
 
-        if (brand.getBrandName() != null && !brand.getBrandName().isBlank()) {
+        if (brand!=null && brand.getBrandName() != null && !brand.getBrandName().isBlank()) {
             displayName.append(brand.getBrandName()).append(" ");
         }
 

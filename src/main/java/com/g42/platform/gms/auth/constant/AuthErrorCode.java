@@ -13,5 +13,6 @@ public enum AuthErrorCode { // Đổi class thành enum
     SYSTEM_ERROR,
     PIN_MISMATCH,
     PIN_NOT_SET,
-    INVALID_OTP
+    INVALID_OTP,
+    BAD_REQUEST
 }

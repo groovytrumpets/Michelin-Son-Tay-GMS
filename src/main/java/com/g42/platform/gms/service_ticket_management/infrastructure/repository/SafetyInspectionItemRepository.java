@@ -37,6 +37,7 @@ public interface SafetyInspectionItemRepository extends JpaRepository<SafetyInsp
         LEFT JOIN work_category wc ON i.work_category_id = wc.idwork_category
         LEFT JOIN ticket_custom_category cc ON i.custom_category_id = cc.id
         WHERE i.inspection_id = :inspectionId
+          AND (i.custom_category_id IS NULL OR cc.status = 'ACTIVE')
         ORDER BY COALESCE(wc.display_order, cc.display_order, 999)
         """, nativeQuery = true)
     List<SafetyInspectionItemWithCategory> findByInspectionIdWithCategory(@Param("inspectionId") Integer inspectionId);

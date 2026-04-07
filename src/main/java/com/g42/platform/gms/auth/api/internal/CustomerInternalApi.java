@@ -9,4 +9,8 @@ public interface CustomerInternalApi {
     List<CustomerProfile> findAllByIds(List<Integer> customerIds);
 
     CustomerProfile findById(Integer customerId);
+
+    String getCustomerPhoneByServiceTicketId(Integer serviceTicketId);
+
+    String getNameByServiceTicketId(Integer serviceTicketId);
 }
