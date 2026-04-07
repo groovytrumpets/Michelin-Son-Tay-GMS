@@ -1,5 +1,6 @@
 package com.g42.platform.gms.manager.attendance.application.service;
 
+import com.g42.platform.gms.manager.attendance.api.dto.StaffShiftAttendanceResponse;
 import com.g42.platform.gms.auth.entity.StaffProfile;
 import com.g42.platform.gms.auth.repository.StaffProfileRepo;
 import com.g42.platform.gms.manager.attendance.api.dto.AttendanceCheckinResponse;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -32,6 +34,8 @@ public class AttendanceManageService {
     private final WorkShiftRepo workShiftRepo;
     private final StaffProfileRepo staffProfileRepo;
     private final AttendanceDtoMapper dtoMapper;
+    private final com.g42.platform.gms.hikvision.sync.HikvisionSyncScheduler hikvisionSyncScheduler;
+    private final com.g42.platform.gms.hikvision.config.HikvisionProperties hikvisionProperties;
 
     public List<AttendanceCheckinResponse> getAttendance(Integer staffId, LocalDate from, LocalDate to) {
         List<AttendanceCheckin> list = staffId != null
@@ -41,6 +45,17 @@ public class AttendanceManageService {
     }
 
     public List<AttendanceCheckinResponse> getAttendanceByDate(LocalDate date) {
+        // Auto-sync from Hikvision if date is today or yesterday and sync is enabled
+        if (hikvisionProperties.isSyncEnabled()) {
+            LocalDate today = LocalDate.now();
+            if (!date.isBefore(today.minusDays(1))) {
+                try {
+                    hikvisionSyncScheduler.syncDate(date);
+                } catch (Exception e) {
+                    // Log but don't fail — return DB data even if sync fails
+                }
+            }
+        }
         return enrich(checkinRepo.findByDate(date));
     }
 
@@ -61,13 +76,18 @@ public class AttendanceManageService {
         checkinRepo.findByStaffAndDateAndShift(request.getStaffId(), date, shiftId)
                 .ifPresent(existing -> { throw new AttendanceException(AttendanceErrorCode.ALREADY_CHECKED_IN); });
 
+        LocalTime checkInTime = request.getCheckInTime() != null ? request.getCheckInTime() : LocalTime.now();
+        LocalTime lateThreshold = shift.getStartTime().plusMinutes(15);
+        String status = checkInTime.isAfter(lateThreshold) ? "LATE" : "PRESENT";
+        String notes = (request.getNotes() != null && !request.getNotes().isBlank()) ? request.getNotes() : "Manual";
+
         AttendanceCheckin checkin = new AttendanceCheckin();
         checkin.setStaffId(request.getStaffId());
         checkin.setAttendanceDate(date);
         checkin.setShiftId(shiftId);
-        checkin.setCheckInTime(request.getCheckInTime() != null ? request.getCheckInTime() : LocalTime.now());
-        checkin.setStatus("PRESENT");
-        checkin.setNotes(request.getNotes());
+        checkin.setCheckInTime(checkInTime);
+        checkin.setStatus(status);
+        checkin.setNotes(notes);
         checkin.setCreatedAt(LocalDateTime.now());
 
         AttendanceCheckin saved = checkinRepo.save(checkin);
@@ -86,10 +106,43 @@ public class AttendanceManageService {
         }
 
         checkin.setCheckOutTime(request.getCheckOutTime() != null ? request.getCheckOutTime() : LocalTime.now());
-        if (request.getNotes() != null) checkin.setNotes(request.getNotes());
 
         AttendanceCheckin saved = checkinRepo.save(checkin);
         return enrichSingle(saved);
+    }
+
+    @Transactional
+    public AttendanceCheckinResponse updateAttendance(Integer checkinId, com.g42.platform.gms.manager.attendance.api.dto.UpdateAttendanceRequest request) {
+        AttendanceCheckin checkin = checkinRepo.findById(checkinId)
+                .orElseThrow(() -> new AttendanceException(AttendanceErrorCode.CHECKIN_NOT_FOUND));
+
+        if (request.getCheckInTime() != null) {
+            checkin.setCheckInTime(request.getCheckInTime());
+            // Recalculate status based on new check-in time
+            if (checkin.getShiftId() != null) {
+                workShiftRepo.findById(checkin.getShiftId()).ifPresent(shift -> {
+                    LocalTime lateThreshold = shift.getStartTime().plusMinutes(15);
+                    checkin.setStatus(request.getCheckInTime().isAfter(lateThreshold) ? "LATE" : "PRESENT");
+                });
+            }
+        }
+        if (request.getCheckOutTime() != null) {
+            checkin.setCheckOutTime(request.getCheckOutTime());
+        }
+
+        // Validate checkIn < checkOut if both present
+        LocalTime finalCheckIn = checkin.getCheckInTime();
+        LocalTime finalCheckOut = checkin.getCheckOutTime();
+        if (finalCheckIn != null && finalCheckOut != null && !finalCheckIn.isBefore(finalCheckOut)) {
+            throw new AttendanceException(AttendanceErrorCode.INVALID_TIME_RANGE);
+        }
+
+        String notes = (request.getNotes() != null && !request.getNotes().isBlank())
+                ? request.getNotes()
+                : "Edited by manager";
+        checkin.setNotes(notes);
+
+        return enrichSingle(checkinRepo.save(checkin));
     }
 
     @Transactional
@@ -141,6 +194,67 @@ public class AttendanceManageService {
                 .checkedIn((int) checkedInCount)
                 .notCheckedIn(allStaff.size() - (int) checkedInCount)
                 .staffList(staffList)
+                .build();
+    }
+
+    /**
+     * Lấy danh sách tất cả ca trong ngày cho 1 nhân viên.
+     * - Record thủ công (shift_id != null): map trực tiếp theo shift_id
+     * - Record Hikvision (shift_id = null): map check_in_time vào ca phù hợp.
+     *   Nếu check_out_time vượt qua shiftEnd của ca check-in → tạo virtual record
+     *   cho ca tiếp theo với check_in = shiftStart của ca đó, check_out = thực tế.
+     */
+    @Transactional(readOnly = true)
+    public StaffShiftAttendanceResponse getStaffShiftAttendance(Integer staffId, LocalDate date) {
+        LocalDate target = date != null ? date : LocalDate.now();
+
+        StaffProfile staff = staffProfileRepo.findById(staffId)
+                .orElseThrow(() -> new AttendanceException(AttendanceErrorCode.STAFF_NOT_FOUND));
+
+        List<WorkShift> allShifts = workShiftRepo.findAll().stream()
+                .filter(s -> Boolean.TRUE.equals(s.getIsActive()))
+                .sorted(Comparator.comparing(WorkShift::getStartTime))
+                .toList();
+
+        List<AttendanceCheckin> checkins = checkinRepo.findByStaffAndDateRange(staffId, target, target);
+
+        // Tất cả records: manual (shift_id != null, notes != Hikvision) và Hikvision (notes = Hikvision)
+        Map<Integer, AttendanceCheckin> manualByShift = checkins.stream()
+                .filter(c -> c.getShiftId() != null && (c.getNotes() == null || !c.getNotes().contains("Hikvision")))
+                .collect(Collectors.toMap(AttendanceCheckin::getShiftId, c -> c, (a, b) -> a));
+
+        Map<Integer, AttendanceCheckin> hikvisionByShift = checkins.stream()
+                .filter(c -> c.getShiftId() != null && c.getNotes() != null && c.getNotes().contains("Hikvision"))
+                .collect(Collectors.toMap(AttendanceCheckin::getShiftId, c -> c, (a, b) -> a));
+
+        List<StaffShiftAttendanceResponse.ShiftStatus> shifts = allShifts.stream()
+                .map(shift -> {
+                    // Ưu tiên thủ công, sau đó Hikvision
+                    AttendanceCheckin checkin = manualByShift.getOrDefault(shift.getShiftId(),
+                            hikvisionByShift.get(shift.getShiftId()));
+                    String source = checkin == null ? null
+                            : (checkin.getNotes() != null && checkin.getNotes().contains("Hikvision") ? "HIKVISION" : "MANUAL");
+                    return StaffShiftAttendanceResponse.ShiftStatus.builder()
+                            .shiftId(shift.getShiftId())
+                            .shiftName(shift.getShiftName())
+                            .shiftStart(shift.getStartTime())
+                            .shiftEnd(shift.getEndTime())
+                            .checkinId(checkin != null ? checkin.getCheckinId() : null)
+                            .checkInTime(checkin != null ? checkin.getCheckInTime() : null)
+                            .checkOutTime(checkin != null ? checkin.getCheckOutTime() : null)
+                            .status(checkin != null ? checkin.getStatus() : null)
+                            .source(source)
+                            .build();
+                })
+                .toList();
+
+        return StaffShiftAttendanceResponse.builder()
+                .staffId(staff.getStaffId())
+                .fullName(staff.getFullName())
+                .position(staff.getPosition())
+                .avatar(staff.getAvatar())
+                .date(target)
+                .shifts(shifts)
                 .build();
     }
 

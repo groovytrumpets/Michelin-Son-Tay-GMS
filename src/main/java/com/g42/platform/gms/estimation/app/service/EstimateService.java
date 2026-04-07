@@ -191,7 +191,7 @@ public class EstimateService {
                 Integer finalTaxId = req.getTaxRuleId();
                 if (finalTaxId == null) {
                     finalTaxId = taxRuleInternalApi.getTaxCodeFreeId("FREE");
-                    if (finalTaxId==null) finalTaxId=taxRuleInternalApi.createNewFreeTax();
+                    if (finalTaxId==-1) finalTaxId=taxRuleInternalApi.createNewFreeTax();
                 }
                 newCategory.setTaxRuleId(finalTaxId);
 
@@ -309,7 +309,15 @@ public class EstimateService {
             newCategory.setIsDefault(false);
             newCategory.setIsActive(true);
             System.out.println("DEBUG CREATING CATA");
-            newCategory.setTaxRuleId(request.getTaxRuleId() != null ? request.getTaxRuleId() : 1);
+            Integer finalTaxId = request.getTaxRuleId();
+            if (finalTaxId == null){
+                finalTaxId = taxRuleInternalApi.getTaxCodeFreeId("FREE");
+                if (finalTaxId==null) {
+                    finalTaxId = taxRuleInternalApi.createNewFreeTax();
+
+                }
+            }
+            newCategory.setTaxRuleId(finalTaxId);
             int nextOrder = workCategoryRepo.findMaxDisplayOrder() + 1;
             newCategory.setDisplayOrder(nextOrder);
             WorkCategory saved = workCategoryRepo.save(newCategory);

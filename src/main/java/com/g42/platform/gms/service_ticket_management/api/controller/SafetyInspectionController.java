@@ -161,6 +161,18 @@ public class SafetyInspectionController {
     }
 
     /**
+     * Xóa mềm hạng mục tùy chỉnh (đặt status = DELETED).
+     */
+    @DeleteMapping("/{inspectionId}/custom-categories/{categoryId}")
+    public ResponseEntity<ApiResponse<Void>> deleteCustomCategory(
+            @PathVariable Integer inspectionId,
+            @PathVariable Integer categoryId) {
+
+        safetyInspectionService.deleteCustomCategory(inspectionId, categoryId);
+        return ResponseEntity.ok(ApiResponses.success(null, "Đã xóa hạng mục tùy chỉnh"));
+    }
+
+    /**
      * Bulk update itemStatus cho nhiều hạng mục cùng lúc (tech điền).
      * Hỗ trợ cả default (workCategoryId) và custom (customCategoryId).
      */
@@ -191,6 +203,12 @@ public class SafetyInspectionController {
             @PathVariable Integer serviceTicketId,
             @RequestParam String recommend){
         String rcm = safetyInspectionService.saveRecommend(serviceTicketId,recommend);
+        return ResponseEntity.ok(ApiResponses.success(rcm));
+    }
+    @GetMapping("/{serviceTicketId}/curent-recommend")
+    public ResponseEntity<ApiResponse<String>> viewCurentSafetyInspectionRcm(
+            @PathVariable Integer serviceTicketId){
+        String rcm = safetyInspectionService.getRecommend(serviceTicketId);
         return ResponseEntity.ok(ApiResponses.success(rcm));
     }
 

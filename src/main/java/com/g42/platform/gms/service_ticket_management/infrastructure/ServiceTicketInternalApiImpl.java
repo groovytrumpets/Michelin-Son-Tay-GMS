@@ -1,0 +1,38 @@
+package com.g42.platform.gms.service_ticket_management.infrastructure;
+
+import com.g42.platform.gms.marketing.service_catalog.infrastructure.entity.ServiceJpaEntity;
+import com.g42.platform.gms.service_ticket_management.api.internal.ServiceTicketInternalApi;
+import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
+import com.g42.platform.gms.service_ticket_management.infrastructure.repository.ServiceTicketRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public class ServiceTicketInternalApiImpl implements ServiceTicketInternalApi {
+    @Autowired
+    private ServiceTicketRepository serviceTicketRepository;
+
+    @Override
+    public Integer getServiceIdByCode(String trackingId) {
+        try {
+        ServiceTicketJpa serviceJpaEntity = serviceTicketRepository.findServiceTicketJpasByTicketCode(trackingId);
+        if (serviceJpaEntity == null) {
+            return -1;
+        }
+        return Integer.parseInt(serviceJpaEntity.getServiceTicketId().toString());
+
+        }catch (Exception e) {
+            System.err.println("Exception in ServiceTicketInternalApiImpl.getServiceIdByCode: "+e.getMessage());
+            return -1;
+        }
+    }
+
+    @Override
+    public String getCodeByServiceTicketId(Integer serviceTicketId) {
+        ServiceTicketJpa serviceTicketJpa = serviceTicketRepository.findByServiceTicketId(serviceTicketId);
+        if (serviceTicketJpa == null) {
+            System.err.println("Cannot found ID: " + serviceTicketId);
+        }
+        return serviceTicketJpa.getTicketCode();
+    }
+}

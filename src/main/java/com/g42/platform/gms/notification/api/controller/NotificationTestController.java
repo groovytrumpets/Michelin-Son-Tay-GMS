@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @RestController
 @AllArgsConstructor
@@ -25,11 +26,22 @@ public class NotificationTestController {
 
     @PostMapping("/booking-confirmed")
     public String bookingConfirmed(){
+        List<String> strings = List.of(new String[]{"a", "b"});
         notificationSender.sendBookingCf(
-                "MTS-???????",
+                "0386037357",
                 "NGUYEN VAN A",
-                "10h"
+                strings,"MTS-12",LocalDateTime.now(),"Here"
         );
+        return "OK";
+    }
+    @PostMapping("/otp")
+    public String sendOtp(){
+        notificationSender.sendOtpViaZalo("0386037357","123456");
+        return "OK";
+    }
+    @PostMapping("/feedback")
+    public String sendFeedback(){
+        notificationSender.sendFeedbackViaZalo("0386037357","Nguyen Van A","123456");
         return "OK";
     }
     private ZaloOAuthService zaloOAuthService;

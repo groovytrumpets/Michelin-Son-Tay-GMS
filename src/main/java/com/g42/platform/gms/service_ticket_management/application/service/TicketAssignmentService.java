@@ -8,6 +8,7 @@ import com.g42.platform.gms.service_ticket_management.api.dto.assign.WorkloadTic
 import com.g42.platform.gms.service_ticket_management.api.mapper.assignment.TicketAssignmentDtoMapper;
 import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicketAssignment;
 import com.g42.platform.gms.service_ticket_management.domain.enums.AssignmentStatus;
+import com.g42.platform.gms.service_ticket_management.domain.enums.RoleInTicket;
 import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicket;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import com.g42.platform.gms.service_ticket_management.domain.exception.AssignmentErrorCode;
@@ -74,7 +75,7 @@ public class TicketAssignmentService {
         // Validate: mỗi ticket chỉ có 1 advisor
         boolean isAdvisorRole = "ADVISOR".equals(dto.getRoleInTicket());
         if (isAdvisorRole) {
-            if (ticketAssignmentRepo.existsByTicketIdAndRole(ticketId, "ADVISOR")) {
+            if (ticketAssignmentRepo.existsByTicketIdAndRole(ticketId, RoleInTicket.ADVISOR)) {
                 throw new AssignmentException("Ticket đã có advisor!", AssignmentErrorCode.INVALID_SERVICE_TICKET_ID);
             }
         }
@@ -98,7 +99,7 @@ public class TicketAssignmentService {
         ServiceTicketAssignment assignment = new ServiceTicketAssignment();
         assignment.setServiceTicketId(ticketId);
         assignment.setStaffId(dto.getStaffId());
-        assignment.setRoleInTicket(dto.getRoleInTicket());
+        assignment.setRoleInTicket(RoleInTicket.valueOf(dto.getRoleInTicket()));
 
         // Chỉ advisor mới là primary, technician luôn false
         boolean isPrimary = isAdvisorRole;
@@ -125,7 +126,7 @@ public class TicketAssignmentService {
 
 
         if (dto.getStaffId() != null) existing.setStaffId(dto.getStaffId());
-        if (dto.getRoleInTicket() != null) existing.setRoleInTicket(dto.getRoleInTicket());
+        if (dto.getRoleInTicket() != null) existing.setRoleInTicket(RoleInTicket.valueOf(dto.getRoleInTicket()));
         if (dto.getIsPrimary() != null) existing.setIsPrimary(dto.getIsPrimary());
         if (dto.getNote() != null) existing.setNote(dto.getNote());
 
@@ -146,7 +147,7 @@ public class TicketAssignmentService {
         }
 
 
-        if (!"TECHNICIAN".equals(existing.getRoleInTicket())) {
+        if (existing.getRoleInTicket() != RoleInTicket.TECHNICIAN) {
             throw new AssignmentException("Chỉ hủy assignment TECHNICIAN ở API này!", AssignmentErrorCode.UNAVAILABLE_STAFF);
         }
 
@@ -189,7 +190,7 @@ public class TicketAssignmentService {
      */
     @Transactional
     public void activateAdvisorAssignment(Integer ticketId) {
-        List<ServiceTicketAssignment> advisorAssignments = ticketAssignmentRepo.findByTicketIdAndRole(ticketId, "ADVISOR");
+        List<ServiceTicketAssignment> advisorAssignments = ticketAssignmentRepo.findByTicketIdAndRole(ticketId, RoleInTicket.ADVISOR);
         for (ServiceTicketAssignment assignment : advisorAssignments) {
             if (assignment.getStatus() == AssignmentStatus.PENDING) {
                 assignment.setStatus(AssignmentStatus.ACTIVE);
@@ -238,7 +239,7 @@ public class TicketAssignmentService {
     public AssignStaffDto changeAdvisor(Integer ticketId, Integer newAdvisorId, String note) {
         requireTicketEditable(ticketId);
         // 1. Tìm assignment advisor hiện tại
-        List<ServiceTicketAssignment> currentAssignments = ticketAssignmentRepo.findByTicketIdAndRole(ticketId, "ADVISOR");
+        List<ServiceTicketAssignment> currentAssignments = ticketAssignmentRepo.findByTicketIdAndRole(ticketId, RoleInTicket.ADVISOR);
         if (currentAssignments.isEmpty()) {
             throw new AssignmentException("Ticket chưa có advisor!", AssignmentErrorCode.INVALID_SERVICE_TICKET_ID);
         }
@@ -268,7 +269,7 @@ public class TicketAssignmentService {
         ServiceTicketAssignment newAssignment = new ServiceTicketAssignment();
         newAssignment.setServiceTicketId(ticketId);
         newAssignment.setStaffId(newAdvisorId);
-        newAssignment.setRoleInTicket("ADVISOR");
+        newAssignment.setRoleInTicket(RoleInTicket.ADVISOR);
         newAssignment.setIsPrimary(true);
         newAssignment.setNote(note != null ? note : "Thay đổi advisor bởi lễ tân");
         newAssignment.setAssignedAt(Instant.now());
@@ -285,7 +286,7 @@ public class TicketAssignmentService {
     @Transactional
     public AssignStaffDto changeAdvisorByAdvisor(Integer ticketId, Integer newAdvisorId, String note) {
         requireTicketEditable(ticketId);
-        List<ServiceTicketAssignment> currentAssignments = ticketAssignmentRepo.findByTicketIdAndRole(ticketId, "ADVISOR");
+        List<ServiceTicketAssignment> currentAssignments = ticketAssignmentRepo.findByTicketIdAndRole(ticketId, RoleInTicket.ADVISOR);
         if (currentAssignments.isEmpty()) {
             throw new AssignmentException("Ticket chưa có advisor!", AssignmentErrorCode.INVALID_SERVICE_TICKET_ID);
         }
@@ -313,7 +314,7 @@ public class TicketAssignmentService {
         ServiceTicketAssignment newAssignment = new ServiceTicketAssignment();
         newAssignment.setServiceTicketId(ticketId);
         newAssignment.setStaffId(newAdvisorId);
-        newAssignment.setRoleInTicket("ADVISOR");
+        newAssignment.setRoleInTicket(RoleInTicket.ADVISOR);
         newAssignment.setIsPrimary(true);
         newAssignment.setNote(note != null ? note : "Thay đổi advisor bởi advisor");
         newAssignment.setAssignedAt(Instant.now());
@@ -333,7 +334,7 @@ public class TicketAssignmentService {
         requireTicketEditable(ticketId);
         List<ServiceTicketAssignment> assignments = ticketAssignmentRepo.findByTicketId(ticketId);
         List<ServiceTicketAssignment> technicianAssignments = assignments.stream()
-                .filter(a -> a.getStaffId().equals(technicianId) && "TECHNICIAN".equals(a.getRoleInTicket()))
+                .filter(a -> a.getStaffId().equals(technicianId) && RoleInTicket.TECHNICIAN == a.getRoleInTicket())
                 .sorted(Comparator.comparing(
                         ServiceTicketAssignment::getAssignedAt,
                         Comparator.nullsLast(Comparator.naturalOrder())
@@ -390,7 +391,7 @@ public class TicketAssignmentService {
         ServiceTicketAssignment newAssignment = new ServiceTicketAssignment();
         newAssignment.setServiceTicketId(ticketId);
         newAssignment.setStaffId(newTechnicianId);
-        newAssignment.setRoleInTicket("TECHNICIAN");
+        newAssignment.setRoleInTicket(RoleInTicket.TECHNICIAN);
         newAssignment.setIsPrimary(false);
         newAssignment.setNote(note != null ? note : "Thay đổi technician bởi advisor");
         newAssignment.setAssignedAt(Instant.now());
@@ -522,7 +523,7 @@ public class TicketAssignmentService {
                 .filter(a -> a.getStatus() == AssignmentStatus.ACTIVE || a.getStatus() == AssignmentStatus.PENDING)
                 .map(a -> {
                     WorkloadTicketDto t = new WorkloadTicketDto();
-                    t.setRoleInTicket(a.getRoleInTicket());
+                    t.setRoleInTicket(a.getRoleInTicket() != null ? a.getRoleInTicket().name() : null);
                     t.setAssignmentStatus(a.getStatus() != null ? a.getStatus().name() : null);
                     t.setTicketCode(a.getTicketCode());
                     t.setTicketStatus(a.getTicketStatus() != null ? a.getTicketStatus().name() : null);

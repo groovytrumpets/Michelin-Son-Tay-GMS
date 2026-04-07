@@ -2,6 +2,7 @@ package com.g42.platform.gms.service_ticket_management.domain.repository;
 
 
 import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicketAssignment;
+import com.g42.platform.gms.service_ticket_management.domain.enums.RoleInTicket;
 
 
 import java.util.List;
@@ -28,7 +29,7 @@ public interface TicketAssignmentRepo {
 
 
     /** Kiểm tra ticket đã có assignment với role cụ thể chưa. */
-    boolean existsByTicketIdAndRole(Integer ticketId, String role);
+    boolean existsByTicketIdAndRole(Integer ticketId, RoleInTicket role);
 
 
     /** Kiểm tra ticket đã có primary assignment chưa. */
@@ -43,7 +44,7 @@ public interface TicketAssignmentRepo {
     boolean isStaffAssignedToTicket(Integer staffId, Integer ticketId);
 
     /** Tìm assignment theo ticket và role. */
-    List<ServiceTicketAssignment> findByTicketIdAndRole(Integer ticketId, String role);
+    List<ServiceTicketAssignment> findByTicketIdAndRole(Integer ticketId, RoleInTicket role);
 
     /** Lấy tất cả assignment của một staff. */
     List<ServiceTicketAssignment> findByStaffId(Integer staffId);
