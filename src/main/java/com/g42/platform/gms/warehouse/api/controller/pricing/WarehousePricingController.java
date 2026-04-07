@@ -20,25 +20,25 @@ public class WarehousePricingController {
 
     private final WarehousePricingService pricingService;
 
-    /** Danh sách cấu hình giá theo kho */
-    @GetMapping("/{warehouseId}")
-    @PreAuthorize("hasAnyAuthority('MANAGER','ADMIN','ACCOUNTANT')")
+    /** Danh sách giá thị trường đang active theo kho */
+    @GetMapping
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<List<PricingResponse>>> list(
-            @PathVariable Integer warehouseId) {
+            @RequestParam Integer warehouseId) {
         return ResponseEntity.ok(ApiResponses.success(pricingService.listByWarehouse(warehouseId)));
     }
 
-    /** Tạo hoặc cập nhật giá cho 1 item trong kho */
+    /** Tạo hoặc cập nhật giá thị trường cho 1 item */
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('MANAGER','ADMIN')")
+    @PreAuthorize("hasAnyRole('MANAGER','ADMIN')")
     public ResponseEntity<ApiResponse<PricingResponse>> upsert(
             @Valid @RequestBody UpsertPricingRequest request) {
         return ResponseEntity.ok(ApiResponses.success(pricingService.upsert(request)));
     }
 
-    /** Vô hiệu hóa 1 cấu hình giá */
+    /** Deactivate giá (xóa mềm) */
     @DeleteMapping("/{pricingId}")
-    @PreAuthorize("hasAnyAuthority('MANAGER','ADMIN')")
+    @PreAuthorize("hasAnyRole('MANAGER','ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deactivate(@PathVariable Integer pricingId) {
         pricingService.deactivate(pricingId);
         return ResponseEntity.ok(ApiResponses.success(null));

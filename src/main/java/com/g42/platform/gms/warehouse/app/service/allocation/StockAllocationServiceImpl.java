@@ -123,7 +123,7 @@ public class StockAllocationServiceImpl implements StockAllocationService {
 
         CreateStockIssueRequest issueRequest = new CreateStockIssueRequest();
         issueRequest.setWarehouseId(warehouseId);
-        issueRequest.setIssueType(IssueType.CUSTOMER_1);
+        issueRequest.setIssueType(IssueType.SERVICE_TICKET);
         issueRequest.setIssueReason("Tu dong xuat kho tu ServiceTicket #" + serviceTicketId);
         issueRequest.setServiceTicketId(serviceTicketId);
         issueRequest.setItems(issueItems);
@@ -195,8 +195,8 @@ public class StockAllocationServiceImpl implements StockAllocationService {
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private void logTransaction(Integer warehouseId, Integer itemId,
-                                 InventoryTransactionType type, int qty,
-                                 int balanceAfter, String refType, Integer refId, Integer staffId) {
+                                InventoryTransactionType type, int qty,
+                                int balanceAfter, String refType, Integer refId, Integer staffId) {
         InventoryTransactionJpa tx = new InventoryTransactionJpa();
         tx.setWarehouseId(warehouseId);
         tx.setItemId(itemId);

@@ -2,10 +2,10 @@ package com.g42.platform.gms.warehouse.app.service.pricing;
 
 import com.g42.platform.gms.warehouse.api.dto.request.UpsertPricingRequest;
 import com.g42.platform.gms.warehouse.api.dto.response.PricingResponse;
-import com.g42.platform.gms.warehouse.infrastructure.entity.CatalogItemJpa;
+import com.g42.platform.gms.warehouse.domain.repository.PartCatalogRepo;
+import com.g42.platform.gms.warehouse.domain.repository.WarehousePricingRepo;
 import com.g42.platform.gms.warehouse.infrastructure.entity.WarehousePricingJpa;
-import com.g42.platform.gms.warehouse.infrastructure.repository.CatalogItemJpaRepo;
-import com.g42.platform.gms.warehouse.infrastructure.repository.WarehousePricingJpaRepo;import lombok.RequiredArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,28 +23,27 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class WarehousePricingServiceImpl implements WarehousePricingService {
 
-    private final WarehousePricingJpaRepo pricingRepo;
-    private final CatalogItemJpaRepo catalogItemJpaRepo;
+    private final WarehousePricingRepo pricingRepo;
+    private final PartCatalogRepo partCatalogRepo;
 
     @Override
     @Transactional(readOnly = true)
     public List<PricingResponse> listByWarehouse(Integer warehouseId) {
-        List<WarehousePricingJpa> pricings =
-                pricingRepo.findByWarehouseIdAndIsActiveTrueOrderByItemId(warehouseId);
+        List<WarehousePricingJpa> pricings = pricingRepo.findActiveByWarehouse(warehouseId);
 
-        // Lấy tên item một lần
         List<Integer> itemIds = pricings.stream().map(WarehousePricingJpa::getItemId).collect(Collectors.toList());
-        Map<Integer, String> nameMap = catalogItemJpaRepo.findAllById(itemIds).stream()
-                .collect(Collectors.toMap(CatalogItemJpa::getItemId, CatalogItemJpa::getItemName));
+        Map<Integer, String> nameMap = partCatalogRepo.findNamesByIds(itemIds);
 
-        return pricings.stream().map(p -> toResponse(p, nameMap.get(p.getItemId()))).collect(Collectors.toList());
+        return pricings.stream()
+                .map(p -> toResponse(p, nameMap.get(p.getItemId())))
+                .collect(Collectors.toList());
     }
 
     @Override
     @Transactional
     public PricingResponse upsert(UpsertPricingRequest request) {
         // Deactivate giá cũ nếu có
-        pricingRepo.findByWarehouseIdAndItemIdAndIsActiveTrue(request.getWarehouseId(), request.getItemId())
+        pricingRepo.findActiveByWarehouseAndItem(request.getWarehouseId(), request.getItemId())
                 .ifPresent(old -> {
                     old.setIsActive(false);
                     pricingRepo.save(old);
@@ -52,9 +51,9 @@ public class WarehousePricingServiceImpl implements WarehousePricingService {
 
         BigDecimal multiplier = request.getMarkupMultiplier() != null
                 ? request.getMarkupMultiplier() : BigDecimal.ONE;
-        BigDecimal sellingPrice = request.getBasePrice()
-                .multiply(multiplier)
-                .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal sellingPrice = request.getSellingPrice() != null
+                ? request.getSellingPrice()
+                : request.getBasePrice().multiply(multiplier).setScale(2, RoundingMode.HALF_UP);
 
         WarehousePricingJpa pricing = new WarehousePricingJpa();
         pricing.setWarehouseId(request.getWarehouseId());

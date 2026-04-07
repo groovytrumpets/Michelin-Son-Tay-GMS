@@ -53,4 +53,9 @@ public class StockEntryRepoImpl implements StockEntryRepo {
     public StockEntryItemJpa saveItem(StockEntryItemJpa item) {
         return itemJpaRepo.save(item);
     }
+
+    @Override
+    public int decreaseRemainingQuantity(Integer entryItemId, int qty) {
+        return itemJpaRepo.decreaseRemainingQuantity(entryItemId, qty);
+    }
 }

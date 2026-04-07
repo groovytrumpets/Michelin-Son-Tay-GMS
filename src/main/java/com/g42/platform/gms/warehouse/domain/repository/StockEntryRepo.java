@@ -23,4 +23,7 @@ public interface StockEntryRepo {
     List<StockEntryItemJpa> findFifoLots(Integer warehouseId, Integer itemId);
 
     StockEntryItemJpa saveItem(StockEntryItemJpa item);
+
+    /** Trừ remaining_quantity trực tiếp bằng UPDATE query — tránh Hibernate overwrite */
+    int decreaseRemainingQuantity(Integer entryItemId, int qty);
 }

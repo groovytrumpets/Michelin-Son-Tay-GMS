@@ -2,6 +2,7 @@ package com.g42.platform.gms.warehouse.infrastructure.repository;
 
 import com.g42.platform.gms.warehouse.infrastructure.entity.StockEntryItemJpa;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -11,10 +12,6 @@ public interface StockEntryItemJpaRepo extends JpaRepository<StockEntryItemJpa, 
 
     List<StockEntryItemJpa> findByEntryId(Integer entryId);
 
-    /**
-     * FIFO: lấy các lô còn hàng của item trong kho cụ thể, sắp xếp cũ nhất trước.
-     * Join với stock_entry để lọc theo warehouseId và chỉ lấy phiếu CONFIRMED.
-     */
     @Query("SELECT sei FROM StockEntryItemJpa sei " +
            "JOIN StockEntryJpa se ON se.entryId = sei.entryId " +
            "WHERE se.warehouseId = :warehouseId " +
@@ -25,4 +22,8 @@ public interface StockEntryItemJpaRepo extends JpaRepository<StockEntryItemJpa, 
     List<StockEntryItemJpa> findFifoLots(
             @Param("warehouseId") Integer warehouseId,
             @Param("itemId") Integer itemId);
+
+    @Modifying
+    @Query("UPDATE StockEntryItemJpa sei SET sei.remainingQuantity = sei.remainingQuantity - :qty WHERE sei.entryItemId = :id AND sei.remainingQuantity >= :qty")
+    int decreaseRemainingQuantity(@Param("id") Integer entryItemId, @Param("qty") int qty);
 }

@@ -3,9 +3,9 @@ package com.g42.platform.gms.warehouse.api.controller.config;
 import com.g42.platform.gms.auth.entity.StaffPrincipal;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
+import com.g42.platform.gms.warehouse.app.service.discount.DiscountService;
 import com.g42.platform.gms.warehouse.domain.enums.IssueType;
 import com.g42.platform.gms.warehouse.infrastructure.entity.DiscountConfigJpa;
-import com.g42.platform.gms.warehouse.infrastructure.repository.DiscountConfigJpaRepo;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -22,21 +22,20 @@ import java.math.BigDecimal;
 @RequiredArgsConstructor
 public class DiscountConfigController {
 
-    private final DiscountConfigJpaRepo discountConfigJpaRepo;
+    private final DiscountService discountService;
 
     @PostMapping
     @PreAuthorize("hasRole('MANAGER')")
     public ResponseEntity<ApiResponse<DiscountConfigJpa>> create(
             @Valid @RequestBody CreateDiscountConfigRequest request,
             @AuthenticationPrincipal StaffPrincipal principal) {
-        DiscountConfigJpa config = new DiscountConfigJpa();
-        config.setItemId(request.getItemId());
-        config.setIssueType(request.getIssueType());
-        config.setQuantityThreshold(request.getQuantityThreshold());
-        config.setDiscountRate(request.getDiscountRate());
-        config.setIsActive(true);
-        config.setCreatedBy(principal.getStaffId());
-        return ResponseEntity.ok(ApiResponses.success(discountConfigJpaRepo.save(config)));
+        DiscountConfigJpa saved = discountService.create(
+                request.getItemId(),
+                request.getIssueType(),
+                request.getQuantityThreshold(),
+                request.getDiscountRate(),
+                principal.getStaffId());
+        return ResponseEntity.ok(ApiResponses.success(saved));
     }
 
     @Data

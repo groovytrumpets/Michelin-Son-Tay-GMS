@@ -36,4 +36,9 @@ public class ReturnEntryRepoImpl implements ReturnEntryRepo {
     public Optional<ReturnEntryItemJpa> findItemById(Integer returnItemId) {
         return itemJpaRepo.findById(returnItemId);
     }
+
+    @Override
+    public ReturnEntryItemJpa saveItem(ReturnEntryItemJpa item) {
+        return itemJpaRepo.save(item);
+    }
 }

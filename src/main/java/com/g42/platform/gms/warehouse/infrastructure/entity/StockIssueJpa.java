@@ -58,7 +58,7 @@ public class StockIssueJpa {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    @OneToMany(mappedBy = "issueId", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "issueId", fetch = FetchType.LAZY)
     private List<StockIssueItemJpa> items = new ArrayList<>();
 
     @PrePersist

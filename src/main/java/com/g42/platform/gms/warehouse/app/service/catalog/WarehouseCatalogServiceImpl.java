@@ -3,8 +3,8 @@ package com.g42.platform.gms.warehouse.app.service.catalog;
 import com.g42.platform.gms.warehouse.api.dto.request.CreatePartRequest;
 import com.g42.platform.gms.warehouse.api.dto.response.PartResponse;
 import com.g42.platform.gms.warehouse.domain.enums.CatalogItemType;
+import com.g42.platform.gms.warehouse.domain.repository.PartCatalogRepo;
 import com.g42.platform.gms.warehouse.infrastructure.entity.CatalogItemJpa;
-import com.g42.platform.gms.warehouse.infrastructure.repository.CatalogItemJpaRepo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
@@ -25,14 +25,13 @@ public class WarehouseCatalogServiceImpl implements WarehouseCatalogService {
     private static final AtomicInteger SKU_SEQ = new AtomicInteger(0);
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyyMMdd");
 
-    private final CatalogItemJpaRepo catalogItemJpaRepo;
+    private final PartCatalogRepo partCatalogRepo;
 
     @Override
     @Transactional(readOnly = true)
     public List<PartResponse> search(String keyword) {
         Specification<CatalogItemJpa> spec = (root, query, cb) -> {
             String like = "%" + keyword.toLowerCase() + "%";
-            // coalesce để tránh lỗi khi cột nullable (partNumber, barcode, sku)
             return cb.or(
                     cb.like(cb.lower(root.get("itemName")), like),
                     cb.like(cb.lower(cb.coalesce(root.get("sku"), "")), like),
@@ -40,7 +39,7 @@ public class WarehouseCatalogServiceImpl implements WarehouseCatalogService {
                     cb.like(cb.lower(cb.coalesce(root.get("barcode"), "")), like)
             );
         };
-        return catalogItemJpaRepo.findAll(spec).stream()
+        return partCatalogRepo.findAll(spec).stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
     }
@@ -65,25 +64,22 @@ public class WarehouseCatalogServiceImpl implements WarehouseCatalogService {
         item.setIsActive(true);
         item.setWarrantyDurationMonths(0);
 
-        return toResponse(catalogItemJpaRepo.save(item));
+        return toResponse(partCatalogRepo.save(item));
     }
-
-    // ── helpers ──────────────────────────────────────────────────────────────
 
     private String resolveSku(String requestedSku) {
         if (requestedSku != null && !requestedSku.isBlank()) {
-            if (catalogItemJpaRepo.existsBySku(requestedSku)) {
+            if (partCatalogRepo.existsBySku(requestedSku)) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT,
                         "SKU '" + requestedSku + "' đã tồn tại");
             }
             return requestedSku;
         }
-        // Tự sinh SKU: PART-YYYYMMDD-seq
         String date = LocalDate.now().format(DATE_FMT);
         String candidate;
         do {
             candidate = String.format("PART-%s-%d", date, SKU_SEQ.incrementAndGet());
-        } while (catalogItemJpaRepo.existsBySku(candidate));
+        } while (partCatalogRepo.existsBySku(candidate));
         return candidate;
     }
 

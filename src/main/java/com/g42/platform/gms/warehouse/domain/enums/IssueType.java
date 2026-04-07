@@ -1,8 +1,13 @@
 package com.g42.platform.gms.warehouse.domain.enums;
 
+/**
+ * Loại phiếu xuất kho:
+ * - SERVICE_TICKET: xuất theo phiếu dịch vụ (lắp tại xưởng hoặc theo phiếu đặt lịch)
+ * - RETAIL: bán lẻ trực tiếp (khách mua mang về, không kèm dịch vụ)
+ * - WHOLESALE: bán buôn (đại lý, garage khác, số lượng lớn)
+ */
 public enum IssueType {
-    STORE_1,
-    STORE_2,
-    CUSTOMER_1,
-    CUSTOMER_2
+    SERVICE_TICKET,
+    RETAIL,
+    WHOLESALE
 }

@@ -14,4 +14,6 @@ public interface ReturnEntryRepo {
     boolean existsByCode(String returnCode);
 
     Optional<ReturnEntryItemJpa> findItemById(Integer returnItemId);
+
+    ReturnEntryItemJpa saveItem(ReturnEntryItemJpa item);
 }

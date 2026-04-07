@@ -4,20 +4,26 @@ import com.g42.platform.gms.warehouse.api.dto.issue.CreateStockIssueRequest;
 import com.g42.platform.gms.warehouse.api.dto.response.StockIssueDetailResponse;
 import com.g42.platform.gms.warehouse.api.dto.response.StockIssueResponse;
 import com.g42.platform.gms.warehouse.domain.enums.InventoryTransactionType;
+import com.g42.platform.gms.warehouse.domain.enums.IssueType;
 import com.g42.platform.gms.warehouse.domain.enums.StockIssueStatus;
+import com.g42.platform.gms.warehouse.domain.repository.DiscountConfigRepo;
 import com.g42.platform.gms.warehouse.domain.repository.InventoryRepo;
 import com.g42.platform.gms.warehouse.domain.repository.InventoryTransactionRepo;
 import com.g42.platform.gms.warehouse.domain.repository.StockEntryRepo;
+import com.g42.platform.gms.warehouse.domain.repository.StockIssueItemRepo;
 import com.g42.platform.gms.warehouse.domain.repository.StockIssueRepo;
-import com.g42.platform.gms.warehouse.infrastructure.entity.*;
+import com.g42.platform.gms.warehouse.domain.repository.WarehousePricingRepo;
+import com.g42.platform.gms.warehouse.infrastructure.entity.InventoryJpa;
+import com.g42.platform.gms.warehouse.infrastructure.entity.InventoryTransactionJpa;
+import com.g42.platform.gms.warehouse.infrastructure.entity.StockEntryItemJpa;
+import com.g42.platform.gms.warehouse.infrastructure.entity.StockIssueItemJpa;
+import com.g42.platform.gms.warehouse.infrastructure.entity.StockIssueJpa;
 import com.g42.platform.gms.warehouse.infrastructure.entity.WarehousePricingJpa;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
-
-import com.g42.platform.gms.warehouse.infrastructure.repository.WarehousePricingJpaRepo;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -37,17 +43,17 @@ public class StockIssueServiceImpl implements StockIssueService {
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyyMMdd");
     private static final AtomicInteger SEQ = new AtomicInteger(0);
 
+    /** Hệ số giá buôn — WHOLESALE bán bằng 85% giá lẻ */
+    private static final BigDecimal WHOLESALE_FACTOR = new BigDecimal("0.85");
+
     private final StockIssueRepo stockIssueRepo;
     private final InventoryRepo inventoryRepo;
     private final InventoryTransactionRepo transactionRepo;
     private final StockEntryRepo stockEntryRepo;
-    private final WarehousePricingJpaRepo pricingRepo;
+    private final WarehousePricingRepo pricingRepo;
+    private final DiscountConfigRepo discountConfigRepo;
+    private final StockIssueItemRepo stockIssueItemRepo;
 
-    /**
-     * Tạo phiếu xuất DRAFT.
-     * Chỉ lưu itemId + quantity + discountRate — giá sẽ được resolve theo FIFO khi confirm.
-     * Mỗi IssueItemRequest tạo 1 placeholder row với entryItemId=0, giá=0.
-     */
     @Override
     @Transactional
     public StockIssueResponse create(CreateStockIssueRequest request, Integer staffId) {
@@ -73,11 +79,14 @@ public class StockIssueServiceImpl implements StockIssueService {
         issue.setStatus(StockIssueStatus.DRAFT);
         issue.setCreatedBy(staffId);
 
+        StockIssueJpa saved = stockIssueRepo.save(issue);
+
         List<StockIssueItemJpa> placeholders = request.getItems().stream().map(req -> {
             StockIssueItemJpa it = new StockIssueItemJpa();
+            it.setIssueId(saved.getIssueId());
             it.setItemId(req.getItemId());
             it.setQuantity(req.getQuantity());
-            it.setEntryItemId(0); // placeholder — sẽ được split khi confirm
+            it.setEntryItemId(0);
             it.setExportPrice(BigDecimal.ZERO);
             it.setImportPrice(BigDecimal.ZERO);
             it.setDiscountRate(req.getDiscountRate() != null ? req.getDiscountRate() : BigDecimal.ZERO);
@@ -85,24 +94,10 @@ public class StockIssueServiceImpl implements StockIssueService {
             return it;
         }).collect(Collectors.toList());
 
-        issue.setItems(placeholders);
-        StockIssueJpa saved = stockIssueRepo.save(issue);
-        saved.getItems().forEach(it -> it.setIssueId(saved.getIssueId()));
-        stockIssueRepo.save(saved);
-        return toResponse(saved);
+        stockIssueItemRepo.saveAll(placeholders);
+        return toResponse(findOrThrow(saved.getIssueId()));
     }
 
-    /**
-     * Confirm phiếu xuất — FIFO split-by-lot.
-     *
-     * Với mỗi placeholder item:
-     *   1. Lấy danh sách lô FIFO còn hàng (remaining_quantity > 0), cũ nhất trước
-     *   2. Consume từng lô, tạo 1 StockIssueItemJpa per lô
-     *   3. Trừ remaining_quantity của lô
-     *   4. Trừ inventory.quantity
-     *   5. Ghi audit log
-     * Sau đó xóa placeholders, lưu lot-split items.
-     */
     @Override
     @Transactional
     public StockIssueResponse confirm(Integer issueId, Integer staffId) {
@@ -119,7 +114,10 @@ public class StockIssueServiceImpl implements StockIssueService {
             BigDecimal discountRate = placeholder.getDiscountRate() != null
                     ? placeholder.getDiscountRate() : BigDecimal.ZERO;
 
-            // Lock inventory row
+            if (discountRate.compareTo(BigDecimal.ZERO) == 0) {
+                discountRate = resolveDiscount(itemId, issue.getIssueType(), needed);
+            }
+
             InventoryJpa inv = inventoryRepo
                     .findByWarehouseAndItemWithLock(issue.getWarehouseId(), itemId)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
@@ -132,62 +130,62 @@ public class StockIssueServiceImpl implements StockIssueService {
                                 + " (yêu cầu=" + needed + ", khả dụng=" + available + ")");
             }
 
-            // FIFO: lấy lô cũ nhất còn hàng
             List<StockEntryItemJpa> lots = stockEntryRepo.findFifoLots(issue.getWarehouseId(), itemId);
             int remaining = needed;
 
-            // Lấy giá bán theo 2 tầng:
-            // Tầng 1: warehouse_pricing.selling_price (giá thị trường, ưu tiên)
-            // Tầng 2: import_price × markup_multiplier của lô (fallback)
             BigDecimal marketSellingPrice = pricingRepo
-                    .findByWarehouseIdAndItemIdAndIsActiveTrue(issue.getWarehouseId(), itemId)
+                    .findActiveByWarehouseAndItem(issue.getWarehouseId(), itemId)
                     .map(WarehousePricingJpa::getSellingPrice)
-                    .orElse(null); // null = dùng fallback từ lô
+                    .orElse(null);
 
             for (StockEntryItemJpa lot : lots) {
                 if (remaining <= 0) break;
 
                 int consume = Math.min(remaining, lot.getRemainingQuantity());
 
-                // 2 tầng giá bán:
-                // Tầng 1: warehouse_pricing (giá thị trường) — nếu có
-                // Tầng 2: import_price × markup_multiplier của lô — fallback
                 BigDecimal sellingPrice = marketSellingPrice != null
                         ? marketSellingPrice
                         : lot.getImportPrice()
                                 .multiply(lot.getMarkupMultiplier())
                                 .setScale(2, RoundingMode.HALF_UP);
 
+                if (issue.getIssueType() == IssueType.WHOLESALE) {
+                    sellingPrice = sellingPrice.multiply(WHOLESALE_FACTOR)
+                            .setScale(2, RoundingMode.HALF_UP);
+                }
+
                 BigDecimal finalPrice = sellingPrice
                         .multiply(BigDecimal.ONE.subtract(
                                 discountRate.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP)))
                         .setScale(2, RoundingMode.HALF_UP);
 
-                // 1 dòng per lô — export_price = giá thị trường, import_price = giá vốn lô
                 StockIssueItemJpa lotItem = new StockIssueItemJpa();
                 lotItem.setIssueId(issueId);
                 lotItem.setItemId(itemId);
                 lotItem.setEntryItemId(lot.getEntryItemId());
                 lotItem.setQuantity(consume);
-                lotItem.setExportPrice(sellingPrice);   // giá bán (thị trường hoặc fallback lô)
-                lotItem.setImportPrice(lot.getImportPrice()); // giá vốn lô FIFO
+                lotItem.setExportPrice(sellingPrice);
+                lotItem.setImportPrice(lot.getImportPrice());
                 lotItem.setDiscountRate(discountRate);
                 lotItem.setFinalPrice(finalPrice);
+
+                if (finalPrice.compareTo(lot.getImportPrice()) < 0) {
+                    java.util.logging.Logger.getLogger(getClass().getName()).warning(
+                            String.format("CẢNH BÁO BÁN LỖ: issueId=%d, itemId=%d, lô=%d, " +
+                                            "giá bán=%.0f < giá vốn=%.0f",
+                                    issueId, itemId, lot.getEntryItemId(),
+                                    finalPrice.doubleValue(), lot.getImportPrice().doubleValue()));
+                }
+
                 lotItems.add(lotItem);
-
-                // Trừ remaining_quantity của lô
-                lot.setRemainingQuantity(lot.getRemainingQuantity() - consume);
-                stockEntryRepo.saveItem(lot);
-
+                stockEntryRepo.decreaseRemainingQuantity(lot.getEntryItemId(), consume);
                 remaining -= consume;
             }
 
-            // Trừ inventory
             int newQty = inv.getQuantity() - needed;
             inv.setQuantity(newQty);
             inventoryRepo.save(inv);
 
-            // Audit log
             InventoryTransactionJpa tx = new InventoryTransactionJpa();
             tx.setWarehouseId(issue.getWarehouseId());
             tx.setItemId(itemId);
@@ -201,16 +199,17 @@ public class StockIssueServiceImpl implements StockIssueService {
             transactionRepo.save(tx);
         }
 
-        // Xóa placeholders, thay bằng lot-split items
-        issue.getItems().clear();
-        stockIssueRepo.save(issue);
-        issue.getItems().addAll(lotItems);
+        stockIssueItemRepo.deleteByIssueId(issueId);
 
         issue.setStatus(StockIssueStatus.CONFIRMED);
         issue.setConfirmedBy(staffId);
         issue.setConfirmedAt(LocalDateTime.now());
+        stockIssueRepo.save(issue);
 
-        return toResponse(stockIssueRepo.save(issue));
+        lotItems.forEach(item -> item.setIssueId(issueId));
+        stockIssueItemRepo.saveAll(lotItems);
+
+        return toResponse(findOrThrow(issueId));
     }
 
     @Override
@@ -265,6 +264,16 @@ public class StockIssueServiceImpl implements StockIssueService {
             candidate = String.format("XK-%s-%d", date, SEQ.incrementAndGet());
         }
         return candidate;
+    }
+
+    private BigDecimal resolveDiscount(Integer itemId, IssueType issueType, int quantity) {
+        return discountConfigRepo.findActiveByItemIdAndIssueType(itemId, issueType)
+                .stream()
+                .filter(c -> c.getQuantityThreshold() == null || c.getQuantityThreshold() <= quantity)
+                .max(java.util.Comparator.comparingInt(c ->
+                        c.getQuantityThreshold() != null ? c.getQuantityThreshold() : 0))
+                .map(c -> c.getDiscountRate())
+                .orElse(BigDecimal.ZERO);
     }
 
     private StockIssueResponse toResponse(StockIssueJpa e) {

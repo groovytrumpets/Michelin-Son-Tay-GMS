@@ -6,8 +6,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.g42.platform.gms.warehouse.api.dto.request.CreateServiceRuleRequest;
 import com.g42.platform.gms.warehouse.api.dto.request.UpdateServiceRuleRequest;
 import com.g42.platform.gms.warehouse.api.dto.response.ServiceSuggestion;
+import com.g42.platform.gms.warehouse.domain.repository.ServiceRuleRepo;
 import com.g42.platform.gms.warehouse.infrastructure.entity.ServiceRuleJpa;
-import com.g42.platform.gms.warehouse.infrastructure.repository.ServiceRuleJpaRepo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ServiceRuleServiceImpl implements ServiceRuleService {
 
-    private final ServiceRuleJpaRepo serviceRuleJpaRepo;
+    private final ServiceRuleRepo serviceRuleRepo;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -31,8 +31,7 @@ public class ServiceRuleServiceImpl implements ServiceRuleService {
         if (vehicleModel == null || vehicleModel.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "vehicleModel không được để trống");
         }
-
-        return serviceRuleJpaRepo.findAllByIsActiveTrue().stream()
+        return serviceRuleRepo.findAllActive().stream()
                 .filter(rule -> rule.getKmThreshold() <= odometerKm)
                 .filter(rule -> vehicleModel.toLowerCase()
                         .contains(rule.getVehicleTypePattern().toLowerCase()))
@@ -50,7 +49,7 @@ public class ServiceRuleServiceImpl implements ServiceRuleService {
         rule.setReason(request.getReason());
         rule.setIsActive(true);
         rule.setCreatedBy(staffId);
-        return toSuggestion(serviceRuleJpaRepo.save(rule));
+        return toSuggestion(serviceRuleRepo.save(rule));
     }
 
     @Override
@@ -62,7 +61,7 @@ public class ServiceRuleServiceImpl implements ServiceRuleService {
         if (request.getSuggestedItemIds() != null) rule.setSuggestedItemIds(toJson(request.getSuggestedItemIds()));
         if (request.getReason() != null) rule.setReason(request.getReason());
         if (request.getIsActive() != null) rule.setIsActive(request.getIsActive());
-        return toSuggestion(serviceRuleJpaRepo.save(rule));
+        return toSuggestion(serviceRuleRepo.save(rule));
     }
 
     @Override
@@ -70,13 +69,11 @@ public class ServiceRuleServiceImpl implements ServiceRuleService {
     public void delete(Integer ruleId) {
         ServiceRuleJpa rule = findOrThrow(ruleId);
         rule.setIsActive(false);
-        serviceRuleJpaRepo.save(rule);
+        serviceRuleRepo.save(rule);
     }
 
-    // ── helpers ──────────────────────────────────────────────────────────────
-
     private ServiceRuleJpa findOrThrow(Integer ruleId) {
-        return serviceRuleJpaRepo.findById(ruleId)
+        return serviceRuleRepo.findById(ruleId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Không tìm thấy service rule id=" + ruleId));
     }

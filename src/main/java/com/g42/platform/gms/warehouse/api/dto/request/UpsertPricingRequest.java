@@ -23,6 +23,9 @@ public class UpsertPricingRequest {
     /** Hệ số markup, mặc định 1.0 (không markup) */
     private BigDecimal markupMultiplier = BigDecimal.ONE;
 
+    /** Giá bán trực tiếp — nếu set thì bỏ qua markupMultiplier */
+    private BigDecimal sellingPrice;
+
     private LocalDate effectiveFrom;
 
     /** null = vô thời hạn */
