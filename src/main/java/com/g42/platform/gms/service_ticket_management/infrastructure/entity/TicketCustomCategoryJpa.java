@@ -25,4 +25,7 @@ public class TicketCustomCategoryJpa {
 
     @Column(name = "display_order")
     private Integer displayOrder;
+
+    @Column(name = "status", nullable = false)
+    private String status = "ACTIVE";
 }

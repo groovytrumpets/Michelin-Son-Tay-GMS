@@ -29,4 +29,9 @@ public class BillingRepoImpl implements BillingRepository {
         ServiceBillJpa serviceBillJpa = serviceBillJpaRepo.findById(billId).orElse(null);
         return serviceBillJpaMapper.toDomain(serviceBillJpa);
     }
+
+    @Override
+    public void save(ServiceBill serviceBill) {
+        ServiceBillJpa saved = serviceBillJpaRepo.save(serviceBillJpaMapper.toEntity(serviceBill));
+    }
 }

@@ -88,7 +88,9 @@ public class ServiceTicketJpa {
     
     @OneToMany(mappedBy = "serviceTicketId", fetch = FetchType.LAZY)
     private List<ServiceTicketAssignmentJpa> assignments = new ArrayList<>();
-    
+    @Column(name = "queue_number")
+    private Integer queueNumber;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();

@@ -39,6 +39,9 @@ public class WorkCategoryJpa {
     @NotNull
     @Column(name = "tax_rule_idtax_rule", nullable = false)
     private Integer taxRuleId;
+    @Lob
+    @Column(name = "category_type")
+    private String categoryType;
 
 
 }

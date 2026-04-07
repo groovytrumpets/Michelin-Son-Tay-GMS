@@ -25,4 +25,11 @@ public class CatalogSummaryDto {
     private String imageUrl;
     private String unit;
     private Boolean isRecurring;
+    private String brand;
+    private String productLine;
+    private String itemCategoryCode;
+    private String madeIn;
+    private Integer taxRuleId;
+    private String partNumber;
+    private String barcode;
 }

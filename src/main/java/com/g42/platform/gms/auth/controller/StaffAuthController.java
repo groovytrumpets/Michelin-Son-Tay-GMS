@@ -1,9 +1,6 @@
 package com.g42.platform.gms.auth.controller;
 
-import com.g42.platform.gms.auth.dto.AuthResponse;
-import com.g42.platform.gms.auth.dto.LoginRequest;
-import com.g42.platform.gms.auth.dto.StaffAuthDto;
-import com.g42.platform.gms.auth.dto.StaffAuthResponse;
+import com.g42.platform.gms.auth.dto.*;
 import com.g42.platform.gms.auth.service.StaffAuthService;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
@@ -46,6 +43,22 @@ public class StaffAuthController {
         StaffAuthResponse authResponse = staffAuthService.verifyStaffAuth(loginRequest);
 
         return ResponseEntity.ok(ApiResponses.success(authResponse));
+    }
+
+    @PostMapping("/request-otp")
+    public ResponseEntity<ApiResponse<Void>> requestOtp(@RequestBody LoginRequest phone) {
+        staffAuthService.requestOtpPhone(phone.getPhone());
+        return ResponseEntity.ok(ApiResponses.successMessage("OTP has been sent to " + phone));
+    }
+    @PostMapping("/verify-otp")
+    public ResponseEntity<ApiResponse<AuthResponse>> verifyOtp(@RequestBody VerifyOtpRequest request) {
+        AuthResponse response = staffAuthService.verifyOtp(request);
+        return ResponseEntity.ok(ApiResponses.success(response));
+    }
+    @PostMapping("/setup-pass")
+    public ResponseEntity<ApiResponse<Void>> setupPin(@RequestBody SetupPinRequest request) {
+        staffAuthService.setupPassword(request);
+        return ResponseEntity.ok(ApiResponses.successMessage("PIN setup successfully. Please login."));
     }
 
 }
