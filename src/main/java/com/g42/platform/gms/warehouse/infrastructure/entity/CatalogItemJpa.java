@@ -58,10 +58,10 @@ public class CatalogItemJpa {
     @Column(name = "is_recurring")
     private Boolean isRecurring;
 
-    @Column(name = "brand_id", nullable = true)
+    @Column(name = "brand_id", nullable = false)
     private Integer brandId;
 
-    @Column(name = "product_line_id", nullable = true)
+    @Column(name = "product_line_id", nullable = false)
     private Integer productLineId;
     @Size(max = 100)
     @Column(name = "made_in", length = 100)
