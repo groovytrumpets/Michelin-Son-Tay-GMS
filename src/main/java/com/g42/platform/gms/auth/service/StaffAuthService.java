@@ -66,6 +66,22 @@ public class StaffAuthService {
     }
     @Transactional(noRollbackFor = AuthException.class)
     public StaffAuthResponse verifyStaffAuth(LoginRequest loginRequest){
+        if (loginRequest.getPhone()==null||loginRequest.getPin()==null){
+            throw new AuthException(AuthErrorCode.BAD_REQUEST.name(), "Số điện thoại hoặc email là bắt buộc");
+        }
+        if (loginRequest.getPhone().contains("@")) {
+            String emailRegex = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,6}$";
+            if (!loginRequest.getPhone().matches(emailRegex)) {
+                throw new AuthException("Số điện thoại hoặc email không hợp lệ");
+            }
+        }else if (loginRequest.getPhone().matches("^[0-9+]+$")) {
+            String phoneRegex = "^(0|\\+84)[0-9]{9}$";
+            if (!loginRequest.getPhone().matches(phoneRegex)) {
+                throw new AuthException("Số điện thoại hoặc email không hợp lệ");
+            }
+        }else {
+            throw new AuthException("Số điện thoại hoặc email không hợp lệ");
+        }
 
         try{
         Authentication authentication = authenticationManager.authenticate(
@@ -78,7 +94,7 @@ public class StaffAuthService {
         if (authentication.isAuthenticated()) {
             //todo: staffAccLocked
             if (!(staffPrincipal.isAccountNonLocked())){
-                throw new AuthException(AuthErrorCode.ACCOUNT_LOCKED.name(), "Tài khoản đã bị khóa");
+                throw new AuthException(AuthErrorCode.ACCOUNT_LOCKED.name(), "Tài khoản đã bị khóa hoặc chưa kích hoạt");
             }
             String token = jwtService.generateStaffJWToken(staffPrincipal.getAuthId());
             staffAuth.setFailedLoginCount(0);

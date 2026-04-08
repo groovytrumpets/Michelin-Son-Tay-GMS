@@ -77,6 +77,9 @@ public class CatalogItemRepoImpl implements CatalogItemRepo {
 
     @Override
     public Brand getBrandById(Integer brandId) {
+        if (brandId == null) {
+            return null;
+        }
         BrandJpa brandJpa = brandJpaRepo.findById(brandId).orElse(null);
         return brandJpaMapper.toDomain(brandJpa);
     }
@@ -108,6 +111,9 @@ public class CatalogItemRepoImpl implements CatalogItemRepo {
 
     @Override
     public ProductLine getProductLineById(Integer productLineId) {
+        if (productLineId == null) {
+            return null;
+        }
         ProductLineJpa itemJpa = productLineJpaRepo.findById(productLineId).orElse(null);
         return productLineJpaMapper.toDomain(itemJpa);
     }

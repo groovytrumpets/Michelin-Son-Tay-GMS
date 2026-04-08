@@ -1,0 +1,32 @@
+package com.g42.platform.gms.estimation.infrastructure;
+
+import com.g42.platform.gms.estimation.domain.entity.StockAllocation;
+import com.g42.platform.gms.estimation.domain.repository.StockAllocationRepository;
+import com.g42.platform.gms.estimation.infrastructure.entity.StockAllocationJpa;
+import com.g42.platform.gms.estimation.infrastructure.mapper.StockAllocationJpaMapper;
+import com.g42.platform.gms.estimation.infrastructure.repository.StockAllocationRepositoryJpa;
+import org.springframework.stereotype.Service;
+
+@Service
+public class StockAllocationRepoImpl implements StockAllocationRepository {
+    private final StockAllocationJpaMapper stockAllocationJpaMapper;
+    private final StockAllocationRepositoryJpa stockAllocationRepositoryJpa;
+
+    public StockAllocationRepoImpl(StockAllocationJpaMapper stockAllocationJpaMapper, StockAllocationRepositoryJpa stockAllocationRepositoryJpa) {
+        this.stockAllocationJpaMapper = stockAllocationJpaMapper;
+        this.stockAllocationRepositoryJpa = stockAllocationRepositoryJpa;
+    }
+
+    @Override
+    public StockAllocation createNewAllocation(StockAllocation stockAllocation) {
+        System.out.println("DEBUG: createNewAllocation");
+        stockAllocation.toString();
+        StockAllocationJpa stockAllocationJpa = stockAllocationRepositoryJpa.save(stockAllocationJpaMapper.fromDomain(stockAllocation));
+        return stockAllocationJpaMapper.toDomain(stockAllocationJpa);
+    }
+
+    @Override
+    public void updateReleasedOldEstimate(Integer revisedFromId) {
+        stockAllocationRepositoryJpa.updateReleasedEstimateById(revisedFromId);
+    }
+}

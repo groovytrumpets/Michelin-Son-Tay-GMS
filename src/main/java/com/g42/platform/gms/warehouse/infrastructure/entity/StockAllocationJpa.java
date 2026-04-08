@@ -6,7 +6,7 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
-@Entity
+@Entity(name = "WarehouseStockAllocation")
 @Table(name = "stock_allocation",
         indexes = {
                 @Index(name = "idx_alloc_ticket", columnList = "service_ticket_id"),

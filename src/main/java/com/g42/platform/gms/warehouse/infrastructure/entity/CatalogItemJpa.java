@@ -32,7 +32,7 @@ public class CatalogItemJpa {
     @ColumnDefault("0")
     @Column(name = "warranty_duration_months")
     private Integer warrantyDurationMonths;
-    @Column(name = "service_service_id")
+    @Column(name = "service_service_id", nullable = true)
     private Long serviceId;
 
     private String sku;
@@ -58,10 +58,10 @@ public class CatalogItemJpa {
     @Column(name = "is_recurring")
     private Boolean isRecurring;
 
-    @Column(name = "brand_id")
+    @Column(name = "brand_id", nullable = false)
     private Integer brandId;
 
-    @Column(name = "product_line_id")
+    @Column(name = "product_line_id", nullable = false)
     private Integer productLineId;
     @Size(max = 100)
     @Column(name = "made_in", length = 100)
