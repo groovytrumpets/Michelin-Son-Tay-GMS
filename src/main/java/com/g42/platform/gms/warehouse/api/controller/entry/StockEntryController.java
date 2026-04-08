@@ -7,6 +7,8 @@ import com.g42.platform.gms.warehouse.api.dto.entry.CreateStockEntryRequest;
 import com.g42.platform.gms.warehouse.api.dto.entry.CreateStockEntryWithAttachmentRequest;
 import com.g42.platform.gms.warehouse.api.dto.response.StockEntryResponse;
 import com.g42.platform.gms.warehouse.app.service.entry.StockEntryService;
+import com.g42.platform.gms.warehouse.api.dto.request.PatchEntryItemRequest;
+import com.g42.platform.gms.warehouse.api.dto.request.UpdateStockEntryRequest;
 import com.g42.platform.gms.warehouse.domain.enums.StockEntryStatus;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +41,25 @@ public class StockEntryController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<StockEntryResponse>> getById(@PathVariable Integer id) {
         return ResponseEntity.ok(ApiResponses.success(stockEntryService.getById(id)));
+    }
+
+    /** Sửa từng item trong phiếu nhập — chỉ khi DRAFT */
+    @PatchMapping("/{id}/items/{itemId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<StockEntryResponse>> patchItem(
+            @PathVariable Integer id,
+            @PathVariable Integer itemId,
+            @RequestBody PatchEntryItemRequest request) {
+        return ResponseEntity.ok(ApiResponses.success(stockEntryService.patchItem(id, itemId, request)));
+    }
+
+    /** Cập nhật phiếu nhập kho — chỉ khi DRAFT */
+    @PutMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<StockEntryResponse>> update(
+            @PathVariable Integer id,
+            @RequestBody UpdateStockEntryRequest request) {
+        return ResponseEntity.ok(ApiResponses.success(stockEntryService.update(id, request)));
     }
 
     /**

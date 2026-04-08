@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 @RequiredArgsConstructor
@@ -22,5 +23,15 @@ public class StockIssueItemRepoImpl implements StockIssueItemRepo {
     @Override
     public void deleteByIssueId(Integer issueId) {
         jpaRepo.deleteByIssueId(issueId);
+    }
+
+    @Override
+    public Optional<StockIssueItemJpa> findById(Integer issueItemId) {
+        return jpaRepo.findById(issueItemId);
+    }
+
+    @Override
+    public StockIssueItemJpa save(StockIssueItemJpa item) {
+        return jpaRepo.save(item);
     }
 }

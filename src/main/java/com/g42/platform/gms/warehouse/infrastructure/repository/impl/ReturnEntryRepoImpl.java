@@ -8,6 +8,7 @@ import com.g42.platform.gms.warehouse.infrastructure.repository.ReturnEntryJpaRe
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -20,6 +21,11 @@ public class ReturnEntryRepoImpl implements ReturnEntryRepo {
     @Override
     public Optional<ReturnEntryJpa> findById(Integer returnId) {
         return jpaRepo.findById(returnId);
+    }
+
+    @Override
+    public List<ReturnEntryJpa> findByWarehouseId(Integer warehouseId) {
+        return jpaRepo.findByWarehouseIdOrderByCreatedAtDesc(warehouseId);
     }
 
     @Override

@@ -3,6 +3,8 @@ package com.g42.platform.gms.warehouse.app.service.entry;
 import com.g42.platform.gms.warehouse.api.dto.entry.CreateStockEntryRequest;
 import com.g42.platform.gms.warehouse.api.dto.entry.CreateStockEntryWithAttachmentRequest;
 import com.g42.platform.gms.warehouse.api.dto.response.StockEntryResponse;
+import com.g42.platform.gms.warehouse.api.dto.request.PatchEntryItemRequest;
+import com.g42.platform.gms.warehouse.api.dto.request.UpdateStockEntryRequest;
 import com.g42.platform.gms.warehouse.domain.enums.StockEntryStatus;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -16,6 +18,12 @@ public interface StockEntryService {
 
     /** Lấy chi tiết 1 phiếu */
     StockEntryResponse getById(Integer entryId);
+
+    /** Cập nhật từng item trong phiếu nhập — chỉ khi DRAFT */
+    StockEntryResponse patchItem(Integer entryId, Integer entryItemId, PatchEntryItemRequest request);
+
+    /** Cập nhật phiếu nhập kho — chỉ khi DRAFT */
+    StockEntryResponse update(Integer entryId, UpdateStockEntryRequest request);
 
     /** Tạo phiếu nhập kho (DRAFT) */
     StockEntryResponse create(CreateStockEntryRequest request, Integer staffId);

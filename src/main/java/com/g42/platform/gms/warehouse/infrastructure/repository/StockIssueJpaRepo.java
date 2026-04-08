@@ -12,5 +12,7 @@ public interface StockIssueJpaRepo extends JpaRepository<StockIssueJpa, Integer>
 
     List<StockIssueJpa> findByServiceTicketId(Integer serviceTicketId);
 
+    List<StockIssueJpa> findByWarehouseIdOrderByCreatedAtDesc(Integer warehouseId);
+
     boolean existsByIssueCode(String issueCode);
 }

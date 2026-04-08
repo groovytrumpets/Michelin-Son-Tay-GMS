@@ -6,6 +6,8 @@ import com.g42.platform.gms.common.service.ImageUploadService;
 import com.g42.platform.gms.warehouse.api.dto.request.CreateReturnEntryFormRequest;
 import com.g42.platform.gms.warehouse.api.dto.request.CreateReturnEntryRequest;
 import com.g42.platform.gms.warehouse.api.dto.request.ReturnEntryItemRequest;
+import com.g42.platform.gms.warehouse.api.dto.request.PatchReturnItemRequest;
+import com.g42.platform.gms.warehouse.api.dto.request.UpdateReturnEntryRequest;
 import com.g42.platform.gms.warehouse.api.dto.response.ReturnEntryItemResponse;
 import com.g42.platform.gms.warehouse.api.dto.response.ReturnEntryResponse;
 import com.g42.platform.gms.warehouse.domain.enums.InventoryTransactionType;
@@ -166,6 +168,78 @@ public class ReturnEntryServiceImpl implements ReturnEntryService {
         attachment.setFileUrl(url);
         attachment.setUploadedBy(staffId);
         attachmentRepo.save(attachment);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ReturnEntryResponse> listByWarehouse(Integer warehouseId) {
+        return returnEntryRepo.findByWarehouseId(warehouseId).stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ReturnEntryResponse getDetail(Integer returnId) {
+        return toResponse(findOrThrow(returnId));
+    }
+
+    @Override
+    @Transactional
+    public ReturnEntryResponse patchItem(Integer returnId, Integer returnItemId, PatchReturnItemRequest request) {
+        ReturnEntryJpa entry = findOrThrow(returnId);
+        if (entry.getStatus() != ReturnEntryStatus.DRAFT) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Chỉ có thể sửa phiếu ở trạng thái DRAFT");
+        }
+        ReturnEntryItemJpa item = returnEntryRepo.findItemById(returnItemId)
+                .filter(i -> i.getReturnId().equals(returnId))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Không tìm thấy item id=" + returnItemId + " trong phiếu id=" + returnId));
+
+        if (request.getQuantity() != null) item.setQuantity(request.getQuantity());
+        if (request.getConditionNote() != null) item.setConditionNote(request.getConditionNote());
+
+        returnEntryRepo.saveItem(item);
+        return toResponse(findOrThrow(returnId));
+    }
+
+    @Override
+    @Transactional
+    public ReturnEntryResponse update(Integer returnId, UpdateReturnEntryRequest request) {
+        ReturnEntryJpa entry = findOrThrow(returnId);
+        if (entry.getStatus() != ReturnEntryStatus.DRAFT) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Chỉ có thể sửa phiếu ở trạng thái DRAFT");
+        }
+        if (request.getReturnReason() != null) entry.setReturnReason(request.getReturnReason());
+
+        if (request.getItems() != null || request.getExchangeItems() != null) {
+            entry.getItems().clear();
+            if (request.getItems() != null) {
+                for (ReturnEntryItemRequest itemReq : request.getItems()) {
+                    ReturnEntryItemJpa item = new ReturnEntryItemJpa();
+                    item.setReturnId(returnId);
+                    item.setItemId(itemReq.getItemId());
+                    item.setQuantity(itemReq.getQuantity());
+                    item.setConditionNote(itemReq.getConditionNote());
+                    item.setExchangeItem(false);
+                    entry.getItems().add(item);
+                }
+            }
+            if (request.getExchangeItems() != null) {
+                for (ReturnEntryItemRequest itemReq : request.getExchangeItems()) {
+                    ReturnEntryItemJpa item = new ReturnEntryItemJpa();
+                    item.setReturnId(returnId);
+                    item.setItemId(itemReq.getItemId());
+                    item.setQuantity(itemReq.getQuantity());
+                    item.setConditionNote(null);
+                    item.setExchangeItem(true);
+                    entry.getItems().add(item);
+                }
+            }
+        }
+        return toResponse(returnEntryRepo.save(entry));
     }
 
     @Override

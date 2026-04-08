@@ -5,6 +5,8 @@ import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.warehouse.api.dto.request.CreateReturnEntryFormRequest;
 import com.g42.platform.gms.warehouse.api.dto.request.CreateReturnEntryRequest;
+import com.g42.platform.gms.warehouse.api.dto.request.PatchReturnItemRequest;
+import com.g42.platform.gms.warehouse.api.dto.request.UpdateReturnEntryRequest;
 import com.g42.platform.gms.warehouse.api.dto.response.ReturnEntryResponse;
 import com.g42.platform.gms.warehouse.app.service.returns.ReturnEntryService;
 import jakarta.validation.Valid;
@@ -16,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/warehouse/return-entries")
@@ -23,6 +26,15 @@ import java.io.IOException;
 public class ReturnEntryController {
 
     private final ReturnEntryService returnEntryService;
+
+    /** Danh sách phiếu hoàn theo kho, mới nhất trước */
+    @GetMapping
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<List<ReturnEntryResponse>>> list(
+            @RequestParam Integer warehouseId) {
+        return ResponseEntity.ok(ApiResponses.success(
+                returnEntryService.listByWarehouse(warehouseId)));
+    }
 
     @PostMapping
     @PreAuthorize("isAuthenticated()")
@@ -60,6 +72,23 @@ public class ReturnEntryController {
         return ResponseEntity.ok(ApiResponses.success(null));
     }
 
+    @PatchMapping("/{id}/items/{itemId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<ReturnEntryResponse>> patchItem(
+            @PathVariable Integer id,
+            @PathVariable Integer itemId,
+            @RequestBody PatchReturnItemRequest request) {
+        return ResponseEntity.ok(ApiResponses.success(returnEntryService.patchItem(id, itemId, request)));
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<ReturnEntryResponse>> update(
+            @PathVariable Integer id,
+            @RequestBody UpdateReturnEntryRequest request) {
+        return ResponseEntity.ok(ApiResponses.success(returnEntryService.update(id, request)));
+    }
+
     @PostMapping("/{id}/confirm")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<ReturnEntryResponse>> confirm(
@@ -67,5 +96,11 @@ public class ReturnEntryController {
             @AuthenticationPrincipal StaffPrincipal principal) {
         return ResponseEntity.ok(ApiResponses.success(
                 returnEntryService.confirm(id, principal.getStaffId())));
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<ReturnEntryResponse>> getDetail(@PathVariable Integer id) {
+        return ResponseEntity.ok(ApiResponses.success(returnEntryService.getDetail(id)));
     }
 }

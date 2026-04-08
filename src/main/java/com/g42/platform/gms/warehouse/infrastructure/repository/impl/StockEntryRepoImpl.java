@@ -60,6 +60,11 @@ public class StockEntryRepoImpl implements StockEntryRepo {
     }
 
     @Override
+    public java.util.Optional<StockEntryItemJpa> findItemById(Integer entryItemId) {
+        return itemJpaRepo.findById(entryItemId);
+    }
+
+    @Override
     public int decreaseRemainingQuantity(Integer entryItemId, int qty) {
         return itemJpaRepo.decreaseRemainingQuantity(entryItemId, qty);
     }

@@ -6,6 +6,7 @@ import com.g42.platform.gms.warehouse.infrastructure.repository.StockIssueJpaRep
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -17,6 +18,11 @@ public class StockIssueRepoImpl implements StockIssueRepo {
     @Override
     public Optional<StockIssueJpa> findById(Integer issueId) {
         return jpaRepo.findById(issueId);
+    }
+
+    @Override
+    public List<StockIssueJpa> findByWarehouseId(Integer warehouseId) {
+        return jpaRepo.findByWarehouseIdOrderByCreatedAtDesc(warehouseId);
     }
 
     @Override

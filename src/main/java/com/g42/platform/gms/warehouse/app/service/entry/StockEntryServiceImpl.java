@@ -4,6 +4,8 @@ import com.g42.platform.gms.common.service.ImageUploadService;
 import com.g42.platform.gms.warehouse.api.dto.entry.CreateStockEntryRequest;
 import com.g42.platform.gms.warehouse.api.dto.entry.CreateStockEntryWithAttachmentRequest;
 import com.g42.platform.gms.warehouse.api.dto.entry.StockEntryItemRequest;
+import com.g42.platform.gms.warehouse.api.dto.request.PatchEntryItemRequest;
+import com.g42.platform.gms.warehouse.api.dto.request.UpdateStockEntryRequest;
 import com.g42.platform.gms.warehouse.api.dto.response.StockEntryItemResponse;
 import com.g42.platform.gms.warehouse.api.dto.response.StockEntryResponse;
 import com.g42.platform.gms.warehouse.domain.enums.InventoryTransactionType;
@@ -60,6 +62,61 @@ public class StockEntryServiceImpl implements StockEntryService {
     @Transactional(readOnly = true)
     public StockEntryResponse getById(Integer entryId) {
         return toResponse(findOrThrow(entryId));
+    }
+
+    @Override
+    @Transactional
+    public StockEntryResponse patchItem(Integer entryId, Integer entryItemId, PatchEntryItemRequest request) {
+        StockEntryJpa entry = findOrThrow(entryId);
+        if (entry.getStatus() != StockEntryStatus.DRAFT) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Chỉ có thể sửa phiếu ở trạng thái DRAFT");
+        }
+        StockEntryItemJpa item = stockEntryRepo.findItemById(entryItemId)
+                .filter(i -> i.getEntryId().equals(entryId))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Không tìm thấy item id=" + entryItemId + " trong phiếu id=" + entryId));
+
+        if (request.getQuantity() != null) {
+            item.setQuantity(request.getQuantity());
+            item.setRemainingQuantity(request.getQuantity());
+        }
+        if (request.getImportPrice() != null) item.setImportPrice(request.getImportPrice());
+        if (request.getMarkupMultiplier() != null) item.setMarkupMultiplier(request.getMarkupMultiplier());
+        if (request.getNotes() != null) item.setNotes(request.getNotes());
+
+        stockEntryRepo.saveItem(item);
+        return toResponse(findOrThrow(entryId));
+    }
+
+    @Override
+    @Transactional
+    public StockEntryResponse update(Integer entryId, UpdateStockEntryRequest request) {
+        StockEntryJpa entry = findOrThrow(entryId);
+        if (entry.getStatus() != StockEntryStatus.DRAFT) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Chỉ có thể sửa phiếu ở trạng thái DRAFT");
+        }
+        if (request.getSupplierName() != null) entry.setSupplierName(request.getSupplierName());
+        if (request.getEntryDate() != null) entry.setEntryDate(request.getEntryDate());
+        if (request.getNotes() != null) entry.setNotes(request.getNotes());
+
+        if (request.getItems() != null) {
+            entry.getItems().clear();
+            for (StockEntryItemRequest itemReq : request.getItems()) {
+                StockEntryItemJpa item = new StockEntryItemJpa();
+                item.setEntryId(entry.getEntryId());
+                item.setItemId(itemReq.getItemId());
+                item.setQuantity(itemReq.getQuantity());
+                item.setImportPrice(itemReq.getImportPrice());
+                item.setMarkupMultiplier(itemReq.getMarkupMultiplier() != null
+                        ? itemReq.getMarkupMultiplier() : java.math.BigDecimal.ONE);
+                item.setRemainingQuantity(itemReq.getQuantity());
+                item.setNotes(itemReq.getNotes());
+                entry.getItems().add(item);
+            }
+        }
+        return toResponse(stockEntryRepo.save(entry));
     }
 
     @Override

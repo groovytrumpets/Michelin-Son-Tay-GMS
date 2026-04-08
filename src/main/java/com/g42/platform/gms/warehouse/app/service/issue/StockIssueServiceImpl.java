@@ -1,6 +1,8 @@
 package com.g42.platform.gms.warehouse.app.service.issue;
 
 import com.g42.platform.gms.warehouse.api.dto.issue.CreateStockIssueRequest;
+import com.g42.platform.gms.warehouse.api.dto.request.PatchIssueItemRequest;
+import com.g42.platform.gms.warehouse.api.dto.request.UpdateStockIssueRequest;
 import com.g42.platform.gms.warehouse.api.dto.response.StockIssueDetailResponse;
 import com.g42.platform.gms.warehouse.api.dto.response.StockIssueResponse;
 import com.g42.platform.gms.warehouse.domain.enums.InventoryTransactionType;
@@ -96,6 +98,57 @@ public class StockIssueServiceImpl implements StockIssueService {
 
         stockIssueItemRepo.saveAll(placeholders);
         return toResponse(findOrThrow(saved.getIssueId()));
+    }
+
+    @Override
+    @Transactional
+    public StockIssueResponse patchItem(Integer issueId, Integer issueItemId, PatchIssueItemRequest request) {
+        StockIssueJpa issue = findOrThrow(issueId);
+        if (issue.getStatus() != StockIssueStatus.DRAFT) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Chỉ có thể sửa phiếu ở trạng thái DRAFT");
+        }
+        StockIssueItemJpa item = stockIssueItemRepo.findById(issueItemId)
+                .filter(i -> i.getIssueId().equals(issueId))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Không tìm thấy item id=" + issueItemId + " trong phiếu id=" + issueId));
+
+        if (request.getQuantity() != null) item.setQuantity(request.getQuantity());
+        if (request.getDiscountRate() != null) item.setDiscountRate(request.getDiscountRate());
+
+        stockIssueItemRepo.save(item);
+        return toResponse(findOrThrow(issueId));
+    }
+
+    @Override
+    @Transactional
+    public StockIssueResponse update(Integer issueId, UpdateStockIssueRequest request) {
+        StockIssueJpa issue = findOrThrow(issueId);
+        if (issue.getStatus() != StockIssueStatus.DRAFT) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Chỉ có thể sửa phiếu ở trạng thái DRAFT");
+        }
+        if (request.getIssueReason() != null) issue.setIssueReason(request.getIssueReason());
+
+        if (request.getItems() != null) {
+            // Xóa placeholders cũ, thêm mới
+            stockIssueItemRepo.deleteByIssueId(issueId);
+            List<StockIssueItemJpa> newItems = request.getItems().stream().map(req -> {
+                StockIssueItemJpa it = new StockIssueItemJpa();
+                it.setIssueId(issueId);
+                it.setItemId(req.getItemId());
+                it.setQuantity(req.getQuantity());
+                it.setEntryItemId(0);
+                it.setExportPrice(BigDecimal.ZERO);
+                it.setImportPrice(BigDecimal.ZERO);
+                it.setDiscountRate(req.getDiscountRate() != null ? req.getDiscountRate() : BigDecimal.ZERO);
+                it.setFinalPrice(BigDecimal.ZERO);
+                return it;
+            }).collect(Collectors.toList());
+            stockIssueItemRepo.saveAll(newItems);
+        }
+        stockIssueRepo.save(issue);
+        return toResponse(findOrThrow(issueId));
     }
 
     @Override
@@ -210,6 +263,14 @@ public class StockIssueServiceImpl implements StockIssueService {
         stockIssueItemRepo.saveAll(lotItems);
 
         return toResponse(findOrThrow(issueId));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<StockIssueResponse> listByWarehouse(Integer warehouseId) {
+        return stockIssueRepo.findByWarehouseId(warehouseId).stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
     }
 
     @Override

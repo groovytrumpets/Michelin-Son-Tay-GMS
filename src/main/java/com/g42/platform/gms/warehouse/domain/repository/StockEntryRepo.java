@@ -27,6 +27,9 @@ public interface StockEntryRepo {
 
     StockEntryItemJpa saveItem(StockEntryItemJpa item);
 
+    /** Tìm item theo id */
+    java.util.Optional<StockEntryItemJpa> findItemById(Integer entryItemId);
+
     /** Trừ remaining_quantity trực tiếp bằng UPDATE query — tránh Hibernate overwrite */
     int decreaseRemainingQuantity(Integer entryItemId, int qty);
 }
