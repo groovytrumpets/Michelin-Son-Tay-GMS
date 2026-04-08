@@ -17,6 +17,7 @@ public class StockAllocationDto {
     private Integer estimateItemId;
     private Integer warehouseId;
     private Integer itemId;
+    private Integer estimateId;
     private Integer quantity;
     private String status;
     private Integer createdBy;

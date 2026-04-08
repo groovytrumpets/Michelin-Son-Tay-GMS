@@ -10,7 +10,7 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 
-@Repository
+@Repository("warehouseStockAllocationRepo")
 @RequiredArgsConstructor
 public class StockAllocationRepoImpl implements StockAllocationRepo {
 
