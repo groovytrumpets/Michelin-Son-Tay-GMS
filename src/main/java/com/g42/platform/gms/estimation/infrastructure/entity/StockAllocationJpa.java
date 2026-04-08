@@ -57,6 +57,9 @@ public class StockAllocationJpa {
     @ColumnDefault("CURRENT_TIMESTAMP")
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+    @NotNull
+    @Column(name = "estimate_id", nullable = false)
+    private Integer estimateId;
 
 
 }

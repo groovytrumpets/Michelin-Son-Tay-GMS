@@ -102,9 +102,16 @@ public class EstimateService {
         estimate.setEstimateType(request.getEstimateType());
         estimate.setStatus(EstimateEnum.DRAFT);
         //todo: check version
+        Integer revisedEstimateId = null;
         int latestEstimateVersion = estimateRepository.findLatestEstimate(request.getServiceTicketId());
+        if (latestEstimateVersion > 1) {
+        revisedEstimateId = estimateRepository.findEstimateIdByVersionAndServiceTicket(request.getServiceTicketId(),latestEstimateVersion-1);
+        }
+            System.out.println("DEBUG: revisedEstimateId=" + revisedEstimateId);
+            System.out.println("DEBUG: latestEstimateVersion=" + latestEstimateVersion);
         estimate.setVersion(latestEstimateVersion);
         estimate.setTotalPrice(BigDecimal.ZERO);
+        estimate.setRevisedFromId(revisedEstimateId);
         Estimate saved = estimateRepository.save(estimate);
 
         List<EstimateItem> items = resolveItems(request.getItems(), saved.getId());
@@ -211,6 +218,7 @@ public class EstimateService {
             item.setItemName(req.getItemName());
             item.setQuantity(req.getQuantity());
             item.setUnitPrice(req.getUnitPrice());
+            item.setWarehouseId(req.getWarehouseId());
             item.setIsChecked(req.getIsChecked() != null ? req.getIsChecked() : false);
 
             TaxRule taxRule = null;

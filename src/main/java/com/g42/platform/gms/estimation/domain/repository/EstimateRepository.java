@@ -17,4 +17,6 @@ public interface EstimateRepository {
     Estimate findEstimateByServiceIdAndLatestVerson(Integer serviceTicketId);
 
     int findLatestEstimate(Integer serviceTicketId);
+
+    Integer findEstimateIdByVersionAndServiceTicket(Integer serviceTicketId, int latestEstimateVersion);
 }

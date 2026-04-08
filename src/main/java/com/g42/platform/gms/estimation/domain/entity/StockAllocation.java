@@ -25,4 +25,5 @@ public class StockAllocation {
     private Integer createdBy;
     private Instant createdAt;
     private Instant updatedAt;
+    private Integer estimateId;
 }

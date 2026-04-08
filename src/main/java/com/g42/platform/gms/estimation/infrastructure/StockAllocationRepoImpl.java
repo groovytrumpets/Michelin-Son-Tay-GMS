@@ -24,4 +24,9 @@ public class StockAllocationRepoImpl implements StockAllocationRepository {
         StockAllocationJpa stockAllocationJpa = stockAllocationRepositoryJpa.save(stockAllocationJpaMapper.fromDomain(stockAllocation));
         return stockAllocationJpaMapper.toDomain(stockAllocationJpa);
     }
+
+    @Override
+    public void updateReleasedOldEstimate(Integer revisedFromId) {
+        stockAllocationRepositoryJpa.updateReleasedEstimateById(revisedFromId);
+    }
 }

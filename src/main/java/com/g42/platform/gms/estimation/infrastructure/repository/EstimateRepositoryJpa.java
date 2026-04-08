@@ -32,4 +32,8 @@ public interface EstimateRepositoryJpa extends JpaRepository<EstimateJpa, Intege
       )
 """)
     List<EstimateJpa> findByServiceTicketIdsAndVersionTop(List<Integer> ticketIds);
+    @Query("""
+    select e.id from EstimateJpa  e where e.serviceTicketId = :serviceTicketId and e.version = :latestEstimateVersion
+    """)
+    Integer findRevisedEstimateId(Integer serviceTicketId, int latestEstimateVersion);
 }
