@@ -15,6 +15,8 @@ public class InventoryResponse {
     private Integer warehouseId;
     private Integer itemId;
     private String itemName;
+    private String sku;
+    private String unit;
     private Integer quantity;
     private Integer reservedQuantity;
     private Integer availableQuantity;

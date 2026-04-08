@@ -22,6 +22,9 @@ public interface StockEntryRepo {
     /** FIFO: lấy các lô còn hàng của item trong kho, cũ nhất trước */
     List<StockEntryItemJpa> findFifoLots(Integer warehouseId, Integer itemId);
 
+    /** Lấy lô nhập gần nhất — dùng để tham khảo giá nhập lần trước */
+    java.util.Optional<StockEntryItemJpa> findLatestLot(Integer warehouseId, Integer itemId);
+
     StockEntryItemJpa saveItem(StockEntryItemJpa item);
 
     /** Trừ remaining_quantity trực tiếp bằng UPDATE query — tránh Hibernate overwrite */

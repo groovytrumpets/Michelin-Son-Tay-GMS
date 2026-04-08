@@ -3,8 +3,10 @@ package com.g42.platform.gms.warehouse.app.service.catalog;
 import com.g42.platform.gms.warehouse.api.dto.request.CreatePartRequest;
 import com.g42.platform.gms.warehouse.api.dto.response.PartResponse;
 import com.g42.platform.gms.warehouse.domain.enums.CatalogItemType;
+import com.g42.platform.gms.warehouse.domain.repository.InventoryRepo;
 import com.g42.platform.gms.warehouse.domain.repository.PartCatalogRepo;
 import com.g42.platform.gms.warehouse.infrastructure.entity.CatalogItemJpa;
+import com.g42.platform.gms.warehouse.infrastructure.entity.InventoryJpa;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
@@ -26,6 +28,7 @@ public class WarehouseCatalogServiceImpl implements WarehouseCatalogService {
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyyMMdd");
 
     private final PartCatalogRepo partCatalogRepo;
+    private final InventoryRepo inventoryRepo;
 
     @Override
     @Transactional(readOnly = true)
@@ -64,7 +67,17 @@ public class WarehouseCatalogServiceImpl implements WarehouseCatalogService {
         item.setIsActive(true);
         item.setWarrantyDurationMonths(0);
 
-        return toResponse(partCatalogRepo.save(item));
+        CatalogItemJpa saved = partCatalogRepo.save(item);
+
+        // Tạo inventory record (qty=0) cho kho được chỉ định
+        InventoryJpa inv = new InventoryJpa();
+        inv.setWarehouseId(request.getWarehouseId());
+        inv.setItemId(saved.getItemId());
+        inv.setQuantity(0);
+        inv.setReservedQuantity(0);
+        inventoryRepo.save(inv);
+
+        return toResponse(saved);
     }
 
     private String resolveSku(String requestedSku) {

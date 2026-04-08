@@ -50,6 +50,11 @@ public class StockEntryRepoImpl implements StockEntryRepo {
     }
 
     @Override
+    public java.util.Optional<StockEntryItemJpa> findLatestLot(Integer warehouseId, Integer itemId) {
+        return itemJpaRepo.findLatestLot(warehouseId, itemId).stream().findFirst();
+    }
+
+    @Override
     public StockEntryItemJpa saveItem(StockEntryItemJpa item) {
         return itemJpaRepo.save(item);
     }

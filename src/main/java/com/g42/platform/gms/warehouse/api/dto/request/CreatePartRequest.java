@@ -12,6 +12,10 @@ public class CreatePartRequest {
     @NotBlank
     private String itemName;
 
+    /** Kho sẽ tạo inventory record (qty=0) khi tạo part mới */
+    @NotNull
+    private Integer warehouseId;
+
     /** SKU tự sinh nếu để trống */
     private String sku;
 

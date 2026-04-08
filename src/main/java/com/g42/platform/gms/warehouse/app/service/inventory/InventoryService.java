@@ -22,4 +22,17 @@ public interface InventoryService {
     List<InventoryResponse> listByWarehouse(Integer warehouseId,
                                             boolean showImportPrice,
                                             boolean showSellingPrice);
+
+    /**
+     * Tìm kiếm tồn kho theo keyword (tên/SKU) — dùng cho màn hình nhập kho.
+     * Trả về cả item chưa có trong inventory (quantity=0) để có thể nhập mới.
+     */
+    List<InventoryResponse> searchByWarehouse(Integer warehouseId, String keyword,
+                                              boolean showImportPrice);
+
+    /**
+     * Lấy toàn bộ PART trong catalog kèm tồn kho hiện tại.
+     * Item chưa có trong kho sẽ có quantity=0.
+     */
+    List<InventoryResponse> listAllPartsWithInventory(Integer warehouseId, boolean showImportPrice);
 }

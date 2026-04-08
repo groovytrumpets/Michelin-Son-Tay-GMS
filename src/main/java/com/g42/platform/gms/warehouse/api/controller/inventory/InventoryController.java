@@ -50,6 +50,36 @@ public class InventoryController {
                 inventoryService.getAvailableQuantity(warehouseId, itemId)));
     }
 
+    /**
+     * Tìm kiếm phụ tùng theo keyword, kèm tồn kho hiện tại.
+     * Dùng cho màn hình nhập kho — hiển thị cả item chưa có trong kho (qty=0).
+     * WAREHOUSE_KEEPER / MANAGER / ADMIN thấy importPrice.
+     */
+    @GetMapping("/{warehouseId}/search")
+    @PreAuthorize("hasAnyRole('WAREHOUSE_KEEPER','MANAGER','ADMIN','ACCOUNTANT')")
+    public ResponseEntity<ApiResponse<List<InventoryResponse>>> search(
+            @PathVariable Integer warehouseId,
+            @RequestParam String keyword,
+            @AuthenticationPrincipal StaffPrincipal principal) {
+        boolean showImportPrice = hasAnyRole(principal, "ACCOUNTANT", "MANAGER", "ADMIN", "WAREHOUSE_KEEPER");
+        return ResponseEntity.ok(ApiResponses.success(
+                inventoryService.searchByWarehouse(warehouseId, keyword, showImportPrice)));
+    }
+
+    /**
+     * Lấy toàn bộ PART kèm tồn kho — dùng cho màn hình tổng quan nhập kho.
+     * Item chưa có trong kho sẽ có quantity=0.
+     */
+    @GetMapping("/{warehouseId}/parts")
+    @PreAuthorize("hasAnyRole('WAREHOUSE_KEEPER','MANAGER','ADMIN','ACCOUNTANT')")
+    public ResponseEntity<ApiResponse<List<InventoryResponse>>> listAllParts(
+            @PathVariable Integer warehouseId,
+            @AuthenticationPrincipal StaffPrincipal principal) {
+        boolean showImportPrice = hasAnyRole(principal, "ACCOUNTANT", "MANAGER", "ADMIN", "WAREHOUSE_KEEPER");
+        return ResponseEntity.ok(ApiResponses.success(
+                inventoryService.listAllPartsWithInventory(warehouseId, showImportPrice)));
+    }
+
     private boolean hasAnyRole(StaffPrincipal principal, String... roles) {
         if (principal == null) return false;
         return principal.getAuthorities().stream()
