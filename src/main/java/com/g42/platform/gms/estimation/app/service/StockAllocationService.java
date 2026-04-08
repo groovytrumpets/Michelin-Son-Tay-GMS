@@ -26,12 +26,16 @@ public class StockAllocationService {
     private final StockAllocationDtoMapper stockAllocationDtoMapper;
     @Transactional
     public List<StockAllocationDto> createStockAllocation(Integer estimateId) {
+        //todo: cancel
         Estimate estimate = estimateService.findById(estimateId);
-        //todo: RELEASED pervious estimate if not null
-        if (estimate.getRevisedFromId() != null && estimate.getVersion()>1) {
-            stockAllocationRepository.updateReleasedOldEstimate(estimate.getRevisedFromId());
-        }
+//        //todo: RELEASED pervious estimate if not null
+//        if (estimate.getRevisedFromId() != null && estimate.getVersion()>1) {
+//            stockAllocationRepository.updateReleasedOldEstimate(estimate.getRevisedFromId());
+//        }
         List<EstimateItem> estimateItems = estimateItemRepository.findByEstimateId(estimateId);
+        //todo: RELEASED pervious estimate if not null
+            stockAllocationRepository.updateReleasedOldEstimate(estimate.getRevisedFromId());
+
         List<StockAllocation> stockAllocations = new ArrayList<>();
         for (EstimateItem estimateItem : estimateItems) {
             if (estimateItem.getItemId()!=null && estimateItem.getWarehouseId()!=null) {
