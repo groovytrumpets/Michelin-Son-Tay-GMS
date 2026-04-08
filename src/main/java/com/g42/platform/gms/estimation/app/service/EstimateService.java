@@ -393,4 +393,8 @@ public class EstimateService {
         List<WorkCategory> workCategories = workCategoryRepo.findAll();
         return workCategories.stream().map(estimateDtoMapper::toWorkCateDto).toList();
     }
+
+    public Estimate findById(Integer estimateId) {
+        return estimateRepository.findEstimateById(estimateId);
+    }
 }

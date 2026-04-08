@@ -5,10 +5,12 @@ import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.common.enums.EstimateEnum;
 import com.g42.platform.gms.estimation.api.dto.EstimateRespondDto;
+import com.g42.platform.gms.estimation.api.dto.StockAllocationDto;
 import com.g42.platform.gms.estimation.api.dto.WorkCataDto;
 import com.g42.platform.gms.estimation.api.dto.request.EstimateItemReqDto;
 import com.g42.platform.gms.estimation.api.dto.request.EstimateRequestDto;
 import com.g42.platform.gms.estimation.app.service.EstimateService;
+import com.g42.platform.gms.estimation.app.service.StockAllocationService;
 import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -21,6 +23,8 @@ import java.util.List;
 @RequestMapping("/api/service-ticket/estimate/")
 public class EstimateController {
     private final EstimateService estimateService;
+    private final StockAllocationService stockAllocationService;
+
     @GetMapping("/{serviceTicketId}")
     public ResponseEntity<ApiResponse<List<EstimateRespondDto>>> getEstimateTicketByCode(@PathVariable Integer serviceTicketId){
         List<EstimateRespondDto> estimate = estimateService.getEstimateByCode(serviceTicketId);
@@ -55,6 +59,12 @@ public class EstimateController {
     public ResponseEntity<ApiResponse<List<WorkCataDto>>> getWorkCateList(){
         List<WorkCataDto> workCataDtos = estimateService.getWorkCateList();
         return ResponseEntity.ok(ApiResponses.success(workCataDtos));
+    }
+
+    @PostMapping("/{estimateId}/stock-allocation")
+    public ResponseEntity<ApiResponse<List<StockAllocationDto>>> createStockAllocation(@PathVariable Integer estimateId){
+        return ResponseEntity.ok(
+                ApiResponses.success(stockAllocationService.createStockAllocation(estimateId)));
     }
 
 }

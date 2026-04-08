@@ -1,4 +1,4 @@
-package com.g42.platform.gms.warehouse.app.service;
+package com.g42.platform.gms.warehouse.app.service.catalog;
 
 import com.g42.platform.gms.warehouse.api.dto.CatalogSummaryDto;
 import com.g42.platform.gms.warehouse.api.mapper.CatalogDtoMapper;
