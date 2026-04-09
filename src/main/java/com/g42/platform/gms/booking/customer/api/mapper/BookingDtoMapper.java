@@ -102,7 +102,7 @@ public abstract class BookingDtoMapper {
         // Bước 3: booking phải DONE (check-in xong) mới bắt đầu luồng ticket
         boolean checkedIn = bookingStatus == BookingStatus.DONE;
         boolean serviceCompleted = ticketStatus == TicketStatus.COMPLETED;
-        boolean serviceInProgress = checkedIn && ticketStatus == TicketStatus.IN_PROGRESS;
+        boolean serviceInProgress = checkedIn && ticketStatus == TicketStatus.REPAIRING;
         String step3;
         if (serviceCompleted) {
             step3 = "COMPLETED";

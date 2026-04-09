@@ -259,8 +259,8 @@ public class CheckInService {
         Integer currentMaxQueue = serviceTicketRepo.findMaxQueueNumberForToday(startOfToday, endOfToday);
         int nextQueueNumber = (currentMaxQueue == null) ? 1 : (currentMaxQueue + 1);
 
-        // 6. Update Service Ticket to DRAFT
-        ticketDomain.setTicketStatus(TicketStatus.DRAFT);
+        // 6. Update Service Ticket to CREATED
+        ticketDomain.setTicketStatus(TicketStatus.CREATED);
         ticketDomain.setCheckInNotes(request.getCheckInNotes());
         ticketDomain.setReceivedAt(LocalDateTime.now());
         ticketDomain.setUpdatedAt(LocalDateTime.now());
