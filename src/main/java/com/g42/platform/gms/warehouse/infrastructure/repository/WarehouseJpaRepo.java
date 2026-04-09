@@ -35,15 +35,13 @@ public interface WarehouseJpaRepo extends JpaRepository<WarehouseJpa,Integer> {
         w.warehouseCode as warehouseCode,
             w.warehouseName as warehouseName,
                 w.address as warehouseAddress,
-        wp.itemId as itemId,
-        wp.sellingPrice as sellingPrice,
+        i.itemId as itemId,
                     i.quantity as quantity,
                         i.reservedQuantity as reservedQuantity,
                             i.minStockLevel as minStockLevel,
                                 i.maxStockLevel as maxStockLevel
-             from WarehousePricingJpa wp join WarehouseJpa w on wp.warehouseId = w.warehouseId
-        left join InventoryJpa i on wp.warehouseId = i.warehouseId and wp.itemId = i.itemId
-            where wp.itemId in(:itemId) and wp.isActive= true
+             from InventoryJpa i join WarehouseJpa w on i.warehouseId = w.warehouseId
+            where i.itemId in(:itemId)
         """)
     List<WarehouseDetailProjection> getListOfWarehouseDetailsByItemIds(@Param("itemId")Set<Integer> itemIds);
 }

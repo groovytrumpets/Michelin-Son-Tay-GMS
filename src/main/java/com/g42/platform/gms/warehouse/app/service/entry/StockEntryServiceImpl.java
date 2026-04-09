@@ -15,6 +15,7 @@ import com.g42.platform.gms.warehouse.domain.repository.InventoryTransactionRepo
 import com.g42.platform.gms.warehouse.domain.repository.StockEntryRepo;
 import com.g42.platform.gms.warehouse.domain.repository.WarehouseAttachmentRepo;
 import com.g42.platform.gms.warehouse.infrastructure.entity.*;
+import com.g42.platform.gms.warehouse.infrastructure.repository.StockEntryJpaRepo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -25,6 +26,7 @@ import org.springframework.web.server.ResponseStatusException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -48,6 +50,7 @@ public class StockEntryServiceImpl implements StockEntryService {
     private final WarehouseAttachmentRepo attachmentRepo;
     private final ObjectMapper objectMapper = new ObjectMapper()
             .findAndRegisterModules(); // hỗ trợ LocalDate
+    private final StockEntryJpaRepo stockEntryJpaRepo;
 
     @Override
     @Transactional(readOnly = true)
@@ -276,6 +279,11 @@ public class StockEntryServiceImpl implements StockEntryService {
         entry.setConfirmedAt(LocalDateTime.now());
 
         return toResponse(stockEntryRepo.save(entry));
+    }
+
+    @Override
+    public BigDecimal findLatesFallBackPrice(Integer itemId, Integer warehouseId) {
+        return stockEntryJpaRepo.findLatesFallBackPrice(itemId,warehouseId);
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────

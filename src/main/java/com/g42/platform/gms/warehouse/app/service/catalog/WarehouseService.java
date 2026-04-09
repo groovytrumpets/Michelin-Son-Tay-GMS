@@ -5,6 +5,7 @@ import com.g42.platform.gms.warehouse.api.dto.CatalogSummaryDto;
 import com.g42.platform.gms.warehouse.api.dto.CatalogWarehouseDto;
 import com.g42.platform.gms.warehouse.api.dto.WarehouseDetailDto;
 import com.g42.platform.gms.warehouse.api.mapper.CatalogDtoMapper;
+import com.g42.platform.gms.warehouse.app.service.pricing.PricingService;
 import com.g42.platform.gms.warehouse.domain.entity.Brand;
 import com.g42.platform.gms.warehouse.domain.entity.CatalogItem;
 import com.g42.platform.gms.warehouse.domain.entity.ProductLine;
@@ -33,6 +34,8 @@ public class WarehouseService {
     private CatalogItemService catalogItemService;
     @Autowired
     private CatalogDtoMapper catalogDtoMapper;
+    @Autowired
+    private PricingService  pricingService;
 
 
     public Page<CatalogSummaryDto> getListItems(int page, int size, CatalogItemType itemType, Boolean isActive, String search, Integer brand, Integer productLine, String categoryCode, BigDecimal minPrice, BigDecimal maxPrice, String sortBy) {
@@ -129,6 +132,18 @@ public class WarehouseService {
             }
             List<WarehouseDetailDto> details = itemWarehouseMap.getOrDefault(catalogItem.getItemId(), new ArrayList<>());
             dto.setWarehouseDetails(details);
+            for (WarehouseDetailDto detail : details) {
+                // Gọi PricingService, truyền sẵn Lớp 1 (detail.getSellingPrice())
+                // và Lớp 2 (catalogItem.getPrice()) vào để tối ưu hiệu năng.
+                BigDecimal effectivePrice = pricingService.getEffectivePrice(
+                        catalogItem.getItemId(),
+                        detail.getWarehouseId(),
+                        catalogItem.getPrice()
+                );
+
+                // Set giá trị cuối cùng vào DTO (Bạn nhớ thêm thuộc tính effectivePrice vào WarehouseDetailDto nhé)
+                detail.setSellingPrice(effectivePrice);
+            }
             return dto;
         });
     }

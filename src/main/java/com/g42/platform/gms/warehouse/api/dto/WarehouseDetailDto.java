@@ -20,7 +20,6 @@ public class WarehouseDetailDto {
     private String warehouseName;
     private String warehouseAddress;
     private Integer itemId;
-
     private BigDecimal sellingPrice;
 
 
