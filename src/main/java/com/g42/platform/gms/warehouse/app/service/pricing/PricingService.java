@@ -30,21 +30,31 @@ public class PricingService {
     public BigDecimal getEffectivePrice(Integer itemId, Integer warehouseId, BigDecimal price) {
         //warehousePricing
         WarehousePricingJpa warehousePricing = warehousePricingJpaRepo.getWarehousePricingJpaByItemIdAndWarehouseId(itemId, warehouseId);
+//        System.out.println("Debug: " + itemId + ", " + warehousePricing);
         if (warehousePricing!=null && warehousePricing.getSellingPrice().compareTo(BigDecimal.ZERO) > 0) {
             System.out.println("FILTER1");
             return warehousePricing.getSellingPrice();
         }
 
         //catalogPrice
-        if (price!=null&&price.compareTo(BigDecimal.ZERO) > 0) {
+        CatalogSummaryDto catalogSummaryDto = null;
+        if (price!=null && price.compareTo(BigDecimal.ZERO) > 0) {
+            return price;
+        }else {
+            catalogSummaryDto = catalogDtoMapper.toSumaryDto(catalogItemRepo.getCatalogItemById(itemId));
+        }
+        if (catalogSummaryDto!=null&&catalogSummaryDto.getPrice()!=null
+                &&catalogSummaryDto.getPrice().compareTo(BigDecimal.ZERO) > 0) {
             System.out.println("FILTER2");
-        return price;
+        return catalogSummaryDto.getPrice();
         }
 
         //2 way above null
-        BigDecimal finalPrice = BigDecimal.ZERO;
-        finalPrice = stockEntryService.findLatesFallBackPrice(itemId,warehouseId);
+        BigDecimal finalPrice = stockEntryService.findLatesFallBackPrice(itemId,warehouseId);
         System.out.println("FILTER3:"+finalPrice);
+        if (finalPrice==null) {
+            finalPrice=BigDecimal.ZERO;
+        }
         return finalPrice;
     }
 }
