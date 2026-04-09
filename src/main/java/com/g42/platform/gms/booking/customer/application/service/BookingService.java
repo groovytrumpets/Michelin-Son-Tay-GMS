@@ -9,6 +9,7 @@ import com.g42.platform.gms.booking.customer.domain.entity.Booking;
 import com.g42.platform.gms.booking.customer.domain.enums.BookingStatus;
 import com.g42.platform.gms.booking.customer.domain.exception.BookingException;
 import com.g42.platform.gms.booking.customer.infrastructure.entity.CatalogItemJpaEntity;
+import com.g42.platform.gms.booking_management.api.internal.BookingManageInternalApi;
 import com.g42.platform.gms.common.enums.CodePrefix;
 import com.g42.platform.gms.common.exception.CodeGenerationException;
 import com.g42.platform.gms.booking.customer.domain.repository.BookingRepository;
@@ -74,6 +75,7 @@ public class BookingService {
 
     /** Cache để tracking rate limit (in-memory, sẽ reset khi restart server) */
     private final Map<String, RateLimitInfo> rateLimitCache = new ConcurrentHashMap<>();
+    private final BookingManageInternalApi bookingManageInternalApi;
 
     // ========================================
     // CREATE BOOKING - Tạo booking mới
@@ -192,6 +194,8 @@ public class BookingService {
 
         // === 8. SAVE BOOKING VÀO DATABASE ===
         booking.initializeDefaults();
+        Integer maxQueueOrder = bookingManageInternalApi.findLatestQueueByBookingReservation(booking);
+        booking.setQueueOrder(maxQueueOrder!=null?maxQueueOrder+1:1);
         Booking savedBooking = bookingRepository.save(booking);
 
         // === 9. RESERVE SLOT CHO BOOKING NÀY ===
@@ -309,6 +313,9 @@ public class BookingService {
         
         // === 6. SAVE BOOKING VÀO DATABASE ===
         booking.initializeDefaults();
+        Integer maxQueueOrder = bookingManageInternalApi.findLatestQueueByBookingReservation(booking);
+        booking.setQueueOrder(maxQueueOrder!=null?maxQueueOrder+1:1);
+        System.out.println("DEBUG: "+booking.getQueueOrder());
         Booking savedBooking = bookingRepository.save(booking);
         
         // === 7. RESERVE SLOT CHO BOOKING NÀY ===
