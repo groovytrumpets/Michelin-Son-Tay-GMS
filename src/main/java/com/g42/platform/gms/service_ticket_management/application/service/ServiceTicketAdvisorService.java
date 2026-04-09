@@ -34,84 +34,90 @@ public class ServiceTicketAdvisorService {
     private final TicketAssignmentService ticketAssignmentService;
 
 
-    /** Advisor bắt đầu dịch vụ sửa — DRAFT/INSPECTION → IN_PROGRESS.
-     * DRAFT: inspection đã hoàn thành (submit xong → về DRAFT), advisor start sửa
-     * INSPECTION: skip inspection, technician đang nhận xe/làm dịch vụ lẻ, advisor confirm start
+    /** Advisor duyệt báo giá, bắt đầu sửa — ESTIMATED/PENDING → REPAIRING.
+     * Theo diagram: ESTIMATED → REPAIRING (Approved), PENDING → REPAIRING (Service/part available)
      */
     @Transactional
     public ServiceTicketDetailResponse startService(String ticketCode, Integer staffId) {
         ServiceTicket ticket = findTicket(ticketCode);
         TicketStatus current = ticket.getTicketStatus();
-        if (current != TicketStatus.DRAFT && current != TicketStatus.INSPECTION) {
-            throw new CheckInException("Chỉ có thể bắt đầu dịch vụ khi phiếu đang DRAFT hoặc INSPECTION. Hiện tại: " + current);
+        if (current != TicketStatus.ESTIMATED && current != TicketStatus.PENDING) {
+            throw new CheckInException("Chỉ có thể bắt đầu sửa khi phiếu đang ESTIMATED hoặc PENDING. Hiện tại: " + current);
         }
-        ticket.setTicketStatus(TicketStatus.IN_PROGRESS);
+        ticket.setTicketStatus(TicketStatus.REPAIRING);
         ticket.setUpdatedAt(LocalDateTime.now());
         serviceTicketRepo.save(ticket);
 
         ticketAssignmentService.startWork(ticket.getServiceTicketId(), staffId);
 
-        log.info("Ticket {} → IN_PROGRESS (advisor start) from {} by staffId: {}", ticketCode, current, staffId);
+        log.info("Ticket {} → REPAIRING (advisor approved) from {} by staffId: {}", ticketCode, current, staffId);
         return manageService.getServiceTicketDetail(ticketCode);
     }
 
+    /** Advisor lập báo giá — INSPECTED → ESTIMATED. */
+    @Transactional
+    public ServiceTicketDetailResponse createEstimate(String ticketCode) {
+        ServiceTicket ticket = findTicket(ticketCode);
+        requireStatus(ticket, TicketStatus.INSPECTED);
+        ticket.setTicketStatus(TicketStatus.ESTIMATED);
+        ticket.setUpdatedAt(LocalDateTime.now());
+        serviceTicketRepo.save(ticket);
+        log.info("Ticket {} → ESTIMATED", ticketCode);
+        return manageService.getServiceTicketDetail(ticketCode);
+    }
 
-    /** Advisor báo chờ phụ tùng — IN_PROGRESS → PENDING. */
+    /** Advisor báo chờ phụ tùng/dịch vụ không khả dụng — CREATED/ESTIMATED → PENDING. */
     @Transactional
     public ServiceTicketDetailResponse waitForParts(String ticketCode) {
         ServiceTicket ticket = findTicket(ticketCode);
-        requireStatus(ticket, TicketStatus.IN_PROGRESS);
+        TicketStatus current = ticket.getTicketStatus();
+        if (current != TicketStatus.CREATED && current != TicketStatus.ESTIMATED) {
+            throw new CheckInException("Chỉ có thể chuyển PENDING từ CREATED hoặc ESTIMATED. Hiện tại: " + current);
+        }
         ticket.setTicketStatus(TicketStatus.PENDING);
         ticket.setUpdatedAt(LocalDateTime.now());
         serviceTicketRepo.save(ticket);
-        log.info("Ticket {} → PENDING (waiting for parts)", ticketCode);
+        log.info("Ticket {} → PENDING (service/part not available)", ticketCode);
         return manageService.getServiceTicketDetail(ticketCode);
     }
 
-
-    /** Advisor xác nhận có phụ tùng, tiếp tục sửa — PENDING → IN_PROGRESS. */
+    /** Advisor xác nhận có phụ tùng, tiếp tục sửa — PENDING → REPAIRING. */
     @Transactional
     public ServiceTicketDetailResponse resumeWork(String ticketCode) {
         ServiceTicket ticket = findTicket(ticketCode);
         requireStatus(ticket, TicketStatus.PENDING);
-        ticket.setTicketStatus(TicketStatus.IN_PROGRESS);
+        ticket.setTicketStatus(TicketStatus.REPAIRING);
         ticket.setUpdatedAt(LocalDateTime.now());
         serviceTicketRepo.save(ticket);
-        log.info("Ticket {} → IN_PROGRESS (parts available)", ticketCode);
+        log.info("Ticket {} → REPAIRING (parts available)", ticketCode);
         return manageService.getServiceTicketDetail(ticketCode);
     }
 
-
-    /** Advisor đưa về DRAFT để thêm dịch vụ vào báo giá — PENDING/IN_PROGRESS/INSPECTION → DRAFT. */
+    /** Khách yêu cầu thêm dịch vụ — REPAIRING → ESTIMATED (để advisor cập nhật báo giá). */
     @Transactional
-    public ServiceTicketDetailResponse backToDraft(String ticketCode) {
+    public ServiceTicketDetailResponse requestAddService(String ticketCode) {
         ServiceTicket ticket = findTicket(ticketCode);
-        TicketStatus current = ticket.getTicketStatus();
-        boolean canBackToDraft = current == TicketStatus.PENDING
-                || current == TicketStatus.IN_PROGRESS
-                || current == TicketStatus.INSPECTION;
-        if (!canBackToDraft) {
-            throw new CheckInException("Chỉ có thể đưa về DRAFT khi phiếu đang PENDING, IN_PROGRESS hoặc INSPECTION. Hiện tại: " + current);
-        }
-        ticket.setTicketStatus(TicketStatus.DRAFT);
+        requireStatus(ticket, TicketStatus.REPAIRING);
+        ticket.setTicketStatus(TicketStatus.ESTIMATED);
         ticket.setUpdatedAt(LocalDateTime.now());
         serviceTicketRepo.save(ticket);
-        log.info("Ticket {} → DRAFT from {} (add new estimate item)", ticketCode, current);
+        log.info("Ticket {} → ESTIMATED (customer request add service)", ticketCode);
         return manageService.getServiceTicketDetail(ticketCode);
     }
 
-
-    /** Hủy phiếu — DRAFT/PENDING/IN_PROGRESS → CANCELLED. */
+    /** Hủy phiếu — CREATED/PENDING/REPAIRING → CANCELLED. */
     @Transactional
     public ServiceTicketDetailResponse cancelTicket(String ticketCode) {
         ServiceTicket ticket = findTicket(ticketCode);
         TicketStatus current = ticket.getTicketStatus();
-        boolean canCancel = current == TicketStatus.DRAFT
+        boolean canCancel = current == TicketStatus.CREATED
                 || current == TicketStatus.PENDING
-                || current == TicketStatus.IN_PROGRESS
-                || current == TicketStatus.INSPECTION;
+                || current == TicketStatus.REPAIRING
+                || current == TicketStatus.INSPECTING
+                || current == TicketStatus.INSPECTED
+                || current == TicketStatus.ESTIMATED;
         if (!canCancel) {
-            throw new CheckInException("Chỉ có thể hủy khi phiếu đang DRAFT, INSPECTION, PENDING hoặc IN_PROGRESS. Hiện tại: " + current);
+            throw new CheckInException("Không thể hủy phiếu ở trạng thái: " + current);
         }
         ticket.setTicketStatus(TicketStatus.CANCELLED);
         ticket.setUpdatedAt(LocalDateTime.now());

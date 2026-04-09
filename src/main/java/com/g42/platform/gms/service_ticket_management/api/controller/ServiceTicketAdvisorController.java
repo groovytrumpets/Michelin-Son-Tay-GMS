@@ -99,10 +99,16 @@ public class ServiceTicketAdvisorController {
     }
 
 
-    /** PENDING/IN_PROGRESS → DRAFT: thêm dịch vụ mới vào báo giá. */
-    @PostMapping("/tickets/{ticketCode}/back-to-draft")
-    public ResponseEntity<ApiResponse<ServiceTicketDetailResponse>> backToDraft(@PathVariable String ticketCode) {
-        return ResponseEntity.ok(ApiResponses.success(advisorService.backToDraft(ticketCode)));
+    /** REPAIRING → ESTIMATED: khách yêu cầu thêm dịch vụ, advisor cập nhật báo giá. */
+    @PostMapping("/tickets/{ticketCode}/request-add-service")
+    public ResponseEntity<ApiResponse<ServiceTicketDetailResponse>> requestAddService(@PathVariable String ticketCode) {
+        return ResponseEntity.ok(ApiResponses.success(advisorService.requestAddService(ticketCode)));
+    }
+
+    /** INSPECTED → ESTIMATED: advisor lập báo giá sau khi kiểm tra xong. */
+    @PostMapping("/tickets/{ticketCode}/create-estimate")
+    public ResponseEntity<ApiResponse<ServiceTicketDetailResponse>> createEstimate(@PathVariable String ticketCode) {
+        return ResponseEntity.ok(ApiResponses.success(advisorService.createEstimate(ticketCode)));
     }
 
 

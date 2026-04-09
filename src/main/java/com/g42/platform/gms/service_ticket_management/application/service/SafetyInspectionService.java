@@ -105,7 +105,7 @@ public class SafetyInspectionService {
         ServiceTicket ticket = serviceTicketRepo.findByServiceTicketId(serviceTicketId);
         if (ticket == null) throw new IllegalArgumentException("Service ticket not found: " + serviceTicketId);
         ticket.setSafetyInspectionEnabled(true);
-        ticket.setTicketStatus(TicketStatus.DRAFT);
+        ticket.setTicketStatus(TicketStatus.CREATED);
         ticket.setUpdatedAt(LocalDateTime.now());
         serviceTicketRepo.save(ticket);
         return getInspectionByServiceTicket(serviceTicketId);
@@ -143,7 +143,7 @@ public class SafetyInspectionService {
 
         ServiceTicket ticket = serviceTicketRepo.findByServiceTicketId(serviceTicketId);
         if (ticket == null) throw new IllegalArgumentException("Service ticket not found: " + serviceTicketId);
-        ticket.setTicketStatus(TicketStatus.DRAFT);
+        ticket.setTicketStatus(TicketStatus.CREATED);
         ticket.setUpdatedAt(LocalDateTime.now());
         serviceTicketRepo.save(ticket);
 
@@ -151,14 +151,14 @@ public class SafetyInspectionService {
     }
 
 
-    /** Cho phép chỉnh phiếu kiểm tra khi ticket ở DRAFT hoặc INSPECTION */
+    /** Cho phép chỉnh phiếu kiểm tra khi ticket ở CREATED hoặc INSPECTING */
     private void requireTicketEditableForInspection(Integer serviceTicketId) {
         ServiceTicket ticket = serviceTicketRepo.findByServiceTicketId(serviceTicketId);
         if (ticket == null) throw new IllegalArgumentException("Service ticket not found: " + serviceTicketId);
         TicketStatus status = ticket.getTicketStatus();
-        if (status != TicketStatus.DRAFT && status != TicketStatus.INSPECTION) {
+        if (status != TicketStatus.CREATED && status != TicketStatus.INSPECTING) {
             throw new IllegalStateException(
-                    "Chi co the chinh sua phieu kiem tra khi ticket o DRAFT hoac INSPECTION. " +
+                    "Chi co the chinh sua phieu kiem tra khi ticket o CREATED hoac INSPECTING. " +
                             "Trang thai hien tai: " + status);
         }
     }
@@ -186,10 +186,10 @@ public class SafetyInspectionService {
         }
         updateTires(saved.getInspectionId(), expandTires(request.getTires()));
         updateItems(saved.getInspectionId(), request.getItems());
-        // Technician submit xong → ticket về DRAFT
+        // Technician submit xong → ticket về INSPECTED
         ServiceTicket ticket = serviceTicketRepo.findByServiceTicketId(request.getServiceTicketId());
-        if (ticket != null && ticket.getTicketStatus() == TicketStatus.INSPECTION) {
-            ticket.setTicketStatus(TicketStatus.DRAFT);
+        if (ticket != null && ticket.getTicketStatus() == TicketStatus.INSPECTING) {
+            ticket.setTicketStatus(TicketStatus.INSPECTED);
             ticket.setUpdatedAt(LocalDateTime.now());
             serviceTicketRepo.save(ticket);
         }
