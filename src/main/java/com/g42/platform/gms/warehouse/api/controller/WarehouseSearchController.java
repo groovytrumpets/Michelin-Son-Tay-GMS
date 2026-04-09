@@ -4,10 +4,7 @@ import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedRespond;
 import com.g42.platform.gms.booking_management.domain.enums.BookingEnum;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
-import com.g42.platform.gms.warehouse.api.dto.CatalogDetailDto;
-import com.g42.platform.gms.warehouse.api.dto.CatalogItemDto;
-import com.g42.platform.gms.warehouse.api.dto.CatalogSummaryDto;
-import com.g42.platform.gms.warehouse.api.dto.SpecificationDto;
+import com.g42.platform.gms.warehouse.api.dto.*;
 import com.g42.platform.gms.warehouse.api.mapper.CatalogDtoMapper;
 import com.g42.platform.gms.warehouse.app.service.catalog.CatalogItemService;
 import com.g42.platform.gms.warehouse.app.service.catalog.WarehouseService;
@@ -45,6 +42,23 @@ public class WarehouseSearchController {
                                                                             @RequestParam(required = false) String sortBy
                                                                             ){
         Page<CatalogSummaryDto> apiResponse = warehouseService.getListItems
+                (page,size,itemType,isActive,search,brand,productLine,categoryCode,minPrice,maxPrice,sortBy);
+        return ResponseEntity.ok(ApiResponses.success(apiResponse));
+    }
+    @GetMapping("/catalog-items-detail")
+    public ResponseEntity<ApiResponse<Page<CatalogWarehouseDto>>> getAllItemsDetail(@RequestParam(defaultValue = "0") int page,
+                                                                                    @RequestParam(defaultValue = "10") int size,
+                                                                                    @RequestParam(required = false) String search,
+                                                                                    @RequestParam(required = false) CatalogItemType itemType,
+                                                                                    @RequestParam(required = false) Boolean isActive,
+                                                                                    @RequestParam(required = false) Integer brand,
+                                                                                    @RequestParam(required = false) Integer productLine,
+                                                                                    @RequestParam(required = false) String categoryCode,
+                                                                                    @RequestParam(required = false) BigDecimal minPrice,
+                                                                                    @RequestParam(required = false) BigDecimal maxPrice,
+                                                                                    @RequestParam(required = false) String sortBy
+    ){
+        Page<CatalogWarehouseDto> apiResponse = warehouseService.getListItemsDetail
                 (page,size,itemType,isActive,search,brand,productLine,categoryCode,minPrice,maxPrice,sortBy);
         return ResponseEntity.ok(ApiResponses.success(apiResponse));
     }

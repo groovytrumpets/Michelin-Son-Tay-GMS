@@ -3,6 +3,7 @@ package com.g42.platform.gms.warehouse.infrastructure;
 import com.g42.platform.gms.warehouse.domain.entity.CatalogItem;
 import com.g42.platform.gms.warehouse.domain.entity.WarehousePricing;
 import com.g42.platform.gms.warehouse.domain.enums.CatalogItemType;
+import com.g42.platform.gms.warehouse.domain.repository.WarehouseDetailProjection;
 import com.g42.platform.gms.warehouse.domain.repository.WarehouseRepo;
 import com.g42.platform.gms.warehouse.infrastructure.entity.CatalogItemJpa;
 import com.g42.platform.gms.warehouse.infrastructure.mapper.*;
@@ -18,6 +19,8 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.Set;
 
 @Repository
 public class WarehouseRepoImpl implements WarehouseRepo {
@@ -70,5 +73,10 @@ public class WarehouseRepoImpl implements WarehouseRepo {
         }
             return catalogItemJpaRepo.findAll(specification, pageable)
                     .map(catalogItemJpaMapper::toDomain);
+    }
+
+    @Override
+    public List<WarehouseDetailProjection> getWarehouseDetailsByItemIds(Set<Integer> itemIds) {
+        return warehouseJpaRepo.getListOfWarehouseDetailsByItemIds(itemIds);
     }
 }
