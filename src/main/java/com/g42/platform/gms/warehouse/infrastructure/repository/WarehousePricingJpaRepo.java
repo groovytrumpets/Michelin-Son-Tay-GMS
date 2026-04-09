@@ -10,4 +10,6 @@ public interface WarehousePricingJpaRepo extends JpaRepository<WarehousePricingJ
     List<WarehousePricingJpa> findByWarehouseIdAndIsActiveTrueOrderByItemId(Integer warehouseId);
 
     java.util.Optional<WarehousePricingJpa> findByWarehouseIdAndItemIdAndIsActiveTrue(Integer warehouseId, Integer itemId);
+
+    WarehousePricingJpa getWarehousePricingJpaByItemIdAndWarehouseId(Integer itemId, Integer warehouseId);
 }
