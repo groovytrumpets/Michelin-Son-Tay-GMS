@@ -33,5 +33,6 @@ public class CatalogWarehouseDto {
     private Integer taxRuleId;
     private String partNumber;
     private String barcode;
+    private String color;
     private List<WarehouseDetailDto> warehouseDetails;
 }

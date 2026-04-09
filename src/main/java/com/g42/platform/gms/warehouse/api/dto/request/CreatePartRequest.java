@@ -24,7 +24,7 @@ public class CreatePartRequest {
     private String unit;
     private String description;
     private String madeIn;
-
+    private String color;
     /** work_category_id — mặc định 1 nếu không truyền */
     private Integer workCategoryId = 1;
 

@@ -19,4 +19,5 @@ public class PartResponse {
     private Integer brandId;
     private Integer productLineId;
     private Boolean isActive;
+    private String color;
 }
