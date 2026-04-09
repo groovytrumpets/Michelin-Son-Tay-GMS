@@ -32,4 +32,5 @@ public class CatalogSummaryDto {
     private Integer taxRuleId;
     private String partNumber;
     private String barcode;
+    private String color;
 }
