@@ -48,7 +48,7 @@ public class ServiceTicket {
             createdAt = LocalDateTime.now();
         }
         if (ticketStatus == null) {
-            ticketStatus = TicketStatus.DRAFT;  // Start as DRAFT, complete check-in will change to CREATED
+            ticketStatus = TicketStatus.CREATED;
         }
         if (immutable == null) {
             immutable = false;

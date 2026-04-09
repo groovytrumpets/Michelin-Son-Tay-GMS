@@ -278,8 +278,8 @@ public class ServiceTicketManageService {
         ServiceTicket ticket = serviceTicketRepo.findByTicketCode(ticketCode)
                 .orElseThrow(() -> new CheckInException("Không tìm thấy service ticket: " + ticketCode));
 
-        if (ticket.getTicketStatus() != TicketStatus.DRAFT) {
-            throw new CheckInException("Lễ tân chỉ được đổi advisor khi phiếu đang DRAFT. Hiện tại: " + ticket.getTicketStatus());
+        if (ticket.getTicketStatus() != TicketStatus.CREATED) {
+            throw new CheckInException("Lễ tân chỉ được đổi advisor khi phiếu đang CREATED. Hiện tại: " + ticket.getTicketStatus());
         }
 
         // Delegate sang TicketAssignmentService — sẽ validate advisor PENDING bên trong
