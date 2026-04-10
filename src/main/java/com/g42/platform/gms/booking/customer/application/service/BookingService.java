@@ -13,7 +13,7 @@ import com.g42.platform.gms.common.enums.CodePrefix;
 import com.g42.platform.gms.common.exception.CodeGenerationException;
 import com.g42.platform.gms.booking.customer.domain.repository.BookingRepository;
 import com.g42.platform.gms.booking.customer.domain.repository.IpBlacklistRepository;
-import com.g42.platform.gms.catalog.repository.CatalogItemRepository;
+import com.g42.platform.gms.catalog.infrastructure.repository.CatalogItemRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -70,7 +70,7 @@ public class BookingService {
     private final SlotService slotService;
     private final IpBlacklistRepository ipBlacklistRepository;
     private final BookingCodeGenerator bookingCodeGenerator;
-    private final com.g42.platform.gms.catalog.repository.ComboItemRepository comboItemRepository;
+    private final com.g42.platform.gms.catalog.infrastructure.repository.ComboItemRepository comboItemRepository;
 
     /** Cache để tracking rate limit (in-memory, sẽ reset khi restart server) */
     private final Map<String, RateLimitInfo> rateLimitCache = new ConcurrentHashMap<>();

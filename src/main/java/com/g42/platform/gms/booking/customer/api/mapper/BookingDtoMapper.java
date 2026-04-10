@@ -6,7 +6,7 @@ import com.g42.platform.gms.booking.customer.api.dto.ServiceItemDto;
 import com.g42.platform.gms.booking.customer.domain.entity.Booking;
 import com.g42.platform.gms.booking.customer.domain.enums.BookingStatus;
 import com.g42.platform.gms.booking.customer.infrastructure.entity.CatalogItemJpaEntity;
-import com.g42.platform.gms.catalog.repository.CatalogItemRepository;
+import com.g42.platform.gms.catalog.infrastructure.repository.CatalogItemRepository;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
 import com.g42.platform.gms.service_ticket_management.infrastructure.repository.ServiceTicketRepository;

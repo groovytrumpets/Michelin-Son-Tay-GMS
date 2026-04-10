@@ -6,7 +6,7 @@ import com.g42.platform.gms.auth.repository.CustomerProfileRepository;
 import com.g42.platform.gms.auth.repository.StaffProfileRepo;
 import com.g42.platform.gms.booking.customer.domain.entity.Booking;
 import com.g42.platform.gms.booking.customer.domain.repository.BookingRepository;
-import com.g42.platform.gms.catalog.repository.CatalogItemRepository;
+import com.g42.platform.gms.catalog.infrastructure.repository.CatalogItemRepository;
 import com.g42.platform.gms.service_ticket_management.api.dto.technician.TechnicianTicketDetailResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.technician.TechnicianTicketListResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.technician.UpdateTechnicianNotesRequest;

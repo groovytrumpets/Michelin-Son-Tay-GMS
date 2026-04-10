@@ -6,7 +6,7 @@ import com.g42.platform.gms.booking.customer.application.service.BookingService;
 import com.g42.platform.gms.booking.customer.domain.entity.Booking;
 import com.g42.platform.gms.booking.customer.domain.enums.BookingStatus;
 import com.g42.platform.gms.booking.customer.domain.repository.BookingRepository;
-import com.g42.platform.gms.catalog.repository.CatalogItemRepository;
+import com.g42.platform.gms.catalog.infrastructure.repository.CatalogItemRepository;
 import com.g42.platform.gms.common.constant.FileUploadConstants;
 import com.g42.platform.gms.common.service.ImageUploadService;
 import com.g42.platform.gms.service_ticket_management.api.dto.assign.AssignStaffDto;
