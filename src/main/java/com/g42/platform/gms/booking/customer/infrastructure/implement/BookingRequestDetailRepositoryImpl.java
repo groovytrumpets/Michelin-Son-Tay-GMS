@@ -8,7 +8,7 @@ import com.g42.platform.gms.booking.customer.infrastructure.entity.CatalogItemJp
 import com.g42.platform.gms.booking.customer.infrastructure.repository.BookingRequestDetailJpaRepository;
 import com.g42.platform.gms.booking.customer.infrastructure.repository.BookingRequestJpaRepository;
 import com.g42.platform.gms.booking.customer.infrastructure.mapper.BookingRequestDetailMapper;
-import com.g42.platform.gms.catalog.repository.CatalogItemRepository;
+import com.g42.platform.gms.catalog.infrastructure.repository.CatalogItemRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 

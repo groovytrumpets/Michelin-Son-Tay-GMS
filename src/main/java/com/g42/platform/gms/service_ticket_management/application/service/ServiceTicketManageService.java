@@ -8,7 +8,7 @@ import com.g42.platform.gms.auth.repository.CustomerProfileRepository;
 import com.g42.platform.gms.auth.repository.StaffProfileRepo;
 import com.g42.platform.gms.booking.customer.domain.entity.Booking;
 import com.g42.platform.gms.booking.customer.domain.repository.BookingRepository;
-import com.g42.platform.gms.catalog.repository.CatalogItemRepository;
+import com.g42.platform.gms.catalog.infrastructure.repository.CatalogItemRepository;
 import com.g42.platform.gms.common.service.ExcelService;
 import com.g42.platform.gms.estimation.api.internal.EstimateInternalApi;
 import com.g42.platform.gms.estimation.domain.entity.Estimate;
