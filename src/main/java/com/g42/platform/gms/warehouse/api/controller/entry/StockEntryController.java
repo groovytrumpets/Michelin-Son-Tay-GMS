@@ -9,8 +9,12 @@ import com.g42.platform.gms.warehouse.api.dto.response.StockEntryResponse;
 import com.g42.platform.gms.warehouse.app.service.entry.StockEntryService;
 import com.g42.platform.gms.warehouse.api.dto.request.PatchEntryItemRequest;
 import com.g42.platform.gms.warehouse.api.dto.request.UpdateStockEntryRequest;
+import com.g42.platform.gms.warehouse.api.dto.response.StockEntryImportResponse;
+import com.g42.platform.gms.warehouse.app.service.entry.StockEntryExcelService;
 import com.g42.platform.gms.warehouse.domain.enums.StockEntryStatus;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -27,6 +31,7 @@ import java.util.List;
 public class StockEntryController {
 
     private final StockEntryService stockEntryService;
+    private final StockEntryExcelService excelService;
 
     @GetMapping
     @PreAuthorize("isAuthenticated()")
@@ -106,5 +111,95 @@ public class StockEntryController {
             @AuthenticationPrincipal StaffPrincipal principal) {
         return ResponseEntity.ok(ApiResponses.success(
                 stockEntryService.confirm(id, principal.getStaffId())));
+    }
+
+    // ── Excel ──────────────────────────────────────────────────────────────
+
+    /**
+     * Xuất danh sách phiếu nhập kho ra Excel.
+     * GET /api/warehouse/stock-entries/excel/export?warehouseId=1
+     */
+    @GetMapping("/excel/export")
+    @PreAuthorize("hasAnyRole('WAREHOUSE_KEEPER','MANAGER','ADMIN','ACCOUNTANT')")
+    public ResponseEntity<byte[]> exportStockEntries(
+            @RequestParam Integer warehouseId,
+            @RequestParam(required = false) StockEntryStatus status) {
+
+        List<StockEntryResponse> entries = stockEntryService.listByWarehouse(warehouseId, status);
+
+        String[] headers = {"STT", "Mã phiếu", "Nhà cung cấp", "Ngày nhập",
+                "Trạng thái", "Số loại hàng", "Ghi chú", "Ngày tạo"};
+        int[] stt = {1};
+        byte[] bytes = com.g42.platform.gms.common.service.ExcelService.exportToExcel(entries, headers, e -> new Object[]{
+                stt[0]++,
+                e.getEntryCode(),
+                e.getSupplierName(),
+                e.getEntryDate() != null ? e.getEntryDate().toString() : "",
+                e.getStatus() != null ? e.getStatus().name() : "",
+                e.getItems() != null ? e.getItems().size() : 0,
+                e.getNotes() != null ? e.getNotes() : "",
+                e.getCreatedAt() != null ? e.getCreatedAt().toString() : ""
+        });
+
+        return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"stock-entries.xlsx\"")
+                .contentType(org.springframework.http.MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(bytes);
+    }
+
+    /**
+     * Tải về file Excel mẫu để nhập kho.
+     * GET /api/warehouse/stock-entries/excel/template
+     */
+    @GetMapping("/excel/template")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<byte[]> downloadTemplate() {
+        byte[] bytes = excelService.downloadTemplate();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"stock-entry-template.xlsx\"")
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(bytes);
+    }
+
+    /**
+     * Tải về danh sách tất cả PART trong catalog (để tham khảo SKU khi điền phiếu nhập).
+     * GET /api/warehouse/stock-entries/excel/catalog
+     */
+    @GetMapping("/excel/catalog")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<byte[]> downloadCatalog() {
+        byte[] bytes = excelService.exportCatalogTemplate();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"catalog-parts.xlsx\"")
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(bytes);
+    }
+
+    /**
+     * Import phiếu nhập kho từ file Excel.
+     * POST /api/warehouse/stock-entries/excel/import
+     * Content-Type: multipart/form-data
+     * Params: file, warehouseId, supplierName
+     */
+    @PostMapping(value = "/excel/import", consumes = "multipart/form-data")
+    @PreAuthorize("hasAnyRole('WAREHOUSE_KEEPER','MANAGER','ADMIN')")
+    public ResponseEntity<ApiResponse<StockEntryImportResponse>> importFromExcel(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam Integer warehouseId,
+            @RequestParam String supplierName,
+            @AuthenticationPrincipal StaffPrincipal principal) {
+
+        StockEntryExcelService.StockEntryImportResult result =
+                excelService.importStockEntry(file, warehouseId, supplierName, principal.getStaffId());
+
+        StockEntryImportResponse response = new StockEntryImportResponse();
+        response.setEntry(result.entry());
+        response.setImportedCount(result.importedCount());
+        response.setErrors(result.errors());
+        response.setHasErrors(!result.errors().isEmpty());
+
+        return ResponseEntity.ok(ApiResponses.success(response));
     }
 }

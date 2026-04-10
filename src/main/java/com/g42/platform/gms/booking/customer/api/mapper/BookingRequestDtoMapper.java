@@ -4,7 +4,7 @@ import com.g42.platform.gms.booking.customer.api.dto.BookingRequestResponse;
 import com.g42.platform.gms.booking.customer.api.dto.ServiceItemDto;
 import com.g42.platform.gms.booking.customer.domain.entity.BookingRequest;
 import com.g42.platform.gms.booking.customer.infrastructure.entity.CatalogItemJpaEntity;
-import com.g42.platform.gms.catalog.repository.CatalogItemRepository;
+import com.g42.platform.gms.catalog.infrastructure.repository.CatalogItemRepository;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.AfterMapping;
