@@ -40,8 +40,18 @@ public class StockAllocationRepoImpl implements StockAllocationRepository {
 
     @Override
     public void save(StockAllocation stockAllocationNew) {
-        StockAllocationJpa stockAllocationJpa = stockAllocationJpaMapper.fromDomain(stockAllocationNew);
+        if (stockAllocationNew.getAllocationId() != null) {
+
+        StockAllocationJpa stockAllocationJpa = stockAllocationRepositoryJpa.getStockAllocationJpaByAllocationId(stockAllocationNew.getAllocationId());
+        if (stockAllocationJpa == null) {
+            new RuntimeException("Không tìm thấy Allocation ID:"+stockAllocationNew.getAllocationId());
+        }
+        stockAllocationJpa.setQuantity(stockAllocationNew.getQuantity());
         stockAllocationRepositoryJpa.save(stockAllocationJpa);
+        }else {
+            StockAllocationJpa stockAllocationJpa = stockAllocationJpaMapper.fromDomain(stockAllocationNew);
+            stockAllocationRepositoryJpa.save(stockAllocationJpa);
+        }
     }
 
     @Override

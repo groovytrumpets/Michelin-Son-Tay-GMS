@@ -156,7 +156,7 @@ public class InventoryServiceImpl implements InventoryService {
         inventoryJpa.setReservedQuantity(Math.max(0, newReserved));
         inventoryJpaRepo.save(inventoryJpa);
     }
-    private InventoryJpa getInventorySafe(Integer warehouseId, Integer itemId) {
+    private InventoryJpa getInventorySafe(Integer itemId, Integer warehouseId) {
         InventoryJpa inventory = inventoryJpaRepo.getInventoryJpaByWarehouseIdAndItemId(warehouseId, itemId);
         if (inventory == null) {
             throw new WarehouseException("Couldn't find Item ID: " + itemId + " warehouse ID: " + warehouseId, WarehouseErrorCode.CATALOG_404);
