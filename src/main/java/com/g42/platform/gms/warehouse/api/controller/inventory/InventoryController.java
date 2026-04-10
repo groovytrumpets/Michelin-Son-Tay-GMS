@@ -4,12 +4,19 @@ import com.g42.platform.gms.auth.entity.StaffPrincipal;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.warehouse.api.dto.response.InventoryResponse;
+import com.g42.platform.gms.warehouse.app.service.inventory.InventoryExcelService;
 import com.g42.platform.gms.warehouse.app.service.inventory.InventoryService;
+import com.g42.platform.gms.warehouse.infrastructure.entity.StockEntryItemJpa;
+import com.g42.platform.gms.warehouse.infrastructure.repository.StockEntryItemJpaRepo;
+import com.g42.platform.gms.warehouse.infrastructure.repository.StockEntryJpaRepo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
 
 import java.util.List;
 
@@ -19,6 +26,9 @@ import java.util.List;
 public class InventoryController {
 
     private final InventoryService inventoryService;
+    private final InventoryExcelService inventoryExcelService;
+    private final StockEntryItemJpaRepo stockEntryItemJpaRepo;
+    private final StockEntryJpaRepo stockEntryJpaRepo;
 
     /**
      * Danh sách tồn kho theo kho — phân quyền field theo role:
@@ -80,12 +90,148 @@ public class InventoryController {
                 inventoryService.listAllPartsWithInventory(warehouseId, showImportPrice)));
     }
 
+    /**
+     * Xuất tồn kho ra Excel.
+     * GET /api/warehouse/inventory/{warehouseId}/export
+     */
+    @GetMapping("/{warehouseId}/export")
+    @PreAuthorize("hasAnyRole('WAREHOUSE_KEEPER','MANAGER','ADMIN','ACCOUNTANT')")
+    public ResponseEntity<byte[]> exportInventory(
+            @PathVariable Integer warehouseId,
+            @AuthenticationPrincipal StaffPrincipal principal) {
+        boolean showImportPrice = hasAnyRole(principal, "ACCOUNTANT", "MANAGER", "ADMIN");
+        boolean showSellingPrice = hasAnyRole(principal, "ADVISOR", "ACCOUNTANT", "MANAGER", "ADMIN", "WAREHOUSE_KEEPER");
+
+        List<InventoryResponse> data = inventoryService.listByWarehouse(warehouseId, showImportPrice, showSellingPrice);
+
+        String[] headers = {"STT", "Item ID", "Tên phụ tùng", "SKU", "Đơn vị",
+                "Tồn kho", "Đang giữ", "Khả dụng", "Giá bán", "Giá nhập"};
+        int[] stt = {1};
+        byte[] bytes = com.g42.platform.gms.common.service.ExcelService.exportToExcel(data, headers, inv -> new Object[]{
+                stt[0]++,
+                inv.getItemId(),
+                inv.getItemName() != null ? inv.getItemName() : "",
+                inv.getSku() != null ? inv.getSku() : "",
+                inv.getUnit() != null ? inv.getUnit() : "",
+                inv.getQuantity(),
+                inv.getReservedQuantity(),
+                inv.getAvailableQuantity(),
+                inv.getSellingPrice() != null ? inv.getSellingPrice() : "",
+                inv.getImportPrice() != null ? inv.getImportPrice() : ""
+        });
+
+        return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"inventory-warehouse-" + warehouseId + ".xlsx\"")
+                .contentType(org.springframework.http.MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(bytes);
+    }
+
+    /**
+     * Export tồn kho ra Excel để chỉnh sửa rồi import lại (sync mode).
+     * GET /api/warehouse/inventory/{warehouseId}/excel/sync-template
+     */
+    @GetMapping("/{warehouseId}/excel/sync-template")
+    @PreAuthorize("hasAnyRole('WAREHOUSE_KEEPER','MANAGER','ADMIN')")
+    public ResponseEntity<byte[]> exportForSync(@PathVariable Integer warehouseId) {
+        byte[] bytes = inventoryExcelService.exportForSync(warehouseId);
+        return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"inventory-sync-" + warehouseId + ".xlsx\"")
+                .contentType(org.springframework.http.MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(bytes);
+    }
+
+    /**
+     * Import/upsert tồn kho từ Excel của T3 (full sync snapshot).
+     * Upsert catalog_item + inventory + stock_entry_item (FIFO).
+     * POST /api/warehouse/inventory/{warehouseId}/excel/sync
+     */
+    @PostMapping(value = "/{warehouseId}/excel/sync", consumes = "multipart/form-data")
+    @PreAuthorize("hasAnyRole('WAREHOUSE_KEEPER','MANAGER','ADMIN')")
+    public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> syncInventory(
+            @PathVariable Integer warehouseId,
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file,
+            @AuthenticationPrincipal StaffPrincipal principal) {
+        InventoryExcelService.SyncResult result =
+                inventoryExcelService.syncFromT3Excel(file, warehouseId, principal.getStaffId());
+        java.util.Map<String, Object> resp = java.util.Map.of(
+                "syncEntryId", result.syncEntryId(),
+                "inventoryUpdated", result.inventoryUpdated(),
+                "inventoryInserted", result.inventoryInserted(),
+                "errors", result.errors(),
+                "hasErrors", !result.errors().isEmpty()
+        );
+        return ResponseEntity.ok(ApiResponses.success(resp));
+    }
+
+    /**
+     * Xem danh sách lô FIFO của 1 item trong kho.
+     * Hiển thị: lô nào còn hàng, giá nhập, markup, số lượng còn lại.
+     * GET /api/warehouse/inventory/{warehouseId}/{itemId}/lots
+     */
+    @GetMapping("/{warehouseId}/{itemId}/lots")
+    @PreAuthorize("hasAnyRole('WAREHOUSE_KEEPER','MANAGER','ADMIN','ACCOUNTANT')")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getLots(
+            @PathVariable Integer warehouseId,
+            @PathVariable Integer itemId) {
+
+        List<StockEntryItemJpa> lots = stockEntryItemJpaRepo.findFifoLots(warehouseId, itemId);
+        List<Map<String, Object>> result = lots.stream().map(lot -> {
+            var entry = stockEntryJpaRepo.findById(lot.getEntryId()).orElse(null);
+            return Map.<String, Object>of(
+                    "entryItemId",        lot.getEntryItemId(),
+                    "entryId",            lot.getEntryId(),
+                    "entryCode",          entry != null ? entry.getEntryCode() : "",
+                    "entryDate",          entry != null && entry.getEntryDate() != null ? entry.getEntryDate().toString() : "",
+                    "supplierName",       entry != null && entry.getSupplierName() != null ? entry.getSupplierName() : "",
+                    "quantity",           lot.getQuantity(),
+                    "remainingQuantity",  lot.getRemainingQuantity(),
+                    "importPrice",        lot.getImportPrice(),
+                    "markupMultiplier",   lot.getMarkupMultiplier(),
+                    "notes",              lot.getNotes() != null ? lot.getNotes() : ""
+            );
+        }).toList();
+
+        return ResponseEntity.ok(ApiResponses.success(result));
+    }
+
+    /**
+     * Xem tất cả lô còn hàng trong kho (tất cả item).
+     * Dùng để kiểm tra tổng quan FIFO.
+     * GET /api/warehouse/inventory/{warehouseId}/lots
+     */
+    @GetMapping("/{warehouseId}/lots")
+    @PreAuthorize("hasAnyRole('WAREHOUSE_KEEPER','MANAGER','ADMIN','ACCOUNTANT')")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getAllLots(
+            @PathVariable Integer warehouseId) {
+
+        List<StockEntryItemJpa> lots = stockEntryItemJpaRepo.findActiveLotsByWarehouse(warehouseId);
+        List<Map<String, Object>> result = lots.stream().map(lot -> {
+            var entry = stockEntryJpaRepo.findById(lot.getEntryId()).orElse(null);
+            return Map.<String, Object>of(
+                    "entryItemId",        lot.getEntryItemId(),
+                    "entryId",            lot.getEntryId(),
+                    "entryCode",          entry != null ? entry.getEntryCode() : "",
+                    "entryDate",          entry != null && entry.getEntryDate() != null ? entry.getEntryDate().toString() : "",
+                    "itemId",             lot.getItemId(),
+                    "quantity",           lot.getQuantity(),
+                    "remainingQuantity",  lot.getRemainingQuantity(),
+                    "importPrice",        lot.getImportPrice(),
+                    "markupMultiplier",   lot.getMarkupMultiplier()
+            );
+        }).toList();
+
+        return ResponseEntity.ok(ApiResponses.success(result));
+    }
+
     private boolean hasAnyRole(StaffPrincipal principal, String... roles) {
         if (principal == null) return false;
         return principal.getAuthorities().stream()
                 .anyMatch(a -> {
                     for (String role : roles) {
-                        // authorities có prefix ROLE_
                         if (a.getAuthority().equals("ROLE_" + role)) return true;
                     }
                     return false;

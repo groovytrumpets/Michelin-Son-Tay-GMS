@@ -12,7 +12,7 @@ import com.g42.platform.gms.booking.customer.domain.exception.BookingException;
 import com.g42.platform.gms.booking.customer.domain.repository.BookingRequestDetailRepository;
 import com.g42.platform.gms.booking.customer.domain.repository.BookingRequestRepository;
 import com.g42.platform.gms.booking.customer.domain.repository.IpBlacklistRepository;
-import com.g42.platform.gms.catalog.repository.CatalogItemRepository;
+import com.g42.platform.gms.catalog.infrastructure.repository.CatalogItemRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

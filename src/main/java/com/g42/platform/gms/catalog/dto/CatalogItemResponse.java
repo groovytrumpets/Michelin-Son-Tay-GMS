@@ -1,4 +1,4 @@
-package com.g42.platform.gms.catalog.api.dto;
+package com.g42.platform.gms.catalog.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
