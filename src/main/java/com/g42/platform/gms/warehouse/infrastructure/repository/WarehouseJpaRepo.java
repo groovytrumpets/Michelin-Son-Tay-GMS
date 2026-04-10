@@ -36,7 +36,7 @@ public interface WarehouseJpaRepo extends JpaRepository<WarehouseJpa,Integer> {
             w.warehouseName as warehouseName,
                 w.address as warehouseAddress,
         i.itemId as itemId,
-                    i.quantity as quantity,
+                    i.quantity - i.reservedQuantity as quantity,
                         i.reservedQuantity as reservedQuantity,
                             i.minStockLevel as minStockLevel,
                                 i.maxStockLevel as maxStockLevel

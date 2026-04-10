@@ -24,4 +24,6 @@ public interface InventoryJpaRepo extends JpaRepository<InventoryJpa, Integer> {
 
     @Query("SELECT i FROM InventoryJpa i WHERE i.warehouseId = :warehouseId AND (i.quantity - i.reservedQuantity) <= i.minStockLevel")
     List<InventoryJpa> findLowStockByWarehouse(@Param("warehouseId") Integer warehouseId);
+
+    InventoryJpa getInventoryJpaByWarehouseIdAndItemId(Integer warehouseId, Integer itemId);
 }

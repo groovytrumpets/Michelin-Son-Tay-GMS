@@ -7,4 +7,6 @@ public interface WarehouseInternalApi {
     CatalogItemDto getItemInfo(Integer itemId);
 
     void updateCatalogBlogService(Service serviceSaved, Integer catalogId);
+
+    void updateInventoryEstimateAllocation(Integer itemId, Integer warehouseId,Integer quantity);
 }

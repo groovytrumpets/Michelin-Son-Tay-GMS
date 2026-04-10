@@ -7,4 +7,6 @@ import org.mapstruct.Mapper;
 @Mapper(componentModel = "spring")
 public interface StockAllocationDtoMapper {
     StockAllocationDto toDto(StockAllocation stockAllocation);
+
+    StockAllocation toDomain(StockAllocationDto dto);
 }
