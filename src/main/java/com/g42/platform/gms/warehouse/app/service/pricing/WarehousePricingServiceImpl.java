@@ -5,6 +5,7 @@ import com.g42.platform.gms.warehouse.api.dto.response.PricingResponse;
 import com.g42.platform.gms.warehouse.domain.repository.PartCatalogRepo;
 import com.g42.platform.gms.warehouse.domain.repository.WarehousePricingRepo;
 import com.g42.platform.gms.warehouse.infrastructure.entity.WarehousePricingJpa;
+import com.g42.platform.gms.warehouse.infrastructure.mapper.WarehousePricingJpaMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -25,6 +26,7 @@ public class WarehousePricingServiceImpl implements WarehousePricingService {
 
     private final WarehousePricingRepo pricingRepo;
     private final PartCatalogRepo partCatalogRepo;
+    private final WarehousePricingJpaMapper warehousePricingJpaMapper;
 
     @Override
     @Transactional(readOnly = true)

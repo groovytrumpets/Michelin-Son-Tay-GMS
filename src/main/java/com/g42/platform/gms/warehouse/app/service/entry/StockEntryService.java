@@ -9,6 +9,7 @@ import com.g42.platform.gms.warehouse.domain.enums.StockEntryStatus;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.List;
 
 public interface StockEntryService {
@@ -39,4 +40,6 @@ public interface StockEntryService {
 
     /** Xác nhận phiếu nhập → cộng current_quantity, cập nhật import_price, ghi audit log */
     StockEntryResponse confirm(Integer entryId, Integer staffId);
+
+    BigDecimal findLatesFallBackPrice(Integer itemId, Integer warehouseId);
 }

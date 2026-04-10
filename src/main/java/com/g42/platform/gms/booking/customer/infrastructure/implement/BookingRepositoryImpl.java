@@ -36,11 +36,13 @@ public class BookingRepositoryImpl implements BookingRepository {
             CustomerProfile customer = customerRepository.findById(domain.getCustomerId())
                 .orElseThrow(() -> new RuntimeException("Customer not found: " + domain.getCustomerId()));
             jpa.setCustomer(customer);
+            jpa.setQueueOrder(domain.getQueueOrder());
         }
         
         if (domain.getCatalogItemIds() != null && !domain.getCatalogItemIds().isEmpty()) {
             List<CatalogItemJpaEntity> services = catalogItemRepository.findAllById(domain.getCatalogItemIds());
             jpa.setServices(services);
+            jpa.setQueueOrder(domain.getQueueOrder());
         }
         
         BookingJpaEntity saved = jpaRepository.save(jpa);

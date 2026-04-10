@@ -9,6 +9,7 @@ import com.g42.platform.gms.warehouse.infrastructure.repository.StockEntryJpaRep
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 

@@ -7,12 +7,13 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class CatalogSummaryDto {
+public class CatalogWarehouseDto {
     private Integer itemId;
     private String itemName;
     private CatalogItemType itemType;
@@ -33,4 +34,5 @@ public class CatalogSummaryDto {
     private String partNumber;
     private String barcode;
     private String color;
+    private List<WarehouseDetailDto> warehouseDetails;
 }

@@ -3,7 +3,9 @@ package com.g42.platform.gms.warehouse.domain.repository;
 import com.g42.platform.gms.warehouse.domain.enums.StockEntryStatus;
 import com.g42.platform.gms.warehouse.infrastructure.entity.StockEntryItemJpa;
 import com.g42.platform.gms.warehouse.infrastructure.entity.StockEntryJpa;
+import org.springframework.data.jpa.repository.Query;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
