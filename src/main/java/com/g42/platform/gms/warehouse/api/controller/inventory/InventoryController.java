@@ -6,9 +6,8 @@ import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.warehouse.api.dto.response.InventoryResponse;
 import com.g42.platform.gms.warehouse.app.service.inventory.InventoryExcelService;
 import com.g42.platform.gms.warehouse.app.service.inventory.InventoryService;
-import com.g42.platform.gms.warehouse.infrastructure.entity.StockEntryItemJpa;
-import com.g42.platform.gms.warehouse.infrastructure.repository.StockEntryItemJpaRepo;
-import com.g42.platform.gms.warehouse.infrastructure.repository.StockEntryJpaRepo;
+import com.g42.platform.gms.warehouse.domain.entity.StockEntryItem;
+import com.g42.platform.gms.warehouse.domain.repository.StockEntryRepo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -18,8 +17,6 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
-import java.util.List;
-
 @RestController
 @RequestMapping("/api/warehouse/inventory")
 @RequiredArgsConstructor
@@ -27,8 +24,7 @@ public class InventoryController {
 
     private final InventoryService inventoryService;
     private final InventoryExcelService inventoryExcelService;
-    private final StockEntryItemJpaRepo stockEntryItemJpaRepo;
-    private final StockEntryJpaRepo stockEntryJpaRepo;
+    private final StockEntryRepo stockEntryRepo;
 
     /**
      * Danh sách tồn kho theo kho — phân quyền field theo role:
@@ -178,9 +174,9 @@ public class InventoryController {
             @PathVariable Integer warehouseId,
             @PathVariable Integer itemId) {
 
-        List<StockEntryItemJpa> lots = stockEntryItemJpaRepo.findFifoLots(warehouseId, itemId);
+        List<StockEntryItem> lots = stockEntryRepo.findFifoLots(warehouseId, itemId);
         List<Map<String, Object>> result = lots.stream().map(lot -> {
-            var entry = stockEntryJpaRepo.findById(lot.getEntryId()).orElse(null);
+            var entry = stockEntryRepo.findEntryById(lot.getEntryId()).orElse(null);
             return Map.<String, Object>of(
                     "entryItemId",        lot.getEntryItemId(),
                     "entryId",            lot.getEntryId(),
@@ -208,9 +204,9 @@ public class InventoryController {
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getAllLots(
             @PathVariable Integer warehouseId) {
 
-        List<StockEntryItemJpa> lots = stockEntryItemJpaRepo.findActiveLotsByWarehouse(warehouseId);
+        List<StockEntryItem> lots = stockEntryRepo.findActiveLotsByWarehouse(warehouseId);
         List<Map<String, Object>> result = lots.stream().map(lot -> {
-            var entry = stockEntryJpaRepo.findById(lot.getEntryId()).orElse(null);
+            var entry = stockEntryRepo.findEntryById(lot.getEntryId()).orElse(null);
             return Map.<String, Object>of(
                     "entryItemId",        lot.getEntryItemId(),
                     "entryId",            lot.getEntryId(),

@@ -1,5 +1,7 @@
 package com.g42.platform.gms.warehouse.infrastructure.repository.impl;
 
+import com.g42.platform.gms.warehouse.domain.entity.StockEntry;
+import com.g42.platform.gms.warehouse.domain.entity.StockEntryItem;
 import com.g42.platform.gms.warehouse.domain.enums.StockEntryStatus;
 import com.g42.platform.gms.warehouse.domain.repository.StockEntryRepo;
 import com.g42.platform.gms.warehouse.infrastructure.entity.StockEntryItemJpa;
@@ -10,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -20,24 +23,105 @@ public class StockEntryRepoImpl implements StockEntryRepo {
     private final StockEntryJpaRepo jpaRepo;
     private final StockEntryItemJpaRepo itemJpaRepo;
 
+    // ── mappers ──────────────────────────────────────────────────────────────
+
+    private StockEntry toDomain(StockEntryJpa jpa) {
+        return StockEntry.builder()
+                .entryId(jpa.getEntryId())
+                .entryCode(jpa.getEntryCode())
+                .warehouseId(jpa.getWarehouseId())
+                .supplierName(jpa.getSupplierName())
+                .entryDate(jpa.getEntryDate())
+                .status(jpa.getStatus())
+                .notes(jpa.getNotes())
+                .confirmedBy(jpa.getConfirmedBy())
+                .confirmedAt(jpa.getConfirmedAt())
+                .createdBy(jpa.getCreatedBy())
+                .createdAt(jpa.getCreatedAt())
+                .updatedAt(jpa.getUpdatedAt())
+                .items(jpa.getItems() != null
+                        ? jpa.getItems().stream().map(this::toDomainItem).toList()
+                        : new ArrayList<>())
+                .build();
+    }
+
+    private StockEntryJpa toJpa(StockEntry domain) {
+        StockEntryJpa jpa = new StockEntryJpa();
+        jpa.setEntryId(domain.getEntryId());
+        jpa.setEntryCode(domain.getEntryCode());
+        jpa.setWarehouseId(domain.getWarehouseId());
+        jpa.setSupplierName(domain.getSupplierName());
+        jpa.setEntryDate(domain.getEntryDate());
+        jpa.setStatus(domain.getStatus() != null ? domain.getStatus() : StockEntryStatus.DRAFT);
+        jpa.setNotes(domain.getNotes());
+        jpa.setConfirmedBy(domain.getConfirmedBy());
+        jpa.setConfirmedAt(domain.getConfirmedAt());
+        jpa.setCreatedBy(domain.getCreatedBy());
+        return jpa;
+    }
+
+    private StockEntryItem toDomainItem(StockEntryItemJpa jpa) {
+        return StockEntryItem.builder()
+                .entryItemId(jpa.getEntryItemId())
+                .entryId(jpa.getEntryId())
+                .itemId(jpa.getItemId())
+                .quantity(jpa.getQuantity())
+                .importPrice(jpa.getImportPrice())
+                .markupMultiplier(jpa.getMarkupMultiplier())
+                .remainingQuantity(jpa.getRemainingQuantity())
+                .notes(jpa.getNotes())
+                .build();
+    }
+
+    private StockEntryItemJpa toJpaItem(StockEntryItem domain) {
+        StockEntryItemJpa jpa = new StockEntryItemJpa();
+        jpa.setEntryItemId(domain.getEntryItemId());
+        jpa.setEntryId(domain.getEntryId());
+        jpa.setItemId(domain.getItemId());
+        jpa.setQuantity(domain.getQuantity());
+        jpa.setImportPrice(domain.getImportPrice());
+        jpa.setMarkupMultiplier(domain.getMarkupMultiplier() != null
+                ? domain.getMarkupMultiplier() : BigDecimal.ONE);
+        jpa.setRemainingQuantity(domain.getRemainingQuantity() != null
+                ? domain.getRemainingQuantity() : 0);
+        jpa.setNotes(domain.getNotes());
+        return jpa;
+    }
+
+    // ── StockEntryRepo impl ──────────────────────────────────────────────────
+
     @Override
-    public Optional<StockEntryJpa> findById(Integer entryId) {
-        return jpaRepo.findById(entryId);
+    public Optional<StockEntry> findById(Integer entryId) {
+        return jpaRepo.findById(entryId).map(this::toDomain);
     }
 
     @Override
-    public List<StockEntryJpa> findByWarehouseId(Integer warehouseId) {
-        return jpaRepo.findByWarehouseIdOrderByCreatedAtDesc(warehouseId);
+    public List<StockEntry> findByWarehouseId(Integer warehouseId) {
+        return jpaRepo.findByWarehouseIdOrderByCreatedAtDesc(warehouseId)
+                .stream().map(this::toDomain).toList();
     }
 
     @Override
-    public List<StockEntryJpa> findByWarehouseIdAndStatus(Integer warehouseId, StockEntryStatus status) {
-        return jpaRepo.findByWarehouseIdAndStatusOrderByCreatedAtDesc(warehouseId, status);
+    public List<StockEntry> findByWarehouseIdAndStatus(Integer warehouseId, StockEntryStatus status) {
+        return jpaRepo.findByWarehouseIdAndStatusOrderByCreatedAtDesc(warehouseId, status)
+                .stream().map(this::toDomain).toList();
     }
 
     @Override
-    public StockEntryJpa save(StockEntryJpa entry) {
-        return jpaRepo.save(entry);
+    public StockEntry save(StockEntry entry) {
+        StockEntryJpa jpa = toJpa(entry);
+
+        // Sync items into the JPA entity so CascadeType.ALL persists them
+        if (entry.getItems() != null) {
+            jpa.getItems().clear();
+            for (StockEntryItem item : entry.getItems()) {
+                StockEntryItemJpa itemJpa = toJpaItem(item);
+                itemJpa.setEntryId(null); // will be set by cascade after persist
+                jpa.getItems().add(itemJpa);
+            }
+        }
+
+        return toDomain(jpaRepo.save(jpa));
     }
 
     @Override
@@ -46,27 +130,55 @@ public class StockEntryRepoImpl implements StockEntryRepo {
     }
 
     @Override
-    public List<StockEntryItemJpa> findFifoLots(Integer warehouseId, Integer itemId) {
-        return itemJpaRepo.findFifoLots(warehouseId, itemId);
+    public List<StockEntryItem> findFifoLots(Integer warehouseId, Integer itemId) {
+        return itemJpaRepo.findFifoLots(warehouseId, itemId)
+                .stream().map(this::toDomainItem).toList();
     }
 
     @Override
-    public java.util.Optional<StockEntryItemJpa> findLatestLot(Integer warehouseId, Integer itemId) {
-        return itemJpaRepo.findLatestLot(warehouseId, itemId).stream().findFirst();
+    public Optional<StockEntryItem> findLatestLot(Integer warehouseId, Integer itemId) {
+        return itemJpaRepo.findLatestLot(warehouseId, itemId)
+                .stream().findFirst().map(this::toDomainItem);
     }
 
     @Override
-    public StockEntryItemJpa saveItem(StockEntryItemJpa item) {
-        return itemJpaRepo.save(item);
+    public StockEntryItem saveItem(StockEntryItem item) {
+        return toDomainItem(itemJpaRepo.save(toJpaItem(item)));
     }
 
     @Override
-    public java.util.Optional<StockEntryItemJpa> findItemById(Integer entryItemId) {
-        return itemJpaRepo.findById(entryItemId);
+    public Optional<StockEntryItem> findItemById(Integer entryItemId) {
+        return itemJpaRepo.findById(entryItemId).map(this::toDomainItem);
     }
 
     @Override
     public int decreaseRemainingQuantity(Integer entryItemId, int qty) {
         return itemJpaRepo.decreaseRemainingQuantity(entryItemId, qty);
+    }
+
+    @Override
+    public BigDecimal findLatesFallBackPrice(Integer itemId, Integer warehouseId) {
+        return jpaRepo.findLatesFallBackPrice(itemId, warehouseId);
+    }
+
+    @Override
+    public Optional<StockEntry> findByEntryCode(String entryCode) {
+        return jpaRepo.findByEntryCode(entryCode).map(this::toDomain);
+    }
+
+    @Override
+    public List<StockEntryItem> findActiveLotsByWarehouse(Integer warehouseId) {
+        return itemJpaRepo.findActiveLotsByWarehouse(warehouseId)
+                .stream().map(this::toDomainItem).toList();
+    }
+
+    @Override
+    public void invalidateSyncLotsByWarehouse(Integer warehouseId) {
+        itemJpaRepo.invalidateSyncLotsByWarehouse(warehouseId);
+    }
+
+    @Override
+    public Optional<StockEntry> findEntryById(Integer entryId) {
+        return jpaRepo.findById(entryId).map(this::toDomain);
     }
 }

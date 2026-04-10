@@ -1,24 +1,24 @@
 package com.g42.platform.gms.warehouse.domain.repository;
 
-import com.g42.platform.gms.warehouse.infrastructure.entity.InventoryJpa;
+import com.g42.platform.gms.warehouse.domain.entity.Inventory;
 
 import java.util.List;
 import java.util.Optional;
 
 /**
  * Domain port — persistence contract cho Inventory.
- * Service chỉ phụ thuộc vào interface này, không biết đến JpaRepo.
+ * Service chỉ phụ thuộc vào interface này và domain entity Inventory.
  */
 public interface InventoryRepo {
 
-    Optional<InventoryJpa> findByWarehouseAndItem(Integer warehouseId, Integer itemId);
+    Optional<Inventory> findByWarehouseAndItem(Integer warehouseId, Integer itemId);
 
     /** SELECT FOR UPDATE — dùng khi cần atomic update */
-    Optional<InventoryJpa> findByWarehouseAndItemWithLock(Integer warehouseId, Integer itemId);
+    Optional<Inventory> findByWarehouseAndItemWithLock(Integer warehouseId, Integer itemId);
 
-    List<InventoryJpa> findByWarehouse(Integer warehouseId);
+    List<Inventory> findByWarehouse(Integer warehouseId);
 
-    List<InventoryJpa> findLowStock(Integer warehouseId);
+    List<Inventory> findLowStock(Integer warehouseId);
 
-    InventoryJpa save(InventoryJpa inventory);
+    Inventory save(Inventory inventory);
 }
