@@ -8,6 +8,8 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Repository
 public interface StockAllocationRepositoryJpa extends JpaRepository<StockAllocationJpa, Integer> {
     @Transactional
@@ -16,4 +18,6 @@ public interface StockAllocationRepositoryJpa extends JpaRepository<StockAllocat
         update StockAllocationJpa s set s.status='RELEASED' where s.estimateId = :revisedFromId
         """)
     void updateReleasedEstimateById(@Param("revisedFromId")Integer revisedFromId);
+
+    List<StockAllocationJpa> findAllByEstimateId(Integer estimateId);
 }

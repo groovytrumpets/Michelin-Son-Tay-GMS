@@ -12,7 +12,7 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 public class StockAllocationDto {
-//    private Integer allocationId;
+    private Integer allocationId;
     private Integer serviceTicketId;
     private Integer estimateItemId;
     private Integer warehouseId;
