@@ -20,4 +20,6 @@ public interface StockAllocationRepositoryJpa extends JpaRepository<StockAllocat
     void updateReleasedEstimateById(@Param("revisedFromId")Integer revisedFromId);
 
     List<StockAllocationJpa> findAllByEstimateId(Integer estimateId);
+
+    StockAllocationJpa getStockAllocationJpaByAllocationId(Integer allocationId);
 }

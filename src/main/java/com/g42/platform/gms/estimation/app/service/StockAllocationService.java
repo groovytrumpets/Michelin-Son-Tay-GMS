@@ -116,11 +116,11 @@ public class StockAllocationService {
             }
             oldMap.remove(dto.getAllocationId());
         }
+        }
         for (StockAllocation deletedAlloc : oldMap.values()) {
             inventoryService.decreaseReservedQuantity(deletedAlloc.getItemId(),deletedAlloc.getWarehouseId(),deletedAlloc.getQuantity());
 
             stockAllocationRepository.delete(deletedAlloc);
-        }
         }
         return stockAllocationRepository.findByEstimateId(estimateId).stream().map(stockAllocationDtoMapper::toDto).toList();
     }
