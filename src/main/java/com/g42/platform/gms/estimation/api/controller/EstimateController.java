@@ -1,6 +1,7 @@
 package com.g42.platform.gms.estimation.api.controller;
 
 
+import com.g42.platform.gms.auth.entity.StaffPrincipal;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.common.enums.EstimateEnum;
@@ -14,6 +15,7 @@ import com.g42.platform.gms.estimation.app.service.StockAllocationService;
 import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -62,9 +64,15 @@ public class EstimateController {
     }
 
     @PostMapping("/{estimateId}/stock-allocation")
-    public ResponseEntity<ApiResponse<List<StockAllocationDto>>> createStockAllocation(@PathVariable Integer estimateId){
+    public ResponseEntity<ApiResponse<List<StockAllocationDto>>> createStockAllocation(@PathVariable Integer estimateId,                                                                                       @AuthenticationPrincipal StaffPrincipal principal){
         return ResponseEntity.ok(
-                ApiResponses.success(stockAllocationService.createStockAllocation(estimateId)));
+                ApiResponses.success(stockAllocationService.createStockAllocation(estimateId,principal.getStaffId())));
+    }
+    @PutMapping("/{estimateId}/stock-allocation/update")
+    public ResponseEntity<ApiResponse<List<StockAllocationDto>>> updateStockAllocation(@PathVariable Integer estimateId,                                                                                       @AuthenticationPrincipal StaffPrincipal principal
+    ,@RequestBody List<StockAllocationDto> stockAllocationDtos){
+        return ResponseEntity.ok(
+                ApiResponses.success(stockAllocationService.updateStockAllocation(estimateId,principal.getStaffId(),stockAllocationDtos)));
     }
 
 }

@@ -7,6 +7,8 @@ import com.g42.platform.gms.estimation.infrastructure.mapper.StockAllocationJpaM
 import com.g42.platform.gms.estimation.infrastructure.repository.StockAllocationRepositoryJpa;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 public class StockAllocationRepoImpl implements StockAllocationRepository {
     private final StockAllocationJpaMapper stockAllocationJpaMapper;
@@ -28,5 +30,23 @@ public class StockAllocationRepoImpl implements StockAllocationRepository {
     @Override
     public void updateReleasedOldEstimate(Integer revisedFromId) {
         stockAllocationRepositoryJpa.updateReleasedEstimateById(revisedFromId);
+    }
+
+    @Override
+    public List<StockAllocation> findByEstimateId(Integer estimateId) {
+        List<StockAllocationJpa> stockAllocationJpas = stockAllocationRepositoryJpa.findAllByEstimateId(estimateId);
+        return stockAllocationJpas.stream().map(stockAllocationJpaMapper::toDomain).toList();
+    }
+
+    @Override
+    public void save(StockAllocation stockAllocationNew) {
+        StockAllocationJpa stockAllocationJpa = stockAllocationJpaMapper.fromDomain(stockAllocationNew);
+        stockAllocationRepositoryJpa.save(stockAllocationJpa);
+    }
+
+    @Override
+    public void delete(StockAllocation deletedAlloc) {
+        StockAllocationJpa stockAllocationJpa = stockAllocationJpaMapper.fromDomain(deletedAlloc);
+        stockAllocationRepositoryJpa.delete(stockAllocationJpa);
     }
 }

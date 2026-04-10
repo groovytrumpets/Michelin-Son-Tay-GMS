@@ -4,6 +4,8 @@ import com.g42.platform.gms.warehouse.api.dto.response.InventoryResponse;
 import com.g42.platform.gms.warehouse.app.service.dto.StockRequest;
 import com.g42.platform.gms.warehouse.app.service.dto.StockShortageInfo;
 import com.g42.platform.gms.warehouse.domain.enums.CatalogItemType;
+import com.g42.platform.gms.warehouse.domain.exception.WarehouseErrorCode;
+import com.g42.platform.gms.warehouse.domain.exception.WarehouseException;
 import com.g42.platform.gms.warehouse.domain.repository.InventoryRepo;
 import com.g42.platform.gms.warehouse.domain.repository.PartCatalogRepo;
 import com.g42.platform.gms.warehouse.domain.repository.StockEntryRepo;
@@ -11,6 +13,7 @@ import com.g42.platform.gms.warehouse.domain.repository.WarehousePricingRepo;
 import com.g42.platform.gms.warehouse.infrastructure.entity.CatalogItemJpa;
 import com.g42.platform.gms.warehouse.infrastructure.entity.InventoryJpa;
 import com.g42.platform.gms.warehouse.infrastructure.entity.WarehousePricingJpa;
+import com.g42.platform.gms.warehouse.infrastructure.repository.InventoryJpaRepo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -21,6 +24,7 @@ import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -31,6 +35,7 @@ public class InventoryServiceImpl implements InventoryService {
     private final PartCatalogRepo partCatalogRepo;
     private final StockEntryRepo stockEntryRepo;
     private final WarehousePricingRepo pricingRepo;
+    private final InventoryJpaRepo inventoryJpaRepo;
 
     @Override
     @Transactional(readOnly = true)
@@ -118,6 +123,48 @@ public class InventoryServiceImpl implements InventoryService {
         Specification<CatalogItemJpa> spec = (root, query, cb) ->
                 cb.equal(root.get("itemType"), CatalogItemType.PART);
         return buildInventoryResponseFromCatalog(warehouseId, spec, showImportPrice);
+    }
+
+    @Override
+    public void updateInventoryByEstimate(Integer itemId, Integer warehouseId, Integer quantity) {
+
+        InventoryJpa inventoryJpa = getInventorySafe(itemId, warehouseId);
+        inventoryJpa.setReservedQuantity(inventoryJpa.getQuantity() + quantity);
+        System.out.println("Debug: " + inventoryJpa.getItemId()+", quantity: " + inventoryJpa.getQuantity());
+        inventoryJpaRepo.save(inventoryJpa);
+    }
+
+    @Override
+    public void increaseReservedQuantity(Integer itemId, Integer warehouseId, Integer quantity) {
+        InventoryJpa inventoryJpa = getInventorySafe(itemId, warehouseId);
+        inventoryJpa.setReservedQuantity(inventoryJpa.getReservedQuantity() + quantity);
+        inventoryJpaRepo.save(inventoryJpa);
+    }
+
+    @Override
+    public void updateReservedQuantityByDelta(Integer itemId, Integer warehouseId, int difference) {
+        InventoryJpa inventoryJpa = getInventorySafe(itemId, warehouseId);
+        int newReserved = inventoryJpa.getReservedQuantity() + difference;
+        inventoryJpa.setReservedQuantity(Math.max(0, newReserved));
+        inventoryJpaRepo.save(inventoryJpa);
+    }
+
+    @Override
+    public void decreaseReservedQuantity(Integer itemId, Integer warehouseId, Integer quantity) {
+        InventoryJpa inventoryJpa = getInventorySafe(itemId, warehouseId);
+        int newReserved = inventoryJpa.getReservedQuantity() - quantity;
+        inventoryJpa.setReservedQuantity(Math.max(0, newReserved));
+        inventoryJpaRepo.save(inventoryJpa);
+    }
+    private InventoryJpa getInventorySafe(Integer warehouseId, Integer itemId) {
+        InventoryJpa inventory = inventoryJpaRepo.getInventoryJpaByWarehouseIdAndItemId(warehouseId, itemId);
+        if (inventory == null) {
+            throw new WarehouseException("Couldn't find Item ID: " + itemId + " warehouse ID: " + warehouseId, WarehouseErrorCode.CATALOG_404);
+        }
+        if (inventory.getReservedQuantity() == null) {
+            inventory.setReservedQuantity(0);
+        }
+        return inventory;
     }
 
     @Override

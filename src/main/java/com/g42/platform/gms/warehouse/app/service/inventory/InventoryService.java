@@ -35,4 +35,12 @@ public interface InventoryService {
      * Item chưa có trong kho sẽ có quantity=0.
      */
     List<InventoryResponse> listAllPartsWithInventory(Integer warehouseId, boolean showImportPrice);
+
+    void updateInventoryByEstimate(Integer itemId, Integer warehouseId,Integer quantity);
+
+    void increaseReservedQuantity(Integer itemId, Integer warehouseId, Integer quantity);
+
+    void updateReservedQuantityByDelta(Integer itemId, Integer warehouseId, int difference);
+
+    void decreaseReservedQuantity(Integer itemId, Integer warehouseId, Integer quantity);
 }
