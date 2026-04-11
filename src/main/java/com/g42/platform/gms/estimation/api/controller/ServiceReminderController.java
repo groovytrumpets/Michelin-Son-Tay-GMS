@@ -1,6 +1,8 @@
 package com.g42.platform.gms.estimation.api.controller;
 
 import com.g42.platform.gms.auth.entity.StaffPrincipal;
+import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedRespond;
+import com.g42.platform.gms.booking_management.domain.enums.BookingEnum;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.estimation.api.dto.RemindReason;
@@ -8,11 +10,14 @@ import com.g42.platform.gms.estimation.api.dto.ReminderCreateDto;
 import com.g42.platform.gms.estimation.api.dto.ReminderRespondDto;
 import com.g42.platform.gms.estimation.app.service.ReminderService;
 import lombok.AllArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.sql.Time;
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -28,7 +33,7 @@ public class ServiceReminderController {
         );
     }
     @GetMapping("/{serviceTicketId}")
-    public ResponseEntity<ApiResponse<ReminderRespondDto>> findReminderByServiceTicket(@PathVariable Integer serviceTicketId){
+    public ResponseEntity<ApiResponse<List<ReminderRespondDto>>> findReminderByServiceTicket(@PathVariable Integer serviceTicketId){
         return ResponseEntity.status(HttpStatus.OK).body(
                 ApiResponses.success(reminderService.findReminderByServiceTicket(serviceTicketId))
         );
@@ -63,6 +68,16 @@ public class ServiceReminderController {
                 ApiResponses.success(reminderService.updateNotifiedRemind(remindId,reason))
         );
     }
+//    @GetMapping("/service-remind-search")
+//    public ResponseEntity<ApiResponse<Page<ReminderRespondDto>>> searchReminders(@RequestParam(defaultValue = "0") int page,
+//                                                                           @RequestParam(defaultValue = "10") int size,
+//                                                                           @RequestParam(required = false) LocalDate date,
+//                                                                           @RequestParam(required = false) Time time,
+//                                                                           @RequestParam(required = false) String status,
+//                                                                           @RequestParam(required = false) String search){
+//        Page<ReminderRespondDto> apiResponse = reminderService.searchReminders(page,size,date,time,status,search);
+//        return ResponseEntity.ok(ApiResponses.success(apiResponse));
+//    }
 
 
 

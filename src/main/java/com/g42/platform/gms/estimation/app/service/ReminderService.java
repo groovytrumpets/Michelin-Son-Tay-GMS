@@ -28,8 +28,8 @@ public class ReminderService {
 
     }
 
-    public ReminderRespondDto findReminderByServiceTicket(Integer serviceTicketId) {
-        return reminderDtoMapper.toResDto(remindRepo.findByServiceTicket(serviceTicketId));
+    public List<ReminderRespondDto> findReminderByServiceTicket(Integer serviceTicketId) {
+        return remindRepo.findByServiceTicket(serviceTicketId).stream().map(reminderDtoMapper::toResDto).toList();
     }
 
     public List<ReminderRespondDto> findReminderByCustomerOrVehicle(Integer customerId, Integer vehicleId) {

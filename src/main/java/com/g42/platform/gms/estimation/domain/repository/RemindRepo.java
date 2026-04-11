@@ -9,7 +9,7 @@ import java.util.List;
 public interface RemindRepo {
     ServiceReminder save(ServiceReminder domain, Integer staffId);
 
-    ServiceReminder findByServiceTicket(Integer serviceTicketId);
+    List<ServiceReminder> findByServiceTicket(Integer serviceTicketId);
 
     List<ServiceReminder> findByCustomerId(Integer customerId);
 

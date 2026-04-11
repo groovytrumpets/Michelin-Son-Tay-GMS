@@ -37,8 +37,8 @@ public class RemindRepoImpl implements RemindRepo {
     }
 
     @Override
-    public ServiceReminder findByServiceTicket(Integer serviceTicketId) {
-        return serviceReminderJpaMapper.toDomain(serviceRemindJpaRepo.findByServiceTicketId(serviceTicketId));
+    public List<ServiceReminder> findByServiceTicket(Integer serviceTicketId) {
+        return serviceRemindJpaRepo.findAllByServiceTicketId(serviceTicketId).stream().map(serviceReminderJpaMapper::toDomain).toList();
     }
 
     @Override

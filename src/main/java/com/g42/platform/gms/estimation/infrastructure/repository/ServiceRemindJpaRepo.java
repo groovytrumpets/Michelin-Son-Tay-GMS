@@ -24,4 +24,6 @@ public interface ServiceRemindJpaRepo extends JpaRepository<ServiceReminderJpa,I
     List<ServiceReminderJpa> findAllByVehicleIdOrderByCreatedAtDesc(Integer vehicleId);
 
     List<ServiceReminderJpa> findAllByCustomerIdAndVehicleIdOrderByCreatedAtDesc(Integer customerId, Integer vehicleId);
+
+    List<ServiceReminderJpa> findAllByServiceTicketId(Integer serviceTicketId);
 }
