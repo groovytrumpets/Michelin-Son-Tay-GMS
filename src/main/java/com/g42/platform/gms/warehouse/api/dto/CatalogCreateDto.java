@@ -37,5 +37,6 @@ public class CatalogCreateDto {
     private Integer workCategoryId;
     private String partNumber;
     private String barcode;
+    private String color;
 
 }

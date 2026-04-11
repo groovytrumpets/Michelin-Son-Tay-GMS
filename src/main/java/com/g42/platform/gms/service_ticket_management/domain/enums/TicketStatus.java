@@ -1,21 +1,25 @@
 package com.g42.platform.gms.service_ticket_management.domain.enums;
 
 /**
- * Enum representing the status of a service ticket lifecycle.
+ * Trạng thái vòng đời phiếu dịch vụ.
  *
- * DRAFT:       Check-in hoàn tất, chờ kiểm tra / bắt đầu sửa
- * INSPECTION:  Đang trong quá trình kiểm tra an toàn
- * PENDING:     Chờ khách hàng duyệt báo giá / chờ phụ tùng
- * IN_PROGRESS: Đang sửa chữa
- * COMPLETED:   Kỹ thuật viên / advisor báo xong sửa xe
- * PAID:        Lễ tân xác nhận thanh toán — trigger ZNS feedback
- * CANCELLED:   Phiếu dịch vụ đã hủy
+ * CREATED:    Lễ tân tạo phiếu, chờ kỹ thuật viên bắt đầu kiểm tra
+ * INSPECTING: Kỹ thuật viên đang kiểm tra an toàn xe
+ * INSPECTED:  Kỹ thuật viên hoàn thành kiểm tra, chờ advisor lập báo giá
+ * ESTIMATED:  Advisor đã lập báo giá, chờ khách duyệt / chờ phụ tùng
+ * PENDING:    Chờ phụ tùng hoặc dịch vụ không khả dụng
+ * REPAIRING:  Đang sửa chữa / thực hiện dịch vụ
+ * COMPLETED:  Kỹ thuật viên báo xong, chờ lễ tân xác nhận thanh toán
+ * PAID:       Lễ tân xác nhận thanh toán — trigger ZNS feedback
+ * CANCELLED:  Phiếu dịch vụ đã hủy
  */
 public enum TicketStatus {
-    DRAFT,
-    INSPECTION,
+    CREATED,
+    INSPECTING,
+    INSPECTED,
+    ESTIMATED,
     PENDING,
-    IN_PROGRESS,
+    REPAIRING,
     COMPLETED,
     PAID,
     CANCELLED

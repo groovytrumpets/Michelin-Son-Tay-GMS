@@ -9,7 +9,7 @@ import com.g42.platform.gms.booking.customer.infrastructure.entity.BookingJpaEnt
 import com.g42.platform.gms.booking.customer.infrastructure.entity.CatalogItemJpaEntity;
 import com.g42.platform.gms.booking.customer.infrastructure.repository.BookingJpaRepository;
 import com.g42.platform.gms.booking.customer.infrastructure.mapper.BookingMapper;
-import com.g42.platform.gms.catalog.repository.CatalogItemRepository;
+import com.g42.platform.gms.catalog.infrastructure.repository.CatalogItemRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
@@ -36,11 +36,13 @@ public class BookingRepositoryImpl implements BookingRepository {
             CustomerProfile customer = customerRepository.findById(domain.getCustomerId())
                 .orElseThrow(() -> new RuntimeException("Customer not found: " + domain.getCustomerId()));
             jpa.setCustomer(customer);
+            jpa.setQueueOrder(domain.getQueueOrder());
         }
         
         if (domain.getCatalogItemIds() != null && !domain.getCatalogItemIds().isEmpty()) {
             List<CatalogItemJpaEntity> services = catalogItemRepository.findAllById(domain.getCatalogItemIds());
             jpa.setServices(services);
+            jpa.setQueueOrder(domain.getQueueOrder());
         }
         
         BookingJpaEntity saved = jpaRepository.save(jpa);

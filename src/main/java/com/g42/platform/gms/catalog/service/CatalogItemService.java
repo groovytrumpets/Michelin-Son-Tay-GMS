@@ -1,9 +1,9 @@
-package com.g42.platform.gms.catalog.application.service;
+package com.g42.platform.gms.catalog.service;
 
 import com.g42.platform.gms.booking.customer.infrastructure.entity.CatalogItemJpaEntity;
-import com.g42.platform.gms.catalog.api.dto.CatalogItemResponse;
+import com.g42.platform.gms.catalog.dto.CatalogItemResponse;
 import com.g42.platform.gms.catalog.exception.CatalogException;
-import com.g42.platform.gms.catalog.repository.CatalogItemRepository;
+import com.g42.platform.gms.catalog.infrastructure.repository.CatalogItemRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

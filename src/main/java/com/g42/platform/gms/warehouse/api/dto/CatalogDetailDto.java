@@ -39,5 +39,6 @@ public class CatalogDetailDto {
     private Integer workCategoryId;
     private String partNumber;
     private String barcode;
+    private String color;
     private List<SpecificationRespondDto> specifications;
 }

@@ -8,7 +8,7 @@ import java.time.LocalTime;
 import java.util.List;
 
 @Data
-public abstract class BaseBookingRequest {
+public abstract class BaseBookingRequest extends ReminderRequest {
     
     @NotNull(message = "Ngày hẹn là bắt buộc")
     @FutureOrPresent(message = "Ngày hẹn phải là hôm nay hoặc tương lai")

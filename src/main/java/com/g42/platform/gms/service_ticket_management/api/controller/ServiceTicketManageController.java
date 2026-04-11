@@ -8,6 +8,8 @@ import com.g42.platform.gms.estimation.api.dto.EstimateRespondDto;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceQueueResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceTicketDetailResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceTicketListResponse;
+import com.g42.platform.gms.service_ticket_management.api.dto.manage.UpdateServiceTicketRequest;
+import com.g42.platform.gms.service_ticket_management.application.service.ServiceTicketAdvisorService;
 import com.g42.platform.gms.service_ticket_management.application.service.ServiceTicketManageService;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +34,7 @@ import java.util.List;
 public class ServiceTicketManageController {
 
     private final ServiceTicketManageService serviceTicketManageService;
+    private final ServiceTicketAdvisorService serviceTicketAdvisorService;
 
     @GetMapping("/tickets")
     public ResponseEntity<ApiResponse<Page<ServiceTicketListResponse>>> getServiceTicketList(
@@ -86,9 +89,17 @@ public class ServiceTicketManageController {
         );
     }
 
+    /** Lễ tân chỉnh sửa yêu cầu khách hàng và danh sách dịch vụ. */
+    @PutMapping("/tickets/{ticketCode}")
+    public ResponseEntity<ApiResponse<ServiceTicketDetailResponse>> editServiceTicket(
+            @PathVariable String ticketCode,
+            @RequestBody UpdateServiceTicketRequest request) {
+        return ResponseEntity.ok(ApiResponses.success(
+                serviceTicketAdvisorService.updateEstimate(ticketCode, request)));
+    }
+
     @GetMapping("/export")
-    public ResponseEntity<byte[]> exportServiceTicketList(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+    public ResponseEntity<byte[]> exportServiceTicketList(            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate){
         byte [] excelConetnt = serviceTicketManageService.exportTicketToExcel(startDate, endDate);
         HttpHeaders headers = new HttpHeaders();

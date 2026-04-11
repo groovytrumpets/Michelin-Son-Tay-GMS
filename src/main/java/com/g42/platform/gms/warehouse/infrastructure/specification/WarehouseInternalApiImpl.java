@@ -2,7 +2,7 @@ package com.g42.platform.gms.warehouse.infrastructure.specification;
 
 import com.g42.platform.gms.warehouse.api.dto.CatalogItemDto;
 import com.g42.platform.gms.warehouse.api.internal.WarehouseInternalApi;
-import com.g42.platform.gms.warehouse.domain.entity.CatalogItem;
+import com.g42.platform.gms.warehouse.app.service.inventory.InventoryService;
 import com.g42.platform.gms.warehouse.domain.exception.WarehouseErrorCode;
 import com.g42.platform.gms.warehouse.domain.exception.WarehouseException;
 import com.g42.platform.gms.warehouse.infrastructure.entity.CatalogItemJpa;
@@ -17,6 +17,8 @@ public class WarehouseInternalApiImpl implements WarehouseInternalApi {
     private CatalogItemJpaRepo catalogItemRepo;
     @Autowired
     private CatalogItemJpaMapper catalogItemJpaMapper;
+    @Autowired
+    private InventoryService inventoryService;
 
 
     @Override
@@ -36,5 +38,10 @@ public class WarehouseInternalApiImpl implements WarehouseInternalApi {
         }
         catalogItemJpa.setServiceId(serviceSaved.getServiceId());
         System.out.println("DEBUG: catalogItem ID: " + catalogItemJpa.getServiceId()+" Saved wth serviceId: " + serviceSaved.getServiceId());
+    }
+
+    @Override
+    public void updateInventoryEstimateAllocation(Integer itemId, Integer warehouseId, Integer quantity) {
+        inventoryService.updateInventoryByEstimate(itemId,warehouseId,quantity);
     }
 }
