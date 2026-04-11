@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 
 
 import java.time.LocalDate;
+import java.util.List;
 
 
 /**
@@ -162,6 +163,12 @@ public class ServiceTicketAdvisorController {
     @GetMapping("/recommend/{serviceTicketId}")
     public ResponseEntity<ApiResponse<String>> getRecommend(@PathVariable Integer serviceTicketId) {
         return ResponseEntity.ok(ApiResponses.success(manageService.getCustomerPerviousRecomment(serviceTicketId)));
+    }
+
+    @GetMapping("/tickets/history")
+    public ResponseEntity<ApiResponse<List<ServiceTicketListResponse>>> getTicketsHistory
+            (@RequestParam Integer customerId, @RequestParam Integer vehicleId) {
+        return ResponseEntity.ok(ApiResponses.success(manageService.getServiceTicketsHistory(customerId,vehicleId)));
     }
 }
 
