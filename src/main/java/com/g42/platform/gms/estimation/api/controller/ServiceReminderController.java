@@ -34,18 +34,18 @@ public class ServiceReminderController {
                 ApiResponses.success(reminderService.createReminder(request,principal))
         );
     }
-    @GetMapping("/{serviceTicketId}")
-    public ResponseEntity<ApiResponse<List<ReminderRespondDto>>> findReminderByServiceTicket(@PathVariable Integer serviceTicketId){
-        return ResponseEntity.status(HttpStatus.OK).body(
-                ApiResponses.success(reminderService.findReminderByServiceTicket(serviceTicketId))
-        );
-    }
-    @GetMapping("/find")
-    public ResponseEntity<ApiResponse<List<ReminderRespondDto>>> findReminderByCustomerOrVehicle(@RequestParam(required = false) Integer customerId, @RequestParam(required = false) Integer vehicleId){
-        return ResponseEntity.status(HttpStatus.OK).body(
-                ApiResponses.success(reminderService.findReminderByCustomerOrVehicle(customerId,vehicleId))
-        );
-    }
+//    @GetMapping("/{serviceTicketId}")
+//    public ResponseEntity<ApiResponse<List<ReminderRespondDto>>> findReminderByServiceTicket(@PathVariable Integer serviceTicketId){
+//        return ResponseEntity.status(HttpStatus.OK).body(
+//                ApiResponses.success(reminderService.findReminderByServiceTicket(serviceTicketId))
+//        );
+//    }
+//    @GetMapping("/find")
+//    public ResponseEntity<ApiResponse<List<ReminderRespondDto>>> findReminderByCustomerOrVehicle(@RequestParam(required = false) Integer customerId, @RequestParam(required = false) Integer vehicleId){
+//        return ResponseEntity.status(HttpStatus.OK).body(
+//                ApiResponses.success(reminderService.findReminderByCustomerOrVehicle(customerId,vehicleId))
+//        );
+//    }
     @PatchMapping("/{remindId}/skipped")
     public ResponseEntity<ApiResponse<ReminderRespondDto>> updateSkippedRemind(@PathVariable Integer remindId,@RequestBody(required = false) RemindReason reason){
         return ResponseEntity.status(HttpStatus.OK).body(
