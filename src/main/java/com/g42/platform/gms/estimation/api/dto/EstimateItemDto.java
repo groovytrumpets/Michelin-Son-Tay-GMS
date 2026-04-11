@@ -14,6 +14,7 @@ public class EstimateItemDto {
     private Integer estimateItemId;
     private String itemName;
     private WorkCataDto workCategory;
+    private Integer warehouseId;
     private Integer itemId;
     private Integer quantity;
     private BigDecimal unitPrice;

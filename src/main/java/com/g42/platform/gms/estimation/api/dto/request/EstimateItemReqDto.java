@@ -14,6 +14,7 @@ public class EstimateItemReqDto {
     private Integer workCategoryId;
     private String newCategoryName;
     private Integer itemId;
+    private Integer warehouseId;
     private String itemName;
     private Integer quantity;
     private BigDecimal unitPrice;

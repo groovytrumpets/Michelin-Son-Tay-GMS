@@ -1,5 +1,6 @@
 package com.g42.platform.gms.booking.customer.api.dto;
 
+import jakarta.persistence.Column;
 import lombok.Data;
 
 import java.time.LocalDate;
@@ -21,6 +22,7 @@ public class BookingResponse {
     private List<Integer> serviceIds;
     private List<ServiceItemDto> services;
     private Integer totalEstimatedTime;
+    private Integer queueOrder;
 
     // Progress tracking
     private List<ProgressStep> progressSteps;

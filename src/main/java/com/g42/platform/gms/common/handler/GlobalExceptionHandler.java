@@ -7,6 +7,7 @@ import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.auth.exception.AuthException;
 import com.g42.platform.gms.customer.domain.exception.CustomerException;
+import com.g42.platform.gms.estimation.domain.exception.EstimateException;
 import com.g42.platform.gms.manager.attendance.domain.exception.AttendanceException;
 import com.g42.platform.gms.manager.schedule.domain.exception.ScheduleException;
 import com.g42.platform.gms.marketing.service_catalog.domain.exception.ServiceException;
@@ -226,5 +227,12 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.FORBIDDEN)
                 .body(ApiResponses.error("ER034", "Access Denied"));
+    }
+    @ExceptionHandler(EstimateException.class)
+    public ResponseEntity<ApiResponse<?>> handleBookingException(EstimateException ex) {
+        System.err.println("Estimate Exception Error: " + ex.getCode() + " - " + ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponses.error(ex.getCode().name(), ex.getMessage()));
     }
 }

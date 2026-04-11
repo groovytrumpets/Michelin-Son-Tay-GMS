@@ -6,7 +6,7 @@ import com.g42.platform.gms.auth.repository.CustomerProfileRepository;
 import com.g42.platform.gms.auth.repository.StaffProfileRepo;
 import com.g42.platform.gms.booking.customer.domain.entity.Booking;
 import com.g42.platform.gms.booking.customer.domain.repository.BookingRepository;
-import com.g42.platform.gms.catalog.repository.CatalogItemRepository;
+import com.g42.platform.gms.catalog.infrastructure.repository.CatalogItemRepository;
 import com.g42.platform.gms.service_ticket_management.api.dto.technician.TechnicianTicketDetailResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.technician.TechnicianTicketListResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.technician.UpdateTechnicianNotesRequest;
@@ -212,8 +212,8 @@ public class ServiceTicketTechnicianService {
         ServiceTicket ticket = serviceTicketRepo.findByTicketCode(ticketCode)
             .orElseThrow(() -> new CheckInException("Không tìm thấy service ticket: " + ticketCode));
 
-        if (ticket.getTicketStatus() != TicketStatus.DRAFT) {
-            throw new CheckInException("Chỉ có thể bắt đầu khi phiếu đang ở trạng thái DRAFT");
+        if (ticket.getTicketStatus() != TicketStatus.CREATED) {
+            throw new CheckInException("Chỉ có thể bắt đầu khi phiếu đang ở trạng thái CREATED");
         }
 
         SafetyInspection inspection = safetyInspectionRepo.findByServiceTicketId(ticket.getServiceTicketId())
@@ -223,9 +223,8 @@ public class ServiceTicketTechnicianService {
             throw new CheckInException("Phiếu này đã hoàn thành kiểm tra an toàn, không thể bắt đầu lại");
         }
 
-        // Luôn chuyển sang INSPECTION khi technician bắt đầu nhận xe
-        // dù skip hay không skip safety inspection
-        ticket.setTicketStatus(TicketStatus.INSPECTION);
+        // Chuyển sang INSPECTING khi technician bắt đầu nhận xe
+        ticket.setTicketStatus(TicketStatus.INSPECTING);
         ticket.setUpdatedAt(java.time.LocalDateTime.now());
         serviceTicketRepo.save(ticket);
 
@@ -252,8 +251,8 @@ public class ServiceTicketTechnicianService {
         ServiceTicket ticket = serviceTicketRepo.findByTicketCode(ticketCode)
             .orElseThrow(() -> new CheckInException("Không tìm thấy service ticket: " + ticketCode));
 
-        if (ticket.getTicketStatus() != TicketStatus.IN_PROGRESS) {
-            throw new CheckInException("Chỉ có thể báo hoàn thành khi phiếu đang ở trạng thái IN_PROGRESS");
+        if (ticket.getTicketStatus() != TicketStatus.REPAIRING) {
+            throw new CheckInException("Chỉ có thể báo hoàn thành khi phiếu đang ở trạng thái REPAIRING");
         }
 
         ticket.setTicketStatus(TicketStatus.COMPLETED);
