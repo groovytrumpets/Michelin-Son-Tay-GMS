@@ -6,6 +6,7 @@ import com.g42.platform.gms.booking_management.domain.enums.BookingEnum;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.estimation.api.dto.RemindReason;
+import com.g42.platform.gms.estimation.api.dto.RemindSearchDto;
 import com.g42.platform.gms.estimation.api.dto.ReminderCreateDto;
 import com.g42.platform.gms.estimation.api.dto.ReminderRespondDto;
 import com.g42.platform.gms.estimation.app.service.ReminderService;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.sql.Time;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -68,16 +70,16 @@ public class ServiceReminderController {
                 ApiResponses.success(reminderService.updateNotifiedRemind(remindId,reason))
         );
     }
-//    @GetMapping("/service-remind-search")
-//    public ResponseEntity<ApiResponse<Page<ReminderRespondDto>>> searchReminders(@RequestParam(defaultValue = "0") int page,
-//                                                                           @RequestParam(defaultValue = "10") int size,
-//                                                                           @RequestParam(required = false) LocalDate date,
-//                                                                           @RequestParam(required = false) Time time,
-//                                                                           @RequestParam(required = false) String status,
-//                                                                           @RequestParam(required = false) String search){
-//        Page<ReminderRespondDto> apiResponse = reminderService.searchReminders(page,size,date,time,status,search);
-//        return ResponseEntity.ok(ApiResponses.success(apiResponse));
-//    }
+    @GetMapping("/service-remind-search")
+    public ResponseEntity<ApiResponse<Page<RemindSearchDto>>> searchReminders(@RequestParam(defaultValue = "0") int page,
+                                                                              @RequestParam(defaultValue = "10") int size,
+                                                                              @RequestParam(required = false) LocalDateTime date,
+                                                                              @RequestParam(required = false) String status,
+                                                                              @RequestParam(required = false) String search,
+                                                                              @RequestParam(required = false) String sortBy){
+        Page<RemindSearchDto> apiResponse = reminderService.searchReminders(page,size,date,status,search,sortBy);
+        return ResponseEntity.ok(ApiResponses.success(apiResponse));
+    }
 
 
 

@@ -1,5 +1,6 @@
 package com.g42.platform.gms.estimation.infrastructure;
 
+import com.g42.platform.gms.estimation.api.dto.RemindSearchDto;
 import com.g42.platform.gms.estimation.domain.entity.ServiceReminder;
 import com.g42.platform.gms.estimation.domain.exception.EstimateErrorCode;
 import com.g42.platform.gms.estimation.domain.exception.EstimateException;
@@ -8,9 +9,17 @@ import com.g42.platform.gms.estimation.infrastructure.entity.ServiceReminderJpa;
 import com.g42.platform.gms.estimation.infrastructure.mapper.ServiceReminderJpaMapper;
 import com.g42.platform.gms.estimation.infrastructure.repository.ServiceRemindJpaRepo;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 
 @Repository
@@ -65,5 +74,25 @@ public class RemindRepoImpl implements RemindRepo {
         serviceReminderJpa.setUpdatedAt(Instant.now());
         serviceReminderJpa.setReason(reason);
         return serviceReminderJpaMapper.toDomain(serviceRemindJpaRepo.save(serviceReminderJpa));
+    }
+
+    @Override
+    public Page<RemindSearchDto> searchReminders(int page, int size, LocalDateTime date, String status, String search, String sortBy) {
+        Sort.Direction direction = Sort.Direction.DESC;
+        if (sortBy != null && !sortBy.isEmpty()) {
+            if (sortBy.equalsIgnoreCase("asc")) {
+                direction = Sort.Direction.ASC;
+            } else if (sortBy.equalsIgnoreCase("desc")) {
+                direction = Sort.Direction.DESC;
+            }
+        }
+        Sort sort = Sort.by(direction, "reminderDate");
+        Pageable pageable = PageRequest.of(page, size, sort);
+
+        // 2. Chuyển đổi Ngày (bỏ qua Giờ để lọc chính xác)
+        LocalDate datePart = (date != null) ? date.toLocalDate() : null;
+
+        // 3. Gọi thẳng Repository lấy kết quả
+        return serviceRemindJpaRepo.searchAllCustom(status, datePart, search, pageable);
     }
 }

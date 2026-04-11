@@ -99,7 +99,6 @@ public class WarehouseService {
             // Query 1 lần lấy toàn bộ thông tin kho của các item trên trang hiện tại
             List<WarehouseDetailProjection> warehouseProjections = warehouseRepo.getWarehouseDetailsByItemIds(itemIds);
 
-            // Nhóm các chi tiết kho theo itemId
             itemWarehouseMap = warehouseProjections.stream()
                     .collect(Collectors.groupingBy(
                             WarehouseDetailProjection::getItemId, // Nhóm theo itemId

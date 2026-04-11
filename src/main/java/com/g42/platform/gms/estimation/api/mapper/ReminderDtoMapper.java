@@ -1,5 +1,6 @@
 package com.g42.platform.gms.estimation.api.mapper;
 
+import com.g42.platform.gms.estimation.api.dto.RemindSearchDto;
 import com.g42.platform.gms.estimation.api.dto.ReminderCreateDto;
 import com.g42.platform.gms.estimation.api.dto.ReminderRespondDto;
 import com.g42.platform.gms.estimation.domain.entity.ServiceReminder;
@@ -12,4 +13,6 @@ public interface ReminderDtoMapper {
     ReminderCreateDto toDto(ServiceReminder reminder);
 
     ReminderRespondDto toResDto(ServiceReminder reminder);
+
+    RemindSearchDto toSearchDto(ServiceReminder serviceReminder);
 }
