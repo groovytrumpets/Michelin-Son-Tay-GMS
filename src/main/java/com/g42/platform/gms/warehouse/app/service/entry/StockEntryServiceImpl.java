@@ -283,7 +283,7 @@ public class StockEntryServiceImpl implements StockEntryService {
 
     @Override
     public BigDecimal findLatesFallBackPrice(Integer itemId, Integer warehouseId) {
-        return stockEntryJpaRepo.findLatesFallBackPrice(itemId,warehouseId);
+        return stockEntryJpaRepo.findLatesFallBackPrice(itemId,warehouseId).orElse(BigDecimal.ZERO);
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────

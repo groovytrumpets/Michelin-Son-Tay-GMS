@@ -15,6 +15,7 @@ import com.g42.platform.gms.common.exception.CodeGenerationException;
 import com.g42.platform.gms.booking.customer.domain.repository.BookingRepository;
 import com.g42.platform.gms.booking.customer.domain.repository.IpBlacklistRepository;
 import com.g42.platform.gms.catalog.infrastructure.repository.CatalogItemRepository;
+import com.g42.platform.gms.estimation.api.internal.EstimateInternalApi;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -76,6 +77,7 @@ public class BookingService {
     /** Cache để tracking rate limit (in-memory, sẽ reset khi restart server) */
     private final Map<String, RateLimitInfo> rateLimitCache = new ConcurrentHashMap<>();
     private final BookingManageInternalApi bookingManageInternalApi;
+    private final EstimateInternalApi estimateInternalApi;
 
     // ========================================
     // CREATE BOOKING - Tạo booking mới
@@ -233,6 +235,7 @@ public class BookingService {
      */
     @Transactional
     public Booking createDirectBookingByStaff(StaffDirectBookingRequest request) {
+
         
         // === 1. TÌM HOẶC TẠO CUSTOMER ACCOUNT ===
         CustomerProfile customer = customerRepository.findByPhone(request.getPhone()).orElse(null);
@@ -323,7 +326,10 @@ public class BookingService {
         
         log.info("Direct booking created by staff: bookingId={}, bookingCode={}, customerId={}",
                 savedBooking.getBookingId(), savedBooking.getBookingCode(), customerId);
-        
+        //todo:update remind if exist
+        if (request.getReminderId()!=null) {
+            estimateInternalApi.updateBookingToRemindById(request.getReminderId(),booking.getBookingId());
+        }
         return savedBooking;
     }
 
