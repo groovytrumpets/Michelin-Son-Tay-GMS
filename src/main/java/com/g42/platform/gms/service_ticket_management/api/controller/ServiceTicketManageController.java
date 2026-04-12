@@ -98,6 +98,24 @@ public class ServiceTicketManageController {
                 serviceTicketAdvisorService.updateEstimate(ticketCode, request)));
     }
 
+    /** Advisor/lễ tân đặt thời gian hẹn lấy xe dự kiến */
+    @PutMapping("/tickets/{ticketCode}/estimated-delivery")
+    public ResponseEntity<ApiResponse<ServiceTicketDetailResponse>> setEstimatedDelivery(
+            @PathVariable String ticketCode,
+            @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME)
+            LocalDateTime estimatedDeliveryAt) {
+        return ResponseEntity.ok(ApiResponses.success(
+                serviceTicketManageService.setEstimatedDelivery(ticketCode, estimatedDeliveryAt)));
+    }
+
+    /** Lễ tân xác nhận khách đã lấy xe thật sự — update delivered_at = now() */
+    @PostMapping("/tickets/{ticketCode}/confirm-delivered")
+    public ResponseEntity<ApiResponse<ServiceTicketDetailResponse>> confirmDelivered(
+            @PathVariable String ticketCode) {
+        return ResponseEntity.ok(ApiResponses.success(
+                serviceTicketManageService.confirmDelivered(ticketCode)));
+    }
+
     @GetMapping("/export")
     public ResponseEntity<byte[]> exportServiceTicketList(            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate){

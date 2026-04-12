@@ -35,7 +35,48 @@ public class InventoryService {
     public int getAvailableQuantity(Integer warehouseId, Integer itemId) {
         return inventoryRepo.findByWarehouseAndItem(warehouseId, itemId)
                 .map(Inventory::getAvailableQuantity)
-                .orElse(0);
+                .orElse(0);    }
+
+    /** Tăng reserved_quantity — dùng khi tạo stock allocation */
+    @Transactional
+    public void increaseReservedQuantity(Integer itemId, Integer warehouseId, Integer quantity) {
+        inventoryRepo.findByWarehouseAndItemWithLock(warehouseId, itemId).ifPresent(inv -> {
+            int newReserved = (inv.getReservedQuantity() != null ? inv.getReservedQuantity() : 0) + quantity;
+            inv.setReservedQuantity(Math.max(0, newReserved));
+            inventoryRepo.save(inv);
+        });
+    }
+
+    /** Giảm reserved_quantity — dùng khi release stock allocation */
+    @Transactional
+    public void decreaseReservedQuantity(Integer itemId, Integer warehouseId, Integer quantity) {
+        inventoryRepo.findByWarehouseAndItemWithLock(warehouseId, itemId).ifPresent(inv -> {
+            int newReserved = (inv.getReservedQuantity() != null ? inv.getReservedQuantity() : 0) - quantity;
+            inv.setReservedQuantity(Math.max(0, newReserved));
+            inventoryRepo.save(inv);
+        });
+    }
+
+    /** Cập nhật reserved_quantity theo delta (dương = tăng, âm = giảm) */
+    @Transactional
+    public void updateReservedQuantityByDelta(Integer itemId, Integer warehouseId, int delta) {
+        inventoryRepo.findByWarehouseAndItemWithLock(warehouseId, itemId).ifPresent(inv -> {
+            int newReserved = (inv.getReservedQuantity() != null ? inv.getReservedQuantity() : 0) + delta;
+            inv.setReservedQuantity(Math.max(0, newReserved));
+            inventoryRepo.save(inv);
+        });
+    }
+
+    /** Cập nhật inventory khi estimate được duyệt (trừ quantity thực tế) */
+    @Transactional
+    public void updateInventoryByEstimate(Integer itemId, Integer warehouseId, Integer quantity) {
+        inventoryRepo.findByWarehouseAndItemWithLock(warehouseId, itemId).ifPresent(inv -> {
+            int newQty = (inv.getQuantity() != null ? inv.getQuantity() : 0) - quantity;
+            int newReserved = (inv.getReservedQuantity() != null ? inv.getReservedQuantity() : 0) - quantity;
+            inv.setQuantity(Math.max(0, newQty));
+            inv.setReservedQuantity(Math.max(0, newReserved));
+            inventoryRepo.save(inv);
+        });
     }
     @Transactional(readOnly = true)
     public List<StockShortageInfo> checkAvailability(List<StockRequest> requests) {
@@ -51,8 +92,8 @@ public class InventoryService {
     }
     @Transactional(readOnly = true)
     public List<InventoryResponse> listByWarehouse(Integer warehouseId,
-                                                    boolean showImportPrice,
-                                                    boolean showSellingPrice) {
+                                                   boolean showImportPrice,
+                                                   boolean showSellingPrice) {
         List<Inventory> invList = inventoryRepo.findByWarehouse(warehouseId);
 
         List<Integer> itemIds = invList.stream().map(Inventory::getItemId).collect(Collectors.toList());
@@ -111,7 +152,7 @@ public class InventoryService {
     }
     @Transactional(readOnly = true)
     public List<InventoryResponse> searchByWarehouse(Integer warehouseId, String keyword,
-                                                      boolean showImportPrice) {
+                                                     boolean showImportPrice) {
         String like = "%" + keyword.toLowerCase() + "%";
         Specification<CatalogItemJpa> spec = (root, query, cb) -> cb.and(
                 cb.equal(root.get("itemType"), CatalogItemType.PART),

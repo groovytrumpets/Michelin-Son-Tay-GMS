@@ -158,7 +158,7 @@ public class StockEntryRepoImpl implements StockEntryRepo {
 
     @Override
     public BigDecimal findLatesFallBackPrice(Integer itemId, Integer warehouseId) {
-        return jpaRepo.findLatesFallBackPrice(itemId, warehouseId);
+        return jpaRepo.findLatesFallBackPrice(itemId, warehouseId).orElse(null);
     }
 
     @Override
