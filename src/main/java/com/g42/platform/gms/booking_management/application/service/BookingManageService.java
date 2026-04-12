@@ -5,6 +5,7 @@ package com.g42.platform.gms.booking_management.application.service;
 import com.g42.platform.gms.booking.customer.api.dto.BookingResponse;
 import com.g42.platform.gms.booking.customer.domain.enums.BookingRequestStatus;
 import com.g42.platform.gms.booking.customer.domain.exception.BookingException;
+import com.g42.platform.gms.booking_management.api.dto.CustomerDto;
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedDetailResponse;
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedRespond;
 import com.g42.platform.gms.booking_management.api.dto.requesting.*;
@@ -163,7 +164,15 @@ return confirmed;
 
     public List<BookedRespond> getBookingBySlot(LocalDate date, LocalTime slot) {
         List<Booking> bookings = bookingRepository.getBookingBySlot(date,slot);
-        return bookings.stream().map(bookingManageDtoMapper::toBookedRespond).toList();
+        List<BookedRespond> bookedResponds = new ArrayList<>();
+        for (Booking booking : bookings) {
+            BookedRespond bookedRespond = bookingManageDtoMapper.toBookedRespond(booking);
+            //find CustomerDto
+            CustomerDto customerDto = customerGateway.findCusDtoById(booking.getCustomerId());
+            bookedRespond.setCustomer(customerDto);
+            bookedResponds.add(bookedRespond);
+        }
+        return bookedResponds;
     }
     @Transactional
     public List<BookedRespond> setQueue(Integer bookingId, Integer queueNumber) {
