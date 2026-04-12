@@ -2,9 +2,11 @@ package com.g42.platform.gms.auth.infrastructure;
 
 import com.g42.platform.gms.auth.entity.CustomerProfile;
 import com.g42.platform.gms.auth.repository.CustomerProfileRepository;
+import com.g42.platform.gms.booking_management.api.dto.CustomerDto;
 import com.g42.platform.gms.booking_management.application.command.CreateCustomerCommand;
 import com.g42.platform.gms.booking_management.application.dto.CustomerData;
 import com.g42.platform.gms.booking_management.application.port.CustomerGateway;
+import com.g42.platform.gms.customer.api.mapper.CustomerDtoMapper;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -13,6 +15,8 @@ import java.util.Optional;
 @AllArgsConstructor
 public class CustomerGatewayImpl implements CustomerGateway {
     private final CustomerProfileRepository customerProfileRepository;
+    private final CustomerDtoMapper customerDtoMapper;
+
     @Override
     public Optional<CustomerData> findByPhone(String phone) {
         return customerProfileRepository.findByPhone(phone).map(cus -> new CustomerData(
@@ -53,5 +57,11 @@ public class CustomerGatewayImpl implements CustomerGateway {
                     cus.setFirstBookingAt(command.firstBookingAt());
                     return customerProfileRepository.save(cus).getCustomerId();
                 });
+    }
+
+    @Override
+    public CustomerDto findCusDtoById(Integer customerId) {
+        CustomerProfile customerProfile = customerProfileRepository.findById(customerId).orElse(null);
+        return customerDtoMapper.toCustomerDto(customerProfile);
     }
 }
