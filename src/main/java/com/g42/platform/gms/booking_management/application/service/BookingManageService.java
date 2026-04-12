@@ -108,7 +108,7 @@ return confirmed;
     public ActionBookingRespond cancelBookingRequest(String requestId, ActionBookingRequest actionBookingRequest) {
         BookingRequest request = bookingRepository.getBookingRequestById(requestId);
         if (request==null){
-            throw new BookingStaffException("LOI", BookingStaffErrorCode.INVALID_ID);
+            throw new BookingStaffException("ID 404", BookingStaffErrorCode.INVALID_ID);
         }
         request.cancel(actionBookingRequest.getReason(), actionBookingRequest.getNote());
         bookingRepository.setRequestBooking(request);
