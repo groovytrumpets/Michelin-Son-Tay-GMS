@@ -1,5 +1,6 @@
 package com.g42.platform.gms.warehouse.infrastructure.repository;
 
+import com.g42.platform.gms.warehouse.api.dto.WarehouseDetailDto;
 import com.g42.platform.gms.warehouse.domain.repository.WarehouseDetailProjection;
 import com.g42.platform.gms.warehouse.infrastructure.entity.WarehouseJpa;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -44,4 +45,18 @@ public interface WarehouseJpaRepo extends JpaRepository<WarehouseJpa,Integer> {
             where i.itemId in(:itemId)
         """)
     List<WarehouseDetailProjection> getListOfWarehouseDetailsByItemIds(@Param("itemId")Set<Integer> itemIds);
+    @Query("""
+    select new com.g42.platform.gms.warehouse.api.dto.WarehouseDetailDto( w.warehouseId,
+        w.warehouseCode,
+            w.warehouseName,
+                w.address,
+        i.itemId,
+                    i.quantity,
+                        i.reservedQuantity,
+                            i.minStockLevel,
+                                i.maxStockLevel)
+             from InventoryJpa i join WarehouseJpa w on i.warehouseId = w.warehouseId
+            where i.itemId =(:itemId)
+        """)
+    List<WarehouseDetailDto> getListOfWarehouseDetailsByItemId(Integer itemId);
 }

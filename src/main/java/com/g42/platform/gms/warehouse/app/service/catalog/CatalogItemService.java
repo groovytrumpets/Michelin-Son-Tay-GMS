@@ -8,10 +8,12 @@ import com.g42.platform.gms.warehouse.domain.entity.*;
 import com.g42.platform.gms.warehouse.domain.exception.WarehouseErrorCode;
 import com.g42.platform.gms.warehouse.domain.exception.WarehouseException;
 import com.g42.platform.gms.warehouse.domain.repository.CatalogItemRepo;
+import com.g42.platform.gms.warehouse.domain.repository.WarehouseRepo;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Service("catalogItemWarehouseService")
@@ -34,6 +36,8 @@ public class CatalogItemService {
     private TaxRuleInternalApi taxRuleInternalApi;
     @Autowired
     private TaxRuleDtoMapper taxRuleDtoMapper;
+    @Autowired
+    private WarehouseRepo warehouseRepo;
 
     public List<BrandHintDto> getAllBrands() {
         List<Brand> brandList = catalogItemRepo.getAllBrands();
@@ -205,6 +209,10 @@ public class CatalogItemService {
                 (taxRuleInternalApi.getTaxRuleById(catalogItem.getTaxRuleId()));
             catalogDetailDto.setTaxRule(taxValue);
         }
+        List<WarehouseDetailDto> warehouseDetails = warehouseRepo.getWarehouseDetailsByItemId(catalogDetailDto.getItemId());
+
+
+        catalogDetailDto.setWarehouseDetails(warehouseDetails);
 
         return catalogDetailDto;
     }
