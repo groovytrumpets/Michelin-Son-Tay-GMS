@@ -4,6 +4,7 @@ import com.g42.platform.gms.estimation.api.internal.TaxRuleInternalApi;
 import com.g42.platform.gms.estimation.api.mapper.TaxRuleDtoMapper;
 import com.g42.platform.gms.warehouse.api.dto.*;
 import com.g42.platform.gms.warehouse.api.mapper.*;
+import com.g42.platform.gms.warehouse.app.service.pricing.PricingService;
 import com.g42.platform.gms.warehouse.domain.entity.*;
 import com.g42.platform.gms.warehouse.domain.exception.WarehouseErrorCode;
 import com.g42.platform.gms.warehouse.domain.exception.WarehouseException;
@@ -13,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -38,6 +40,8 @@ public class CatalogItemService {
     private TaxRuleDtoMapper taxRuleDtoMapper;
     @Autowired
     private WarehouseRepo warehouseRepo;
+    @Autowired
+    private PricingService pricingService;
 
     public List<BrandHintDto> getAllBrands() {
         List<Brand> brandList = catalogItemRepo.getAllBrands();
@@ -210,6 +214,13 @@ public class CatalogItemService {
             catalogDetailDto.setTaxRule(taxValue);
         }
         List<WarehouseDetailDto> warehouseDetails = warehouseRepo.getWarehouseDetailsByItemId(catalogDetailDto.getItemId());
+        for (WarehouseDetailDto warehouseDetailDto : warehouseDetails) {
+            BigDecimal selinPrice= pricingService.getEffectivePrice(catalogItem.getItemId(),warehouseDetailDto.getWarehouseId(),catalogItem.getPrice());
+            if (selinPrice==null) {
+                selinPrice = BigDecimal.ZERO;
+            }
+            warehouseDetailDto.setSellingPrice(selinPrice);
+        }
 
 
         catalogDetailDto.setWarehouseDetails(warehouseDetails);
