@@ -57,6 +57,9 @@ public class ServiceTicketJpa {
     
     @Column(name = "delivered_at")
     private LocalDateTime deliveredAt;
+
+    @Column(name = "estimated_delivery_at")
+    private LocalDateTime estimatedDeliveryAt;
     
     @Column(name = "completed_at")
     private LocalDateTime completedAt;

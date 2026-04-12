@@ -45,6 +45,7 @@ public class ServiceTicketDetailResponse {
     private TicketStatus ticketStatus;
     private LocalDateTime receivedAt;
     private LocalDateTime deliveredAt;
+    private LocalDateTime estimatedDeliveryAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     
