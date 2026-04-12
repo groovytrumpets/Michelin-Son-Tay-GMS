@@ -1,5 +1,6 @@
 package com.g42.platform.gms.warehouse.infrastructure.repository.impl;
 
+import com.g42.platform.gms.warehouse.api.dto.WarehouseDetailDto;
 import com.g42.platform.gms.warehouse.domain.entity.CatalogItem;
 import com.g42.platform.gms.warehouse.domain.entity.WarehousePricing;
 import com.g42.platform.gms.warehouse.domain.enums.CatalogItemType;
@@ -78,5 +79,10 @@ public class WarehouseRepoImpl implements WarehouseRepo {
     @Override
     public List<WarehouseDetailProjection> getWarehouseDetailsByItemIds(Set<Integer> itemIds) {
         return warehouseJpaRepo.getListOfWarehouseDetailsByItemIds(itemIds);
+    }
+
+    @Override
+    public List<WarehouseDetailDto> getWarehouseDetailsByItemId(Integer itemId) {
+        return warehouseJpaRepo.getListOfWarehouseDetailsByItemId(itemId);
     }
 }

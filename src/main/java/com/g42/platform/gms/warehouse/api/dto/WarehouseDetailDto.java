@@ -32,4 +32,15 @@ public class WarehouseDetailDto {
     private Integer minStockLevel;
     private Integer maxStockLevel;
 
+    public WarehouseDetailDto(Integer warehouseId, String warehouseCode, String warehouseName, String warehouseAddress, Integer itemId, Integer quantity, Integer reservedQuantity, Integer minStockLevel, Integer maxStockLevel) {
+        this.warehouseId = warehouseId;
+        this.warehouseCode = warehouseCode;
+        this.warehouseName = warehouseName;
+        this.warehouseAddress = warehouseAddress;
+        this.itemId = itemId;
+        this.quantity = quantity;
+        this.reservedQuantity = reservedQuantity;
+        this.minStockLevel = minStockLevel;
+        this.maxStockLevel = maxStockLevel;
+    }
 }

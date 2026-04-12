@@ -1,5 +1,6 @@
 package com.g42.platform.gms.warehouse.domain.repository;
 
+import com.g42.platform.gms.warehouse.api.dto.WarehouseDetailDto;
 import com.g42.platform.gms.warehouse.domain.entity.CatalogItem;
 import com.g42.platform.gms.warehouse.domain.enums.CatalogItemType;
 import org.springframework.data.domain.Page;
@@ -14,4 +15,6 @@ public interface WarehouseRepo {
     Page<CatalogItem> getListOfCatalogItems(int page, int size, CatalogItemType itemType, Boolean isActive, String search, Integer brandId, Integer productLineId, Integer categoryId, BigDecimal minPrice, BigDecimal maxPrice, String sortBy);
 
     List<WarehouseDetailProjection> getWarehouseDetailsByItemIds(Set<Integer> itemIds);
+
+    List<WarehouseDetailDto> getWarehouseDetailsByItemId(Integer itemId);
 }
