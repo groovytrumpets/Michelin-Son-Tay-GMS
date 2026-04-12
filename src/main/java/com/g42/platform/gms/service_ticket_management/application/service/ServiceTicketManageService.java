@@ -463,6 +463,13 @@ public class ServiceTicketManageService {
         List<ServiceTicket> serviceTickets = serviceTicketRepo.findByCustomerAndVehicle(customerId,vehicleId);
         return serviceTickets.stream().map(serviceTicketDtoMapper::toDto).toList();
     }
+    public List<ServiceTicketListResponse> getBookedHistory(Integer customerId) {
+        if (customerId == null) {
+            throw new AssignmentException("CustomerId or VehicleId are null!",AssignmentErrorCode.BAD_REQUEST);
+        }
+        List<ServiceTicket> serviceTickets = serviceTicketRepo.findByCustomerId(customerId);
+        return serviceTickets.stream().map(serviceTicketDtoMapper::toDto).toList();
+    }
 }
 
 

@@ -45,4 +45,6 @@ public interface ServiceTicketRepo {
     ServiceTicket findPerviousCustomerService(Integer customerId, Integer serviceTicketId,Integer vehicleId);
 
     List<ServiceTicket> findByCustomerAndVehicle(Integer customerId, Integer vehicleId);
+
+    List<ServiceTicket> findByCustomerId(Integer customerId);
 }
