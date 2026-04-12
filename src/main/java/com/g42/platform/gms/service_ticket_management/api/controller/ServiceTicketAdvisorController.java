@@ -183,5 +183,10 @@ public class ServiceTicketAdvisorController {
             (@RequestParam Integer customerId, @RequestParam Integer vehicleId) {
         return ResponseEntity.ok(ApiResponses.success(manageService.getServiceTicketsHistory(customerId,vehicleId)));
     }
+    @GetMapping("/booking/history")
+    public ResponseEntity<ApiResponse<List<ServiceTicketListResponse>>> getBookedHistory
+            (@RequestParam Integer customerId) {
+        return ResponseEntity.ok(ApiResponses.success(manageService.getBookedHistory(customerId)));
+    }
 }
 
