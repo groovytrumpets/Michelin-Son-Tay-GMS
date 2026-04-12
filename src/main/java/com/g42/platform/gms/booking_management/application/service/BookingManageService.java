@@ -51,7 +51,12 @@ public class BookingManageService {
     }
 
     public BookedDetailResponse getBookedDetailById(String bookingId) {
-        return bookingManageDtoMapper.toBookedDetailResponse(bookingRepository.getBookedDetailById(bookingId));
+        Booking booking = bookingRepository.getBookedDetailById(bookingId);
+        BookedDetailResponse bookedDetailResponse = bookingManageDtoMapper.toBookedDetailResponse(booking);
+        CustomerDto customerDto = customerGateway.findCusDtoById(booking.getCustomerId());
+        bookedDetailResponse.setCustomer(customerDto);
+
+        return bookedDetailResponse;
         //todo: null handle exception
     }
 

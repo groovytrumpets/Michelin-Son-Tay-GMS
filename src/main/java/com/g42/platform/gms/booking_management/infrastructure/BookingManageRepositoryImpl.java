@@ -72,6 +72,7 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
                     b.getBookingId(),
                     b.getBookingCode(),
                     new CustomerDto(
+                            customer != null ? customer.getCustomerId() : null,
                             customer != null ? customer.getFullName() : null,
                             customer != null ? customer.getPhone() : null,
                             null
@@ -92,7 +93,6 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
     public Booking getBookedDetailById(String bookingId) {
         BookingJpa bookingJpa = bookingManageJpaRepository.getBookingJpaByBookingCode(bookingId);
         return bookingManagerMapper.toDomain(bookingJpa);
-
     }
     @Override
     public Page<BookingRequest> getBookingRequestList(int page, int size, LocalDate date, Boolean isGuest, BookingRequestStatus status, String search) {
