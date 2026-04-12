@@ -103,6 +103,13 @@ public class BookingManageController {
                                                                          @RequestParam Integer bookingId2){
         return ResponseEntity.ok(ApiResponses.success(bookingService.setswapQueueByBookingIds(bookingId1, bookingId2)));
     }
+
+    @PutMapping("/booking/{bookingId}/not-arrived")
+    public ResponseEntity<ApiResponse<BookedRespond>> markNotArrived(
+            @PathVariable Integer bookingId,
+            @RequestParam(required = false) String note) {
+        return ResponseEntity.ok(ApiResponses.success(bookingService.markNotArrived(bookingId, note)));
+    }
 //
 //    @GetMapping("/booking-request")
 //    public ResponseEntity<ApiResponse<Page<BookingRequestRes>>> getAllBookingSlot(@RequestParam(required = false) LocalDate date){
