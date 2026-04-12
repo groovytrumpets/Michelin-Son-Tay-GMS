@@ -423,6 +423,14 @@ public class ServiceTicketManageService {
         }
         return null;
     }
+
+    public List<ServiceTicketListResponse> getServiceTicketsHistory(Integer customerId, Integer vehicleId) {
+        if (customerId == null || vehicleId == null) {
+            throw new AssignmentException("CustomerId or VehicleId are null!",AssignmentErrorCode.BAD_REQUEST);
+        }
+        List<ServiceTicket> serviceTickets = serviceTicketRepo.findByCustomerAndVehicle(customerId,vehicleId);
+        return serviceTickets.stream().map(serviceTicketDtoMapper::toDto).toList();
+    }
 }
 
 

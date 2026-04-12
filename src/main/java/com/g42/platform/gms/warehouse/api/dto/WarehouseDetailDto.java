@@ -32,11 +32,4 @@ public class WarehouseDetailDto {
     private Integer minStockLevel;
     private Integer maxStockLevel;
 
-
-    public Integer getAvailableQuantity() {
-        if (quantity == null) return 0;
-        int reserved = (reservedQuantity != null) ? reservedQuantity : 0;
-        return Math.max(0, quantity - reserved);
-    }
-
 }
