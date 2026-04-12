@@ -31,6 +31,11 @@ public class WarehousePricingRepoImpl implements WarehousePricingRepo {
     }
 
     @Override
+    public Optional<WarehousePricingJpa> findByItemIdAndWarehouseId(Integer itemId, Integer warehouseId) {
+        return jpaRepo.findByWarehouseIdAndItemIdAndIsActiveTrue(warehouseId, itemId);
+    }
+
+    @Override
     public WarehousePricingJpa save(WarehousePricingJpa pricing) {
         return jpaRepo.save(pricing);
     }

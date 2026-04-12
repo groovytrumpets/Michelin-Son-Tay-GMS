@@ -160,6 +160,19 @@ public class ServiceTicketAdvisorController {
         return ResponseEntity.ok(ApiResponses.success(
                 advisorService.changeTechnician(ticketCode, oldTechnicianId, newTechnicianId, note)));
     }
+    /**
+     * Advisor đặt thời gian hẹn lấy xe dự kiến cho khách.
+     * Lưu vào estimated_delivery_at.
+     */
+    @PutMapping("/tickets/{ticketCode}/estimated-delivery")
+    public ResponseEntity<ApiResponse<ServiceTicketDetailResponse>> setEstimatedDelivery(
+            @PathVariable String ticketCode,
+            @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME)
+            java.time.LocalDateTime estimatedDeliveryAt) {
+        return ResponseEntity.ok(ApiResponses.success(
+                manageService.setEstimatedDelivery(ticketCode, estimatedDeliveryAt)));
+    }
+
     @GetMapping("/recommend/{serviceTicketId}")
     public ResponseEntity<ApiResponse<String>> getRecommend(@PathVariable Integer serviceTicketId) {
         return ResponseEntity.ok(ApiResponses.success(manageService.getCustomerPerviousRecomment(serviceTicketId)));

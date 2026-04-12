@@ -1,13 +1,16 @@
 package com.g42.platform.gms.warehouse.app.service.inventory;
 
 import com.g42.platform.gms.common.service.ExcelService;
+import com.g42.platform.gms.warehouse.domain.entity.Inventory;
+import com.g42.platform.gms.warehouse.domain.entity.StockEntry;
+import com.g42.platform.gms.warehouse.domain.entity.StockEntryItem;
 import com.g42.platform.gms.warehouse.domain.enums.CatalogItemType;
 import com.g42.platform.gms.warehouse.domain.enums.StockEntryStatus;
 import com.g42.platform.gms.warehouse.domain.repository.InventoryRepo;
 import com.g42.platform.gms.warehouse.domain.repository.PartCatalogRepo;
+import com.g42.platform.gms.warehouse.domain.repository.StockEntryRepo;
 import com.g42.platform.gms.warehouse.infrastructure.entity.*;
-import com.g42.platform.gms.warehouse.infrastructure.repository.StockEntryItemJpaRepo;
-import com.g42.platform.gms.warehouse.infrastructure.repository.StockEntryJpaRepo;import lombok.RequiredArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.*;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -44,8 +47,7 @@ public class InventoryExcelService {
 
     private final PartCatalogRepo partCatalogRepo;
     private final InventoryRepo inventoryRepo;
-    private final StockEntryJpaRepo stockEntryJpaRepo;
-    private final StockEntryItemJpaRepo stockEntryItemJpaRepo;
+    private final StockEntryRepo stockEntryRepo;
 
     // Cột Excel (0-indexed) — format có lô
     private static final int COL_STT       = 0;
@@ -74,10 +76,10 @@ public class InventoryExcelService {
      */
     public byte[] exportForSync(Integer warehouseId) {
         // Lấy tất cả lô còn hàng trong kho
-        List<StockEntryItemJpa> activeLots = stockEntryItemJpaRepo.findActiveLotsByWarehouse(warehouseId);
+        List<StockEntryItem> activeLots = stockEntryRepo.findActiveLotsByWarehouse(warehouseId);
 
         // Build map itemId → catalog item
-        List<Integer> itemIds = activeLots.stream().map(StockEntryItemJpa::getItemId).distinct().toList();
+        List<Integer> itemIds = activeLots.stream().map(StockEntryItem::getItemId).distinct().toList();
         Specification<CatalogItemJpa> spec = (root, query, cb) -> root.get("itemId").in(itemIds);
         Map<Integer, CatalogItemJpa> catalogMap = itemIds.isEmpty()
                 ? Map.of()
@@ -85,17 +87,17 @@ public class InventoryExcelService {
                         .collect(Collectors.toMap(CatalogItemJpa::getItemId, c -> c));
 
         // Build map entryId → entry (để lấy entryCode và entryDate)
-        Map<Integer, StockEntryJpa> entryMap = activeLots.stream()
-                .map(StockEntryItemJpa::getEntryId)
+        Map<Integer, StockEntry> entryMap = activeLots.stream()
+                .map(StockEntryItem::getEntryId)
                 .distinct()
-                .map(id -> stockEntryJpaRepo.findById(id).orElse(null))
+                .map(id -> stockEntryRepo.findEntryById(id).orElse(null))
                 .filter(Objects::nonNull)
-                .collect(Collectors.toMap(StockEntryJpa::getEntryId, e -> e));
+                .collect(Collectors.toMap(StockEntry::getEntryId, e -> e));
 
         int[] stt = {1};
         return ExcelService.exportToExcel(activeLots, HEADERS, lot -> {
             CatalogItemJpa cat = catalogMap.get(lot.getItemId());
-            StockEntryJpa entry = entryMap.get(lot.getEntryId());
+            StockEntry entry = entryMap.get(lot.getEntryId());
             return new Object[]{
                     stt[0]++,
                     cat != null && cat.getSku() != null ? cat.getSku() : "",
@@ -143,11 +145,11 @@ public class InventoryExcelService {
 
         // Bước 1: Invalidate tất cả lô SYNC cũ của warehouse này
         // (đặt remainingQuantity = 0 để FIFO không dùng nữa)
-        stockEntryItemJpaRepo.invalidateSyncLotsByWarehouse(warehouseId);
+        stockEntryRepo.invalidateSyncLotsByWarehouse(warehouseId);
 
         // Bước 2: Tạo stock_entry SYNC mới
-        StockEntryJpa syncEntry = buildSyncEntry(warehouseId, staffId);
-        StockEntryJpa savedEntry = stockEntryJpaRepo.save(syncEntry);
+        StockEntry syncEntry = buildSyncEntry(warehouseId, staffId);
+        StockEntry savedEntry = stockEntryRepo.save(syncEntry);
 
         // Bước 3: Parse từng dòng → tích lũy qty per item + tạo lô
         Map<Integer, Integer> itemTotalQty = new LinkedHashMap<>(); // itemId → tổng qty từ file
@@ -201,15 +203,16 @@ public class InventoryExcelService {
 
             // Tạo stock_entry_item cho lô này (chỉ khi qty > 0 và có giá)
             if (qty > 0 && importPrice.compareTo(BigDecimal.ZERO) > 0) {
-                StockEntryItemJpa entryItem = new StockEntryItemJpa();
-                entryItem.setEntryId(savedEntry.getEntryId());
-                entryItem.setItemId(itemId);
-                entryItem.setQuantity(qty);
-                entryItem.setImportPrice(importPrice);
-                entryItem.setMarkupMultiplier(markup);
-                entryItem.setRemainingQuantity(qty);
-                entryItem.setNotes(notes);
-                stockEntryItemJpaRepo.save(entryItem);
+                StockEntryItem entryItem = StockEntryItem.builder()
+                        .entryId(savedEntry.getEntryId())
+                        .itemId(itemId)
+                        .quantity(qty)
+                        .importPrice(importPrice)
+                        .markupMultiplier(markup)
+                        .remainingQuantity(qty)
+                        .notes(notes)
+                        .build();
+                stockEntryRepo.saveItem(entryItem);
             }
         }
 
@@ -218,17 +221,18 @@ public class InventoryExcelService {
         for (Map.Entry<Integer, Integer> e : itemTotalQty.entrySet()) {
             Integer itemId = e.getKey();
             Integer totalQty = e.getValue();
-            InventoryJpa inv = inventoryRepo.findByWarehouseAndItem(warehouseId, itemId).orElse(null);
+            Inventory inv = inventoryRepo.findByWarehouseAndItem(warehouseId, itemId).orElse(null);
             if (inv != null) {
                 inv.setQuantity(totalQty);
                 inventoryRepo.save(inv);
                 inventoryUpdated++;
             } else {
-                InventoryJpa newInv = new InventoryJpa();
-                newInv.setWarehouseId(warehouseId);
-                newInv.setItemId(itemId);
-                newInv.setQuantity(totalQty);
-                newInv.setReservedQuantity(0);
+                Inventory newInv = Inventory.builder()
+                        .warehouseId(warehouseId)
+                        .itemId(itemId)
+                        .quantity(totalQty)
+                        .reservedQuantity(0)
+                        .build();
                 inventoryRepo.save(newInv);
                 inventoryInserted++;
             }
@@ -239,18 +243,18 @@ public class InventoryExcelService {
 
     // ── helpers ──────────────────────────────────────────────────────────────
 
-    private StockEntryJpa buildSyncEntry(Integer warehouseId, Integer staffId) {
-        StockEntryJpa entry = new StockEntryJpa();
-        entry.setEntryCode("SYNC-" + warehouseId + "-" + System.currentTimeMillis());
-        entry.setWarehouseId(warehouseId);
-        entry.setSupplierName("SYNC - Đồng bộ từ kho T3");
-        entry.setEntryDate(LocalDate.now());
-        entry.setStatus(StockEntryStatus.CONFIRMED);
-        entry.setNotes("Đồng bộ tồn kho từ hệ thống kho T3");
-        entry.setCreatedBy(staffId);
-        entry.setConfirmedBy(staffId);
-        entry.setConfirmedAt(LocalDateTime.now());
-        return entry;
+    private StockEntry buildSyncEntry(Integer warehouseId, Integer staffId) {
+        return StockEntry.builder()
+                .entryCode("SYNC-" + warehouseId + "-" + System.currentTimeMillis())
+                .warehouseId(warehouseId)
+                .supplierName("SYNC - Đồng bộ từ kho T3")
+                .entryDate(LocalDate.now())
+                .status(StockEntryStatus.CONFIRMED)
+                .notes("Đồng bộ tồn kho từ hệ thống kho T3")
+                .createdBy(staffId)
+                .confirmedBy(staffId)
+                .confirmedAt(LocalDateTime.now())
+                .build();
     }
 
     private Map<Integer, BigDecimal> buildLatestPriceMap(Integer warehouseId) {

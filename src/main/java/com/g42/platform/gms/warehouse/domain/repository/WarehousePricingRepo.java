@@ -11,6 +11,9 @@ public interface WarehousePricingRepo {
 
     Optional<WarehousePricingJpa> findActiveByWarehouseAndItem(Integer warehouseId, Integer itemId);
 
+    /** Lấy pricing theo item + warehouse (không filter active) — dùng cho PricingService */
+    Optional<WarehousePricingJpa> findByItemIdAndWarehouseId(Integer itemId, Integer warehouseId);
+
     Optional<WarehousePricingJpa> findById(Integer pricingId);
 
     WarehousePricingJpa save(WarehousePricingJpa pricing);

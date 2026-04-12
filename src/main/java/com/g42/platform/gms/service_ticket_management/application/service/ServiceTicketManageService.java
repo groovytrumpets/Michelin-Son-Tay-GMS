@@ -163,6 +163,7 @@ public class ServiceTicketManageService {
         response.setCheckInNotes(ticket.getCheckInNotes());
         response.setReceivedAt(ticket.getReceivedAt());
         response.setDeliveredAt(ticket.getDeliveredAt());
+        response.setEstimatedDeliveryAt(ticket.getEstimatedDeliveryAt());
         response.setCreatedAt(ticket.getCreatedAt());
         response.setUpdatedAt(ticket.getUpdatedAt());
         response.setImmutable(ticket.getImmutable());
@@ -263,6 +264,37 @@ public class ServiceTicketManageService {
 
         // TODO: trigger ZNS feedback notification here
         log.info("Ticket {} → PAID", ticketCode);
+
+        return getServiceTicketDetail(ticketCode);
+    }
+
+    /**
+     * Advisor/lễ tân đặt thời gian hẹn lấy xe dự kiến.
+     * Lưu vào estimated_delivery_at.
+     */
+    @Transactional
+    public ServiceTicketDetailResponse setEstimatedDelivery(String ticketCode, LocalDateTime estimatedDeliveryAt) {
+        ServiceTicket ticket = serviceTicketRepo.findByTicketCode(ticketCode)
+                .orElseThrow(() -> new CheckInException("Không tìm thấy service ticket: " + ticketCode));
+        ticket.setEstimatedDeliveryAt(estimatedDeliveryAt);
+        ticket.setUpdatedAt(LocalDateTime.now());
+        serviceTicketRepo.save(ticket);
+        log.info("Ticket {} → estimatedDeliveryAt={}", ticketCode, estimatedDeliveryAt);
+        return getServiceTicketDetail(ticketCode);
+    }
+
+    /**
+     * Lễ tân xác nhận khách đã lấy xe thật sự.
+     * Update delivered_at = now().
+     */
+    @Transactional
+    public ServiceTicketDetailResponse confirmDelivered(String ticketCode) {
+        ServiceTicket ticket = serviceTicketRepo.findByTicketCode(ticketCode)
+                .orElseThrow(() -> new CheckInException("Không tìm thấy service ticket: " + ticketCode));
+        ticket.setDeliveredAt(LocalDateTime.now());
+        ticket.setUpdatedAt(LocalDateTime.now());
+        serviceTicketRepo.save(ticket);
+        log.info("Ticket {} → deliveredAt={}", ticketCode, ticket.getDeliveredAt());
         return getServiceTicketDetail(ticketCode);
     }
 
