@@ -222,4 +222,10 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
         return bookingManagerMapper.toDomain(bookingJpa);
     }
 
+    @Override
+    @org.springframework.transaction.annotation.Transactional
+    public void bulkExpireOldRequests() {
+        bookingMRequestJpaRepo.bulkExpireOldRequests(LocalDateTime.now());
+    }
+
 }

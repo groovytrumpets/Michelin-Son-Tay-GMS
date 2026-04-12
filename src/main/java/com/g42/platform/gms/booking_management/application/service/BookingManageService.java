@@ -55,6 +55,8 @@ public class BookingManageService {
     }
 
     public Page<BookingRequestRes> getListBookingRequest(int page, int size, LocalDate date, Boolean isGuest, BookingRequestStatus status, String search) {
+        // Lazy expire: update trước khi query
+        bookingRepository.bulkExpireOldRequests();
         Page<BookingRequest> bookingList = bookingRepository.getBookingRequestList(page,size,date,isGuest,status,search);
         //return bookingMRequestDtoMapper.toBookingRequestResPage(bookingList);
         return bookingList.map(bookingMRequestDtoMapper::toBookingRequestRes);
@@ -201,6 +203,28 @@ return confirmed;
         bookingRepository.save(booking1);
         bookingRepository.save(booking2);
         return getBookingBySlot(booking1.getScheduledDate(), booking1.getScheduledTime());
+    }
+
+    @Transactional
+    public BookedRespond markNotArrived(Integer bookingId, String note) {
+        Booking booking = bookingRepository.getBookedById(bookingId);
+        if (booking == null) {
+            throw new BookingStaffException("Không tìm thấy booking", BookingStaffErrorCode.INVALID_ID);
+        }
+        if (booking.getStatus() != BookingEnum.CONFIRMED) {
+            throw new BookingStaffException("Chỉ có thể đánh dấu không đến khi booking đang CONFIRMED ",
+                    BookingStaffErrorCode.BOOKING_CANT_EDIT);
+        }
+        booking.setStatus(BookingEnum.NOT_ARRIVED);
+        if (note != null && !note.isBlank()) {
+            String existing = booking.getDescription();
+            String updated = (existing != null && !existing.isBlank())
+                    ? existing + " | [Không đến] " + note
+                    : "[Không đến] " + note;
+            booking.setDescription(updated);
+        }
+        Booking saved = bookingRepository.save(booking);
+        return bookingManageDtoMapper.toBookedRespond(saved);
     }
 
     private void compare2BookingsSlot(Booking booking1, Booking booking2) {
