@@ -21,4 +21,5 @@ public class EstimateItemReqDto {
     private Integer taxRuleId;
     private Boolean isChecked;
     private Boolean isRemoved;
+    private String unit;
 }
