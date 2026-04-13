@@ -89,6 +89,6 @@ public class WarehouseRepoImpl implements WarehouseRepo {
 
     @Override
     public List<Warehouse> getAllWarehouse() {
-        return warehouseJpaRepo.findAllByIsActive(true);
+        return warehouseJpaRepo.findAllByIsActive(true).stream().map(warehouseJpaMapper::toDomain).toList();
     }
 }

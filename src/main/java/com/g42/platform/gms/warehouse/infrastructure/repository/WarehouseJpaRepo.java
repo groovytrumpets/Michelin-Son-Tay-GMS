@@ -61,5 +61,5 @@ public interface WarehouseJpaRepo extends JpaRepository<WarehouseJpa,Integer> {
         """)
     List<WarehouseDetailDto> getListOfWarehouseDetailsByItemId(Integer itemId);
 
-    List<Warehouse> findAllByIsActive(Boolean isActive);
+    List<WarehouseJpa> findAllByIsActive(Boolean isActive);
 }
