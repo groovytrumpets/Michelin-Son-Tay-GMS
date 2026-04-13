@@ -43,6 +43,16 @@ public class CatalogItem {
     private String barcode;
     private String color;
 
+    public Integer getBrandId() {
+        if (brandId == null) return 0;
+        return brandId;
+    }
+
+    public Integer getProductLineId() {
+        if (productLineId == null) return 0;
+        return productLineId;
+    }
+
     public void validateBrandConsistency(Brand brand, ProductLine productLine) {
         if (!productLine.getBrandId().equals(brand.getBrandId())) {
             throw new WarehouseException("Product line không thuộc brand", WarehouseErrorCode.INVALID_PRODUCT_LINE);

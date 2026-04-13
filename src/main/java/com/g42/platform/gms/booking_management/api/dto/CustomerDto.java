@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CustomerDto {
+    private Integer customerId;
     private String fullName;
     private String phone;
     private LocalDateTime firstBookingAt;

@@ -112,7 +112,8 @@ public class WarehouseService {
                                     prj.getQuantity(),
                                     prj.getReservedQuantity(),
                                     prj.getMinStockLevel(),
-                                    prj.getMaxStockLevel()
+                                    prj.getMaxStockLevel(),
+                                    prj.getAvailableStockLevel()
                             ), Collectors.toList()) // Map Projection thành DTO và gom thành List
                     ));
         } else {

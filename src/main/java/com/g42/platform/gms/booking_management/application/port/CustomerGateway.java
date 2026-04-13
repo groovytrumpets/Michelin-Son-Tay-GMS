@@ -1,5 +1,6 @@
 package com.g42.platform.gms.booking_management.application.port;
 
+import com.g42.platform.gms.booking_management.api.dto.CustomerDto;
 import com.g42.platform.gms.booking_management.application.command.CreateCustomerCommand;
 import com.g42.platform.gms.booking_management.application.dto.CustomerData;
 
@@ -11,4 +12,6 @@ public interface CustomerGateway {
 
     CustomerData create(String fullName, String phone, String firstBookingAt    );
     Integer getOrCreateCustomer(CreateCustomerCommand command);
+
+    CustomerDto findCusDtoById(Integer customerId);
 }

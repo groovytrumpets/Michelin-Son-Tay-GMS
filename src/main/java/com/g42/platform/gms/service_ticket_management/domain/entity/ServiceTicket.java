@@ -25,6 +25,7 @@ public class ServiceTicket {
     private String customerRequest;
     private String technicianNotes;
     private LocalDateTime deliveredAt;
+    private LocalDateTime estimatedDeliveryAt;
     private Boolean isDeleted;
     private String checkInNotes;
     private Boolean immutable;

@@ -1,6 +1,7 @@
 package com.g42.platform.gms.customer.api.mapper;
 
 
+import com.g42.platform.gms.booking_management.api.dto.CustomerDto;
 import com.g42.platform.gms.customer.api.dto.CustomerCreateDto;
 import com.g42.platform.gms.customer.domain.entity.*;
 import org.mapstruct.Mapper;
@@ -16,4 +17,6 @@ public interface CustomerDtoMapper {
     @Mapping(source = "customerProfile.avatar", target = "avatar")
     @Mapping(source = "customerProfile.dob", target = "dob", dateFormat = "yyyy-MM-dd")
     CustomerCreateDto toCusCreateDto(CustomerProfile customerProfile, CustomerAuth customerAuth);
+
+    CustomerDto toCustomerDto(com.g42.platform.gms.auth.entity.CustomerProfile customerProfile);
 }

@@ -5,6 +5,7 @@ package com.g42.platform.gms.booking_management.application.service;
 import com.g42.platform.gms.booking.customer.api.dto.BookingResponse;
 import com.g42.platform.gms.booking.customer.domain.enums.BookingRequestStatus;
 import com.g42.platform.gms.booking.customer.domain.exception.BookingException;
+import com.g42.platform.gms.booking_management.api.dto.CustomerDto;
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedDetailResponse;
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedRespond;
 import com.g42.platform.gms.booking_management.api.dto.requesting.*;
@@ -50,11 +51,18 @@ public class BookingManageService {
     }
 
     public BookedDetailResponse getBookedDetailById(String bookingId) {
-        return bookingManageDtoMapper.toBookedDetailResponse(bookingRepository.getBookedDetailById(bookingId));
+        Booking booking = bookingRepository.getBookedDetailById(bookingId);
+        BookedDetailResponse bookedDetailResponse = bookingManageDtoMapper.toBookedDetailResponse(booking);
+        CustomerDto customerDto = customerGateway.findCusDtoById(booking.getCustomerId());
+        bookedDetailResponse.setCustomer(customerDto);
+
+        return bookedDetailResponse;
         //todo: null handle exception
     }
 
     public Page<BookingRequestRes> getListBookingRequest(int page, int size, LocalDate date, Boolean isGuest, BookingRequestStatus status, String search) {
+        // Lazy expire: update trước khi query
+        bookingRepository.bulkExpireOldRequests();
         Page<BookingRequest> bookingList = bookingRepository.getBookingRequestList(page,size,date,isGuest,status,search);
         //return bookingMRequestDtoMapper.toBookingRequestResPage(bookingList);
         return bookingList.map(bookingMRequestDtoMapper::toBookingRequestRes);
@@ -108,7 +116,7 @@ return confirmed;
     public ActionBookingRespond cancelBookingRequest(String requestId, ActionBookingRequest actionBookingRequest) {
         BookingRequest request = bookingRepository.getBookingRequestById(requestId);
         if (request==null){
-            throw new BookingStaffException("LOI", BookingStaffErrorCode.INVALID_ID);
+            throw new BookingStaffException("ID 404", BookingStaffErrorCode.INVALID_ID);
         }
         request.cancel(actionBookingRequest.getReason(), actionBookingRequest.getNote());
         bookingRepository.setRequestBooking(request);
@@ -163,7 +171,15 @@ return confirmed;
 
     public List<BookedRespond> getBookingBySlot(LocalDate date, LocalTime slot) {
         List<Booking> bookings = bookingRepository.getBookingBySlot(date,slot);
-        return bookings.stream().map(bookingManageDtoMapper::toBookedRespond).toList();
+        List<BookedRespond> bookedResponds = new ArrayList<>();
+        for (Booking booking : bookings) {
+            BookedRespond bookedRespond = bookingManageDtoMapper.toBookedRespond(booking);
+            //find CustomerDto
+            CustomerDto customerDto = customerGateway.findCusDtoById(booking.getCustomerId());
+            bookedRespond.setCustomer(customerDto);
+            bookedResponds.add(bookedRespond);
+        }
+        return bookedResponds;
     }
     @Transactional
     public List<BookedRespond> setQueue(Integer bookingId, Integer queueNumber) {
@@ -201,6 +217,28 @@ return confirmed;
         bookingRepository.save(booking1);
         bookingRepository.save(booking2);
         return getBookingBySlot(booking1.getScheduledDate(), booking1.getScheduledTime());
+    }
+
+    @Transactional
+    public BookedRespond markNotArrived(Integer bookingId, String note) {
+        Booking booking = bookingRepository.getBookedById(bookingId);
+        if (booking == null) {
+            throw new BookingStaffException("Không tìm thấy booking", BookingStaffErrorCode.INVALID_ID);
+        }
+        if (booking.getStatus() != BookingEnum.CONFIRMED) {
+            throw new BookingStaffException("Chỉ có thể đánh dấu không đến khi booking đang CONFIRMED ",
+                    BookingStaffErrorCode.BOOKING_CANT_EDIT);
+        }
+        booking.setStatus(BookingEnum.NOT_ARRIVED);
+        if (note != null && !note.isBlank()) {
+            String existing = booking.getDescription();
+            String updated = (existing != null && !existing.isBlank())
+                    ? existing + " | [Không đến] " + note
+                    : "[Không đến] " + note;
+            booking.setDescription(updated);
+        }
+        Booking saved = bookingRepository.save(booking);
+        return bookingManageDtoMapper.toBookedRespond(saved);
     }
 
     private void compare2BookingsSlot(Booking booking1, Booking booking2) {

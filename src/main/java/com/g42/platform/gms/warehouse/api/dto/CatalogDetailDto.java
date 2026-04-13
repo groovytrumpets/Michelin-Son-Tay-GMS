@@ -41,4 +41,5 @@ public class CatalogDetailDto {
     private String barcode;
     private String color;
     private List<SpecificationRespondDto> specifications;
+    private List<WarehouseDetailDto> warehouseDetails;
 }

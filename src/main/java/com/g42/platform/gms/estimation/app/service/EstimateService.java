@@ -219,6 +219,7 @@ public class EstimateService {
             item.setQuantity(req.getQuantity());
             item.setUnitPrice(req.getUnitPrice());
             item.setWarehouseId(req.getWarehouseId());
+            item.setUnit(req.getUnit());
             item.setIsChecked(req.getIsChecked() != null ? req.getIsChecked() : false);
 
             TaxRule taxRule = null;

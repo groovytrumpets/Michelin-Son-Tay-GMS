@@ -1,22 +1,24 @@
 package com.g42.platform.gms.warehouse.domain.entity;
 
 import com.g42.platform.gms.warehouse.domain.enums.StockEntryStatus;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class StockEntry {
     private Integer entryId;
     private String entryCode;
     private Integer warehouseId;
-    private Integer itemId;
-    private String itemName;
-    private Integer quantity;
-    private BigDecimal importPrice;
     private String supplierName;
     private LocalDate entryDate;
     private StockEntryStatus status;
@@ -25,5 +27,7 @@ public class StockEntry {
     private LocalDateTime confirmedAt;
     private Integer createdBy;
     private LocalDateTime createdAt;
-    private List<String> attachmentUrls;
+    private LocalDateTime updatedAt;
+    @Builder.Default
+    private List<StockEntryItem> items = new ArrayList<>();
 }

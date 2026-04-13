@@ -122,4 +122,16 @@ public class ServiceTicketRepoImpl implements ServiceTicketRepo {
         ServiceTicketJpa serviceTicketJpa2 = jpaRepo.findFirstByCustomerIdAndVehicleIdAndServiceTicketIdNotOrderByReceivedAtDesc(customerId,vehicleId, serviceTicketId);
         return mapper.toDomain(serviceTicketJpa2);
     }
+
+    @Override
+    public List<ServiceTicket> findByCustomerAndVehicle(Integer customerId, Integer vehicleId) {
+        List<ServiceTicketJpa> serviceTicketJpas = jpaRepo.findAllByCustomerIdAndVehicleIdOrderByReceivedAtDesc(customerId, vehicleId);
+        return serviceTicketJpas.stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
+    public List<ServiceTicket> findByCustomerId(Integer customerId) {
+        List<ServiceTicketJpa> serviceTicketJpas = jpaRepo.findAllByCustomerIdOrderByReceivedAtDesc(customerId);
+        return serviceTicketJpas.stream().map(mapper::toDomain).toList();
+    }
 }

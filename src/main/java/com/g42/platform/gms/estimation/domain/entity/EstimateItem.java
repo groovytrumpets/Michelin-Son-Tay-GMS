@@ -37,6 +37,7 @@ public class EstimateItem {
     private Boolean isRemoved = false;
     private BigDecimal taxAmount;
     private BigDecimal appliedTaxRate;
+    private String unit;
     public BigDecimal getSubTotal() {
         if (unitPrice == null || quantity == null) return BigDecimal.ZERO;
         return unitPrice.multiply(BigDecimal.valueOf(quantity));
