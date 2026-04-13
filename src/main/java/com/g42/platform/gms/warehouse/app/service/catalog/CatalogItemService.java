@@ -78,6 +78,13 @@ public class CatalogItemService {
         List<Specification> specifications = catalogItemRepo.getListOfSpecsByItem(catalogItem.getItemId());
         String itemName = builDisplayName(catalogDtoMapper.toDomain(createDto),brand,productLine,specifications,itemCategory);
         catalogItem.setItemName(itemName);
+        //todo: free tax
+        Integer finalTaxId = createDto.getTaxRuleId();
+        if (finalTaxId == null) {
+            finalTaxId = taxRuleInternalApi.getTaxCodeFreeId("FREE");
+            if (finalTaxId==-1) finalTaxId=taxRuleInternalApi.createNewFreeTax();
+        }
+        catalogItem.setTaxRuleId(finalTaxId);
         CatalogItem saveCatalogItem = catalogItemRepo.saveCatalogItem(catalogItem);
         return catalogDtoMapper.toDto(saveCatalogItem);
     }
