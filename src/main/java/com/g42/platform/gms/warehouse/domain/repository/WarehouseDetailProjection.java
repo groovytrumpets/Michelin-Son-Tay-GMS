@@ -13,4 +13,5 @@ public interface WarehouseDetailProjection {
     Integer getReservedQuantity();
     Integer getMinStockLevel();
     Integer getMaxStockLevel();
+    Integer getAvailableStockLevel();
 }

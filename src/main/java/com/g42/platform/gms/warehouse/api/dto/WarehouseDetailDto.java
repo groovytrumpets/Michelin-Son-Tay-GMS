@@ -31,6 +31,12 @@ public class WarehouseDetailDto {
     private Integer reservedQuantity;
     private Integer minStockLevel;
     private Integer maxStockLevel;
+    private Integer availableStockLevel;
+
+    public Integer getAvailableStockLevel() {
+        this.setAvailableStockLevel(this.quantity-this.reservedQuantity);
+        return availableStockLevel;
+    }
 
     public WarehouseDetailDto(Integer warehouseId, String warehouseCode, String warehouseName, String warehouseAddress, Integer itemId, Integer quantity, Integer reservedQuantity, Integer minStockLevel, Integer maxStockLevel) {
         this.warehouseId = warehouseId;
