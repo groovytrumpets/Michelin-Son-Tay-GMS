@@ -42,6 +42,8 @@ public class CatalogItemService {
     private WarehouseRepo warehouseRepo;
     @Autowired
     private PricingService pricingService;
+    @Autowired
+    private WarehouseDtoMapper warehouseDtoMapper;
 
     public List<BrandHintDto> getAllBrands() {
         List<Brand> brandList = catalogItemRepo.getAllBrands();
@@ -230,5 +232,10 @@ public class CatalogItemService {
 
     public SpecAttributeDto getSpecsAttributeById(Integer attributeId) {
         return specAttributeDtoMapper.toDto(catalogItemRepo.getSpecAttributeById(attributeId));
+    }
+
+    public List<WarehouseDto> getAllWarehouse() {
+        List<Warehouse> warehouses = warehouseRepo.getAllWarehouse();
+        return warehouses.stream().map(warehouseDtoMapper::toDto).toList();
     }
 }

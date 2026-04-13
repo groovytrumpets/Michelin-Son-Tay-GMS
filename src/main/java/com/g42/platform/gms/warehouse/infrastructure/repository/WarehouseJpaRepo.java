@@ -1,6 +1,7 @@
 package com.g42.platform.gms.warehouse.infrastructure.repository;
 
 import com.g42.platform.gms.warehouse.api.dto.WarehouseDetailDto;
+import com.g42.platform.gms.warehouse.domain.entity.Warehouse;
 import com.g42.platform.gms.warehouse.domain.repository.WarehouseDetailProjection;
 import com.g42.platform.gms.warehouse.infrastructure.entity.WarehouseJpa;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -59,4 +60,6 @@ public interface WarehouseJpaRepo extends JpaRepository<WarehouseJpa,Integer> {
             where i.itemId =(:itemId)
         """)
     List<WarehouseDetailDto> getListOfWarehouseDetailsByItemId(Integer itemId);
+
+    List<Warehouse> findAllByIsActive(Boolean isActive);
 }
