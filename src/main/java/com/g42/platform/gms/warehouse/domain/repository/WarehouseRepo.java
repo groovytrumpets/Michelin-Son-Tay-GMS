@@ -2,6 +2,7 @@ package com.g42.platform.gms.warehouse.domain.repository;
 
 import com.g42.platform.gms.warehouse.api.dto.WarehouseDetailDto;
 import com.g42.platform.gms.warehouse.domain.entity.CatalogItem;
+import com.g42.platform.gms.warehouse.domain.entity.Warehouse;
 import com.g42.platform.gms.warehouse.domain.enums.CatalogItemType;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Repository;
@@ -17,4 +18,6 @@ public interface WarehouseRepo {
     List<WarehouseDetailProjection> getWarehouseDetailsByItemIds(Set<Integer> itemIds);
 
     List<WarehouseDetailDto> getWarehouseDetailsByItemId(Integer itemId);
+
+    List<Warehouse> getAllWarehouse();
 }

@@ -78,5 +78,10 @@ public class WarehouseController {
     public ResponseEntity<ApiResponse<SpecAttribute>> createSpecAttribute(@RequestBody SpecAttribute specAttribute) {
         return ResponseEntity.ok(ApiResponses.success(catalogItemService.saveSpecAttribute(specAttribute)));
     }
+    @GetMapping("/warehouse/all")
+    public ResponseEntity<ApiResponse<List<WarehouseDto>>> getAllWarehouse() {
+        List<WarehouseDto> promotionCreateDtoList = catalogItemService.getAllWarehouse();
+        return ResponseEntity.ok(ApiResponses.success(promotionCreateDtoList));
+    }
 
 }
