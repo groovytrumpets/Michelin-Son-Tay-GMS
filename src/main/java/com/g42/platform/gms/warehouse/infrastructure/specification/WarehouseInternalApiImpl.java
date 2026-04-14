@@ -6,8 +6,10 @@ import com.g42.platform.gms.warehouse.app.service.inventory.InventoryService;
 import com.g42.platform.gms.warehouse.domain.exception.WarehouseErrorCode;
 import com.g42.platform.gms.warehouse.domain.exception.WarehouseException;
 import com.g42.platform.gms.warehouse.infrastructure.entity.CatalogItemJpa;
+import com.g42.platform.gms.warehouse.infrastructure.entity.WorkCategoryJpaEntity;
 import com.g42.platform.gms.warehouse.infrastructure.mapper.CatalogItemJpaMapper;
 import com.g42.platform.gms.warehouse.infrastructure.repository.CatalogItemJpaRepo;
+import com.g42.platform.gms.warehouse.infrastructure.repository.WorkCategoryJpaEntityRepo;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -19,7 +21,8 @@ public class WarehouseInternalApiImpl implements WarehouseInternalApi {
     private CatalogItemJpaMapper catalogItemJpaMapper;
     @Autowired
     private InventoryService inventoryService;
-
+    @Autowired
+    private WorkCategoryJpaEntityRepo itemCategoryJpaRepo;
 
     @Override
     public CatalogItemDto getItemInfo(Integer itemId) {
@@ -43,5 +46,14 @@ public class WarehouseInternalApiImpl implements WarehouseInternalApi {
     @Override
     public void updateInventoryEstimateAllocation(Integer itemId, Integer warehouseId, Integer quantity) {
         inventoryService.updateInventoryByEstimate(itemId,warehouseId,quantity);
+    }
+
+    @Override
+    public Integer findCodeByCategoryCode(String categoryCode) {
+        WorkCategoryJpaEntity workCategoryJpaEntity = itemCategoryJpaRepo.findByCategoryCode(categoryCode);
+        if (workCategoryJpaEntity == null) {
+            return null;
+        }
+        return workCategoryJpaEntity.getWorkCategoryId();
     }
 }
