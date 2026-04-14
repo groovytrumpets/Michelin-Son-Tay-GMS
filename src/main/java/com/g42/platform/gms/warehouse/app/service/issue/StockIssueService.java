@@ -1,7 +1,11 @@
 package com.g42.platform.gms.warehouse.app.service.issue;
 
+import com.g42.platform.gms.auth.entity.StaffProfile;
+import com.g42.platform.gms.auth.repository.StaffProfileRepo;
 import com.g42.platform.gms.booking.customer.infrastructure.entity.CatalogItemJpaEntity;
 import com.g42.platform.gms.catalog.infrastructure.repository.CatalogItemRepository;
+import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicket;
+import com.g42.platform.gms.service_ticket_management.domain.repository.ServiceTicketRepo;
 import com.g42.platform.gms.warehouse.api.dto.issue.CreateStockIssueRequest;
 import com.g42.platform.gms.warehouse.api.dto.request.PatchIssueItemRequest;
 import com.g42.platform.gms.warehouse.api.dto.request.UpdateStockIssueRequest;
@@ -25,7 +29,9 @@ import com.g42.platform.gms.warehouse.domain.repository.StockIssueRepo;
 import com.g42.platform.gms.warehouse.domain.repository.WarehousePricingRepo;
 import com.g42.platform.gms.warehouse.infrastructure.entity.InventoryTransactionJpa;
 import com.g42.platform.gms.warehouse.infrastructure.entity.StockAllocationJpa;
+import com.g42.platform.gms.warehouse.infrastructure.entity.WarehouseJpa;
 import com.g42.platform.gms.warehouse.infrastructure.entity.WarehousePricingJpa;
+import com.g42.platform.gms.warehouse.infrastructure.repository.WarehouseJpaRepo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -69,6 +75,9 @@ public class StockIssueService {
     private final DiscountConfigRepo discountConfigRepo;
     private final StockIssueItemRepo stockIssueItemRepo;
     private final CatalogItemRepository catalogItemRepository;
+    private final StaffProfileRepo staffProfileRepo;
+    private final WarehouseJpaRepo warehouseJpaRepo;
+    private final ServiceTicketRepo serviceTicketRepo;
 
     @Transactional
     public StockIssueResponse create(CreateStockIssueRequest request, Integer staffId) {
@@ -359,12 +368,31 @@ public class StockIssueService {
         resp.setCreatedBy(issue.getCreatedBy());
         resp.setCreatedAt(issue.getCreatedAt());
 
+        enrichHeaderFields(
+            issue.getWarehouseId(),
+            issue.getServiceTicketId(),
+            issue.getCreatedBy(),
+            issue.getConfirmedBy(),
+            resp
+        );
+
         resp.setItems(issue.getItems().stream().map(it -> {
             StockIssueDetailResponse.IssueItemDetail d = new StockIssueDetailResponse.IssueItemDetail();
             d.setIssueItemId(it.getIssueItemId());
+            d.setIssueItemCode(issue.getIssueCode() + "-L" + it.getIssueItemId());
             d.setItemId(it.getItemId());
             d.setItemName(itemNameById.get(it.getItemId()));
             d.setEntryItemId(it.getEntryItemId());
+
+            if (it.getEntryItemId() != null && it.getEntryItemId() > 0) {
+                stockEntryRepo.findItemById(it.getEntryItemId()).ifPresent(entryItem -> {
+                    stockEntryRepo.findEntryById(entryItem.getEntryId()).ifPresent(entry -> {
+                        d.setEntryCode(entry.getEntryCode());
+                        d.setEntryLotCode(entry.getEntryCode() + "-LOT" + entryItem.getEntryItemId());
+                    });
+                });
+            }
+
             d.setQuantity(it.getQuantity());
             d.setExportPrice(it.getExportPrice());
             d.setImportPrice(it.getImportPrice());
@@ -419,6 +447,70 @@ public class StockIssueService {
         r.setConfirmedAt(e.getConfirmedAt());
         r.setCreatedBy(e.getCreatedBy());
         r.setCreatedAt(e.getCreatedAt());
+
+        WarehouseJpa warehouse = e.getWarehouseId() != null
+                ? warehouseJpaRepo.findById(e.getWarehouseId()).orElse(null)
+                : null;
+        if (warehouse != null) {
+            r.setWarehouseCode(warehouse.getWarehouseCode());
+            r.setWarehouseName(warehouse.getWarehouseName());
+        }
+
+        if (e.getServiceTicketId() != null) {
+            ServiceTicket ticket = serviceTicketRepo.findByServiceTicketId(e.getServiceTicketId());
+            if (ticket != null) {
+                r.setServiceTicketCode(ticket.getTicketCode());
+            }
+        }
+
+        if (e.getCreatedBy() != null) {
+            StaffProfile createdBy = staffProfileRepo.findById(e.getCreatedBy()).orElse(null);
+            if (createdBy != null) {
+                r.setCreatedByName(createdBy.getFullName());
+            }
+        }
+
+        if (e.getConfirmedBy() != null) {
+            StaffProfile confirmedBy = staffProfileRepo.findById(e.getConfirmedBy()).orElse(null);
+            if (confirmedBy != null) {
+                r.setConfirmedByName(confirmedBy.getFullName());
+            }
+        }
         return r;
+    }
+
+    private void enrichHeaderFields(Integer warehouseId,
+                                    Integer serviceTicketId,
+                                    Integer createdById,
+                                    Integer confirmedById,
+                                    StockIssueDetailResponse resp) {
+        if (warehouseId != null) {
+            WarehouseJpa warehouse = warehouseJpaRepo.findById(warehouseId).orElse(null);
+            if (warehouse != null) {
+                resp.setWarehouseCode(warehouse.getWarehouseCode());
+                resp.setWarehouseName(warehouse.getWarehouseName());
+            }
+        }
+
+        if (serviceTicketId != null) {
+            ServiceTicket ticket = serviceTicketRepo.findByServiceTicketId(serviceTicketId);
+            if (ticket != null) {
+                resp.setServiceTicketCode(ticket.getTicketCode());
+            }
+        }
+
+        if (createdById != null) {
+            StaffProfile createdBy = staffProfileRepo.findById(createdById).orElse(null);
+            if (createdBy != null) {
+                resp.setCreatedByName(createdBy.getFullName());
+            }
+        }
+
+        if (confirmedById != null) {
+            StaffProfile confirmedBy = staffProfileRepo.findById(confirmedById).orElse(null);
+            if (confirmedBy != null) {
+                resp.setConfirmedByName(confirmedBy.getFullName());
+            }
+        }
     }
 }

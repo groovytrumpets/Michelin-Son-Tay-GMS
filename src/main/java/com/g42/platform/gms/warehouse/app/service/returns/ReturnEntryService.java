@@ -2,6 +2,10 @@ package com.g42.platform.gms.warehouse.app.service.returns;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.g42.platform.gms.auth.entity.StaffProfile;
+import com.g42.platform.gms.auth.repository.StaffProfileRepo;
+import com.g42.platform.gms.booking.customer.infrastructure.entity.CatalogItemJpaEntity;
+import com.g42.platform.gms.catalog.infrastructure.repository.CatalogItemRepository;
 import com.g42.platform.gms.common.service.ImageUploadService;
 import com.g42.platform.gms.warehouse.api.dto.request.CreateReturnEntryFormRequest;
 import com.g42.platform.gms.warehouse.api.dto.request.CreateReturnEntryRequest;
@@ -16,12 +20,15 @@ import com.g42.platform.gms.warehouse.domain.enums.ReturnType;
 import com.g42.platform.gms.warehouse.domain.repository.InventoryRepo;
 import com.g42.platform.gms.warehouse.domain.repository.InventoryTransactionRepo;
 import com.g42.platform.gms.warehouse.domain.repository.ReturnEntryRepo;
+import com.g42.platform.gms.warehouse.domain.repository.StockIssueRepo;
 import com.g42.platform.gms.warehouse.domain.repository.WarehouseAttachmentRepo;
 import com.g42.platform.gms.warehouse.domain.entity.Inventory;
 import com.g42.platform.gms.warehouse.infrastructure.entity.InventoryTransactionJpa;
 import com.g42.platform.gms.warehouse.infrastructure.entity.ReturnEntryItemJpa;
 import com.g42.platform.gms.warehouse.infrastructure.entity.ReturnEntryJpa;
+import com.g42.platform.gms.warehouse.infrastructure.entity.WarehouseJpa;
 import com.g42.platform.gms.warehouse.infrastructure.entity.WarehouseAttachmentJpa;
+import com.g42.platform.gms.warehouse.infrastructure.repository.WarehouseJpaRepo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -39,6 +46,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -55,6 +64,10 @@ public class ReturnEntryService {
     private final InventoryTransactionRepo transactionRepo;
     private final WarehouseAttachmentRepo attachmentRepo;
     private final ImageUploadService imageUploadService;
+    private final WarehouseJpaRepo warehouseJpaRepo;
+    private final StockIssueRepo stockIssueRepo;
+    private final StaffProfileRepo staffProfileRepo;
+    private final CatalogItemRepository catalogItemRepository;
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
     @Transactional
     public ReturnEntryResponse create(CreateReturnEntryRequest request, Integer staffId) {
@@ -360,10 +373,44 @@ public class ReturnEntryService {
         r.setCreatedBy(e.getCreatedBy());
         r.setCreatedAt(e.getCreatedAt());
 
+        if (e.getWarehouseId() != null) {
+            WarehouseJpa warehouse = warehouseJpaRepo.findById(e.getWarehouseId()).orElse(null);
+            if (warehouse != null) {
+                r.setWarehouseCode(warehouse.getWarehouseCode());
+                r.setWarehouseName(warehouse.getWarehouseName());
+            }
+        }
+
+        if (e.getSourceIssueId() != null) {
+            stockIssueRepo.findById(e.getSourceIssueId())
+                    .ifPresent(sourceIssue -> r.setSourceIssueCode(sourceIssue.getIssueCode()));
+        }
+
+        if (e.getCreatedBy() != null) {
+            StaffProfile createdBy = staffProfileRepo.findById(e.getCreatedBy()).orElse(null);
+            if (createdBy != null) {
+                r.setCreatedByName(createdBy.getFullName());
+            }
+        }
+
+        if (e.getConfirmedBy() != null) {
+            StaffProfile confirmedBy = staffProfileRepo.findById(e.getConfirmedBy()).orElse(null);
+            if (confirmedBy != null) {
+                r.setConfirmedByName(confirmedBy.getFullName());
+            }
+        }
+
+        Set<Integer> itemIds = e.getItems().stream()
+                .map(ReturnEntryItemJpa::getItemId)
+                .collect(Collectors.toSet());
+        Map<Integer, String> itemNameById = catalogItemRepository.findAllById(itemIds).stream()
+                .collect(Collectors.toMap(CatalogItemJpaEntity::getItemId, CatalogItemJpaEntity::getItemName));
+
         r.setItems(e.getItems().stream().map(i -> {
             ReturnEntryItemResponse ir = new ReturnEntryItemResponse();
             ir.setReturnItemId(i.getReturnItemId());
             ir.setItemId(i.getItemId());
+            ir.setItemName(itemNameById.get(i.getItemId()));
             ir.setQuantity(i.getQuantity());
             ir.setConditionNote(i.getConditionNote());
             return ir;
