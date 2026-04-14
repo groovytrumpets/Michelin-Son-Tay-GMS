@@ -20,6 +20,10 @@ import com.g42.platform.gms.warehouse.domain.repository.WarehouseAttachmentRepo;
 import com.g42.platform.gms.warehouse.infrastructure.entity.InventoryTransactionJpa;
 import com.g42.platform.gms.warehouse.infrastructure.entity.WarehouseAttachmentJpa;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -60,6 +64,19 @@ public class StockEntryService {
                 ? stockEntryRepo.findByWarehouseIdAndStatus(warehouseId, status)
                 : stockEntryRepo.findByWarehouseId(warehouseId);
         return entries.stream().map(this::toResponse).collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public Page<StockEntryResponse> searchByWarehouse(Integer warehouseId,
+                                                      StockEntryStatus status,
+                                                      LocalDate fromDate,
+                                                      LocalDate toDate,
+                                                      String search,
+                                                      int page,
+                                                      int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        return stockEntryRepo.search(warehouseId, status, fromDate, toDate, search, pageable)
+                .map(this::toResponse);
     }
 
     @Transactional(readOnly = true)

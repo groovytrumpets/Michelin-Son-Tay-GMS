@@ -9,9 +9,12 @@ import com.g42.platform.gms.warehouse.infrastructure.entity.StockEntryJpa;
 import com.g42.platform.gms.warehouse.infrastructure.repository.StockEntryItemJpaRepo;
 import com.g42.platform.gms.warehouse.infrastructure.repository.StockEntryJpaRepo;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -107,6 +110,18 @@ public class StockEntryRepoImpl implements StockEntryRepo {
     public List<StockEntry> findByWarehouseIdAndStatus(Integer warehouseId, StockEntryStatus status) {
         return jpaRepo.findByWarehouseIdAndStatusOrderByCreatedAtDesc(warehouseId, status)
                 .stream().map(this::toDomain).toList();
+    }
+
+    @Override
+    public Page<StockEntry> search(Integer warehouseId,
+                                   StockEntryStatus status,
+                                   LocalDate fromDate,
+                                   LocalDate toDate,
+                                   String search,
+                                   Pageable pageable) {
+        String normalizedSearch = (search == null || search.isBlank()) ? null : search.trim();
+        return jpaRepo.search(warehouseId, status, fromDate, toDate, normalizedSearch, pageable)
+                .map(this::toDomain);
     }
 
     @Override

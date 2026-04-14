@@ -7,6 +7,11 @@ import com.g42.platform.gms.warehouse.domain.repository.WarehousePricingRepo;
 import com.g42.platform.gms.warehouse.infrastructure.entity.WarehousePricingJpa;
 import com.g42.platform.gms.warehouse.infrastructure.mapper.WarehousePricingJpaMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,6 +43,27 @@ public class WarehousePricingService {
                 .map(p -> toResponse(p, nameMap.get(p.getItemId())))
                 .collect(Collectors.toList());
     }
+
+            @Transactional(readOnly = true)
+            public Page<PricingResponse> searchByWarehouse(Integer warehouseId,
+                                   Boolean isActive,
+                                   String search,
+                                   int page,
+                                   int size) {
+            Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+            Page<WarehousePricingJpa> pricingPage = pricingRepo.search(warehouseId, isActive, search, pageable);
+
+            List<Integer> itemIds = pricingPage.getContent().stream()
+                .map(WarehousePricingJpa::getItemId)
+                .collect(Collectors.toList());
+            Map<Integer, String> nameMap = partCatalogRepo.findNamesByIds(itemIds);
+
+            List<PricingResponse> content = pricingPage.getContent().stream()
+                .map(p -> toResponse(p, nameMap.get(p.getItemId())))
+                .collect(Collectors.toList());
+
+            return new PageImpl<>(content, pageable, pricingPage.getTotalElements());
+            }
     @Transactional
     public PricingResponse upsert(UpsertPricingRequest request) {
         // Deactivate giá cũ nếu có
