@@ -3,6 +3,7 @@ package com.g42.platform.gms.warehouse.api.controller.allocation;
 import com.g42.platform.gms.auth.entity.StaffPrincipal;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
+import com.g42.platform.gms.warehouse.api.dto.response.StockIssueResponse;
 import com.g42.platform.gms.warehouse.app.service.allocation.StockAllocationService;
 import com.g42.platform.gms.warehouse.app.service.dto.StockShortageInfo;
 import lombok.RequiredArgsConstructor;
@@ -29,13 +30,22 @@ public class StockAllocationController {
                 stockAllocationService.reserve(estimateId, principal.getStaffId())));
     }
 
-    @PostMapping("/{ticketId}/commit")
+    @PostMapping("/{ticketId}/request-issue")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<Void>> commit(
+    public ResponseEntity<ApiResponse<List<StockIssueResponse>>> requestIssue(
             @PathVariable Integer ticketId,
             @AuthenticationPrincipal StaffPrincipal principal) {
-        stockAllocationService.commit(ticketId, principal.getStaffId());
-        return ResponseEntity.ok(ApiResponses.success(null));
+        return ResponseEntity.ok(ApiResponses.success(
+                stockAllocationService.requestIssueDraft(ticketId, principal.getStaffId())));
+    }
+
+    @PostMapping("/{ticketId}/commit")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<List<StockIssueResponse>>> commitAlias(
+            @PathVariable Integer ticketId,
+            @AuthenticationPrincipal StaffPrincipal principal) {
+        return ResponseEntity.ok(ApiResponses.success(
+                stockAllocationService.requestIssueDraft(ticketId, principal.getStaffId())));
     }
 
     @PostMapping("/{ticketId}/release")

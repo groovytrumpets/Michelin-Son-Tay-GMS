@@ -2,6 +2,8 @@ package com.g42.platform.gms.warehouse.infrastructure.repository.impl;
 
 import com.g42.platform.gms.warehouse.domain.entity.StockIssue;
 import com.g42.platform.gms.warehouse.domain.entity.StockIssueItem;
+import com.g42.platform.gms.warehouse.domain.enums.IssueType;
+import com.g42.platform.gms.warehouse.domain.enums.StockIssueStatus;
 import com.g42.platform.gms.warehouse.domain.repository.StockIssueRepo;
 import com.g42.platform.gms.warehouse.infrastructure.entity.StockIssueItemJpa;
 import com.g42.platform.gms.warehouse.infrastructure.entity.StockIssueJpa;
@@ -39,6 +41,22 @@ public class StockIssueRepoImpl implements StockIssueRepo {
     @Override
     public boolean existsByCode(String issueCode) {
         return jpaRepo.existsByIssueCode(issueCode);
+    }
+
+    @Override
+    public boolean existsConfirmedServiceTicketIssue(Integer serviceTicketId) {
+        return jpaRepo.existsByServiceTicketIdAndIssueTypeAndStatus(
+                serviceTicketId,
+                IssueType.SERVICE_TICKET,
+                StockIssueStatus.CONFIRMED);
+    }
+
+    @Override
+    public boolean existsDraftServiceTicketIssue(Integer serviceTicketId) {
+        return jpaRepo.existsByServiceTicketIdAndIssueTypeAndStatus(
+                serviceTicketId,
+                IssueType.SERVICE_TICKET,
+                StockIssueStatus.DRAFT);
     }
 
     // ── mappers ──────────────────────────────────────────────────────────────

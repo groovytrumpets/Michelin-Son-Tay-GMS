@@ -10,4 +10,6 @@ public interface StockIssueRepo {
     List<StockIssue> findByWarehouseId(Integer warehouseId);
     StockIssue save(StockIssue issue);
     boolean existsByCode(String issueCode);
+    boolean existsConfirmedServiceTicketIssue(Integer serviceTicketId);
+    boolean existsDraftServiceTicketIssue(Integer serviceTicketId);
 }

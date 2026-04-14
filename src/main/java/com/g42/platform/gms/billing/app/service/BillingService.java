@@ -30,6 +30,7 @@ import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
 import com.g42.platform.gms.service_ticket_management.infrastructure.repository.ServiceTicketRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -65,6 +66,9 @@ public class BillingService {
     private CustomerInternalApi customerInternalApi;
     @Autowired
     private ZaloNotificationSender zaloNotificationSender;
+    @Autowired
+    @Qualifier("warehouseStockAllocationService")
+    private com.g42.platform.gms.warehouse.app.service.allocation.StockAllocationService warehouseStockAllocationService;
 
     //todo: get available promotion
     @Transactional
@@ -121,7 +125,7 @@ public class BillingService {
         }
     }
     @Transactional
-    public PaymentTransactionDto createNewPayment(PaymentTransactionDto dto) {
+    public PaymentTransactionDto createNewPayment(PaymentTransactionDto dto, Integer staffId) {
         PaymentTransaction paymentTransactionDto = serviceBillDtoMapper.mapPaymentToEntity(dto);
         paymentTransactionDto.setPaidAt(Instant.now());
         PaymentTransaction paymentTransaction = paymentTransationRepo.createNewPayment(paymentTransactionDto);
@@ -131,6 +135,10 @@ public class BillingService {
         serviceTicketJpa.setDeliveredAt(LocalDateTime.now());
         serviceTicketRepository.save(serviceTicketJpa);
         serviceBill.setPaymentStatus(PaymentStatus.PAID.name());
+
+        // Luong moi: chi chuyen ticket sang PAID, viec tao phieu xuat kho DRAFT
+        // duoc goi bang API yeu cau xuat kho tu stock allocation.
+
         //todo: send feedback
         String code = serviceTicketInternalApi.getCodeByServiceTicketId(serviceBill.getServiceTicketId());
         String phone = customerInternalApi.getCustomerPhoneByServiceTicketId(serviceBill.getServiceTicketId());

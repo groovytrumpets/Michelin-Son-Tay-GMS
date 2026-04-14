@@ -9,17 +9,20 @@ import com.g42.platform.gms.warehouse.domain.entity.Inventory;
 import com.g42.platform.gms.warehouse.domain.entity.StockEntryItem;
 import com.g42.platform.gms.warehouse.domain.entity.StockIssue;
 import com.g42.platform.gms.warehouse.domain.entity.StockIssueItem;
+import com.g42.platform.gms.warehouse.domain.enums.AllocationStatus;
 import com.g42.platform.gms.warehouse.domain.enums.InventoryTransactionType;
 import com.g42.platform.gms.warehouse.domain.enums.IssueType;
 import com.g42.platform.gms.warehouse.domain.enums.StockIssueStatus;
 import com.g42.platform.gms.warehouse.domain.repository.DiscountConfigRepo;
 import com.g42.platform.gms.warehouse.domain.repository.InventoryRepo;
 import com.g42.platform.gms.warehouse.domain.repository.InventoryTransactionRepo;
+import com.g42.platform.gms.warehouse.domain.repository.StockAllocationRepo;
 import com.g42.platform.gms.warehouse.domain.repository.StockEntryRepo;
 import com.g42.platform.gms.warehouse.domain.repository.StockIssueItemRepo;
 import com.g42.platform.gms.warehouse.domain.repository.StockIssueRepo;
 import com.g42.platform.gms.warehouse.domain.repository.WarehousePricingRepo;
 import com.g42.platform.gms.warehouse.infrastructure.entity.InventoryTransactionJpa;
+import com.g42.platform.gms.warehouse.infrastructure.entity.StockAllocationJpa;
 import com.g42.platform.gms.warehouse.infrastructure.entity.WarehousePricingJpa;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -34,7 +37,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -49,6 +54,7 @@ public class StockIssueService {
     private static final BigDecimal WHOLESALE_FACTOR = new BigDecimal("0.85");
 
     private final StockIssueRepo stockIssueRepo;
+    private final StockAllocationRepo stockAllocationRepo;
     private final InventoryRepo inventoryRepo;
     private final InventoryTransactionRepo transactionRepo;
     private final StockEntryRepo stockEntryRepo;
@@ -151,6 +157,16 @@ public class StockIssueService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Phiếu đã được xác nhận");
         }
 
+        List<StockAllocationJpa> ticketReservedAllocations = new ArrayList<>();
+        Map<Integer, Integer> reservedByItem = new HashMap<>();
+        if (issue.getIssueType() == IssueType.SERVICE_TICKET && issue.getServiceTicketId() != null) {
+            ticketReservedAllocations = stockAllocationRepo
+                    .findByTicketAndStatus(issue.getServiceTicketId(), AllocationStatus.RESERVED);
+            for (StockAllocationJpa alloc : ticketReservedAllocations) {
+                reservedByItem.merge(alloc.getItemId(), alloc.getQuantity(), Integer::sum);
+            }
+        }
+
         List<StockIssueItem> lotItems = new ArrayList<>();
 
         for (StockIssueItem placeholder : issue.getItems()) {
@@ -169,10 +185,12 @@ public class StockIssueService {
                             "Không tìm thấy tồn kho cho itemId=" + itemId));
 
             int available = Math.max(0, inv.getQuantity() - inv.getReservedQuantity());
-            if (available < needed) {
+                int reservedForThisTicket = reservedByItem.getOrDefault(itemId, 0);
+                int effectiveAvailable = available + reservedForThisTicket;
+                if (effectiveAvailable < needed) {
                 throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                         "Không đủ tồn kho cho itemId=" + itemId
-                                + " (yêu cầu=" + needed + ", khả dụng=" + available + ")");
+                        + " (yêu cầu=" + needed + ", khả dụng=" + effectiveAvailable + ")");
             }
 
             List<StockEntryItem> lots = stockEntryRepo.findFifoLots(issue.getWarehouseId(), itemId);
@@ -251,6 +269,36 @@ public class StockIssueService {
         issue.setConfirmedBy(staffId);
         issue.setConfirmedAt(LocalDateTime.now());
         stockIssueRepo.save(issue);
+
+        for (StockAllocationJpa alloc : ticketReservedAllocations) {
+            Inventory inv = inventoryRepo
+                .findByWarehouseAndItemWithLock(alloc.getWarehouseId(), alloc.getItemId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Không tìm thấy tồn kho cho allocation itemId=" + alloc.getItemId()));
+
+            if (inv.getReservedQuantity() < alloc.getQuantity()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Reserved quantity khong hop le cho allocation id=" + alloc.getAllocationId());
+            }
+
+            inv.setReservedQuantity(inv.getReservedQuantity() - alloc.getQuantity());
+            inventoryRepo.save(inv);
+
+            InventoryTransactionJpa reservedTx = new InventoryTransactionJpa();
+            reservedTx.setWarehouseId(alloc.getWarehouseId());
+            reservedTx.setItemId(alloc.getItemId());
+            reservedTx.setTransactionType(InventoryTransactionType.ADJUSTMENT);
+            reservedTx.setQuantity(-alloc.getQuantity());
+            reservedTx.setBalanceAfter(inv.getQuantity());
+            reservedTx.setReferenceType("stock_allocation_commit");
+            reservedTx.setReferenceId(alloc.getAllocationId());
+            reservedTx.setCreatedById(staffId);
+            reservedTx.setCreatedAt(Instant.now());
+            transactionRepo.save(reservedTx);
+
+            alloc.setStatus(AllocationStatus.COMMITTED);
+            stockAllocationRepo.save(alloc);
+        }
 
         lotItems.forEach(item -> item.setIssueId(issueId));
         stockIssueItemRepo.saveAll(lotItems);
