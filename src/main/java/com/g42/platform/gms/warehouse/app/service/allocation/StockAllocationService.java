@@ -6,6 +6,7 @@ import com.g42.platform.gms.estimation.infrastructure.repository.EstimateItemRep
 import com.g42.platform.gms.estimation.infrastructure.repository.EstimateRepositoryJpa;
 import com.g42.platform.gms.warehouse.api.dto.issue.CreateStockIssueRequest;
 import com.g42.platform.gms.warehouse.api.dto.response.StockAllocationResult;
+import com.g42.platform.gms.warehouse.api.dto.response.StockIssueResponse;
 import com.g42.platform.gms.warehouse.app.service.dto.StockShortageInfo;
 import com.g42.platform.gms.warehouse.domain.enums.AllocationStatus;
 import com.g42.platform.gms.warehouse.domain.enums.InventoryTransactionType;
@@ -87,17 +88,56 @@ public class StockAllocationService {
         return shortages;
     }
     @Transactional
-    public void commit(Integer serviceTicketId, Integer staffId) {
+        public List<StockIssueResponse> requestIssueDraft(Integer serviceTicketId, Integer staffId) {
         if (stockIssueRepo.existsConfirmedServiceTicketIssue(serviceTicketId)) {
-            return;
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Service ticket da co phieu xuat CONFIRMED");
+        }
+        if (stockIssueRepo.existsDraftServiceTicketIssue(serviceTicketId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Service ticket da co phieu xuat DRAFT");
         }
 
         List<StockAllocationJpa> reserved = allocationRepo
                 .findByTicketAndStatus(serviceTicketId, AllocationStatus.RESERVED);
 
-        if (reserved.isEmpty()) return;
+        if (reserved.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                "Khong co stock allocation RESERVED cho service ticket nay");
+        }
 
         Map<Integer, List<CreateStockIssueRequest.IssueItemRequest>> issueItemsByWarehouse = new HashMap<>();
+
+        for (StockAllocationJpa alloc : reserved) {
+            CreateStockIssueRequest.IssueItemRequest item = new CreateStockIssueRequest.IssueItemRequest();
+            item.setItemId(alloc.getItemId());
+            item.setQuantity(alloc.getQuantity());
+            item.setDiscountRate(BigDecimal.ZERO);
+
+            issueItemsByWarehouse
+                    .computeIfAbsent(alloc.getWarehouseId(), k -> new ArrayList<>())
+                    .add(item);
+        }
+
+        List<StockIssueResponse> createdIssues = new ArrayList<>();
+        for (Map.Entry<Integer, List<CreateStockIssueRequest.IssueItemRequest>> entry : issueItemsByWarehouse.entrySet()) {
+            CreateStockIssueRequest issueRequest = new CreateStockIssueRequest();
+            issueRequest.setWarehouseId(entry.getKey());
+            issueRequest.setIssueType(IssueType.SERVICE_TICKET);
+            issueRequest.setIssueReason("Yeu cau xuat kho tu ServiceTicket #" + serviceTicketId);
+            issueRequest.setServiceTicketId(serviceTicketId);
+            issueRequest.setItems(entry.getValue());
+
+            createdIssues.add(stockIssueService.create(issueRequest, staffId));
+        }
+
+        return createdIssues;
+    }
+
+    @Transactional
+    public void commitReservedAfterIssueConfirmed(Integer serviceTicketId, Integer staffId) {
+        List<StockAllocationJpa> reserved = allocationRepo
+                .findByTicketAndStatus(serviceTicketId, AllocationStatus.RESERVED);
 
         for (StockAllocationJpa alloc : reserved) {
             Inventory inv = inventoryRepo
@@ -119,27 +159,6 @@ public class StockAllocationService {
 
             alloc.setStatus(AllocationStatus.COMMITTED);
             allocationRepo.save(alloc);
-
-            CreateStockIssueRequest.IssueItemRequest item = new CreateStockIssueRequest.IssueItemRequest();
-            item.setItemId(alloc.getItemId());
-            item.setQuantity(alloc.getQuantity());
-            item.setDiscountRate(BigDecimal.ZERO);
-
-            issueItemsByWarehouse
-                    .computeIfAbsent(alloc.getWarehouseId(), k -> new ArrayList<>())
-                    .add(item);
-        }
-
-        for (Map.Entry<Integer, List<CreateStockIssueRequest.IssueItemRequest>> entry : issueItemsByWarehouse.entrySet()) {
-            CreateStockIssueRequest issueRequest = new CreateStockIssueRequest();
-            issueRequest.setWarehouseId(entry.getKey());
-            issueRequest.setIssueType(IssueType.SERVICE_TICKET);
-            issueRequest.setIssueReason("Tu dong xuat kho tu ServiceTicket #" + serviceTicketId);
-            issueRequest.setServiceTicketId(serviceTicketId);
-            issueRequest.setItems(entry.getValue());
-
-            var issueResp = stockIssueService.create(issueRequest, staffId);
-            stockIssueService.confirm(issueResp.getIssueId(), staffId);
         }
     }
 
@@ -153,7 +172,7 @@ public class StockAllocationService {
                 .findByTicketAndStatus(serviceTicketId, AllocationStatus.RESERVED);
 
         if (!reserved.isEmpty()) {
-            commit(serviceTicketId, staffId);
+            requestIssueDraft(serviceTicketId, staffId);
             return;
         }
 
@@ -186,12 +205,11 @@ public class StockAllocationService {
             CreateStockIssueRequest issueRequest = new CreateStockIssueRequest();
             issueRequest.setWarehouseId(entry.getKey());
             issueRequest.setIssueType(IssueType.SERVICE_TICKET);
-            issueRequest.setIssueReason("Fallback xuat kho khi PAID theo Estimate #" + estimateId);
+            issueRequest.setIssueReason("Fallback yeu cau xuat kho theo Estimate #" + estimateId);
             issueRequest.setServiceTicketId(serviceTicketId);
             issueRequest.setItems(entry.getValue());
 
-            var issueResp = stockIssueService.create(issueRequest, staffId);
-            stockIssueService.confirm(issueResp.getIssueId(), staffId);
+            stockIssueService.create(issueRequest, staffId);
         }
     }
     @Transactional

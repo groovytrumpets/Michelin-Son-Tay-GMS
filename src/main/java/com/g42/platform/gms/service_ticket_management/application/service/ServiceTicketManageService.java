@@ -32,6 +32,12 @@ import com.g42.platform.gms.service_ticket_management.api.mapper.ServiceTicketDe
 import com.g42.platform.gms.vehicle.api.internal.VehicleInternalApi;
 import com.g42.platform.gms.vehicle.entity.Vehicle;
 import com.g42.platform.gms.vehicle.repository.VehicleRepository;
+import com.g42.platform.gms.warehouse.domain.enums.AllocationStatus;
+import com.g42.platform.gms.warehouse.domain.enums.StockIssueStatus;
+import com.g42.platform.gms.warehouse.infrastructure.entity.StockAllocationJpa;
+import com.g42.platform.gms.warehouse.infrastructure.entity.StockIssueJpa;
+import com.g42.platform.gms.warehouse.infrastructure.repository.StockAllocationJpaRepo;
+import com.g42.platform.gms.warehouse.infrastructure.repository.StockIssueJpaRepo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -75,6 +81,8 @@ public class ServiceTicketManageService {
     private final VehicleInternalApi vehicleInternalApi;
     private final EstimateInternalApi estimateInternalApi;
     private final SafetyInspectionService safetyInspectionService;
+    private final StockIssueJpaRepo stockIssueJpaRepo;
+    private final StockAllocationJpaRepo stockAllocationJpaRepo;
 
     /**
      * Get paginated list of service tickets with filters.
@@ -227,6 +235,27 @@ public class ServiceTicketManageService {
                     response.setAdvisorId(a.getStaffId());
                     response.setAdvisorName(a.getFullName());
                 });
+
+        // Warehouse status info for advisor UI gating
+        List<StockIssueJpa> stockIssues = stockIssueJpaRepo.findByServiceTicketId(ticket.getServiceTicketId());
+        boolean hasDraftStockIssue = stockIssues.stream()
+            .anyMatch(issue -> issue.getStatus() == StockIssueStatus.DRAFT);
+        boolean hasConfirmedStockIssue = stockIssues.stream()
+            .anyMatch(issue -> issue.getStatus() == StockIssueStatus.CONFIRMED);
+
+        List<StockAllocationJpa> allocations = stockAllocationJpaRepo.findByServiceTicketId(ticket.getServiceTicketId());
+        int reservedAllocationCount = (int) allocations.stream()
+            .filter(allocation -> allocation.getStatus() == AllocationStatus.RESERVED)
+            .count();
+        int committedAllocationCount = (int) allocations.stream()
+            .filter(allocation -> allocation.getStatus() == AllocationStatus.COMMITTED)
+            .count();
+
+        response.setHasDraftStockIssue(hasDraftStockIssue);
+        response.setHasConfirmedStockIssue(hasConfirmedStockIssue);
+        response.setReservedAllocationCount(reservedAllocationCount);
+        response.setCommittedAllocationCount(committedAllocationCount);
+        response.setWarehouseReadyForRepair(hasConfirmedStockIssue && committedAllocationCount > 0);
 
 
         log.info("Service ticket detail retrieved: {}", ticketCode);
