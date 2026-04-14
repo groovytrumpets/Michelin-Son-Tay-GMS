@@ -31,15 +31,15 @@ public class WarehouseAllocationListener {
         }
     }
 
-    /** Khi ticket PAID → commit hàng */
+    /**
+     * Khi ticket PAID: luồng mới không tự động commit/xuat kho.
+     * Advisor phải chủ động gọi API request-issue, kho xác nhận riêng.
+     */
     @EventListener
     @Async
     public void onTicketPaid(TicketPaidEvent event) {
-        try {
-            stockAllocationService.commit(event.getServiceTicketId(), event.getStaffId());
-        } catch (Exception e) {
-            log.error("Failed to commit stock for ticketId={}", event.getServiceTicketId(), e);
-        }
+        log.info("Ticket {} paid - skip auto warehouse commit in manual request-issue flow",
+                event.getServiceTicketId());
     }
 
     /** Khi ticket CANCELLED → release hàng */

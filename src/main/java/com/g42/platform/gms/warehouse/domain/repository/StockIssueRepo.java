@@ -11,4 +11,5 @@ public interface StockIssueRepo {
     StockIssue save(StockIssue issue);
     boolean existsByCode(String issueCode);
     boolean existsConfirmedServiceTicketIssue(Integer serviceTicketId);
+    boolean existsDraftServiceTicketIssue(Integer serviceTicketId);
 }

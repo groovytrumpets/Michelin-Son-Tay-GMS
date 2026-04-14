@@ -56,6 +56,13 @@ public class ServiceTicketDetailResponse {
     // Assignment info — advisor phụ trách
     private String advisorName;
     private Integer advisorId;
+
+    // Warehouse export/allocation status
+    private Boolean hasDraftStockIssue;
+    private Boolean hasConfirmedStockIssue;
+    private Integer reservedAllocationCount;
+    private Integer committedAllocationCount;
+    private Boolean warehouseReadyForRepair;
     
     // Flags
     private Boolean immutable;

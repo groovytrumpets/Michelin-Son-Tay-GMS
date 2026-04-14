@@ -134,10 +134,8 @@ public class BillingService {
         serviceTicketRepository.save(serviceTicketJpa);
         serviceBill.setPaymentStatus(PaymentStatus.PAID.name());
 
-        warehouseStockAllocationService.commitOnPaid(
-            serviceBill.getServiceTicketId(),
-            serviceBill.getEstimateId(),
-            staffId);
+        // Luong moi: chi chuyen ticket sang PAID, viec tao phieu xuat kho DRAFT
+        // duoc goi bang API yeu cau xuat kho tu stock allocation.
 
         //todo: send feedback
         String code = serviceTicketInternalApi.getCodeByServiceTicketId(serviceBill.getServiceTicketId());

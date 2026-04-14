@@ -51,6 +51,14 @@ public class StockIssueRepoImpl implements StockIssueRepo {
                 StockIssueStatus.CONFIRMED);
     }
 
+    @Override
+    public boolean existsDraftServiceTicketIssue(Integer serviceTicketId) {
+        return jpaRepo.existsByServiceTicketIdAndIssueTypeAndStatus(
+                serviceTicketId,
+                IssueType.SERVICE_TICKET,
+                StockIssueStatus.DRAFT);
+    }
+
     // ── mappers ──────────────────────────────────────────────────────────────
 
     private StockIssue toDomain(StockIssueJpa jpa) {
