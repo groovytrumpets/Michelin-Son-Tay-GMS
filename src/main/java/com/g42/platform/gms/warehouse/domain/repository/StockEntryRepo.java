@@ -3,8 +3,11 @@ package com.g42.platform.gms.warehouse.domain.repository;
 import com.g42.platform.gms.warehouse.domain.entity.StockEntry;
 import com.g42.platform.gms.warehouse.domain.entity.StockEntryItem;
 import com.g42.platform.gms.warehouse.domain.enums.StockEntryStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -15,6 +18,13 @@ public interface StockEntryRepo {
     List<StockEntry> findByWarehouseId(Integer warehouseId);
 
     List<StockEntry> findByWarehouseIdAndStatus(Integer warehouseId, StockEntryStatus status);
+
+    Page<StockEntry> search(Integer warehouseId,
+                            StockEntryStatus status,
+                            LocalDate fromDate,
+                            LocalDate toDate,
+                            String search,
+                            Pageable pageable);
 
     StockEntry save(StockEntry entry);
 

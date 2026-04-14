@@ -1,13 +1,19 @@
 package com.g42.platform.gms.warehouse.infrastructure.repository.impl;
 
+import com.g42.platform.gms.warehouse.domain.enums.ReturnEntryStatus;
+import com.g42.platform.gms.warehouse.domain.enums.ReturnType;
 import com.g42.platform.gms.warehouse.domain.repository.ReturnEntryRepo;
 import com.g42.platform.gms.warehouse.infrastructure.entity.ReturnEntryItemJpa;
 import com.g42.platform.gms.warehouse.infrastructure.entity.ReturnEntryJpa;
 import com.g42.platform.gms.warehouse.infrastructure.repository.ReturnEntryItemJpaRepo;
 import com.g42.platform.gms.warehouse.infrastructure.repository.ReturnEntryJpaRepo;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -26,6 +32,20 @@ public class ReturnEntryRepoImpl implements ReturnEntryRepo {
     @Override
     public List<ReturnEntryJpa> findByWarehouseId(Integer warehouseId) {
         return jpaRepo.findByWarehouseIdOrderByCreatedAtDesc(warehouseId);
+    }
+
+    @Override
+    public Page<ReturnEntryJpa> search(Integer warehouseId,
+                                       ReturnEntryStatus status,
+                                       ReturnType returnType,
+                                       LocalDate fromDate,
+                                       LocalDate toDate,
+                                       String search,
+                                       Pageable pageable) {
+        String normalizedSearch = (search == null || search.isBlank()) ? null : search.trim();
+        LocalDateTime fromDateTime = fromDate != null ? fromDate.atStartOfDay() : null;
+        LocalDateTime toDateTime = toDate != null ? toDate.atTime(23, 59, 59) : null;
+        return jpaRepo.search(warehouseId, status, returnType, fromDateTime, toDateTime, normalizedSearch, pageable);
     }
 
     @Override
