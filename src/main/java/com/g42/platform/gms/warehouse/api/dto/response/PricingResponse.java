@@ -9,6 +9,8 @@ import java.time.LocalDate;
 public class PricingResponse {
     private Integer pricingId;
     private Integer warehouseId;
+    private String warehouseCode;
+    private String warehouseName;
     private Integer itemId;
     private String itemName;
     private BigDecimal basePrice;
