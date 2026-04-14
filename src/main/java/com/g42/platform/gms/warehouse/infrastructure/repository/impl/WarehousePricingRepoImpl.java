@@ -4,6 +4,8 @@ import com.g42.platform.gms.warehouse.domain.repository.WarehousePricingRepo;
 import com.g42.platform.gms.warehouse.infrastructure.entity.WarehousePricingJpa;
 import com.g42.platform.gms.warehouse.infrastructure.repository.WarehousePricingJpaRepo;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -18,6 +20,15 @@ public class WarehousePricingRepoImpl implements WarehousePricingRepo {
     @Override
     public List<WarehousePricingJpa> findActiveByWarehouse(Integer warehouseId) {
         return jpaRepo.findByWarehouseIdAndIsActiveTrueOrderByItemId(warehouseId);
+    }
+
+    @Override
+    public Page<WarehousePricingJpa> search(Integer warehouseId,
+                                            Boolean isActive,
+                                            String search,
+                                            Pageable pageable) {
+        String normalizedSearch = (search == null || search.isBlank()) ? null : search.trim();
+        return jpaRepo.search(warehouseId, isActive, normalizedSearch, pageable);
     }
 
     @Override

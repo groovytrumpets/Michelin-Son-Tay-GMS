@@ -1,5 +1,7 @@
 package com.g42.platform.gms.warehouse.app.service.issue;
 
+import com.g42.platform.gms.booking.customer.infrastructure.entity.CatalogItemJpaEntity;
+import com.g42.platform.gms.catalog.infrastructure.repository.CatalogItemRepository;
 import com.g42.platform.gms.warehouse.api.dto.issue.CreateStockIssueRequest;
 import com.g42.platform.gms.warehouse.api.dto.request.PatchIssueItemRequest;
 import com.g42.platform.gms.warehouse.api.dto.request.UpdateStockIssueRequest;
@@ -25,6 +27,10 @@ import com.g42.platform.gms.warehouse.infrastructure.entity.InventoryTransaction
 import com.g42.platform.gms.warehouse.infrastructure.entity.StockAllocationJpa;
 import com.g42.platform.gms.warehouse.infrastructure.entity.WarehousePricingJpa;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +46,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -61,6 +68,7 @@ public class StockIssueService {
     private final WarehousePricingRepo pricingRepo;
     private final DiscountConfigRepo discountConfigRepo;
     private final StockIssueItemRepo stockIssueItemRepo;
+    private final CatalogItemRepository catalogItemRepository;
 
     @Transactional
     public StockIssueResponse create(CreateStockIssueRequest request, Integer staffId) {
@@ -314,8 +322,28 @@ public class StockIssueService {
     }
 
     @Transactional(readOnly = true)
+    public Page<StockIssueResponse> searchByWarehouse(Integer warehouseId,
+                                                      StockIssueStatus status,
+                                                      IssueType issueType,
+                                                      LocalDate fromDate,
+                                                      LocalDate toDate,
+                                                      String search,
+                                                      int page,
+                                                      int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        return stockIssueRepo.search(warehouseId, status, issueType, fromDate, toDate, search, pageable)
+                .map(this::toResponse);
+    }
+
+    @Transactional(readOnly = true)
     public StockIssueDetailResponse getDetail(Integer issueId) {
         StockIssue issue = findOrThrow(issueId);
+
+        Set<Integer> itemIds = issue.getItems().stream()
+            .map(StockIssueItem::getItemId)
+            .collect(Collectors.toSet());
+        Map<Integer, String> itemNameById = catalogItemRepository.findAllById(itemIds).stream()
+            .collect(Collectors.toMap(CatalogItemJpaEntity::getItemId, CatalogItemJpaEntity::getItemName));
 
         StockIssueDetailResponse resp = new StockIssueDetailResponse();
         resp.setIssueId(issue.getIssueId());
@@ -335,6 +363,7 @@ public class StockIssueService {
             StockIssueDetailResponse.IssueItemDetail d = new StockIssueDetailResponse.IssueItemDetail();
             d.setIssueItemId(it.getIssueItemId());
             d.setItemId(it.getItemId());
+            d.setItemName(itemNameById.get(it.getItemId()));
             d.setEntryItemId(it.getEntryItemId());
             d.setQuantity(it.getQuantity());
             d.setExportPrice(it.getExportPrice());

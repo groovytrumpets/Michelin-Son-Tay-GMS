@@ -9,13 +9,18 @@ import com.g42.platform.gms.warehouse.api.dto.request.UpdateStockIssueRequest;
 import com.g42.platform.gms.warehouse.api.dto.response.StockIssueDetailResponse;
 import com.g42.platform.gms.warehouse.api.dto.response.StockIssueResponse;
 import com.g42.platform.gms.warehouse.app.service.issue.StockIssueService;
+import com.g42.platform.gms.warehouse.domain.enums.IssueType;
+import com.g42.platform.gms.warehouse.domain.enums.StockIssueStatus;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -28,10 +33,17 @@ public class StockIssueController {
     /** Danh sách phiếu xuất theo kho, mới nhất trước */
     @GetMapping
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<List<StockIssueResponse>>> list(
-            @RequestParam Integer warehouseId) {
+    public ResponseEntity<ApiResponse<Page<StockIssueResponse>>> list(
+            @RequestParam Integer warehouseId,
+            @RequestParam(required = false) StockIssueStatus status,
+            @RequestParam(required = false) IssueType issueType,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
         return ResponseEntity.ok(ApiResponses.success(
-                stockIssueService.listByWarehouse(warehouseId)));
+                stockIssueService.searchByWarehouse(warehouseId, status, issueType, fromDate, toDate, search, page, size)));
     }
 
     @PostMapping

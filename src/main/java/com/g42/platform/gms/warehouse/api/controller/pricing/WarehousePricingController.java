@@ -7,6 +7,7 @@ import com.g42.platform.gms.warehouse.api.dto.response.PricingResponse;
 import com.g42.platform.gms.warehouse.app.service.pricing.WarehousePricingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -23,9 +24,14 @@ public class WarehousePricingController {
     /** Danh sách giá thị trường đang active theo kho */
     @GetMapping
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<List<PricingResponse>>> list(
-            @RequestParam Integer warehouseId) {
-        return ResponseEntity.ok(ApiResponses.success(pricingService.listByWarehouse(warehouseId)));
+    public ResponseEntity<ApiResponse<Page<PricingResponse>>> list(
+            @RequestParam Integer warehouseId,
+            @RequestParam(required = false) Boolean isActive,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ResponseEntity.ok(ApiResponses.success(
+                pricingService.searchByWarehouse(warehouseId, isActive, search, page, size)));
     }
 
     /** Tạo hoặc cập nhật giá thị trường cho 1 item */

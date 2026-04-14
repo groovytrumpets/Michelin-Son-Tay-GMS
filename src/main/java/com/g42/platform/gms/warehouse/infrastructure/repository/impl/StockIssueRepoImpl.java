@@ -9,9 +9,13 @@ import com.g42.platform.gms.warehouse.infrastructure.entity.StockIssueItemJpa;
 import com.g42.platform.gms.warehouse.infrastructure.entity.StockIssueJpa;
 import com.g42.platform.gms.warehouse.infrastructure.repository.StockIssueJpaRepo;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -31,6 +35,21 @@ public class StockIssueRepoImpl implements StockIssueRepo {
     public List<StockIssue> findByWarehouseId(Integer warehouseId) {
         return jpaRepo.findByWarehouseIdOrderByCreatedAtDesc(warehouseId)
                 .stream().map(this::toDomain).toList();
+    }
+
+    @Override
+    public Page<StockIssue> search(Integer warehouseId,
+                                   StockIssueStatus status,
+                                   IssueType issueType,
+                                   LocalDate fromDate,
+                                   LocalDate toDate,
+                                   String search,
+                                   Pageable pageable) {
+        String normalizedSearch = (search == null || search.isBlank()) ? null : search.trim();
+        LocalDateTime fromDateTime = fromDate != null ? fromDate.atStartOfDay() : null;
+        LocalDateTime toDateTime = toDate != null ? toDate.atTime(23, 59, 59) : null;
+        return jpaRepo.search(warehouseId, status, issueType, fromDateTime, toDateTime, normalizedSearch, pageable)
+                .map(this::toDomain);
     }
 
     @Override

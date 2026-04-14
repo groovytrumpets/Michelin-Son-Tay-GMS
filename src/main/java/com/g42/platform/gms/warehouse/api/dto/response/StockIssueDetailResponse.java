@@ -28,6 +28,7 @@ public class StockIssueDetailResponse {
     public static class IssueItemDetail {
         private Integer issueItemId;
         private Integer itemId;
+        private String itemName;
         private Integer entryItemId;   // lô nhập tương ứng
         private Integer quantity;
         private BigDecimal exportPrice;   // = selling_price của lô
