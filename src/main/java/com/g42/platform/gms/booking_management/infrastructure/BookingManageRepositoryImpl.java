@@ -150,7 +150,10 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
         List<CatalogItem> catalogItems = request.getServices();
         int estimateTime = catalogItems.stream()
                 .filter(item -> item.getServiceService() != null)
-                .mapToInt(item -> item.getServiceService().getEstimateTime())
+                .mapToInt(item -> {
+                    Integer time = item.getServiceService().getEstimateTime();
+                    return time != null ? time : 0;
+                })
                 .sum();
         booking.setEstimateTime(estimateTime);
         BookingJpa bookingJpa = bookingManageJpaRepository.save(bookingManagerMapper.toBooking(booking));
