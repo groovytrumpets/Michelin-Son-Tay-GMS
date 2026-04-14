@@ -1,4 +1,4 @@
-package com.g42.platform.gms.warehouse.infrastructure;
+package com.g42.platform.gms.warehouse.infrastructure.repository.impl;
 
 import com.g42.platform.gms.marketing.service_catalog.infrastructure.repository.ServiceJpaRepository;
 import com.g42.platform.gms.warehouse.api.dto.SpecificationRespondDto;
