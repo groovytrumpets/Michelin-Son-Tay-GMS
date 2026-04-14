@@ -4,6 +4,9 @@ import com.g42.platform.gms.estimation.infrastructure.entity.EstimateItemJpa;
 import com.g42.platform.gms.estimation.infrastructure.entity.EstimateJpa;
 import com.g42.platform.gms.estimation.infrastructure.repository.EstimateItemRepositoryJpa;
 import com.g42.platform.gms.estimation.infrastructure.repository.EstimateRepositoryJpa;
+import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicket;
+import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
+import com.g42.platform.gms.service_ticket_management.domain.repository.ServiceTicketRepo;
 import com.g42.platform.gms.warehouse.api.dto.issue.CreateStockIssueRequest;
 import com.g42.platform.gms.warehouse.api.dto.response.StockAllocationResult;
 import com.g42.platform.gms.warehouse.api.dto.response.StockIssueResponse;
@@ -43,6 +46,7 @@ public class StockAllocationService {
     private final EstimateRepositoryJpa estimateRepositoryJpa;
     private final StockIssueService stockIssueService;
     private final StockIssueRepo stockIssueRepo;
+    private final ServiceTicketRepo serviceTicketRepo;
     @Transactional
     public List<StockShortageInfo> reserve(Integer estimateId, Integer staffId) {
         List<EstimateItemJpa> estimateItems = estimateItemRepositoryJpa.findByEstimateId(estimateId);
@@ -129,6 +133,12 @@ public class StockAllocationService {
             issueRequest.setItems(entry.getValue());
 
             createdIssues.add(stockIssueService.create(issueRequest, staffId));
+        }
+
+        ServiceTicket ticket = serviceTicketRepo.findByServiceTicketId(serviceTicketId);
+        if (ticket != null && ticket.getTicketStatus() == TicketStatus.ESTIMATED) {
+            ticket.setTicketStatus(TicketStatus.PENDING);
+            serviceTicketRepo.save(ticket);
         }
 
         return createdIssues;
