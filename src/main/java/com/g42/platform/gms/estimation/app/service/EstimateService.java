@@ -40,58 +40,84 @@ public class EstimateService {
 
 
     public List<EstimateRespondDto> getEstimateByCode(Integer serviceTicketId) {
-        //todo: find all estimate
+        // 1. Tìm tất cả estimate
         List<Estimate> estimateList = estimateRepository.getListOfEstimateByServiceTiketCode(serviceTicketId);
 
-        //todo: get estimate item list of list estimate ids
+        // EARLY RETURN: Nếu không có estimate nào, trả về list rỗng ngay lập tức
+        if (estimateList == null || estimateList.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        // 2. Lấy danh sách estimate IDs
         List<Integer> estimateIds = estimateList.stream().map(Estimate::getId).toList();
-        List<EstimateItem> estimateItems =estimateItemRepository.findByEstimateIds(estimateIds).stream().filter(estimateItem -> Boolean.FALSE.equals(estimateItem.getIsRemoved())).toList();
 
-        //todo: get work-catalog of estimateItem
-        List<Integer> workCategoryId = estimateItems.stream().map(EstimateItem::getWorkCategoryId).filter(Objects::nonNull).distinct().toList();
-        Map<Integer, WorkCategory> categoryMap = workCategoryRepo
-                .findAllById(workCategoryId)
+        // 3. Lấy estimate items và lọc những item không bị xóa
+        List<EstimateItem> estimateItems = estimateItemRepository.findByEstimateIds(estimateIds)
                 .stream()
-                .collect(Collectors.toMap(WorkCategory::getId, wc -> wc));
+                .filter(item -> Boolean.FALSE.equals(item.getIsRemoved()))
+                .toList();
 
-        //todo: group by estimateItem by estimateId
+        // 4. Lấy danh sách work-catalog của estimateItem an toàn
+        List<Integer> workCategoryIds = estimateItems.stream()
+                .map(EstimateItem::getWorkCategoryId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        // Khởi tạo map rỗng, chỉ query DB nếu có workCategoryIds
+        Map<Integer, WorkCategory> categoryMap;
+        if (!workCategoryIds.isEmpty()) {
+            categoryMap = workCategoryRepo.findAllById(workCategoryIds)
+                    .stream()
+                    .collect(Collectors.toMap(WorkCategory::getId, wc -> wc));
+        } else {
+            categoryMap = new HashMap<>();
+        }
+
+        // 5. Group estimateItem by estimateId
         Map<Integer, List<EstimateItem>> itemsByEstimateId = estimateItems.stream()
                 .collect(Collectors.groupingBy(EstimateItem::getEstimateId));
-        //todo: map estimateResponĐto
+
+        // 6. Map dữ liệu sang DTO
         return estimateList.stream().map(estimate -> {
             EstimateRespondDto dto = estimateDtoMapper.toEstimateDto(estimate);
-            List<EstimateItem> items = itemsByEstimateId
-                    .getOrDefault(estimate.getId(), List.of());
+            List<EstimateItem> items = itemsByEstimateId.getOrDefault(estimate.getId(), List.of());
 
             BigDecimal totalTax = BigDecimal.ZERO;
             BigDecimal subTotal = BigDecimal.ZERO;
             List<EstimateItemDto> itemDtos = new ArrayList<>();
+
             for (EstimateItem item : items) {
                 EstimateItemDto itemDto = estimateDtoMapper.toEstimateItemDto(item);
-                // inject work category to ech items
-                WorkCategory wc = categoryMap.get(item.getWorkCategoryId());
-                if (wc != null) {
-                    itemDto.setWorkCategory(estimateDtoMapper.toWorkCateDto(wc));
+
+                // inject work category to each item
+                if (item.getWorkCategoryId() != null) {
+                    WorkCategory wc = categoryMap.get(item.getWorkCategoryId());
+                    if (wc != null) {
+                        itemDto.setWorkCategory(estimateDtoMapper.toWorkCateDto(wc));
+                    }
                 }
 
+                // Tính toán giá tiền cho các item được checked
                 if (Boolean.TRUE.equals(item.getIsChecked())) {
-
-                    // 1. Cộng dồn tiền thuế (chỉ cho item được chọn)
+                    // 1. Cộng dồn tiền thuế
                     if (item.getTaxAmount() != null) {
                         totalTax = totalTax.add(item.getTaxAmount());
                     }
 
-                    // 2. Cộng dồn tiền hàng (chỉ cho item được chọn)
+                    // 2. Cộng dồn tiền hàng
                     BigDecimal itemQty = BigDecimal.valueOf(item.getQuantity() != null ? item.getQuantity() : 0);
                     BigDecimal itemPrice = item.getUnitPrice() != null ? item.getUnitPrice() : BigDecimal.ZERO;
                     subTotal = subTotal.add(itemPrice.multiply(itemQty));
                 }
                 itemDtos.add(itemDto);
             }
+
             dto.setTotalPrice(subTotal.add(totalTax));
             dto.setSubTotal(subTotal);
             dto.setTotalTaxAmount(totalTax);
             dto.setItems(itemDtos);
+
             return dto;
         }).toList();
     }

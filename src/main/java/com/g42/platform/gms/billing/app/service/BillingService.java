@@ -1,6 +1,7 @@
 package com.g42.platform.gms.billing.app.service;
 
 import com.g42.platform.gms.auth.api.internal.CustomerInternalApi;
+import com.g42.platform.gms.billing.api.dto.BillEstimateDto;
 import com.g42.platform.gms.billing.api.dto.PaymentTransactionDto;
 import com.g42.platform.gms.billing.api.dto.ServiceBillDto;
 import com.g42.platform.gms.billing.api.mapper.ServiceBillDtoMapper;
@@ -15,6 +16,7 @@ import com.g42.platform.gms.billing.domain.repository.BillingRepository;
 import com.g42.platform.gms.billing.domain.repository.PaymentTransationRepo;
 import com.g42.platform.gms.common.enums.EstimateEnum;
 import com.g42.platform.gms.customer.domain.entity.CustomerProfile;
+import com.g42.platform.gms.estimation.api.dto.EstimateRespondDto;
 import com.g42.platform.gms.estimation.app.service.EstimateService;
 import com.g42.platform.gms.estimation.domain.entity.Estimate;
 import com.g42.platform.gms.estimation.domain.repository.EstimateRepository;
@@ -150,5 +152,20 @@ public class BillingService {
 
         ticketAssignmentService.markAssignmentDone(serviceBill.getServiceTicketId());
         return serviceBillDtoMapper.mapPaymentToDto(paymentTransaction);
+    }
+
+    public BillEstimateDto getBillWithEstimate(Integer serviceTicketId) {
+        BillEstimateDto billEstimateDto = new BillEstimateDto();
+        ServiceBill serviceBill = billingRepository.getBillingByServiceTicket(serviceTicketId);
+        if (serviceBill == null) {
+            throw new BillingException("Bill not found!", BillingErrorCode.ESTIMATE_404);
+        }
+        billEstimateDto = serviceBillDtoMapper.toBillEstimateDto(serviceBill);
+        List<EstimateRespondDto> estimateRespondDtos = estimateService.getEstimateByCode(serviceTicketId);
+        if (estimateRespondDtos!=null||billEstimateDto!=null) {
+
+        billEstimateDto.setEstimate(estimateRespondDtos);
+        }
+        return  billEstimateDto;
     }
 }
