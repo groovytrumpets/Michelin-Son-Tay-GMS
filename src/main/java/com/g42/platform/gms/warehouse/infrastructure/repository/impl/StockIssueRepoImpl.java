@@ -115,6 +115,8 @@ public class StockIssueRepoImpl implements StockIssueRepo {
         jpa.setConfirmedBy(domain.getConfirmedBy());
         jpa.setConfirmedAt(domain.getConfirmedAt());
         jpa.setCreatedBy(domain.getCreatedBy());
+        jpa.setCreatedAt(domain.getCreatedAt());
+        jpa.setUpdatedAt(domain.getUpdatedAt());
         return jpa;
     }
 
