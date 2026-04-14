@@ -23,6 +23,10 @@ import com.g42.platform.gms.warehouse.infrastructure.entity.ReturnEntryItemJpa;
 import com.g42.platform.gms.warehouse.infrastructure.entity.ReturnEntryJpa;
 import com.g42.platform.gms.warehouse.infrastructure.entity.WarehouseAttachmentJpa;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -168,6 +172,20 @@ public class ReturnEntryService {
         return returnEntryRepo.findByWarehouseId(warehouseId).stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ReturnEntryResponse> searchByWarehouse(Integer warehouseId,
+                                                       ReturnEntryStatus status,
+                                                       ReturnType returnType,
+                                                       LocalDate fromDate,
+                                                       LocalDate toDate,
+                                                       String search,
+                                                       int page,
+                                                       int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        return returnEntryRepo.search(warehouseId, status, returnType, fromDate, toDate, search, pageable)
+                .map(this::toResponse);
     }
     @Transactional(readOnly = true)
     public ReturnEntryResponse getDetail(Integer returnId) {

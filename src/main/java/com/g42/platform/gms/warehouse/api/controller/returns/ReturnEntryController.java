@@ -9,8 +9,12 @@ import com.g42.platform.gms.warehouse.api.dto.request.PatchReturnItemRequest;
 import com.g42.platform.gms.warehouse.api.dto.request.UpdateReturnEntryRequest;
 import com.g42.platform.gms.warehouse.api.dto.response.ReturnEntryResponse;
 import com.g42.platform.gms.warehouse.app.service.returns.ReturnEntryService;
+import com.g42.platform.gms.warehouse.domain.enums.ReturnEntryStatus;
+import com.g42.platform.gms.warehouse.domain.enums.ReturnType;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -18,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -30,10 +35,17 @@ public class ReturnEntryController {
     /** Danh sách phiếu hoàn theo kho, mới nhất trước */
     @GetMapping
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<List<ReturnEntryResponse>>> list(
-            @RequestParam Integer warehouseId) {
+    public ResponseEntity<ApiResponse<Page<ReturnEntryResponse>>> list(
+            @RequestParam Integer warehouseId,
+            @RequestParam(required = false) ReturnEntryStatus status,
+            @RequestParam(required = false) ReturnType returnType,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
         return ResponseEntity.ok(ApiResponses.success(
-                returnEntryService.listByWarehouse(warehouseId)));
+                returnEntryService.searchByWarehouse(warehouseId, status, returnType, fromDate, toDate, search, page, size)));
     }
 
     @PostMapping
