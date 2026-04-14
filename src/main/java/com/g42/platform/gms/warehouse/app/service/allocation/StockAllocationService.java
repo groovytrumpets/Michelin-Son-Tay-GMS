@@ -93,10 +93,6 @@ public class StockAllocationService {
     }
     @Transactional
         public List<StockIssueResponse> requestIssueDraft(Integer serviceTicketId, Integer staffId) {
-        if (stockIssueRepo.existsConfirmedServiceTicketIssue(serviceTicketId)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                "Service ticket da co phieu xuat CONFIRMED");
-        }
         if (stockIssueRepo.existsDraftServiceTicketIssue(serviceTicketId)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                 "Service ticket da co phieu xuat DRAFT");

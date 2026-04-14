@@ -29,7 +29,7 @@ public class StaffDashboardController {
      * Lấy toàn bộ thông tin dashboard cho kỹ thuật viên đang đăng nhập.
      */
     @GetMapping("/dashboard")
-    @PreAuthorize("hasRole('TECHNICIAN')")
+    @PreAuthorize("hasRole('MANAGER')")
     public ResponseEntity<ApiResponse<DashboardOverviewResponse>> getDashboard(
             @AuthenticationPrincipal StaffPrincipal principal) {
 
@@ -43,7 +43,7 @@ public class StaffDashboardController {
      * Lấy danh sách task hôm nay của kỹ thuật viên.
      */
     @GetMapping("/tasks/today")
-    @PreAuthorize("hasRole('TECHNICIAN')")
+    @PreAuthorize("hasRole('MANAGER')")
     public ResponseEntity<ApiResponse<List<TaskSummaryDto>>> getTodayTasks(
             @AuthenticationPrincipal StaffPrincipal principal) {
 
@@ -57,7 +57,7 @@ public class StaffDashboardController {
      * Lấy lịch làm việc theo khoảng ngày.
      */
     @GetMapping("/schedule")
-    @PreAuthorize("hasRole('TECHNICIAN')")
+    @PreAuthorize("hasRole('MANAGER')")
     public ResponseEntity<ApiResponse<List<ScheduleDayDto>>> getSchedule(
             @AuthenticationPrincipal StaffPrincipal principal,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -73,7 +73,7 @@ public class StaffDashboardController {
      * Lấy lịch sử chấm công theo tháng.
      */
     @GetMapping("/attendance/history")
-    @PreAuthorize("hasRole('TECHNICIAN')")
+    @PreAuthorize("hasRole('MANAGER')")
     public ResponseEntity<ApiResponse<List<AttendanceRecordDto>>> getAttendanceHistory(
             @AuthenticationPrincipal StaffPrincipal principal,
             @RequestParam int month,
@@ -89,7 +89,7 @@ public class StaffDashboardController {
      * Lấy danh sách thông báo (tất cả, có phân trang).
      */
     @GetMapping("/notifications")
-    @PreAuthorize("hasRole('TECHNICIAN')")
+    @PreAuthorize("hasRole('MANAGER')")
     public ResponseEntity<ApiResponse<List<NotificationSummaryDto>>> getNotifications(
             @AuthenticationPrincipal StaffPrincipal principal,
             @RequestParam(defaultValue = "0") int page,
@@ -105,7 +105,7 @@ public class StaffDashboardController {
      * Đánh dấu thông báo đã đọc.
      */
     @PutMapping("/notifications/{notificationId}/read")
-    @PreAuthorize("hasRole('TECHNICIAN')")
+    @PreAuthorize("hasRole('MANAGER')")
     public ResponseEntity<ApiResponse<String>> markNotificationAsRead(
             @AuthenticationPrincipal StaffPrincipal principal,
             @PathVariable Integer notificationId) {
@@ -120,7 +120,7 @@ public class StaffDashboardController {
      * Lấy thống kê cá nhân theo tháng.
      */
     @GetMapping("/statistics")
-    @PreAuthorize("hasRole('TECHNICIAN')")
+    @PreAuthorize("hasRole('MANAGER')")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getStatistics(
             @AuthenticationPrincipal StaffPrincipal principal,
             @RequestParam int month,
