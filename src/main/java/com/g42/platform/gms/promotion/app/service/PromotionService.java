@@ -41,6 +41,7 @@ public class PromotionService {
                     PromotionErrorCode.INVALID_ENUM_TARGET_TYPE
             );
         }
+        promotionCreateDto.setUsedCount(0);
         Promotion promotion = promotionRepo.createNewPromotion(promotionDtoMapper.fromDto(promotionCreateDto));
         return promotionDtoMapper.toDto(promotion);
     }

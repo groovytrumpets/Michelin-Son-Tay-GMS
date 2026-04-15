@@ -96,10 +96,12 @@ public class BillingService {
                     .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
             serviceBill.setDiscountAmount(discountAmount);
             System.out.println("DEBUG: Promotion: " + discountAmount);
+            promotionRepo.countUsed(promotion.getPromotionId());
             serviceBill.setFinalAmount(estimate.getTotalPrice().subtract(discountAmount));
         }else {
             serviceBill.setDiscountAmount(BigDecimal.ZERO);
             serviceBill.setFinalAmount(estimate.getTotalPrice());
+            throw new BillingException("Đơn hàng chưa đủ điều kiện áp dụng Promotion",BillingErrorCode.PROMOTION404);
         }
         //todo: change status of estimate and service ticket
         serviceTicket.setTicketStatus(TicketStatus.COMPLETED);
