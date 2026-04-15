@@ -241,6 +241,6 @@ public class GlobalExceptionHandler {
         System.err.println("Billing Error: " + ex.getCode() + " - " + ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponses.error(ex.getCode().name(), ex.getMessage()));
+                .body(ApiResponses.errorBill(ex.getCode().name(), ex.getMessage()));
     }
 }
