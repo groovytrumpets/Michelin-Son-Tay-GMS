@@ -4,9 +4,11 @@ import com.g42.platform.gms.auth.entity.StaffProfile;
 import com.g42.platform.gms.auth.repository.StaffProfileRepo;
 import com.g42.platform.gms.booking.customer.infrastructure.entity.CatalogItemJpaEntity;
 import com.g42.platform.gms.catalog.infrastructure.repository.CatalogItemRepository;
+import com.g42.platform.gms.common.service.ImageUploadService;
 import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicket;
 import com.g42.platform.gms.service_ticket_management.domain.repository.ServiceTicketRepo;
 import com.g42.platform.gms.warehouse.api.dto.issue.CreateStockIssueRequest;
+import com.g42.platform.gms.warehouse.api.dto.issue.CreateStockIssueWithAttachmentRequest;
 import com.g42.platform.gms.warehouse.api.dto.request.PatchIssueItemRequest;
 import com.g42.platform.gms.warehouse.api.dto.request.UpdateStockIssueRequest;
 import com.g42.platform.gms.warehouse.api.dto.response.StockIssueDetailResponse;
@@ -26,12 +28,16 @@ import com.g42.platform.gms.warehouse.domain.repository.StockAllocationRepo;
 import com.g42.platform.gms.warehouse.domain.repository.StockEntryRepo;
 import com.g42.platform.gms.warehouse.domain.repository.StockIssueItemRepo;
 import com.g42.platform.gms.warehouse.domain.repository.StockIssueRepo;
+import com.g42.platform.gms.warehouse.domain.repository.WarehouseAttachmentRepo;
 import com.g42.platform.gms.warehouse.domain.repository.WarehousePricingRepo;
 import com.g42.platform.gms.warehouse.infrastructure.entity.InventoryTransactionJpa;
 import com.g42.platform.gms.warehouse.infrastructure.entity.StockAllocationJpa;
+import com.g42.platform.gms.warehouse.infrastructure.entity.WarehouseAttachmentJpa;
 import com.g42.platform.gms.warehouse.infrastructure.entity.WarehouseJpa;
 import com.g42.platform.gms.warehouse.infrastructure.entity.WarehousePricingJpa;
 import com.g42.platform.gms.warehouse.infrastructure.repository.WarehouseJpaRepo;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -40,8 +46,10 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
@@ -78,6 +86,11 @@ public class StockIssueService {
     private final StaffProfileRepo staffProfileRepo;
     private final WarehouseJpaRepo warehouseJpaRepo;
     private final ServiceTicketRepo serviceTicketRepo;
+    private final WarehouseAttachmentRepo attachmentRepo;
+    private final ImageUploadService imageUploadService;
+    private final ObjectMapper objectMapper;
+
+    private static final String FOLDER_STOCK_ISSUE = "stock-issues";
 
     @Transactional
     public StockIssueResponse create(CreateStockIssueRequest request, Integer staffId) {
@@ -122,12 +135,76 @@ public class StockIssueService {
     }
 
     @Transactional
+    public StockIssueResponse createWithAttachment(CreateStockIssueRequest request,
+                                                    MultipartFile file,
+                                                    Integer staffId) throws IOException {
+        StockIssueResponse created = create(request, staffId);
+
+        String url = imageUploadService.uploadImage(file, FOLDER_STOCK_ISSUE);
+        WarehouseAttachmentJpa attachment = new WarehouseAttachmentJpa();
+        attachment.setRefType(WarehouseAttachmentJpa.RefType.STOCK_ISSUE);
+        attachment.setRefId(created.getIssueId());
+        attachment.setFileUrl(url);
+        attachment.setUploadedBy(staffId);
+        attachmentRepo.save(attachment);
+
+        return toResponse(findOrThrow(created.getIssueId()));
+    }
+
+    /**
+     * Tạo phiếu + ảnh qua @ModelAttribute form.
+     */
+    @Transactional
+    public StockIssueResponse createWithAttachmentForm(CreateStockIssueWithAttachmentRequest req,
+                                                        Integer staffId) throws IOException {
+        List<CreateStockIssueRequest.IssueItemRequest> items;
+        try {
+            items = objectMapper.readValue(req.getItems(),
+                    new TypeReference<List<CreateStockIssueRequest.IssueItemRequest>>() {});
+        } catch (Exception e) {
+            throw new ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST,
+                    "items không hợp lệ: " + e.getMessage());
+        }
+
+        CreateStockIssueRequest request = new CreateStockIssueRequest();
+        request.setWarehouseId(req.getWarehouseId());
+        request.setIssueType(IssueType.valueOf(req.getIssueType()));
+        request.setIssueReason(req.getIssueReason());
+        request.setServiceTicketId(req.getServiceTicketId());
+        request.setItems(items);
+
+        return createWithAttachment(request, req.getFile(), staffId);
+    }
+
+    @Transactional
+    public void addAttachment(Integer issueId, MultipartFile file, Integer staffId) throws IOException {
+        StockIssue issue = findOrThrow(issueId);
+        if (issue.getStatus() == StockIssueStatus.CONFIRMED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Phiếu đã được xác nhận");
+        }
+        String url = imageUploadService.uploadImage(file, FOLDER_STOCK_ISSUE);
+        WarehouseAttachmentJpa attachment = new WarehouseAttachmentJpa();
+        attachment.setRefType(WarehouseAttachmentJpa.RefType.STOCK_ISSUE);
+        attachment.setRefId(issueId);
+        attachment.setFileUrl(url);
+        attachment.setUploadedBy(staffId);
+        attachmentRepo.save(attachment);
+    }
+
+    @Transactional
     public StockIssueResponse patchItem(Integer issueId, Integer issueItemId, PatchIssueItemRequest request) {
         StockIssue issue = findOrThrow(issueId);
         if (issue.getStatus() != StockIssueStatus.DRAFT) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                     "Chỉ có thể sửa phiếu ở trạng thái DRAFT");
         }
+        
+        // Phiếu SERVICE_TICKET không được tự điều chỉnh
+        if (issue.getIssueType() == IssueType.SERVICE_TICKET) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Phiếu xuất từ Service Ticket không được điều chỉnh. Vui lòng yêu cầu tạo đơn mới từ cửa hàng");
+        }
+        
         StockIssueItem item = stockIssueItemRepo.findById(issueItemId)
                 .filter(i -> i.getIssueId().equals(issueId))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
@@ -147,9 +224,29 @@ public class StockIssueService {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                     "Chỉ có thể sửa phiếu ở trạng thái DRAFT");
         }
+        
+        // Phiếu SERVICE_TICKET không được tự điều chỉnh — cửa hàng phải tạo đơn mới
+        if (issue.getIssueType() == IssueType.SERVICE_TICKET) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Phiếu xuất từ Service Ticket không được điều chỉnh. Vui lòng yêu cầu tạo đơn mới từ cửa hàng");
+        }
+        
         if (request.getIssueReason() != null) issue.setIssueReason(request.getIssueReason());
 
         if (request.getItems() != null) {
+            // Validate inventory availability trước khi update
+            for (CreateStockIssueRequest.IssueItemRequest item : request.getItems()) {
+                int available = inventoryRepo
+                        .findByWarehouseAndItem(issue.getWarehouseId(), item.getItemId())
+                        .map(inv -> Math.max(0, inv.getQuantity() - inv.getReservedQuantity()))
+                        .orElse(0);
+                if (available < item.getQuantity()) {
+                    throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                            "Không đủ tồn kho cho itemId=" + item.getItemId()
+                                    + " (yêu cầu=" + item.getQuantity() + ", khả dụng=" + available + ")");
+                }
+            }
+            
             stockIssueItemRepo.deleteByIssueId(issueId);
             List<StockIssueItem> newItems = request.getItems().stream().map(req -> StockIssueItem.builder()
                     .issueId(issueId)
@@ -172,6 +269,14 @@ public class StockIssueService {
         StockIssue issue = findOrThrow(issueId);
         if (issue.getStatus() == StockIssueStatus.CONFIRMED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Phiếu đã được xác nhận");
+        }
+        
+        // Kiểm tra xem phiếu có ảnh chứng từ không
+        boolean hasAttachment = attachmentRepo.existsByRefTypeAndRefId(
+                WarehouseAttachmentJpa.RefType.STOCK_ISSUE, issueId);
+        if (!hasAttachment) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Cần đính kèm ảnh chứng từ trước khi xác nhận");
         }
 
         List<StockAllocationJpa> ticketReservedAllocations = new ArrayList<>();
@@ -402,6 +507,28 @@ public class StockIssueService {
             return d;
         }).collect(Collectors.toList()));
 
+        // Thêm thông tin attachments
+        resp.setAttachmentUrls(
+            attachmentRepo.findByRefTypeAndRefId(
+                    WarehouseAttachmentJpa.RefType.STOCK_ISSUE, issueId)
+                    .stream()
+                    .map(WarehouseAttachmentJpa::getFileUrl)
+                    .collect(Collectors.toList())
+        );
+
+        // Tính toán totals
+        int totalQty = resp.getItems().stream()
+                .mapToInt(StockIssueDetailResponse.IssueItemDetail::getQuantity)
+                .sum();
+        resp.setTotalQuantity(totalQty);
+
+        BigDecimal totalVal = resp.getItems().stream()
+                .map(item -> item.getFinalPrice() != null
+                    ? item.getFinalPrice().multiply(BigDecimal.valueOf(item.getQuantity()))
+                    : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        resp.setTotalValue(totalVal);
+
         return resp;
     }
 
@@ -476,6 +603,12 @@ public class StockIssueService {
                 r.setConfirmedByName(confirmedBy.getFullName());
             }
         }
+
+        // Thêm số lượng attachments
+        int attachmentCount = (int) attachmentRepo.findByRefTypeAndRefId(
+                WarehouseAttachmentJpa.RefType.STOCK_ISSUE, e.getIssueId()).size();
+        r.setAttachmentCount(attachmentCount);
+
         return r;
     }
 

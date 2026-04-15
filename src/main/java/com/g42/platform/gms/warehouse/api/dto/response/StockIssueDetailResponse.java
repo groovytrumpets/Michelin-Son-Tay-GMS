@@ -28,6 +28,9 @@ public class StockIssueDetailResponse {
     private String createdByName;
     private LocalDateTime createdAt;
     private List<IssueItemDetail> items;
+    private List<String> attachmentUrls;  // danh sách URL ảnh chứng từ
+    private Integer totalQuantity;        // tổng số lượng
+    private BigDecimal totalValue;        // tổng giá trị (sum finalPrice)
 
     @Data
     public static class IssueItemDetail {

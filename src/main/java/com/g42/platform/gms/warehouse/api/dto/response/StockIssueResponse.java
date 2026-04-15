@@ -26,4 +26,5 @@ public class StockIssueResponse {
     private Integer createdBy;
     private String createdByName;
     private LocalDateTime createdAt;
+    private Integer attachmentCount; // số lượng ảnh chứng từ
 }
