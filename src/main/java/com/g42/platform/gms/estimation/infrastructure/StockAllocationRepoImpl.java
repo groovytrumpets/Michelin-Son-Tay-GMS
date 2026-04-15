@@ -80,7 +80,7 @@ public class StockAllocationRepoImpl implements StockAllocationRepository {
             for (StockAllocationJpa stockAllocationJpa : stockAllocationJpas) {
                 if (stockAllocationJpa.getEstimateItemId().equals(estimateItem.getId())) {
                     estimateViaAllocationDto.setStockAllocationDto(stockAllocationJpaMapper.toDto(stockAllocationJpa));
-                }
+                }else estimateViaAllocationDto.setStockAllocationDto(null);
             }
             listEstimateViaAllocationDto.add(estimateViaAllocationDto);
         }
