@@ -27,6 +27,11 @@ public class StockAllocationRepoImpl implements StockAllocationRepo {
     }
 
     @Override
+    public List<StockAllocationJpa> findByEstimateItemId(Integer estimateItemId) {
+        return jpaRepo.findByEstimateItemId(estimateItemId);
+    }
+
+    @Override
     public StockAllocationJpa save(StockAllocationJpa allocation) {
         return jpaRepo.save(allocation);
     }

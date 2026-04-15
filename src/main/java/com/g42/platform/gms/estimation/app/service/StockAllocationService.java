@@ -33,14 +33,19 @@ public class StockAllocationService {
 
     @Transactional
     public List<StockAllocationDto> createStockAllocation(Integer estimateId, Integer staffId) {
-        //todo: cancel
         Estimate estimate = estimateService.findById(estimateId);
-//        //todo: RELEASED pervious estimate if not null
-//        if (estimate.getRevisedFromId() != null && estimate.getVersion()>1) {
-//            stockAllocationRepository.updateReleasedOldEstimate(estimate.getRevisedFromId());
-//        }
+        Map<String, Integer> committedByItemWarehouse = new java.util.HashMap<>();
+
         if (estimate.getRevisedFromId() != null) {
             List<StockAllocation> oldAllocations = stockAllocationRepository.findByEstimateId(estimate.getRevisedFromId());
+
+            // Keep track of quantities already committed in previous estimate.
+            for (StockAllocation oldAlloc : oldAllocations) {
+                if ("COMMITTED".equals(oldAlloc.getStatus())) {
+                    String key = allocKey(oldAlloc.getWarehouseId(), oldAlloc.getItemId());
+                    committedByItemWarehouse.merge(key, oldAlloc.getQuantity(), Integer::sum);
+                }
+            }
 
             for (StockAllocation oldAlloc : oldAllocations) {
                 if ("RESERVED".equals(oldAlloc.getStatus())) {
@@ -52,35 +57,51 @@ public class StockAllocationService {
                 }
             }
 
-
-        //todo: RELEASED pervious estimate if not null
+            // Release only old RESERVED rows; keep COMMITTED history intact.
             stockAllocationRepository.updateReleasedOldEstimate(estimate.getRevisedFromId());
         }
-        List<EstimateItem> estimateItems = estimateItemRepository.findByEstimateId(estimateId);
+
+        List<EstimateItem> estimateItems = estimateItemRepository.findByEstimateId(estimateId)
+                .stream()
+                .filter(i -> i.getItemId() != null)
+                .filter(i -> i.getWarehouseId() != null)
+                .filter(i -> i.getQuantity() != null && i.getQuantity() > 0)
+                .filter(i -> !Boolean.TRUE.equals(i.getIsRemoved()))
+                .filter(i -> Boolean.TRUE.equals(i.getIsChecked()))
+                .toList();
+
         List<StockAllocation> stockAllocations = new ArrayList<>();
         for (EstimateItem estimateItem : estimateItems) {
-            if (estimateItem.getItemId()!=null && estimateItem.getWarehouseId()!=null) {
-        StockAllocation stockAllocation = new StockAllocation();
-        stockAllocation.setServiceTicketId(estimate.getServiceTicketId());
-        stockAllocation.setEstimateItemId(estimateItem.getId());
-        stockAllocation.setWarehouseId(estimateItem.getWarehouseId());
-        stockAllocation.setItemId(estimateItem.getItemId());
-        stockAllocation.setQuantity(estimateItem.getQuantity());
-        stockAllocation.setEstimateId(estimateId);
-        stockAllocation.setStatus("RESERVED");
-        stockAllocation.setCreatedBy(staffId);
-//        stockAllocation.setCreatedBy();
-        stockAllocation.setCreatedAt(Instant.now());
-        StockAllocation savedStockAllocation = stockAllocationRepository.createNewAllocation(stockAllocation);
+            String key = allocKey(estimateItem.getWarehouseId(), estimateItem.getItemId());
+            int alreadyCommitted = committedByItemWarehouse.getOrDefault(key, 0);
+            int toReserve = Math.max(estimateItem.getQuantity() - alreadyCommitted, 0);
+
+            if (toReserve > 0) {
+                StockAllocation stockAllocation = new StockAllocation();
+                stockAllocation.setServiceTicketId(estimate.getServiceTicketId());
+                stockAllocation.setEstimateItemId(estimateItem.getId());
+                stockAllocation.setWarehouseId(estimateItem.getWarehouseId());
+                stockAllocation.setItemId(estimateItem.getItemId());
+                stockAllocation.setQuantity(toReserve);
+                stockAllocation.setEstimateId(estimateId);
+                stockAllocation.setStatus("RESERVED");
+                stockAllocation.setCreatedBy(staffId);
+                stockAllocation.setCreatedAt(Instant.now());
+
+                StockAllocation savedStockAllocation = stockAllocationRepository.createNewAllocation(stockAllocation);
                 stockAllocations.add(savedStockAllocation);
-            //todo: update Inventory
+
                 inventoryService.increaseReservedQuantity(
-                    savedStockAllocation.getItemId(),
-                    savedStockAllocation.getWarehouseId(),
-                    savedStockAllocation.getQuantity());
+                        savedStockAllocation.getItemId(),
+                        savedStockAllocation.getWarehouseId(),
+                        savedStockAllocation.getQuantity());
             }
         }
         return stockAllocations.stream().map(stockAllocationDtoMapper::toDto).toList();
+    }
+
+    private String allocKey(Integer warehouseId, Integer itemId) {
+        return warehouseId + ":" + itemId;
     }
     @Transactional
     public List<StockAllocationDto> updateStockAllocation(Integer estimateId, Integer staffId, List<StockAllocationDto> stockAllocationDtos) {
