@@ -96,6 +96,7 @@ public class BillingService {
                     .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
             serviceBill.setDiscountAmount(discountAmount);
             System.out.println("DEBUG: Promotion: " + discountAmount);
+            promotionRepo.countUsed(promotion.getPromotionId());
             serviceBill.setFinalAmount(estimate.getTotalPrice().subtract(discountAmount));
         }else {
             serviceBill.setDiscountAmount(BigDecimal.ZERO);
