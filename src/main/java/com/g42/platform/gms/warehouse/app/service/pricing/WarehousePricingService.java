@@ -4,8 +4,10 @@ import com.g42.platform.gms.warehouse.api.dto.request.UpsertPricingRequest;
 import com.g42.platform.gms.warehouse.api.dto.response.PricingResponse;
 import com.g42.platform.gms.warehouse.domain.repository.PartCatalogRepo;
 import com.g42.platform.gms.warehouse.domain.repository.WarehousePricingRepo;
+import com.g42.platform.gms.warehouse.infrastructure.entity.WarehouseJpa;
 import com.g42.platform.gms.warehouse.infrastructure.entity.WarehousePricingJpa;
 import com.g42.platform.gms.warehouse.infrastructure.mapper.WarehousePricingJpaMapper;
+import com.g42.platform.gms.warehouse.infrastructure.repository.WarehouseJpaRepo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -32,6 +34,7 @@ public class WarehousePricingService {
     private final WarehousePricingRepo pricingRepo;
     private final PartCatalogRepo partCatalogRepo;
     private final WarehousePricingJpaMapper warehousePricingJpaMapper;
+    private final WarehouseJpaRepo warehouseJpaRepo;
     @Transactional(readOnly = true)
     public List<PricingResponse> listByWarehouse(Integer warehouseId) {
         List<WarehousePricingJpa> pricings = pricingRepo.findActiveByWarehouse(warehouseId);
@@ -105,6 +108,15 @@ public class WarehousePricingService {
         PricingResponse r = new PricingResponse();
         r.setPricingId(p.getPricingId());
         r.setWarehouseId(p.getWarehouseId());
+
+        if (p.getWarehouseId() != null) {
+            WarehouseJpa warehouse = warehouseJpaRepo.findById(p.getWarehouseId()).orElse(null);
+            if (warehouse != null) {
+                r.setWarehouseCode(warehouse.getWarehouseCode());
+                r.setWarehouseName(warehouse.getWarehouseName());
+            }
+        }
+
         r.setItemId(p.getItemId());
         r.setItemName(itemName);
         r.setBasePrice(p.getBasePrice());

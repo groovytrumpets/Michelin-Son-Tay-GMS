@@ -12,6 +12,8 @@ public class StockEntryResponse {
     private Integer entryId;
     private String entryCode;
     private Integer warehouseId;
+    private String warehouseCode;
+    private String warehouseName;
     private String supplierName;
     private LocalDate entryDate;
     private StockEntryStatus status;
@@ -19,7 +21,9 @@ public class StockEntryResponse {
     private List<StockEntryItemResponse> items;
     private List<String> attachments; // danh sách URL ảnh chứng từ
     private Integer confirmedBy;
+    private String confirmedByName;
     private LocalDateTime confirmedAt;
     private Integer createdBy;
+    private String createdByName;
     private LocalDateTime createdAt;
 }
