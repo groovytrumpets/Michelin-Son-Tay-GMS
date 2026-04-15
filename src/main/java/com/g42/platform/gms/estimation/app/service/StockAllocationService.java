@@ -1,5 +1,6 @@
 package com.g42.platform.gms.estimation.app.service;
 
+import com.g42.platform.gms.estimation.api.dto.EstimateViaAllocationDto;
 import com.g42.platform.gms.estimation.api.dto.StockAllocationDto;
 import com.g42.platform.gms.estimation.api.mapper.StockAllocationDtoMapper;
 import com.g42.platform.gms.estimation.domain.entity.Estimate;
@@ -136,5 +137,10 @@ public class StockAllocationService {
     public List<StockAllocationDto> getStockAllocationByEstimate(Integer estimateId) {
         List<StockAllocation> stockAllocations = stockAllocationRepository.findByEstimateId(estimateId);
         return  stockAllocations.stream().map(stockAllocationDtoMapper::toDto).toList();
+    }
+
+    public List<EstimateViaAllocationDto> getEstimateToAllocation(Integer estimateId) {
+        List<EstimateViaAllocationDto> stockAllocations = stockAllocationRepository.findEstimateAndAllocationById(estimateId);
+        return  stockAllocations;
     }
 }
