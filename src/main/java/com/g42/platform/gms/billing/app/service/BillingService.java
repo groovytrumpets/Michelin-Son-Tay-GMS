@@ -14,6 +14,7 @@ import com.g42.platform.gms.billing.domain.exception.BillingErrorCode;
 import com.g42.platform.gms.billing.domain.exception.BillingException;
 import com.g42.platform.gms.billing.domain.repository.BillingRepository;
 import com.g42.platform.gms.billing.domain.repository.PaymentTransationRepo;
+import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.common.enums.EstimateEnum;
 import com.g42.platform.gms.customer.domain.entity.CustomerProfile;
 import com.g42.platform.gms.estimation.api.dto.EstimateRespondDto;
@@ -31,6 +32,8 @@ import com.g42.platform.gms.service_ticket_management.infrastructure.entity.Serv
 import com.g42.platform.gms.service_ticket_management.infrastructure.repository.ServiceTicketRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
