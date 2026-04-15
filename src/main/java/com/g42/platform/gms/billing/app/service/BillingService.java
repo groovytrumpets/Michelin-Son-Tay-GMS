@@ -38,6 +38,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -82,14 +83,19 @@ public class BillingService {
         System.out.println("DEBUG: Estimate: " + estimate.getId());
         ServiceTicketJpa serviceTicket = serviceTicketRepository.findByServiceTicketId(serviceBillDto.getServiceTicketId());
         validateBillingRequest(estimate, serviceTicket);
+        serviceBill.setSubTotal(estimate.getTotalPrice());
         serviceBill.setEstimateId(estimate.getId());
         //todo: check promotion available for billing
         Promotion promotion = resolvePromotion(serviceBillDto);
         if (promotion != null) {
-            BigDecimal discountAmount = serviceBillDto.getSubTotal()
+        System.out.println("DEBUG: Promotion: " + promotion.getPromotionId());
+            System.out.println("DEBUG: Promotion: " + promotion.getDiscountPercent());
+            BigDecimal baseAmount = estimate.getTotalPrice();
+            BigDecimal discountAmount = baseAmount
                     .multiply(promotion.getDiscountPercent())
-                    .divide(BigDecimal.valueOf(100));
+                    .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
             serviceBill.setDiscountAmount(discountAmount);
+            System.out.println("DEBUG: Promotion: " + discountAmount);
             serviceBill.setFinalAmount(estimate.getTotalPrice().subtract(discountAmount));
         }else {
             serviceBill.setDiscountAmount(BigDecimal.ZERO);
@@ -100,7 +106,7 @@ public class BillingService {
         serviceTicketRepository.save(serviceTicket);
         estimate.setStatus(EstimateEnum.ARCHIVED);
         estimateRepository.save(estimate);
-        serviceBill.setPaidAt(Instant.now());
+//        serviceBill.setPaidAt(Instant.now());
         ServiceBill saved = billingRepository.createNewBilling(serviceBill);
         return serviceBillDtoMapper.mapToDto(saved);
     }
@@ -138,6 +144,7 @@ public class BillingService {
         serviceTicketJpa.setDeliveredAt(LocalDateTime.now());
         serviceTicketRepository.save(serviceTicketJpa);
         serviceBill.setPaymentStatus(PaymentStatus.PAID.name());
+        serviceBill.setPaidAt(Instant.now());
 
         // Luong moi: chi chuyen ticket sang PAID, viec tao phieu xuat kho DRAFT
         // duoc goi bang API yeu cau xuat kho tu stock allocation.
