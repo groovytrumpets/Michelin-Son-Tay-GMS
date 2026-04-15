@@ -1,6 +1,7 @@
 package com.g42.platform.gms.common.handler;
 
 import com.g42.platform.gms.auth.constant.AuthErrorCode;
+import com.g42.platform.gms.billing.domain.exception.BillingException;
 import com.g42.platform.gms.booking.customer.domain.exception.BookingException;
 import com.g42.platform.gms.booking_management.domain.exception.BookingStaffException;
 import com.g42.platform.gms.common.dto.ApiResponse;
@@ -234,5 +235,12 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponses.error(ex.getCode().name(), ex.getMessage()));
+    }
+    @ExceptionHandler(BillingException.class)
+    public ResponseEntity<ApiResponse<?>> handleBookingException(BillingException ex) {
+        System.err.println("Billing Error: " + ex.getCode() + " - " + ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponses.errorBill(ex.getCode().name(), ex.getMessage()));
     }
 }

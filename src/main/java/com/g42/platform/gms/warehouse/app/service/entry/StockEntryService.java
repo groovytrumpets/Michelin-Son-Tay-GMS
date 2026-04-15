@@ -1,5 +1,9 @@
 package com.g42.platform.gms.warehouse.app.service.entry;
 
+import com.g42.platform.gms.auth.entity.StaffProfile;
+import com.g42.platform.gms.auth.repository.StaffProfileRepo;
+import com.g42.platform.gms.booking.customer.infrastructure.entity.CatalogItemJpaEntity;
+import com.g42.platform.gms.catalog.infrastructure.repository.CatalogItemRepository;
 import com.g42.platform.gms.common.service.ImageUploadService;
 import com.g42.platform.gms.warehouse.api.dto.entry.CreateStockEntryRequest;
 import com.g42.platform.gms.warehouse.api.dto.entry.CreateStockEntryWithAttachmentRequest;
@@ -18,7 +22,9 @@ import com.g42.platform.gms.warehouse.domain.repository.InventoryTransactionRepo
 import com.g42.platform.gms.warehouse.domain.repository.StockEntryRepo;
 import com.g42.platform.gms.warehouse.domain.repository.WarehouseAttachmentRepo;
 import com.g42.platform.gms.warehouse.infrastructure.entity.InventoryTransactionJpa;
+import com.g42.platform.gms.warehouse.infrastructure.entity.WarehouseJpa;
 import com.g42.platform.gms.warehouse.infrastructure.entity.WarehouseAttachmentJpa;
+import com.g42.platform.gms.warehouse.infrastructure.repository.WarehouseJpaRepo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -40,6 +46,8 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -56,6 +64,9 @@ public class StockEntryService {
     private final InventoryTransactionRepo transactionRepo;
     private final ImageUploadService imageUploadService;
     private final WarehouseAttachmentRepo attachmentRepo;
+    private final WarehouseJpaRepo warehouseJpaRepo;
+    private final StaffProfileRepo staffProfileRepo;
+    private final CatalogItemRepository catalogItemRepository;
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
 
     @Transactional(readOnly = true)
@@ -320,10 +331,39 @@ public class StockEntryService {
         r.setCreatedBy(e.getCreatedBy());
         r.setCreatedAt(e.getCreatedAt());
 
+        if (e.getWarehouseId() != null) {
+            WarehouseJpa warehouse = warehouseJpaRepo.findById(e.getWarehouseId()).orElse(null);
+            if (warehouse != null) {
+                r.setWarehouseCode(warehouse.getWarehouseCode());
+                r.setWarehouseName(warehouse.getWarehouseName());
+            }
+        }
+
+        if (e.getCreatedBy() != null) {
+            StaffProfile createdBy = staffProfileRepo.findById(e.getCreatedBy()).orElse(null);
+            if (createdBy != null) {
+                r.setCreatedByName(createdBy.getFullName());
+            }
+        }
+
+        if (e.getConfirmedBy() != null) {
+            StaffProfile confirmedBy = staffProfileRepo.findById(e.getConfirmedBy()).orElse(null);
+            if (confirmedBy != null) {
+                r.setConfirmedByName(confirmedBy.getFullName());
+            }
+        }
+
+        Set<Integer> itemIds = e.getItems().stream()
+                .map(StockEntryItem::getItemId)
+                .collect(Collectors.toSet());
+        Map<Integer, String> itemNameById = catalogItemRepository.findAllById(itemIds).stream()
+                .collect(Collectors.toMap(CatalogItemJpaEntity::getItemId, CatalogItemJpaEntity::getItemName));
+
         List<StockEntryItemResponse> itemResponses = e.getItems().stream().map(i -> {
             StockEntryItemResponse ir = new StockEntryItemResponse();
             ir.setEntryItemId(i.getEntryItemId());
             ir.setItemId(i.getItemId());
+            ir.setItemName(itemNameById.get(i.getItemId()));
             ir.setQuantity(i.getQuantity());
             ir.setImportPrice(i.getImportPrice());
             ir.setMarkupMultiplier(i.getMarkupMultiplier());

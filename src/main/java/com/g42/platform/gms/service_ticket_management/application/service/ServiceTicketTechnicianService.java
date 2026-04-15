@@ -25,6 +25,9 @@ import com.g42.platform.gms.service_ticket_management.api.mapper.ServiceTicketLi
 import com.g42.platform.gms.service_ticket_management.api.mapper.ServiceTicketDetailMapper;
 import com.g42.platform.gms.vehicle.entity.Vehicle;
 import com.g42.platform.gms.vehicle.repository.VehicleRepository;
+import com.g42.platform.gms.warehouse.domain.enums.AllocationStatus;
+import com.g42.platform.gms.warehouse.domain.repository.StockAllocationRepo;
+import com.g42.platform.gms.warehouse.domain.repository.StockIssueRepo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -59,6 +62,8 @@ public class ServiceTicketTechnicianService {
     private final SafetyInspectionRepo safetyInspectionRepo;
     private final ServiceTicketListMapper listMapper;
     private final ServiceTicketDetailMapper detailMapper;
+    private final StockAllocationRepo stockAllocationRepo;
+    private final StockIssueRepo stockIssueRepo;
     
     /**
      * Get paginated list of service tickets assigned to a specific technician.
@@ -255,6 +260,8 @@ public class ServiceTicketTechnicianService {
             throw new CheckInException("Chỉ có thể báo hoàn thành khi phiếu đang ở trạng thái REPAIRING");
         }
 
+        validateWarehouseBeforeFinish(ticket.getServiceTicketId());
+
         ticket.setTicketStatus(TicketStatus.COMPLETED);
         ticket.setCompletedAt(java.time.LocalDateTime.now());
         ticket.setUpdatedAt(java.time.LocalDateTime.now());
@@ -262,6 +269,26 @@ public class ServiceTicketTechnicianService {
 
         log.info("Ticket {} marked as COMPLETED by technician", ticketCode);
         return getTechnicianTicketDetail(ticketCode);
+    }
+
+    private void validateWarehouseBeforeFinish(Integer serviceTicketId) {
+        int reservedCount = stockAllocationRepo
+                .findByTicketAndStatus(serviceTicketId, AllocationStatus.RESERVED)
+                .size();
+        if (reservedCount > 0) {
+            throw new CheckInException("Chưa thể hoàn thành: vẫn còn vật tư ở trạng thái RESERVED");
+        }
+
+        if (stockIssueRepo.existsDraftServiceTicketIssue(serviceTicketId)) {
+            throw new CheckInException("Chưa thể hoàn thành: vẫn còn phiếu xuất kho DRAFT");
+        }
+
+        int committedCount = stockAllocationRepo
+                .findByTicketAndStatus(serviceTicketId, AllocationStatus.COMMITTED)
+                .size();
+        if (committedCount > 0 && !stockIssueRepo.existsConfirmedServiceTicketIssue(serviceTicketId)) {
+            throw new CheckInException("Chưa thể hoàn thành: chưa có phiếu xuất kho CONFIRMED tương ứng");
+        }
     }
 
 }

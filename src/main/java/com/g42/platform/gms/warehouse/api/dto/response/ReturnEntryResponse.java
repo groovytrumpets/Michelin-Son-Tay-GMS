@@ -11,12 +11,17 @@ public class ReturnEntryResponse {
     private Integer returnId;
     private String returnCode;
     private Integer warehouseId;
+    private String warehouseCode;
+    private String warehouseName;
     private String returnReason;
     private Integer sourceIssueId;
+    private String sourceIssueCode;
     private ReturnEntryStatus status;
     private List<ReturnEntryItemResponse> items;
     private Integer confirmedBy;
+    private String confirmedByName;
     private LocalDateTime confirmedAt;
     private Integer createdBy;
+    private String createdByName;
     private LocalDateTime createdAt;
 }

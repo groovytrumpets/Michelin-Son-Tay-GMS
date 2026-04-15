@@ -20,5 +20,4 @@ public class ServiceBillDto {
     private Integer warehouseId;
     private Integer estimateId;
     private Integer promotionId;
-    private EstimateRespondDto estimateRespondDto;
 }
