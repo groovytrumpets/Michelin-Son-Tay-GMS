@@ -16,5 +16,5 @@ public interface ServiceRepository {
 
     Service save(Service service);
 
-    Page<Service> getListOfProductsByCatalogItem(int page, int size, CatalogItemType itemType, String search, String sortBy, BigDecimal maxPrice, BigDecimal minPrice, String categoryCode, Integer brandId, Integer productLineId);
+    Page<Service> getListOfProductsByCatalogItem(int page, int size, CatalogItemType itemType, String search, String sortBy, BigDecimal maxPrice, BigDecimal minPrice, Integer categoryCode, Integer brandId, Integer productLineId);
 }

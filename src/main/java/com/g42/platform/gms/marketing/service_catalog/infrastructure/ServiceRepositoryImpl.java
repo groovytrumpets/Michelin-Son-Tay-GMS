@@ -54,7 +54,7 @@ public class ServiceRepositoryImpl implements ServiceRepository {
     }
 
     @Override
-    public Page<Service> getListOfProductsByCatalogItem(int page, int size, CatalogItemType itemType, String search, String sortBy, BigDecimal maxPrice, BigDecimal minPrice, String categoryCode, Integer brandId, Integer productLineId) {
+    public Page<Service> getListOfProductsByCatalogItem(int page, int size, CatalogItemType itemType, String search, String sortBy, BigDecimal maxPrice, BigDecimal minPrice, Integer categoryCode, Integer brandId, Integer productLineId) {
         Sort sort = Sort.by(Sort.Direction.ASC, "createdAt");
         if (sortBy != null && !sortBy.isEmpty()) {
             String[] parts = sortBy.split(",");

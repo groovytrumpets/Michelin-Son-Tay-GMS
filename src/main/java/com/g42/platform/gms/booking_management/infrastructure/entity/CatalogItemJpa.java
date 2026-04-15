@@ -4,11 +4,14 @@ import com.g42.platform.gms.marketing.service_catalog.infrastructure.entity.Serv
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
-
+@Getter
+@Setter
 @Entity
 @Table(name = "catalog_item")
-@Data
+
 public class CatalogItemJpa {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -28,4 +31,6 @@ public class CatalogItemJpa {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "service_service_id", nullable = false)
     private ServiceJpaEntity serviceService;
+    @Column(name = "work_category_id")
+    private Integer workCategoryId;
 }
