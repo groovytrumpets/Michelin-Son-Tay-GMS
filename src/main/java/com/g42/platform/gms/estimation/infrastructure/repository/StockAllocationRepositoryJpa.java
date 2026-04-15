@@ -27,4 +27,7 @@ public interface StockAllocationRepositoryJpa extends JpaRepository<StockAllocat
     StockAllocationJpa getStockAllocationJpaByAllocationId(Integer allocationId);
 
     StockAllocationJpa findByEstimateItemId(Integer estimateItemId);
+
+    StockAllocationJpa findByEstimateIdAndWarehouseIdAndItemIdAndStatus(
+            Integer estimateId, Integer warehouseId, Integer itemId, String status);
 }

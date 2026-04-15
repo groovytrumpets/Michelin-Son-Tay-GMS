@@ -77,10 +77,15 @@ public class StockAllocationService {
             int toReserve = Math.max(estimateItem.getQuantity() - alreadyCommitted, 0);
 
             if (toReserve > 0) {
-                // Check if allocation for this estimate_item_id already exists
-                StockAllocation existing = stockAllocationRepository.findByEstimateItemId(estimateItem.getId());
+                // Check if allocation already exists in current estimate for same warehouse + item
+                StockAllocation existing = stockAllocationRepository.findByEstimateIdAndWarehouseIdAndItemIdAndStatus(
+                        estimateId, 
+                        estimateItem.getWarehouseId(), 
+                        estimateItem.getItemId(), 
+                        "RESERVED"
+                );
                 
-                if (existing != null && "RESERVED".equals(existing.getStatus())) {
+                if (existing != null) {
                     // Update existing allocation with new quantity
                     int quantityDiff = toReserve - existing.getQuantity();
                     existing.setQuantity(toReserve);
