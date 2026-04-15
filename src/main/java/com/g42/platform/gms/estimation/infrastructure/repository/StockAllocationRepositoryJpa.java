@@ -25,4 +25,6 @@ public interface StockAllocationRepositoryJpa extends JpaRepository<StockAllocat
     List<StockAllocationJpa> findAllByEstimateId(Integer estimateId);
 
     StockAllocationJpa getStockAllocationJpaByAllocationId(Integer allocationId);
+
+    StockAllocationJpa findByEstimateItemId(Integer estimateItemId);
 }

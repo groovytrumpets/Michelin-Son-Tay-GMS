@@ -77,24 +77,45 @@ public class StockAllocationService {
             int toReserve = Math.max(estimateItem.getQuantity() - alreadyCommitted, 0);
 
             if (toReserve > 0) {
-                StockAllocation stockAllocation = new StockAllocation();
-                stockAllocation.setServiceTicketId(estimate.getServiceTicketId());
-                stockAllocation.setEstimateItemId(estimateItem.getId());
-                stockAllocation.setWarehouseId(estimateItem.getWarehouseId());
-                stockAllocation.setItemId(estimateItem.getItemId());
-                stockAllocation.setQuantity(toReserve);
-                stockAllocation.setEstimateId(estimateId);
-                stockAllocation.setStatus("RESERVED");
-                stockAllocation.setCreatedBy(staffId);
-                stockAllocation.setCreatedAt(Instant.now());
+                // Check if allocation for this estimate_item_id already exists
+                StockAllocation existing = stockAllocationRepository.findByEstimateItemId(estimateItem.getId());
+                
+                if (existing != null && "RESERVED".equals(existing.getStatus())) {
+                    // Update existing allocation with new quantity
+                    int quantityDiff = toReserve - existing.getQuantity();
+                    existing.setQuantity(toReserve);
+                    stockAllocationRepository.save(existing);
+                    
+                    if (quantityDiff != 0) {
+                        inventoryService.updateReservedQuantityByDelta(
+                                existing.getItemId(),
+                                existing.getWarehouseId(),
+                                quantityDiff
+                        );
+                    }
+                    stockAllocations.add(existing);
+                } else {
+                    // Create new allocation
+                    StockAllocation stockAllocation = new StockAllocation();
+                    stockAllocation.setServiceTicketId(estimate.getServiceTicketId());
+                    stockAllocation.setEstimateItemId(estimateItem.getId());
+                    stockAllocation.setWarehouseId(estimateItem.getWarehouseId());
+                    stockAllocation.setItemId(estimateItem.getItemId());
+                    stockAllocation.setQuantity(toReserve);
+                    stockAllocation.setEstimateId(estimateId);
+                    stockAllocation.setStatus("RESERVED");
+                    stockAllocation.setCreatedBy(staffId);
+                    stockAllocation.setCreatedAt(Instant.now());
 
-                StockAllocation savedStockAllocation = stockAllocationRepository.createNewAllocation(stockAllocation);
-                stockAllocations.add(savedStockAllocation);
+                    StockAllocation savedStockAllocation = stockAllocationRepository.createNewAllocation(stockAllocation);
+                    stockAllocations.add(savedStockAllocation);
 
-                inventoryService.increaseReservedQuantity(
-                        savedStockAllocation.getItemId(),
-                        savedStockAllocation.getWarehouseId(),
-                        savedStockAllocation.getQuantity());
+                    inventoryService.increaseReservedQuantity(
+                            savedStockAllocation.getItemId(),
+                            savedStockAllocation.getWarehouseId(),
+                            savedStockAllocation.getQuantity()
+                    );
+                }
             }
         }
         return stockAllocations.stream().map(stockAllocationDtoMapper::toDto).toList();

@@ -13,6 +13,8 @@ public interface StockAllocationRepository {
 
     List<StockAllocation> findByEstimateId(Integer estimateId);
 
+    StockAllocation findByEstimateItemId(Integer estimateItemId);
+
     void save(StockAllocation stockAllocationNew);
 
     void delete(StockAllocation deletedAlloc);
