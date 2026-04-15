@@ -92,7 +92,8 @@ public class StockAllocationService {
                 ));
         //handle add new and update:
         for (StockAllocationDto dto : stockAllocationDtos) {
-        if (dto.getAllocationId()==null){
+            System.out.println("DEBUG allo:"+dto.getAllocationId()+", "+dto.getStatus());
+        if (dto.getAllocationId()==null) {
             //add new
             StockAllocation stockAllocationNew = stockAllocationDtoMapper.toDomain(dto);
             stockAllocationNew.setCreatedBy(staffId);
@@ -107,6 +108,11 @@ public class StockAllocationService {
             StockAllocation oldAllocation = oldMap.get(dto.getAllocationId());
             //count difference Delta: old 4 tire new 6 tire update: +2 tire
             //if old 4 tire, new 1 tire mean -3 tire
+            if ("COMMITTED".equals(oldAllocation.getStatus())) {
+                // Vẫn phải xóa khỏi oldMap để nó không bị lọt xuống vòng lặp Xóa ở bên dưới
+                oldMap.remove(dto.getAllocationId());
+                continue; // Bỏ qua mọi xử lý update bên dưới, nhảy sang dto tiếp theo
+            }
             int difference = dto.getQuantity() - oldAllocation.getQuantity();
             if (difference != 0) {
                 oldAllocation.setQuantity(dto.getQuantity());
@@ -118,10 +124,17 @@ public class StockAllocationService {
         }
         }
         for (StockAllocation deletedAlloc : oldMap.values()) {
+            if ("COMMITTED".equals(deletedAlloc.getStatus())) {
+                continue;
+            }
             inventoryService.decreaseReservedQuantity(deletedAlloc.getItemId(),deletedAlloc.getWarehouseId(),deletedAlloc.getQuantity());
-
             stockAllocationRepository.delete(deletedAlloc);
         }
         return stockAllocationRepository.findByEstimateId(estimateId).stream().map(stockAllocationDtoMapper::toDto).toList();
+    }
+
+    public List<StockAllocationDto> getStockAllocationByEstimate(Integer estimateId) {
+        List<StockAllocation> stockAllocations = stockAllocationRepository.findByEstimateId(estimateId);
+        return  stockAllocations.stream().map(stockAllocationDtoMapper::toDto).toList();
     }
 }
