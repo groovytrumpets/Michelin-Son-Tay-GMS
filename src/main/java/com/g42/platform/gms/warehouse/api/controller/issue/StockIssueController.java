@@ -4,6 +4,7 @@ import com.g42.platform.gms.auth.entity.StaffPrincipal;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.warehouse.api.dto.issue.CreateStockIssueRequest;
+import com.g42.platform.gms.warehouse.api.dto.issue.CreateStockIssueWithAttachmentRequest;
 import com.g42.platform.gms.warehouse.api.dto.request.PatchIssueItemRequest;
 import com.g42.platform.gms.warehouse.api.dto.request.UpdateStockIssueRequest;
 import com.g42.platform.gms.warehouse.api.dto.response.StockIssueDetailResponse;
@@ -19,7 +20,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -55,6 +58,21 @@ public class StockIssueController {
                 stockIssueService.create(request, principal.getStaffId())));
     }
 
+    /**
+     * Tạo phiếu xuất kho + ảnh chứng từ trong 1 form (multipart/form-data).
+     * Dùng @ModelAttribute — tương tự CheckIn complete-all.
+     * items truyền dưới dạng JSON string.
+     * POST /api/warehouse/stock-issues/with-attachment
+     */
+    @PostMapping(value = "/with-attachment", consumes = "multipart/form-data")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<StockIssueResponse>> createWithAttachment(
+            @Valid @ModelAttribute CreateStockIssueWithAttachmentRequest request,
+            @AuthenticationPrincipal StaffPrincipal principal) throws IOException {
+        return ResponseEntity.ok(ApiResponses.success(
+                stockIssueService.createWithAttachmentForm(request, principal.getStaffId())));
+    }
+
     /** Sửa từng item trong phiếu xuất — chỉ khi DRAFT */
     @PatchMapping("/{id}/items/{itemId}")
     @PreAuthorize("isAuthenticated()")
@@ -80,6 +98,17 @@ public class StockIssueController {
             @AuthenticationPrincipal StaffPrincipal principal) {
         return ResponseEntity.ok(ApiResponses.success(
                 stockIssueService.confirm(id, principal.getStaffId())));
+    }
+
+    /** Upload ảnh riêng cho phiếu đã tạo */
+    @PostMapping("/{id}/attachments")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Void>> addAttachment(
+            @PathVariable Integer id,
+            @RequestParam("file") MultipartFile file,
+            @AuthenticationPrincipal StaffPrincipal principal) throws IOException {
+        stockIssueService.addAttachment(id, file, principal.getStaffId());
+        return ResponseEntity.ok(ApiResponses.success(null));
     }
 
     @GetMapping("/{id}")
