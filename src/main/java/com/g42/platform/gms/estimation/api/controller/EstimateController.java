@@ -74,5 +74,10 @@ public class EstimateController {
         return ResponseEntity.ok(
                 ApiResponses.success(stockAllocationService.updateStockAllocation(estimateId,principal.getStaffId(),stockAllocationDtos)));
     }
+    @GetMapping("/{estimateId}/stock-allocation-get")
+    public ResponseEntity<ApiResponse<List<StockAllocationDto>>> getStockAllocationByEstimateId(@PathVariable Integer estimateId){
+        return ResponseEntity.ok(
+                ApiResponses.success(stockAllocationService.getStockAllocationByEstimate(estimateId)));
+    }
 
 }
