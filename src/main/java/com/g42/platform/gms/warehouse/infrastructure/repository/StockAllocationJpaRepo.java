@@ -14,6 +14,10 @@ public interface StockAllocationJpaRepo extends JpaRepository<StockAllocationJpa
 
     List<StockAllocationJpa> findByServiceTicketId(Integer serviceTicketId);
 
+    List<StockAllocationJpa> findByServiceTicketIdAndWarehouseIdAndStatus(Integer serviceTicketId, Integer warehouseId, AllocationStatus status);
+
+    List<StockAllocationJpa> findByIssueIdAndStatus(Integer issueId, AllocationStatus status);
+
     List<StockAllocationJpa> findByEstimateItemId(Integer estimateItemId);
 
     @Query("SELECT SUM(a.quantity) FROM StockAllocationJpa a WHERE a.warehouseId = :warehouseId AND a.itemId = :itemId AND a.status = 'RESERVED'")

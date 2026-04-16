@@ -12,6 +12,10 @@ public interface StockAllocationRepo {
 
     List<StockAllocationJpa> findByTicketAndStatus(Integer serviceTicketId, AllocationStatus status);
 
+    List<StockAllocationJpa> findByTicketAndWarehouseAndStatus(Integer serviceTicketId, Integer warehouseId, AllocationStatus status);
+
+    List<StockAllocationJpa> findByIssueIdAndStatus(Integer issueId, AllocationStatus status);
+
     List<StockAllocationJpa> findByEstimateItemId(Integer estimateItemId);
 
     StockAllocationJpa save(StockAllocationJpa allocation);
