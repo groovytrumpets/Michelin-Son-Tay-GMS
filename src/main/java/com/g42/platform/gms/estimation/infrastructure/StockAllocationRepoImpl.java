@@ -13,6 +13,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class StockAllocationRepoImpl implements StockAllocationRepository {
@@ -71,19 +73,39 @@ public class StockAllocationRepoImpl implements StockAllocationRepository {
 
     @Override
     public List<EstimateViaAllocationDto> findEstimateAndAllocationById(Integer estimateId) {
-        List<EstimateViaAllocationDto> listEstimateViaAllocationDto = new ArrayList<>();
-        List<EstimateItemJpa> estimateItems = estimateItemJpaRepository.findByEstimateIdAndIsRemoved(estimateId, false);
-        List<StockAllocationJpa> stockAllocationJpas = stockAllocationRepositoryJpa.findAllByEstimateId(estimateId);
-        for (EstimateItemJpa estimateItem : estimateItems) {
-        EstimateViaAllocationDto  estimateViaAllocationDto = new EstimateViaAllocationDto();
-            estimateViaAllocationDto.setEstimateItemDto(estimateDtoMapper.toEstimateItemDtoJpa(estimateItem));
-            for (StockAllocationJpa stockAllocationJpa : stockAllocationJpas) {
-                if (stockAllocationJpa.getEstimateItemId().equals(estimateItem.getId())) {
-                    estimateViaAllocationDto.setStockAllocationDto(stockAllocationJpaMapper.toDto(stockAllocationJpa));
-                }
+        List<EstimateItemJpa> allItems = estimateItemJpaRepository.findByEstimateId(estimateId);
+        List<StockAllocationJpa> allAllocations = stockAllocationRepositoryJpa.findAllByEstimateId(estimateId);
+
+        // Chỉ lấy active items để trả về frontend
+        List<EstimateItemJpa> activeItems = allItems.stream()
+                .filter(i -> Boolean.FALSE.equals(i.getIsRemoved()))
+                .toList();
+
+        // Map allocation theo estimateItemId để lookup O(1)
+        Map<Integer, StockAllocationJpa> allocationByItemId = allAllocations.stream()
+                .collect(Collectors.toMap(
+                        StockAllocationJpa::getEstimateItemId,
+                        a -> a,
+                        (a1, a2) -> a1
+                ));
+
+        return activeItems.stream().map(activeItem -> {
+            EstimateViaAllocationDto dto = new EstimateViaAllocationDto();
+            dto.setEstimateItemDto(estimateDtoMapper.toEstimateItemDtoJpa(activeItem));
+
+            // Bước 1: tìm allocation trực tiếp của item active này
+            StockAllocationJpa allocation = allocationByItemId.get(activeItem.getId());
+
+            // Bước 2: nếu null → tìm qua revisedFromItemId
+            if (allocation == null && activeItem.getRevisedFromItemId() != null) {
+                allocation = allocationByItemId.get(activeItem.getRevisedFromItemId());
             }
-            listEstimateViaAllocationDto.add(estimateViaAllocationDto);
-        }
-        return listEstimateViaAllocationDto;
+
+            dto.setStockAllocationDto(allocation != null
+                    ? stockAllocationJpaMapper.toDto(allocation)
+                    : null);
+
+            return dto;
+        }).toList();
     }
 }
