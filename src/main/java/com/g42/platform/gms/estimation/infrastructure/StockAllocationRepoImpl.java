@@ -11,9 +11,7 @@ import com.g42.platform.gms.estimation.infrastructure.mapper.StockAllocationJpaM
 import com.g42.platform.gms.estimation.infrastructure.repository.StockAllocationRepositoryJpa;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -88,18 +86,18 @@ public class StockAllocationRepoImpl implements StockAllocationRepository {
                         a -> a,
                         (a1, a2) -> a1
                 ));
+        Map<Integer, EstimateItemJpa> itemById = allItems.stream()
+                .collect(Collectors.toMap(EstimateItemJpa::getId, i -> i));
 
         return activeItems.stream().map(activeItem -> {
             EstimateViaAllocationDto dto = new EstimateViaAllocationDto();
             dto.setEstimateItemDto(estimateDtoMapper.toEstimateItemDtoJpa(activeItem));
 
-            // Bước 1: tìm allocation trực tiếp của item active này
-            StockAllocationJpa allocation = allocationByItemId.get(activeItem.getId());
-
-            // Bước 2: nếu null → tìm qua revisedFromItemId
-            if (allocation == null && activeItem.getRevisedFromItemId() != null) {
-                allocation = allocationByItemId.get(activeItem.getRevisedFromItemId());
-            }
+            StockAllocationJpa allocation = resolveAllocation(
+                    activeItem,
+                    allocationByItemId,
+                    itemById
+            );
 
             dto.setStockAllocationDto(allocation != null
                     ? stockAllocationJpaMapper.toDto(allocation)
@@ -107,5 +105,31 @@ public class StockAllocationRepoImpl implements StockAllocationRepository {
 
             return dto;
         }).toList();
+    }
+    private StockAllocationJpa resolveAllocation(
+            EstimateItemJpa item,
+            Map<Integer, StockAllocationJpa> allocationByItemId,
+            Map<Integer, EstimateItemJpa> itemById
+    ) {
+        Integer currentId = item.getId();
+        Set<Integer> visited = new HashSet<>();
+
+        while (currentId != null && !visited.contains(currentId)) {
+            visited.add(currentId);
+
+            // 1. check allocation tại node hiện tại
+            StockAllocationJpa allocation = allocationByItemId.get(currentId);
+            if (allocation != null) {
+                return allocation;
+            }
+
+            // 2. đi về item trước
+            EstimateItemJpa current = itemById.get(currentId);
+            if (current == null) break;
+
+            currentId = current.getRevisedFromItemId();
+        }
+
+        return null;
     }
 }
