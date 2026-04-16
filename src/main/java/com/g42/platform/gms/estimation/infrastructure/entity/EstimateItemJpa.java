@@ -69,6 +69,8 @@ public class EstimateItemJpa {
     @Size(max = 50)
     @Column(name = "unit", length = 50)
     private String unit;
+    @Column(name = "revised_from_item_id")
+    private Integer revisedFromItemId;
 
 
 }

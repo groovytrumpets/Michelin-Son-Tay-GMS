@@ -27,5 +27,6 @@ public class EstimateItemDto {
     private BigDecimal unitPriceWithVat;
     private BigDecimal subTotalWithVat;
     private String unit;
+    private Integer revisedFromItemId;
 
 }

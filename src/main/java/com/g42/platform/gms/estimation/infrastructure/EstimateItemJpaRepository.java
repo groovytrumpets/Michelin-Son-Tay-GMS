@@ -7,7 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 interface EstimateItemJpaRepository extends JpaRepository<EstimateItemJpa, Integer> {
-    List<EstimateItem> findByEstimateId(Integer estimateId);
+    List<EstimateItemJpa> findByEstimateId(Integer estimateId);
 
     List<EstimateItemJpa> findByEstimateIdAndIsRemoved(Integer estimateId, Boolean isRemoved);
 }
