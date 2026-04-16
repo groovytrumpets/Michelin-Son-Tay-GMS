@@ -179,7 +179,12 @@ public class EstimateService {
                 existing.setIsRemoved(req.getIsRemoved());
                 WorkCategory wc = workCategoryRepo.findById(req.getWorkCategoryId());
                 TaxRule taxRule = (wc != null) ? taxRuleRepository.findById(wc.getTaxRuleId()) : null;
-                applyTax(existing,taxRule.getTaxRuleId());
+                Integer taxRuleId = (wc != null && wc.getTaxRuleId() != null)
+                        ? wc.getTaxRuleId()
+                        : null;
+                if (taxRule != null) {
+                applyTax(existing,taxRuleId);
+                }
                 toSave.add(existing);
                 incomingIds.add(req.getItemId());
             } else {

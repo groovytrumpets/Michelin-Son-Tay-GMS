@@ -101,7 +101,7 @@ public class BillingService {
         }else {
             serviceBill.setDiscountAmount(BigDecimal.ZERO);
             serviceBill.setFinalAmount(estimate.getTotalPrice());
-            throw new BillingException("Đơn hàng chưa đủ điều kiện áp dụng Promotion",BillingErrorCode.PROMOTION404);
+//            throw new BillingException("Đơn hàng chưa đủ điều kiện áp dụng Promotion",BillingErrorCode.PROMOTION404);
         }
         //todo: change status of estimate and service ticket
         serviceTicket.setTicketStatus(TicketStatus.COMPLETED);
