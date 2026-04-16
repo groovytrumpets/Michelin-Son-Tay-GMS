@@ -7,6 +7,7 @@ import com.g42.platform.gms.estimation.api.dto.request.EstimateItemReqDto;
 import com.g42.platform.gms.estimation.domain.entity.Estimate;
 import com.g42.platform.gms.estimation.domain.entity.EstimateItem;
 import com.g42.platform.gms.estimation.domain.entity.WorkCategory;
+import com.g42.platform.gms.estimation.infrastructure.entity.EstimateItemJpa;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -25,4 +26,6 @@ public interface EstimateDtoMapper {
     @Mapping(target = "workCateId", source = "id")
     WorkCataDto toWorkCateDto(WorkCategory workCataDto);
     EstimateItemReqDto toEstimateItemReqDto(EstimateItem estimateItem);
+    @Mapping(target = "estimateItemId", source = "id")
+    EstimateItemDto toEstimateItemDtoJpa(EstimateItemJpa estimateItem);
 }

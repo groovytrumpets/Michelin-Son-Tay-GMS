@@ -22,4 +22,5 @@ public class EstimateItemReqDto {
     private Boolean isChecked;
     private Boolean isRemoved;
     private String unit;
+    private Integer revisedFromItemId;
 }

@@ -6,6 +6,7 @@ import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.common.enums.EstimateEnum;
 import com.g42.platform.gms.estimation.api.dto.EstimateRespondDto;
+import com.g42.platform.gms.estimation.api.dto.EstimateViaAllocationDto;
 import com.g42.platform.gms.estimation.api.dto.StockAllocationDto;
 import com.g42.platform.gms.estimation.api.dto.WorkCataDto;
 import com.g42.platform.gms.estimation.api.dto.request.EstimateItemReqDto;
@@ -73,6 +74,11 @@ public class EstimateController {
     ,@RequestBody List<StockAllocationDto> stockAllocationDtos){
         return ResponseEntity.ok(
                 ApiResponses.success(stockAllocationService.updateStockAllocation(estimateId,principal.getStaffId(),stockAllocationDtos)));
+    }
+    @GetMapping("/{estimateId}/stock-allocation-get")
+    public ResponseEntity<ApiResponse<List<EstimateViaAllocationDto>>> getStockAllocationByEstimateId(@PathVariable Integer estimateId){
+        return ResponseEntity.ok(
+                ApiResponses.success(stockAllocationService.getEstimateToAllocation(estimateId)));
     }
 
 }
