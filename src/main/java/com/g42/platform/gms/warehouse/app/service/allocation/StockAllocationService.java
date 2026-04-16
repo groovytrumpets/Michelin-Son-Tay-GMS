@@ -49,13 +49,22 @@ public class StockAllocationService {
     private final ServiceTicketRepo serviceTicketRepo;
     @Transactional
     public List<StockShortageInfo> reserve(Integer estimateId, Integer staffId) {
-        List<EstimateItemJpa> estimateItems = estimateItemRepositoryJpa.findByEstimateId(estimateId);
+        List<EstimateItemJpa> estimateItems = estimateItemRepositoryJpa.findByEstimateId(estimateId)
+                .stream()
+                .filter(i -> i.getWarehouseId() != null)
+                .filter(i -> i.getItemId() != null)
+                .filter(i -> i.getQuantity() != null && i.getQuantity() > 0)
+                .filter(i -> !Boolean.TRUE.equals(i.getIsRemoved()))
+                .filter(i -> Boolean.TRUE.equals(i.getIsChecked()))
+                .toList();
+
         List<StockShortageInfo> shortages = new ArrayList<>();
 
         for (EstimateItemJpa ei : estimateItems) {
-            if (ei.getWarehouseId() == null || ei.getItemId() == null || ei.getQuantity() == null) {
-                continue;
-            }
+            int required = ei.getQuantity();
+
+            List<StockAllocationJpa> existingAllocations = allocationRepo.findByEstimateItemId(ei.getId());
+            StockAllocationJpa existingAllocation = existingAllocations.isEmpty() ? null : existingAllocations.get(0);
 
             Inventory inv = inventoryRepo
                     .findByWarehouseAndItemWithLock(ei.getWarehouseId(), ei.getItemId())
@@ -65,27 +74,49 @@ public class StockAllocationService {
                     ? Math.max(0, inv.getQuantity() - inv.getReservedQuantity())
                     : 0;
 
-            if (available < ei.getQuantity()) {
-                shortages.add(new StockShortageInfo(
-                        ei.getWarehouseId(), ei.getItemId(), ei.getQuantity(), available));
+            int deltaToReserve = existingAllocation != null
+                    ? required - existingAllocation.getQuantity()
+                    : required;
+
+            if (existingAllocation != null && existingAllocation.getStatus() == AllocationStatus.COMMITTED) {
                 continue;
             }
 
+            if (deltaToReserve > 0 && available < deltaToReserve) {
+                shortages.add(new StockShortageInfo(
+                    ei.getWarehouseId(), ei.getItemId(), deltaToReserve, available));
+                continue;
+            }
+
+            if (existingAllocation != null) {
+                if (deltaToReserve != 0) {
+                    existingAllocation.setQuantity(required);
+                    allocationRepo.save(existingAllocation);
+                    inv.setReservedQuantity(inv.getReservedQuantity() + deltaToReserve);
+                    inventoryRepo.save(inv);
+                    logTransaction(ei.getWarehouseId(), ei.getItemId(),
+                            InventoryTransactionType.ADJUSTMENT, deltaToReserve,
+                            inv.getQuantity(), "stock_allocation", existingAllocation.getAllocationId(), staffId);
+                }
+                continue;
+            }
+
+            Integer serviceTicketId = getServiceTicketIdFromEstimate(estimateId);
             StockAllocationJpa allocation = new StockAllocationJpa();
-            allocation.setServiceTicketId(getServiceTicketIdFromEstimate(estimateId));
+            allocation.setServiceTicketId(serviceTicketId);
             allocation.setEstimateItemId(ei.getId());
             allocation.setWarehouseId(ei.getWarehouseId());
             allocation.setItemId(ei.getItemId());
-            allocation.setQuantity(ei.getQuantity());
+            allocation.setQuantity(required);
             allocation.setStatus(AllocationStatus.RESERVED);
             allocation.setCreatedBy(staffId);
             allocationRepo.save(allocation);
 
-            inv.setReservedQuantity(inv.getReservedQuantity() + ei.getQuantity());
+            inv.setReservedQuantity(inv.getReservedQuantity() + required);
             inventoryRepo.save(inv);
 
             logTransaction(ei.getWarehouseId(), ei.getItemId(),
-                    InventoryTransactionType.ADJUSTMENT, ei.getQuantity(),
+                    InventoryTransactionType.ADJUSTMENT, required,
                     inv.getQuantity(), "stock_allocation", allocation.getAllocationId(), staffId);
         }
 
@@ -207,6 +238,10 @@ public class StockAllocationService {
                     .add(item);
         }
 
+        if (issueItemsByWarehouse.isEmpty()) {
+            return;
+        }
+
         for (Map.Entry<Integer, List<CreateStockIssueRequest.IssueItemRequest>> entry : issueItemsByWarehouse.entrySet()) {
             CreateStockIssueRequest issueRequest = new CreateStockIssueRequest();
             issueRequest.setWarehouseId(entry.getKey());
@@ -299,10 +334,15 @@ public class StockAllocationService {
                 .orElse(null);
     }
 
+    private String allocKey(Integer warehouseId, Integer itemId) {
+        return warehouseId + ":" + itemId;
+    }
+
     private StockAllocationResult toResult(StockAllocationJpa a) {
         StockAllocationResult r = new StockAllocationResult();
         r.setAllocationId(a.getAllocationId());
         r.setServiceTicketId(a.getServiceTicketId());
+        r.setIssueId(a.getIssueId());
         r.setEstimateItemId(a.getEstimateItemId());
         r.setWarehouseId(a.getWarehouseId());
         r.setItemId(a.getItemId());

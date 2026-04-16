@@ -119,6 +119,15 @@ public class StockIssueService {
 
         StockIssue saved = stockIssueRepo.save(issue);
 
+        if (saved.getIssueType() == IssueType.SERVICE_TICKET && saved.getServiceTicketId() != null) {
+            List<StockAllocationJpa> reservedAllocations = stockAllocationRepo
+                    .findByTicketAndWarehouseAndStatus(saved.getServiceTicketId(), saved.getWarehouseId(), AllocationStatus.RESERVED);
+            for (StockAllocationJpa allocation : reservedAllocations) {
+                allocation.setIssueId(saved.getIssueId());
+                stockAllocationRepo.save(allocation);
+            }
+        }
+
         List<StockIssueItem> placeholders = request.getItems().stream().map(req -> StockIssueItem.builder()
                 .issueId(saved.getIssueId())
                 .itemId(req.getItemId())
@@ -281,9 +290,16 @@ public class StockIssueService {
 
         List<StockAllocationJpa> ticketReservedAllocations = new ArrayList<>();
         Map<Integer, Integer> reservedByItem = new HashMap<>();
-        if (issue.getIssueType() == IssueType.SERVICE_TICKET && issue.getServiceTicketId() != null) {
+        if (issue.getIssueType() == IssueType.SERVICE_TICKET) {
             ticketReservedAllocations = stockAllocationRepo
-                    .findByTicketAndStatus(issue.getServiceTicketId(), AllocationStatus.RESERVED);
+                    .findByIssueIdAndStatus(issueId, AllocationStatus.RESERVED);
+            if (ticketReservedAllocations.isEmpty() && issue.getServiceTicketId() != null) {
+                ticketReservedAllocations = stockAllocationRepo
+                        .findByTicketAndWarehouseAndStatus(
+                                issue.getServiceTicketId(),
+                                issue.getWarehouseId(),
+                                AllocationStatus.RESERVED);
+            }
             for (StockAllocationJpa alloc : ticketReservedAllocations) {
                 reservedByItem.merge(alloc.getItemId(), alloc.getQuantity(), Integer::sum);
             }

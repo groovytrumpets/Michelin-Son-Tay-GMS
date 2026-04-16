@@ -14,6 +14,11 @@ public interface StockAllocationRepository {
 
     List<StockAllocation> findByEstimateId(Integer estimateId);
 
+    StockAllocation findByEstimateItemId(Integer estimateItemId);
+
+    StockAllocation findByEstimateIdAndWarehouseIdAndItemIdAndStatus(
+            Integer estimateId, Integer warehouseId, Integer itemId, String status);
+
     void save(StockAllocation stockAllocationNew);
 
     void delete(StockAllocation deletedAlloc);
