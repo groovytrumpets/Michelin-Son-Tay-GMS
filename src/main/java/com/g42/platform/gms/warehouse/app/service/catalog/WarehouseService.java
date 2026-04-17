@@ -5,6 +5,7 @@ import com.g42.platform.gms.warehouse.api.dto.CatalogSummaryDto;
 import com.g42.platform.gms.warehouse.api.dto.CatalogWarehouseDto;
 import com.g42.platform.gms.warehouse.api.dto.WarehouseDetailDto;
 import com.g42.platform.gms.warehouse.api.mapper.CatalogDtoMapper;
+import com.g42.platform.gms.warehouse.app.service.dto.PricingResolve;
 import com.g42.platform.gms.warehouse.app.service.pricing.PricingService;
 import com.g42.platform.gms.warehouse.domain.entity.Brand;
 import com.g42.platform.gms.warehouse.domain.entity.CatalogItem;
@@ -113,7 +114,8 @@ public class WarehouseService {
                                     prj.getReservedQuantity(),
                                     prj.getMinStockLevel(),
                                     prj.getMaxStockLevel(),
-                                    prj.getAvailableStockLevel()
+                                    prj.getAvailableStockLevel(),
+                                    prj.getNotify()
                             ), Collectors.toList()) // Map Projection thành DTO và gom thành List
                     ));
         } else {
@@ -135,14 +137,14 @@ public class WarehouseService {
             for (WarehouseDetailDto detail : details) {
                 // Gọi PricingService, truyền sẵn Lớp 1 (detail.getSellingPrice())
                 // và Lớp 2 (catalogItem.getPrice()) vào để tối ưu hiệu năng.
-                BigDecimal effectivePrice = pricingService.getEffectivePrice(
+                PricingResolve pricingResolve = pricingService.getEffectivePrice(
                         catalogItem.getItemId(),
                         detail.getWarehouseId(),
                         catalogItem.getPrice()
                 );
-
                 // Set giá trị cuối cùng vào DTO (Bạn nhớ thêm thuộc tính effectivePrice vào WarehouseDetailDto nhé)
-                detail.setSellingPrice(effectivePrice);
+                detail.setSellingPrice(pricingResolve.getFinalPrice());
+                detail.setNotify(pricingResolve.getNotify());
             }
             return dto;
         });
