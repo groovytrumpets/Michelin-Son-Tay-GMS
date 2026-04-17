@@ -7,6 +7,7 @@ import lombok.Data;
 public class StockAllocationResult {
     private Integer allocationId;
     private Integer serviceTicketId;
+    private Integer issueId;
     private Integer estimateItemId;
     private Integer warehouseId;
     private Integer itemId;

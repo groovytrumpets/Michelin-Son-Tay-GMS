@@ -27,6 +27,21 @@ public class StockAllocationRepoImpl implements StockAllocationRepo {
     }
 
     @Override
+    public List<StockAllocationJpa> findByTicketAndWarehouseAndStatus(Integer serviceTicketId, Integer warehouseId, AllocationStatus status) {
+        return jpaRepo.findByServiceTicketIdAndWarehouseIdAndStatus(serviceTicketId, warehouseId, status);
+    }
+
+    @Override
+    public List<StockAllocationJpa> findByIssueIdAndStatus(Integer issueId, AllocationStatus status) {
+        return jpaRepo.findByIssueIdAndStatus(issueId, status);
+    }
+
+    @Override
+    public List<StockAllocationJpa> findByEstimateItemId(Integer estimateItemId) {
+        return jpaRepo.findByEstimateItemId(estimateItemId);
+    }
+
+    @Override
     public StockAllocationJpa save(StockAllocationJpa allocation) {
         return jpaRepo.save(allocation);
     }

@@ -48,6 +48,26 @@ public class StockAllocationRepoImpl implements StockAllocationRepository {
     }
 
     @Override
+    public StockAllocation findByEstimateItemId(Integer estimateItemId) {
+        StockAllocationJpa stockAllocationJpa = stockAllocationRepositoryJpa.findByEstimateItemId(estimateItemId);
+        if (stockAllocationJpa == null) {
+            return null;
+        }
+        return stockAllocationJpaMapper.toDomain(stockAllocationJpa);
+    }
+
+    @Override
+    public StockAllocation findByEstimateIdAndWarehouseIdAndItemIdAndStatus(
+            Integer estimateId, Integer warehouseId, Integer itemId, String status) {
+        StockAllocationJpa stockAllocationJpa = stockAllocationRepositoryJpa
+                .findByEstimateIdAndWarehouseIdAndItemIdAndStatus(estimateId, warehouseId, itemId, status);
+        if (stockAllocationJpa == null) {
+            return null;
+        }
+        return stockAllocationJpaMapper.toDomain(stockAllocationJpa);
+    }
+
+    @Override
     public void save(StockAllocation stockAllocationNew) {
         if (stockAllocationNew.getAllocationId() != null) {
 

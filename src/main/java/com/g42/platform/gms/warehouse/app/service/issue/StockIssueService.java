@@ -119,6 +119,15 @@ public class StockIssueService {
 
         StockIssue saved = stockIssueRepo.save(issue);
 
+        if (saved.getIssueType() == IssueType.SERVICE_TICKET && saved.getServiceTicketId() != null) {
+            List<StockAllocationJpa> reservedAllocations = stockAllocationRepo
+                    .findByTicketAndWarehouseAndStatus(saved.getServiceTicketId(), saved.getWarehouseId(), AllocationStatus.RESERVED);
+            for (StockAllocationJpa allocation : reservedAllocations) {
+                allocation.setIssueId(saved.getIssueId());
+                stockAllocationRepo.save(allocation);
+            }
+        }
+
         List<StockIssueItem> placeholders = request.getItems().stream().map(req -> StockIssueItem.builder()
                 .issueId(saved.getIssueId())
                 .itemId(req.getItemId())
@@ -281,9 +290,16 @@ public class StockIssueService {
 
         List<StockAllocationJpa> ticketReservedAllocations = new ArrayList<>();
         Map<Integer, Integer> reservedByItem = new HashMap<>();
-        if (issue.getIssueType() == IssueType.SERVICE_TICKET && issue.getServiceTicketId() != null) {
+        if (issue.getIssueType() == IssueType.SERVICE_TICKET) {
             ticketReservedAllocations = stockAllocationRepo
-                    .findByTicketAndStatus(issue.getServiceTicketId(), AllocationStatus.RESERVED);
+                    .findByIssueIdAndStatus(issueId, AllocationStatus.RESERVED);
+            if (ticketReservedAllocations.isEmpty() && issue.getServiceTicketId() != null) {
+                ticketReservedAllocations = stockAllocationRepo
+                        .findByTicketAndWarehouseAndStatus(
+                                issue.getServiceTicketId(),
+                                issue.getWarehouseId(),
+                                AllocationStatus.RESERVED);
+            }
             for (StockAllocationJpa alloc : ticketReservedAllocations) {
                 reservedByItem.merge(alloc.getItemId(), alloc.getQuantity(), Integer::sum);
             }
@@ -499,11 +515,28 @@ public class StockIssueService {
             }
 
             d.setQuantity(it.getQuantity());
-            d.setExportPrice(it.getExportPrice());
-            d.setImportPrice(it.getImportPrice());
-            d.setDiscountRate(it.getDiscountRate());
-            d.setFinalPrice(it.getFinalPrice());
-            d.setGrossProfit(it.getGrossProfit());
+            BigDecimal exportPrice = it.getExportPrice();
+            BigDecimal importPrice = it.getImportPrice();
+            BigDecimal discountRate = it.getDiscountRate();
+            BigDecimal finalPrice = it.getFinalPrice();
+            BigDecimal grossProfit = it.getGrossProfit();
+
+            // DRAFT issues store placeholder rows with zero prices; provide preview pricing for UI.
+            if (issue.getStatus() == StockIssueStatus.DRAFT
+                    && (isNullOrZero(exportPrice) || isNullOrZero(importPrice) || isNullOrZero(finalPrice))) {
+                PricingPreview preview = buildDraftPricingPreview(issue, it);
+                exportPrice = preview.exportPrice();
+                importPrice = preview.importPrice();
+                discountRate = preview.discountRate();
+                finalPrice = preview.finalPrice();
+                grossProfit = preview.grossProfit();
+            }
+
+            d.setExportPrice(exportPrice);
+            d.setImportPrice(importPrice);
+            d.setDiscountRate(discountRate);
+            d.setFinalPrice(finalPrice);
+            d.setGrossProfit(grossProfit);
             return d;
         }).collect(Collectors.toList()));
 
@@ -558,6 +591,81 @@ public class StockIssueService {
                         c.getQuantityThreshold() != null ? c.getQuantityThreshold() : 0))
                 .map(c -> c.getDiscountRate())
                 .orElse(BigDecimal.ZERO);
+    }
+
+    private PricingPreview buildDraftPricingPreview(StockIssue issue, StockIssueItem item) {
+        int quantity = item.getQuantity() != null ? item.getQuantity() : 0;
+        BigDecimal discountRate = item.getDiscountRate() != null
+                ? item.getDiscountRate()
+                : resolveDiscount(item.getItemId(), issue.getIssueType(), quantity);
+
+        List<StockEntryItem> lots = stockEntryRepo.findFifoLots(issue.getWarehouseId(), item.getItemId());
+        BigDecimal importPrice = computeAverageImportPrice(lots, quantity);
+
+        BigDecimal sellingPrice = pricingRepo
+                .findActiveByWarehouseAndItem(issue.getWarehouseId(), item.getItemId())
+                .map(WarehousePricingJpa::getSellingPrice)
+                .orElseGet(() -> {
+                    if (!lots.isEmpty()) {
+                        StockEntryItem first = lots.get(0);
+                        return first.getImportPrice()
+                                .multiply(first.getMarkupMultiplier())
+                                .setScale(2, RoundingMode.HALF_UP);
+                    }
+                    return BigDecimal.ZERO;
+                });
+
+        if (issue.getIssueType() == IssueType.WHOLESALE) {
+            sellingPrice = sellingPrice.multiply(WHOLESALE_FACTOR).setScale(2, RoundingMode.HALF_UP);
+        }
+
+        BigDecimal finalPrice = sellingPrice
+                .multiply(BigDecimal.ONE.subtract(
+                        discountRate.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP)))
+                .setScale(2, RoundingMode.HALF_UP);
+
+        BigDecimal grossProfit = finalPrice.subtract(importPrice).setScale(2, RoundingMode.HALF_UP);
+
+        return new PricingPreview(sellingPrice, importPrice, discountRate, finalPrice, grossProfit);
+    }
+
+    private BigDecimal computeAverageImportPrice(List<StockEntryItem> lots, int quantityNeeded) {
+        if (quantityNeeded <= 0 || lots.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        int remaining = quantityNeeded;
+        int consumed = 0;
+        BigDecimal totalCost = BigDecimal.ZERO;
+
+        for (StockEntryItem lot : lots) {
+            if (remaining <= 0) {
+                break;
+            }
+            int take = Math.min(remaining, lot.getRemainingQuantity());
+            if (take <= 0) {
+                continue;
+            }
+            totalCost = totalCost.add(lot.getImportPrice().multiply(BigDecimal.valueOf(take)));
+            consumed += take;
+            remaining -= take;
+        }
+
+        if (consumed == 0) {
+            return BigDecimal.ZERO;
+        }
+        return totalCost.divide(BigDecimal.valueOf(consumed), 2, RoundingMode.HALF_UP);
+    }
+
+    private boolean isNullOrZero(BigDecimal value) {
+        return value == null || value.compareTo(BigDecimal.ZERO) == 0;
+    }
+
+    private record PricingPreview(
+            BigDecimal exportPrice,
+            BigDecimal importPrice,
+            BigDecimal discountRate,
+            BigDecimal finalPrice,
+            BigDecimal grossProfit) {
     }
 
     private StockIssueResponse toResponse(StockIssue e) {
