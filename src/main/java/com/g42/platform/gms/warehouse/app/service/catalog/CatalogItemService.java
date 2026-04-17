@@ -4,6 +4,7 @@ import com.g42.platform.gms.estimation.api.internal.TaxRuleInternalApi;
 import com.g42.platform.gms.estimation.api.mapper.TaxRuleDtoMapper;
 import com.g42.platform.gms.warehouse.api.dto.*;
 import com.g42.platform.gms.warehouse.api.mapper.*;
+import com.g42.platform.gms.warehouse.app.service.dto.PricingResolve;
 import com.g42.platform.gms.warehouse.app.service.pricing.PricingService;
 import com.g42.platform.gms.warehouse.domain.entity.*;
 import com.g42.platform.gms.warehouse.domain.exception.WarehouseErrorCode;
@@ -223,12 +224,15 @@ public class CatalogItemService {
             catalogDetailDto.setTaxRule(taxValue);
         }
         List<WarehouseDetailDto> warehouseDetails = warehouseRepo.getWarehouseDetailsByItemId(catalogDetailDto.getItemId());
+        PricingResolve pricingResolve = new PricingResolve();
         for (WarehouseDetailDto warehouseDetailDto : warehouseDetails) {
-            BigDecimal selinPrice= pricingService.getEffectivePrice(catalogItem.getItemId(),warehouseDetailDto.getWarehouseId(),catalogItem.getPrice());
-            if (selinPrice==null) {
+            pricingResolve = pricingService.getEffectivePrice(catalogItem.getItemId(),warehouseDetailDto.getWarehouseId(),catalogItem.getPrice());
+            BigDecimal selinPrice= pricingResolve.getFinalPrice();
+            if (pricingResolve==null) {
                 selinPrice = BigDecimal.ZERO;
             }
             warehouseDetailDto.setSellingPrice(selinPrice);
+            warehouseDetailDto.setNotify(pricingResolve.getNotify());
         }
 
 
