@@ -1,9 +1,9 @@
 package com.g42.platform.gms.warehouse.app.service.discount;
 
+import com.g42.platform.gms.warehouse.domain.entity.DiscountConfig;
 import com.g42.platform.gms.warehouse.domain.enums.IssueType;
 import com.g42.platform.gms.warehouse.domain.repository.DiscountConfigRepo;
 import com.g42.platform.gms.warehouse.domain.repository.StockEntryRepo;
-import com.g42.platform.gms.warehouse.infrastructure.entity.DiscountConfigJpa;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,8 +27,8 @@ public class DiscountService {
             .max(java.util.Comparator
                 .comparingInt(this::specificityScore)
                 .thenComparingInt(c -> c.getQuantityThreshold() != null ? c.getQuantityThreshold() : 0)
-                .thenComparing(DiscountConfigJpa::getDiscountRate))
-            .map(DiscountConfigJpa::getDiscountRate)
+                .thenComparing(DiscountConfig::getDiscountRate))
+            .map(DiscountConfig::getDiscountRate)
             .orElse(BigDecimal.ZERO);
         }
 
@@ -51,10 +51,10 @@ public class DiscountService {
                 .orElse(false);
     }
     @Transactional
-    public DiscountConfigJpa create(Integer itemId, IssueType issueType,
+    public DiscountConfig create(Integer itemId, IssueType issueType,
                                      Integer quantityThreshold, BigDecimal discountRate,
                                      Integer createdBy) {
-        DiscountConfigJpa config = new DiscountConfigJpa();
+        DiscountConfig config = new DiscountConfig();
         config.setItemId(itemId);
         config.setIssueType(issueType);
         config.setQuantityThreshold(quantityThreshold);
@@ -64,7 +64,7 @@ public class DiscountService {
         return discountConfigRepo.save(config);
     }
 
-    private int specificityScore(DiscountConfigJpa config) {
+    private int specificityScore(DiscountConfig config) {
         int score = 0;
         if (config.getItemId() != null) {
             score += 2;
