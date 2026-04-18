@@ -50,4 +50,6 @@ public class ServiceTicketListResponse {
     // Flags
     private Boolean isGuest;
     private Integer queueNumber;
+    private Boolean hasBill;
+    private Integer billId;
 }

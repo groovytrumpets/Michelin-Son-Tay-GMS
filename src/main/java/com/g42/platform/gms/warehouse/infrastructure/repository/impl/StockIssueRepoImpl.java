@@ -38,6 +38,12 @@ public class StockIssueRepoImpl implements StockIssueRepo {
     }
 
     @Override
+    public List<StockIssue> findByServiceTicketId(Integer serviceTicketId) {
+        return jpaRepo.findByServiceTicketId(serviceTicketId)
+                .stream().map(this::toDomain).toList();
+    }
+
+    @Override
     public Page<StockIssue> search(Integer warehouseId,
                                    StockIssueStatus status,
                                    IssueType issueType,

@@ -18,6 +18,7 @@ public class StockIssueItem {
     private Integer entryItemId;
     private Integer quantity;
     private BigDecimal exportPrice;
+    private BigDecimal estimateUnitPrice;
     private BigDecimal importPrice;
     private BigDecimal discountRate;
     private BigDecimal finalPrice;

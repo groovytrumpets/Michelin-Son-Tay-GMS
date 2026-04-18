@@ -31,6 +31,9 @@ public class StockIssueItemJpa {
     @Column(name = "export_price", nullable = false, precision = 12, scale = 2)
     private BigDecimal exportPrice;
 
+    @Column(name = "estimate_unit_price", precision = 12, scale = 2)
+    private BigDecimal estimateUnitPrice;
+
     @Column(name = "import_price", nullable = false, precision = 12, scale = 2)
     private BigDecimal importPrice;
 
