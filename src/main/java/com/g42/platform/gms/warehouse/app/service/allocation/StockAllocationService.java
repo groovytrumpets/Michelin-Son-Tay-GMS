@@ -14,7 +14,6 @@ import com.g42.platform.gms.warehouse.app.service.dto.StockShortageInfo;
 import com.g42.platform.gms.warehouse.domain.enums.AllocationStatus;
 import com.g42.platform.gms.warehouse.domain.enums.InventoryTransactionType;
 import com.g42.platform.gms.warehouse.domain.enums.IssueType;
-import com.g42.platform.gms.warehouse.domain.enums.StockIssueStatus;
 import com.g42.platform.gms.warehouse.domain.repository.InventoryRepo;
 import com.g42.platform.gms.warehouse.domain.repository.InventoryTransactionRepo;
 import com.g42.platform.gms.warehouse.app.service.issue.StockIssueService;
@@ -35,8 +34,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Service("warehouseStockAllocationService")
 @RequiredArgsConstructor
@@ -135,16 +132,14 @@ public class StockAllocationService {
                 "Khong co stock allocation RESERVED cho service ticket nay");
         }
 
-        Set<Integer> draftWarehouses = stockIssueRepo.findByServiceTicketId(serviceTicketId).stream()
-            .filter(issue -> issue.getIssueType() == IssueType.SERVICE_TICKET)
-            .filter(issue -> issue.getStatus() == StockIssueStatus.DRAFT)
-            .map(issue -> issue.getWarehouseId())
-            .filter(id -> id != null)
-            .collect(Collectors.toSet());
-
         Map<Integer, List<CreateStockIssueRequest.IssueItemRequest>> issueItemsByWarehouse = new HashMap<>();
 
         for (StockAllocationJpa alloc : reserved) {
+            // Only create new drafts from allocations not yet linked to any issue.
+            if (alloc.getIssueId() != null) {
+                continue;
+            }
+
             CreateStockIssueRequest.IssueItemRequest item = new CreateStockIssueRequest.IssueItemRequest();
             item.setItemId(alloc.getItemId());
             item.setQuantity(alloc.getQuantity());
@@ -157,10 +152,6 @@ public class StockAllocationService {
 
         List<StockIssueResponse> createdIssues = new ArrayList<>();
         for (Map.Entry<Integer, List<CreateStockIssueRequest.IssueItemRequest>> entry : issueItemsByWarehouse.entrySet()) {
-            if (draftWarehouses.contains(entry.getKey())) {
-                continue;
-            }
-
             CreateStockIssueRequest issueRequest = new CreateStockIssueRequest();
             issueRequest.setWarehouseId(entry.getKey());
             issueRequest.setIssueType(IssueType.SERVICE_TICKET);
@@ -172,8 +163,8 @@ public class StockAllocationService {
         }
 
         if (createdIssues.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Tat ca kho da co phieu xuat DRAFT. Hay xu ly cac phieu DRAFT hien co truoc khi tao moi");
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                "Khong co allocation RESERVED moi de tao phieu xuat kho");
         }
 
         ServiceTicket ticket = serviceTicketRepo.findByServiceTicketId(serviceTicketId);

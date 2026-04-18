@@ -111,6 +111,9 @@ public class StockIssueService {
                             request.getWarehouseId(),
                             AllocationStatus.RESERVED);
             for (StockAllocationJpa alloc : reservedAllocations) {
+                if (alloc.getIssueId() != null) {
+                    continue;
+                }
                 reservedByItem.merge(alloc.getItemId(), alloc.getQuantity(), Integer::sum);
             }
         }
@@ -145,6 +148,9 @@ public class StockIssueService {
             List<StockAllocationJpa> reservedAllocations = stockAllocationRepo
                     .findByTicketAndWarehouseAndStatus(saved.getServiceTicketId(), saved.getWarehouseId(), AllocationStatus.RESERVED);
             for (StockAllocationJpa allocation : reservedAllocations) {
+                if (allocation.getIssueId() != null) {
+                    continue;
+                }
                 allocation.setIssueId(saved.getIssueId());
                 stockAllocationRepo.save(allocation);
             }
