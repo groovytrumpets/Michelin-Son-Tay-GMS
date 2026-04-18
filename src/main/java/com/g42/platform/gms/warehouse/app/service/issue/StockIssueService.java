@@ -1,9 +1,15 @@
 package com.g42.platform.gms.warehouse.app.service.issue;
 
+import com.g42.platform.gms.estimation.infrastructure.entity.EstimateItemJpa;
+import com.g42.platform.gms.estimation.infrastructure.entity.EstimateJpa;
+import com.g42.platform.gms.estimation.infrastructure.repository.EstimateItemRepositoryJpa;
+import com.g42.platform.gms.estimation.infrastructure.repository.EstimateRepositoryJpa;
 import com.g42.platform.gms.auth.entity.StaffProfile;
 import com.g42.platform.gms.auth.repository.StaffProfileRepo;
 import com.g42.platform.gms.booking.customer.infrastructure.entity.CatalogItemJpaEntity;
 import com.g42.platform.gms.catalog.infrastructure.repository.CatalogItemRepository;
+import com.g42.platform.gms.billing.domain.entity.ServiceBill;
+import com.g42.platform.gms.billing.domain.repository.BillingRepository;
 import com.g42.platform.gms.common.service.ImageUploadService;
 import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicket;
 import com.g42.platform.gms.service_ticket_management.domain.repository.ServiceTicketRepo;
@@ -21,7 +27,6 @@ import com.g42.platform.gms.warehouse.domain.enums.AllocationStatus;
 import com.g42.platform.gms.warehouse.domain.enums.InventoryTransactionType;
 import com.g42.platform.gms.warehouse.domain.enums.IssueType;
 import com.g42.platform.gms.warehouse.domain.enums.StockIssueStatus;
-import com.g42.platform.gms.warehouse.domain.repository.DiscountConfigRepo;
 import com.g42.platform.gms.warehouse.domain.repository.InventoryRepo;
 import com.g42.platform.gms.warehouse.domain.repository.InventoryTransactionRepo;
 import com.g42.platform.gms.warehouse.domain.repository.StockAllocationRepo;
@@ -60,6 +65,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
@@ -80,29 +86,45 @@ public class StockIssueService {
     private final InventoryTransactionRepo transactionRepo;
     private final StockEntryRepo stockEntryRepo;
     private final WarehousePricingRepo pricingRepo;
-    private final DiscountConfigRepo discountConfigRepo;
+    private final com.g42.platform.gms.warehouse.app.service.discount.DiscountService discountService;
     private final StockIssueItemRepo stockIssueItemRepo;
     private final CatalogItemRepository catalogItemRepository;
     private final StaffProfileRepo staffProfileRepo;
     private final WarehouseJpaRepo warehouseJpaRepo;
     private final ServiceTicketRepo serviceTicketRepo;
+    private final EstimateRepositoryJpa estimateRepositoryJpa;
+    private final EstimateItemRepositoryJpa estimateItemRepositoryJpa;
     private final WarehouseAttachmentRepo attachmentRepo;
     private final ImageUploadService imageUploadService;
     private final ObjectMapper objectMapper;
+    private final BillingRepository billingRepository;
 
     private static final String FOLDER_STOCK_ISSUE = "stock-issues";
 
     @Transactional
     public StockIssueResponse create(CreateStockIssueRequest request, Integer staffId) {
+        Map<Integer, Integer> reservedByItem = new HashMap<>();
+        if (request.getIssueType() == IssueType.SERVICE_TICKET && request.getServiceTicketId() != null) {
+            List<StockAllocationJpa> reservedAllocations = stockAllocationRepo
+                    .findByTicketAndWarehouseAndStatus(
+                            request.getServiceTicketId(),
+                            request.getWarehouseId(),
+                            AllocationStatus.RESERVED);
+            for (StockAllocationJpa alloc : reservedAllocations) {
+                reservedByItem.merge(alloc.getItemId(), alloc.getQuantity(), Integer::sum);
+            }
+        }
+
         for (CreateStockIssueRequest.IssueItemRequest item : request.getItems()) {
             int available = inventoryRepo
                     .findByWarehouseAndItem(request.getWarehouseId(), item.getItemId())
                     .map(inv -> Math.max(0, inv.getQuantity() - inv.getReservedQuantity()))
                     .orElse(0);
-            if (available < item.getQuantity()) {
+            int effectiveAvailable = available + reservedByItem.getOrDefault(item.getItemId(), 0);
+            if (effectiveAvailable < item.getQuantity()) {
                 throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                         "Không đủ tồn kho cho itemId=" + item.getItemId()
-                                + " (yêu cầu=" + item.getQuantity() + ", khả dụng=" + available + ")");
+                                + " (yêu cầu=" + item.getQuantity() + ", khả dụng=" + effectiveAvailable + ")");
             }
         }
 
@@ -134,6 +156,7 @@ public class StockIssueService {
                 .quantity(req.getQuantity())
                 .entryItemId(0)
                 .exportPrice(BigDecimal.ZERO)
+            .estimateUnitPrice(resolveEstimateUnitPrice(saved.getServiceTicketId(), saved.getWarehouseId(), req.getItemId()))
                 .importPrice(BigDecimal.ZERO)
                 .discountRate(req.getDiscountRate() != null ? req.getDiscountRate() : BigDecimal.ZERO)
                 .finalPrice(BigDecimal.ZERO)
@@ -263,6 +286,7 @@ public class StockIssueService {
                     .quantity(req.getQuantity())
                     .entryItemId(0)
                     .exportPrice(BigDecimal.ZERO)
+                    .estimateUnitPrice(resolveEstimateUnitPrice(issue.getServiceTicketId(), issue.getWarehouseId(), req.getItemId()))
                     .importPrice(BigDecimal.ZERO)
                     .discountRate(req.getDiscountRate() != null ? req.getDiscountRate() : BigDecimal.ZERO)
                     .finalPrice(BigDecimal.ZERO)
@@ -310,11 +334,14 @@ public class StockIssueService {
         for (StockIssueItem placeholder : issue.getItems()) {
             Integer itemId = placeholder.getItemId();
             int needed = placeholder.getQuantity();
+                BigDecimal estimateUnitPrice = placeholder.getEstimateUnitPrice() != null
+                    ? placeholder.getEstimateUnitPrice()
+                    : resolveEstimateUnitPrice(issue.getServiceTicketId(), issue.getWarehouseId(), itemId);
             BigDecimal discountRate = placeholder.getDiscountRate() != null
                     ? placeholder.getDiscountRate() : BigDecimal.ZERO;
 
             if (discountRate.compareTo(BigDecimal.ZERO) == 0) {
-                discountRate = resolveDiscount(itemId, issue.getIssueType(), needed);
+                discountRate = discountService.resolveDiscountRate(itemId, issue.getIssueType(), needed);
             }
 
             Inventory inv = inventoryRepo
@@ -355,7 +382,9 @@ public class StockIssueService {
                             .setScale(2, RoundingMode.HALF_UP);
                 }
 
-                BigDecimal finalPrice = sellingPrice
+                BigDecimal finalPriceBase = resolveFinalPriceBase(issue.getIssueType(), estimateUnitPrice, sellingPrice);
+
+                BigDecimal finalPrice = finalPriceBase
                         .multiply(BigDecimal.ONE.subtract(
                                 discountRate.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP)))
                         .setScale(2, RoundingMode.HALF_UP);
@@ -366,6 +395,7 @@ public class StockIssueService {
                         .entryItemId(lot.getEntryItemId())
                         .quantity(consume)
                         .exportPrice(sellingPrice)
+                    .estimateUnitPrice(estimateUnitPrice)
                         .importPrice(lot.getImportPrice())
                         .discountRate(discountRate)
                         .finalPrice(finalPrice)
@@ -488,6 +518,7 @@ public class StockIssueService {
         resp.setConfirmedAt(issue.getConfirmedAt());
         resp.setCreatedBy(issue.getCreatedBy());
         resp.setCreatedAt(issue.getCreatedAt());
+        enrichBillFields(issue.getServiceTicketId(), resp);
 
         enrichHeaderFields(
             issue.getWarehouseId(),
@@ -516,6 +547,7 @@ public class StockIssueService {
 
             d.setQuantity(it.getQuantity());
             BigDecimal exportPrice = it.getExportPrice();
+            BigDecimal estimateUnitPrice = it.getEstimateUnitPrice();
             BigDecimal importPrice = it.getImportPrice();
             BigDecimal discountRate = it.getDiscountRate();
             BigDecimal finalPrice = it.getFinalPrice();
@@ -533,6 +565,7 @@ public class StockIssueService {
             }
 
             d.setExportPrice(exportPrice);
+            d.setEstimateUnitPrice(estimateUnitPrice);
             d.setImportPrice(importPrice);
             d.setDiscountRate(discountRate);
             d.setFinalPrice(finalPrice);
@@ -584,20 +617,14 @@ public class StockIssueService {
     }
 
     private BigDecimal resolveDiscount(Integer itemId, IssueType issueType, int quantity) {
-        return discountConfigRepo.findActiveByItemIdAndIssueType(itemId, issueType)
-                .stream()
-                .filter(c -> c.getQuantityThreshold() == null || c.getQuantityThreshold() <= quantity)
-                .max(java.util.Comparator.comparingInt(c ->
-                        c.getQuantityThreshold() != null ? c.getQuantityThreshold() : 0))
-                .map(c -> c.getDiscountRate())
-                .orElse(BigDecimal.ZERO);
+        return discountService.resolveDiscountRate(itemId, issueType, quantity);
     }
 
     private PricingPreview buildDraftPricingPreview(StockIssue issue, StockIssueItem item) {
         int quantity = item.getQuantity() != null ? item.getQuantity() : 0;
         BigDecimal discountRate = item.getDiscountRate() != null
                 ? item.getDiscountRate()
-                : resolveDiscount(item.getItemId(), issue.getIssueType(), quantity);
+            : discountService.resolveDiscountRate(item.getItemId(), issue.getIssueType(), quantity);
 
         List<StockEntryItem> lots = stockEntryRepo.findFifoLots(issue.getWarehouseId(), item.getItemId());
         BigDecimal importPrice = computeAverageImportPrice(lots, quantity);
@@ -619,7 +646,13 @@ public class StockIssueService {
             sellingPrice = sellingPrice.multiply(WHOLESALE_FACTOR).setScale(2, RoundingMode.HALF_UP);
         }
 
-        BigDecimal finalPrice = sellingPrice
+        BigDecimal estimateUnitPrice = item.getEstimateUnitPrice() != null
+            ? item.getEstimateUnitPrice()
+            : resolveEstimateUnitPrice(issue.getServiceTicketId(), issue.getWarehouseId(), item.getItemId());
+
+        BigDecimal finalPriceBase = resolveFinalPriceBase(issue.getIssueType(), estimateUnitPrice, sellingPrice);
+
+        BigDecimal finalPrice = finalPriceBase
                 .multiply(BigDecimal.ONE.subtract(
                         discountRate.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP)))
                 .setScale(2, RoundingMode.HALF_UP);
@@ -660,6 +693,33 @@ public class StockIssueService {
         return value == null || value.compareTo(BigDecimal.ZERO) == 0;
     }
 
+    private BigDecimal resolveFinalPriceBase(IssueType issueType, BigDecimal estimateUnitPrice, BigDecimal warehouseSellingPrice) {
+        if (issueType == IssueType.SERVICE_TICKET && estimateUnitPrice != null && estimateUnitPrice.compareTo(BigDecimal.ZERO) > 0) {
+            return estimateUnitPrice;
+        }
+        return warehouseSellingPrice;
+    }
+
+    private BigDecimal resolveEstimateUnitPrice(Integer serviceTicketId, Integer warehouseId, Integer itemId) {
+        if (serviceTicketId == null || itemId == null) {
+            return null;
+        }
+        Optional<EstimateJpa> latestEstimateOpt = estimateRepositoryJpa.findTopByServiceTicketIdOrderByVersionDesc(serviceTicketId);
+        if (latestEstimateOpt.isEmpty()) {
+            return null;
+        }
+        Integer estimateId = latestEstimateOpt.get().getId();
+        return estimateItemRepositoryJpa.findByEstimateId(estimateId).stream()
+                .filter(i -> itemId.equals(i.getItemId()))
+                .filter(i -> warehouseId == null || warehouseId.equals(i.getWarehouseId()))
+                .filter(i -> !Boolean.TRUE.equals(i.getIsRemoved()))
+                .filter(i -> Boolean.TRUE.equals(i.getIsChecked()))
+                .map(EstimateItemJpa::getUnitPrice)
+                .filter(p -> p != null)
+                .findFirst()
+                .orElse(null);
+    }
+
     private record PricingPreview(
             BigDecimal exportPrice,
             BigDecimal importPrice,
@@ -682,6 +742,7 @@ public class StockIssueService {
         r.setConfirmedAt(e.getConfirmedAt());
         r.setCreatedBy(e.getCreatedBy());
         r.setCreatedAt(e.getCreatedAt());
+        enrichBillFields(e.getServiceTicketId(), r);
 
         WarehouseJpa warehouse = e.getWarehouseId() != null
                 ? warehouseJpaRepo.findById(e.getWarehouseId()).orElse(null)
@@ -753,5 +814,27 @@ public class StockIssueService {
                 resp.setConfirmedByName(confirmedBy.getFullName());
             }
         }
+    }
+
+    private void enrichBillFields(Integer serviceTicketId, StockIssueResponse resp) {
+        if (serviceTicketId == null) {
+            resp.setHasBill(false);
+            resp.setBillId(null);
+            return;
+        }
+        ServiceBill bill = billingRepository.getBillingByServiceTicket(serviceTicketId);
+        resp.setHasBill(bill != null);
+        resp.setBillId(bill != null ? bill.getBillId() : null);
+    }
+
+    private void enrichBillFields(Integer serviceTicketId, StockIssueDetailResponse resp) {
+        if (serviceTicketId == null) {
+            resp.setHasBill(false);
+            resp.setBillId(null);
+            return;
+        }
+        ServiceBill bill = billingRepository.getBillingByServiceTicket(serviceTicketId);
+        resp.setHasBill(bill != null);
+        resp.setBillId(bill != null ? bill.getBillId() : null);
     }
 }

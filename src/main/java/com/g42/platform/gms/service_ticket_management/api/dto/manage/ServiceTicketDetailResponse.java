@@ -60,6 +60,8 @@ public class ServiceTicketDetailResponse {
     // Warehouse export/allocation status
     private Boolean hasDraftStockIssue;
     private Boolean hasConfirmedStockIssue;
+    private Boolean hasBill;
+    private Integer billId;
     private Integer reservedAllocationCount;
     private Integer committedAllocationCount;
     private Boolean warehouseReadyForRepair;

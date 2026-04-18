@@ -31,6 +31,8 @@ public class StockIssueDetailResponse {
     private List<String> attachmentUrls;  // danh sách URL ảnh chứng từ
     private Integer totalQuantity;        // tổng số lượng
     private BigDecimal totalValue;        // tổng giá trị (sum finalPrice)
+    private Boolean hasBill;
+    private Integer billId;
 
     @Data
     public static class IssueItemDetail {
@@ -43,6 +45,7 @@ public class StockIssueDetailResponse {
         private String entryLotCode;
         private Integer quantity;
         private BigDecimal exportPrice;   // = selling_price của lô
+        private BigDecimal estimateUnitPrice; // giá đơn vị đã chốt trên estimate
         private BigDecimal importPrice;   // = import_price của lô
         private BigDecimal discountRate;
         private BigDecimal finalPrice;

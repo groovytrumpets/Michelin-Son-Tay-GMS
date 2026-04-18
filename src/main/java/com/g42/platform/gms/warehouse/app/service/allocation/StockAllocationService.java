@@ -14,6 +14,7 @@ import com.g42.platform.gms.warehouse.app.service.dto.StockShortageInfo;
 import com.g42.platform.gms.warehouse.domain.enums.AllocationStatus;
 import com.g42.platform.gms.warehouse.domain.enums.InventoryTransactionType;
 import com.g42.platform.gms.warehouse.domain.enums.IssueType;
+import com.g42.platform.gms.warehouse.domain.enums.StockIssueStatus;
 import com.g42.platform.gms.warehouse.domain.repository.InventoryRepo;
 import com.g42.platform.gms.warehouse.domain.repository.InventoryTransactionRepo;
 import com.g42.platform.gms.warehouse.app.service.issue.StockIssueService;
@@ -34,6 +35,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service("warehouseStockAllocationService")
 @RequiredArgsConstructor
@@ -124,11 +127,6 @@ public class StockAllocationService {
     }
     @Transactional
         public List<StockIssueResponse> requestIssueDraft(Integer serviceTicketId, Integer staffId) {
-        if (stockIssueRepo.existsDraftServiceTicketIssue(serviceTicketId)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                "Service ticket da co phieu xuat DRAFT");
-        }
-
         List<StockAllocationJpa> reserved = allocationRepo
                 .findByTicketAndStatus(serviceTicketId, AllocationStatus.RESERVED);
 
@@ -136,6 +134,13 @@ public class StockAllocationService {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                 "Khong co stock allocation RESERVED cho service ticket nay");
         }
+
+        Set<Integer> draftWarehouses = stockIssueRepo.findByServiceTicketId(serviceTicketId).stream()
+            .filter(issue -> issue.getIssueType() == IssueType.SERVICE_TICKET)
+            .filter(issue -> issue.getStatus() == StockIssueStatus.DRAFT)
+            .map(issue -> issue.getWarehouseId())
+            .filter(id -> id != null)
+            .collect(Collectors.toSet());
 
         Map<Integer, List<CreateStockIssueRequest.IssueItemRequest>> issueItemsByWarehouse = new HashMap<>();
 
@@ -152,6 +157,10 @@ public class StockAllocationService {
 
         List<StockIssueResponse> createdIssues = new ArrayList<>();
         for (Map.Entry<Integer, List<CreateStockIssueRequest.IssueItemRequest>> entry : issueItemsByWarehouse.entrySet()) {
+            if (draftWarehouses.contains(entry.getKey())) {
+                continue;
+            }
+
             CreateStockIssueRequest issueRequest = new CreateStockIssueRequest();
             issueRequest.setWarehouseId(entry.getKey());
             issueRequest.setIssueType(IssueType.SERVICE_TICKET);
@@ -160,6 +169,11 @@ public class StockAllocationService {
             issueRequest.setItems(entry.getValue());
 
             createdIssues.add(stockIssueService.create(issueRequest, staffId));
+        }
+
+        if (createdIssues.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Tat ca kho da co phieu xuat DRAFT. Hay xu ly cac phieu DRAFT hien co truoc khi tao moi");
         }
 
         ServiceTicket ticket = serviceTicketRepo.findByServiceTicketId(serviceTicketId);

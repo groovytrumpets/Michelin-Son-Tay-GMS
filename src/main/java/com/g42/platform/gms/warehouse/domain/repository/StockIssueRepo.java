@@ -13,6 +13,7 @@ import java.util.Optional;
 public interface StockIssueRepo {
     Optional<StockIssue> findById(Integer issueId);
     List<StockIssue> findByWarehouseId(Integer warehouseId);
+    List<StockIssue> findByServiceTicketId(Integer serviceTicketId);
     Page<StockIssue> search(Integer warehouseId,
                             StockIssueStatus status,
                             IssueType issueType,
