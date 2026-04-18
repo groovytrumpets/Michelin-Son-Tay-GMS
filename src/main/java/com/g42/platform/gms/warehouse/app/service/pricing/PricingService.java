@@ -4,9 +4,9 @@ import com.g42.platform.gms.warehouse.api.dto.CatalogSummaryDto;
 import com.g42.platform.gms.warehouse.api.mapper.CatalogDtoMapper;
 import com.g42.platform.gms.warehouse.app.service.dto.PricingResolve;
 import com.g42.platform.gms.warehouse.app.service.entry.StockEntryService;
+import com.g42.platform.gms.warehouse.domain.entity.WarehousePricing;
 import com.g42.platform.gms.warehouse.domain.repository.CatalogItemRepo;
 import com.g42.platform.gms.warehouse.domain.repository.WarehousePricingRepo;
-import com.g42.platform.gms.warehouse.infrastructure.entity.WarehousePricingJpa;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -25,7 +25,7 @@ public class PricingService {
     public PricingResolve getEffectivePrice(Integer itemId, Integer warehouseId, BigDecimal price) {
         PricingResolve  pricingResolve = new PricingResolve();
         // 1. Ưu tiên warehouse_pricing (manager set)
-        WarehousePricingJpa warehousePricing = warehousePricingRepo
+        WarehousePricing warehousePricing = warehousePricingRepo
                 .findByItemIdAndWarehouseId(itemId, warehouseId).orElse(null);
         if (warehousePricing != null && warehousePricing.getSellingPrice().compareTo(BigDecimal.ZERO) > 0) {
             pricingResolve.setFinalPrice(warehousePricing.getSellingPrice());

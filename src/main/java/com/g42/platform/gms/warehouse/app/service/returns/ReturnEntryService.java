@@ -4,8 +4,6 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.g42.platform.gms.auth.entity.StaffProfile;
 import com.g42.platform.gms.auth.repository.StaffProfileRepo;
-import com.g42.platform.gms.booking.customer.infrastructure.entity.CatalogItemJpaEntity;
-import com.g42.platform.gms.catalog.infrastructure.repository.CatalogItemRepository;
 import com.g42.platform.gms.common.service.ImageUploadService;
 import com.g42.platform.gms.warehouse.api.dto.request.CreateReturnEntryFormRequest;
 import com.g42.platform.gms.warehouse.api.dto.request.CreateReturnEntryRequest;
@@ -22,13 +20,14 @@ import com.g42.platform.gms.warehouse.domain.repository.InventoryTransactionRepo
 import com.g42.platform.gms.warehouse.domain.repository.ReturnEntryRepo;
 import com.g42.platform.gms.warehouse.domain.repository.StockIssueRepo;
 import com.g42.platform.gms.warehouse.domain.repository.WarehouseAttachmentRepo;
+import com.g42.platform.gms.warehouse.domain.repository.PartCatalogRepo;
 import com.g42.platform.gms.warehouse.domain.entity.Inventory;
-import com.g42.platform.gms.warehouse.infrastructure.entity.InventoryTransactionJpa;
-import com.g42.platform.gms.warehouse.infrastructure.entity.ReturnEntryItemJpa;
-import com.g42.platform.gms.warehouse.infrastructure.entity.ReturnEntryJpa;
-import com.g42.platform.gms.warehouse.infrastructure.entity.WarehouseJpa;
-import com.g42.platform.gms.warehouse.infrastructure.entity.WarehouseAttachmentJpa;
-import com.g42.platform.gms.warehouse.infrastructure.repository.WarehouseJpaRepo;
+import com.g42.platform.gms.warehouse.domain.entity.InventoryTransaction;
+import com.g42.platform.gms.warehouse.domain.entity.ReturnEntry;
+import com.g42.platform.gms.warehouse.domain.entity.ReturnEntryItem;
+import com.g42.platform.gms.warehouse.domain.entity.Warehouse;
+import com.g42.platform.gms.warehouse.domain.entity.WarehouseAttachment;
+import com.g42.platform.gms.warehouse.domain.repository.WarehouseRepo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -64,14 +63,15 @@ public class ReturnEntryService {
     private final InventoryTransactionRepo transactionRepo;
     private final WarehouseAttachmentRepo attachmentRepo;
     private final ImageUploadService imageUploadService;
-    private final WarehouseJpaRepo warehouseJpaRepo;
+    private final WarehouseRepo warehouseRepo;
     private final StockIssueRepo stockIssueRepo;
     private final StaffProfileRepo staffProfileRepo;
-    private final CatalogItemRepository catalogItemRepository;
+    private final PartCatalogRepo partCatalogRepo;
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+
     @Transactional
     public ReturnEntryResponse create(CreateReturnEntryRequest request, Integer staffId) {
-        ReturnEntryJpa entry = new ReturnEntryJpa();
+        ReturnEntry entry = new ReturnEntry();
         entry.setReturnCode(generateCode());
         entry.setWarehouseId(request.getWarehouseId());
         entry.setReturnReason(request.getReturnReason());
@@ -81,10 +81,10 @@ public class ReturnEntryService {
         entry.setStatus(ReturnEntryStatus.DRAFT);
         entry.setCreatedBy(staffId);
 
-        ReturnEntryJpa saved = returnEntryRepo.save(entry);
+        ReturnEntry saved = returnEntryRepo.save(entry);
 
         for (ReturnEntryItemRequest itemReq : request.getItems()) {
-            ReturnEntryItemJpa item = new ReturnEntryItemJpa();
+            ReturnEntryItem item = new ReturnEntryItem();
             item.setReturnId(saved.getReturnId());
             item.setItemId(itemReq.getItemId());
             item.setQuantity(itemReq.getQuantity());
@@ -95,7 +95,7 @@ public class ReturnEntryService {
 
         if (request.getExchangeItems() != null) {
             for (ReturnEntryItemRequest itemReq : request.getExchangeItems()) {
-                ReturnEntryItemJpa item = new ReturnEntryItemJpa();
+                ReturnEntryItem item = new ReturnEntryItem();
                 item.setReturnId(saved.getReturnId());
                 item.setItemId(itemReq.getItemId());
                 item.setQuantity(itemReq.getQuantity());
@@ -107,6 +107,7 @@ public class ReturnEntryService {
 
         return toResponse(returnEntryRepo.save(saved));
     }
+
     @Transactional
     public ReturnEntryResponse createWithAttachments(CreateReturnEntryFormRequest req, Integer staffId) throws IOException {
         List<ReturnEntryItemRequest> items;
@@ -141,15 +142,15 @@ public class ReturnEntryService {
             req.getFile_0(), req.getFile_1(), req.getFile_2(), req.getFile_3(), req.getFile_4()
         };
 
-        ReturnEntryJpa saved = findOrThrow(created.getReturnId());
-        List<ReturnEntryItemJpa> savedItems = saved.getItems();
+        ReturnEntry saved = findOrThrow(created.getReturnId());
+        List<ReturnEntryItem> savedItems = saved.getItems();
 
         for (int i = 0; i < savedItems.size() && i < files.length; i++) {
             MultipartFile file = files[i];
             if (file != null && !file.isEmpty()) {
                 String url = imageUploadService.uploadImage(file, FOLDER_RETURN_ENTRY);
-                WarehouseAttachmentJpa attachment = new WarehouseAttachmentJpa();
-                attachment.setRefType(WarehouseAttachmentJpa.RefType.RETURN_ENTRY_ITEM);
+                WarehouseAttachment attachment = new WarehouseAttachment();
+                attachment.setRefType(WarehouseAttachment.RefType.RETURN_ENTRY_ITEM);
                 attachment.setRefId(savedItems.get(i).getReturnItemId());
                 attachment.setFileUrl(url);
                 attachment.setUploadedBy(staffId);
@@ -161,11 +162,11 @@ public class ReturnEntryService {
     }
     @Transactional
     public void addAttachment(Integer returnItemId, MultipartFile file, Integer staffId) throws IOException {
-        ReturnEntryItemJpa item = returnEntryRepo.findItemById(returnItemId)
+        ReturnEntryItem item = returnEntryRepo.findItemById(returnItemId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Không tìm thấy return_entry_item id=" + returnItemId));
 
-        ReturnEntryJpa entry = findOrThrow(item.getReturnId());
+        ReturnEntry entry = findOrThrow(item.getReturnId());
         if (entry.getStatus() == ReturnEntryStatus.CONFIRMED) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                     "Không thể thêm ảnh cho phiếu đã xác nhận");
@@ -173,8 +174,8 @@ public class ReturnEntryService {
 
         String url = imageUploadService.uploadImage(file, FOLDER_RETURN_ENTRY);
 
-        WarehouseAttachmentJpa attachment = new WarehouseAttachmentJpa();
-        attachment.setRefType(WarehouseAttachmentJpa.RefType.RETURN_ENTRY_ITEM);
+    WarehouseAttachment attachment = new WarehouseAttachment();
+    attachment.setRefType(WarehouseAttachment.RefType.RETURN_ENTRY_ITEM);
         attachment.setRefId(returnItemId);
         attachment.setFileUrl(url);
         attachment.setUploadedBy(staffId);
@@ -200,18 +201,20 @@ public class ReturnEntryService {
         return returnEntryRepo.search(warehouseId, status, returnType, fromDate, toDate, search, pageable)
                 .map(this::toResponse);
     }
+
     @Transactional(readOnly = true)
     public ReturnEntryResponse getDetail(Integer returnId) {
         return toResponse(findOrThrow(returnId));
     }
+
     @Transactional
     public ReturnEntryResponse patchItem(Integer returnId, Integer returnItemId, PatchReturnItemRequest request) {
-        ReturnEntryJpa entry = findOrThrow(returnId);
+        ReturnEntry entry = findOrThrow(returnId);
         if (entry.getStatus() != ReturnEntryStatus.DRAFT) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                     "Chỉ có thể sửa phiếu ở trạng thái DRAFT");
         }
-        ReturnEntryItemJpa item = returnEntryRepo.findItemById(returnItemId)
+        ReturnEntryItem item = returnEntryRepo.findItemById(returnItemId)
                 .filter(i -> i.getReturnId().equals(returnId))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Không tìm thấy item id=" + returnItemId + " trong phiếu id=" + returnId));
@@ -222,9 +225,10 @@ public class ReturnEntryService {
         returnEntryRepo.saveItem(item);
         return toResponse(findOrThrow(returnId));
     }
+
     @Transactional
     public ReturnEntryResponse update(Integer returnId, UpdateReturnEntryRequest request) {
-        ReturnEntryJpa entry = findOrThrow(returnId);
+        ReturnEntry entry = findOrThrow(returnId);
         if (entry.getStatus() != ReturnEntryStatus.DRAFT) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                     "Chỉ có thể sửa phiếu ở trạng thái DRAFT");
@@ -235,7 +239,7 @@ public class ReturnEntryService {
             entry.getItems().clear();
             if (request.getItems() != null) {
                 for (ReturnEntryItemRequest itemReq : request.getItems()) {
-                    ReturnEntryItemJpa item = new ReturnEntryItemJpa();
+                    ReturnEntryItem item = new ReturnEntryItem();
                     item.setReturnId(returnId);
                     item.setItemId(itemReq.getItemId());
                     item.setQuantity(itemReq.getQuantity());
@@ -246,7 +250,7 @@ public class ReturnEntryService {
             }
             if (request.getExchangeItems() != null) {
                 for (ReturnEntryItemRequest itemReq : request.getExchangeItems()) {
-                    ReturnEntryItemJpa item = new ReturnEntryItemJpa();
+                    ReturnEntryItem item = new ReturnEntryItem();
                     item.setReturnId(returnId);
                     item.setItemId(itemReq.getItemId());
                     item.setQuantity(itemReq.getQuantity());
@@ -258,18 +262,19 @@ public class ReturnEntryService {
         }
         return toResponse(returnEntryRepo.save(entry));
     }
+
     @Transactional
     public ReturnEntryResponse confirm(Integer returnId, Integer staffId) {
-        ReturnEntryJpa entry = findOrThrow(returnId);
+        ReturnEntry entry = findOrThrow(returnId);
 
         if (entry.getStatus() == ReturnEntryStatus.CONFIRMED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Phiếu đã được xác nhận");
         }
 
-        List<ReturnEntryItemJpa> returnItems = entry.getItems().stream()
+        List<ReturnEntryItem> returnItems = entry.getItems().stream()
                 .filter(i -> !i.isExchangeItem()).collect(Collectors.toList());
-        List<ReturnEntryItemJpa> exchangeItems = entry.getItems().stream()
-                .filter(ReturnEntryItemJpa::isExchangeItem).collect(Collectors.toList());
+        List<ReturnEntryItem> exchangeItems = entry.getItems().stream()
+            .filter(ReturnEntryItem::isExchangeItem).collect(Collectors.toList());
 
         if (returnItems.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
@@ -278,7 +283,7 @@ public class ReturnEntryService {
 
         ReturnType type = entry.getReturnType();
 
-        for (ReturnEntryItemJpa item : returnItems) {
+        for (ReturnEntryItem item : returnItems) {
             Inventory inv = getOrCreateInventory(entry.getWarehouseId(), item.getItemId());
 
             int newQty;
@@ -299,7 +304,7 @@ public class ReturnEntryService {
         }
 
         if (type == ReturnType.EXCHANGE) {
-            for (ReturnEntryItemJpa item : exchangeItems) {
+            for (ReturnEntryItem item : exchangeItems) {
                 Inventory inv = getOrCreateInventory(entry.getWarehouseId(), item.getItemId());
                 int newQty = Math.max(0, inv.getQuantity() - item.getQuantity());
                 inv.setQuantity(newQty);
@@ -331,7 +336,7 @@ public class ReturnEntryService {
     private void saveTransaction(Integer warehouseId, Integer itemId,
                                   InventoryTransactionType type, int qty, int balance,
                                   Integer returnId, Integer staffId) {
-        InventoryTransactionJpa tx = new InventoryTransactionJpa();
+        InventoryTransaction tx = new InventoryTransaction();
         tx.setWarehouseId(warehouseId);
         tx.setItemId(itemId);
         tx.setTransactionType(type);
@@ -344,7 +349,7 @@ public class ReturnEntryService {
         transactionRepo.save(tx);
     }
 
-    private ReturnEntryJpa findOrThrow(Integer returnId) {
+    private ReturnEntry findOrThrow(Integer returnId) {
         return returnEntryRepo.findById(returnId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Không tìm thấy phiếu hàng trả id=" + returnId));
@@ -360,7 +365,7 @@ public class ReturnEntryService {
         return candidate;
     }
 
-    private ReturnEntryResponse toResponse(ReturnEntryJpa e) {
+    private ReturnEntryResponse toResponse(ReturnEntry e) {
         ReturnEntryResponse r = new ReturnEntryResponse();
         r.setReturnId(e.getReturnId());
         r.setReturnCode(e.getReturnCode());
@@ -374,7 +379,7 @@ public class ReturnEntryService {
         r.setCreatedAt(e.getCreatedAt());
 
         if (e.getWarehouseId() != null) {
-            WarehouseJpa warehouse = warehouseJpaRepo.findById(e.getWarehouseId()).orElse(null);
+            Warehouse warehouse = warehouseRepo.findById(e.getWarehouseId()).orElse(null);
             if (warehouse != null) {
                 r.setWarehouseCode(warehouse.getWarehouseCode());
                 r.setWarehouseName(warehouse.getWarehouseName());
@@ -401,10 +406,9 @@ public class ReturnEntryService {
         }
 
         Set<Integer> itemIds = e.getItems().stream()
-                .map(ReturnEntryItemJpa::getItemId)
+            .map(ReturnEntryItem::getItemId)
                 .collect(Collectors.toSet());
-        Map<Integer, String> itemNameById = catalogItemRepository.findAllById(itemIds).stream()
-                .collect(Collectors.toMap(CatalogItemJpaEntity::getItemId, CatalogItemJpaEntity::getItemName));
+        Map<Integer, String> itemNameById = partCatalogRepo.findNamesByIds(itemIds.stream().toList());
 
         r.setItems(e.getItems().stream().map(i -> {
             ReturnEntryItemResponse ir = new ReturnEntryItemResponse();

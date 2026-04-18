@@ -2,8 +2,6 @@ package com.g42.platform.gms.warehouse.app.service.entry;
 
 import com.g42.platform.gms.auth.entity.StaffProfile;
 import com.g42.platform.gms.auth.repository.StaffProfileRepo;
-import com.g42.platform.gms.booking.customer.infrastructure.entity.CatalogItemJpaEntity;
-import com.g42.platform.gms.catalog.infrastructure.repository.CatalogItemRepository;
 import com.g42.platform.gms.common.service.ImageUploadService;
 import com.g42.platform.gms.warehouse.api.dto.entry.CreateStockEntryRequest;
 import com.g42.platform.gms.warehouse.api.dto.entry.CreateStockEntryWithAttachmentRequest;
@@ -13,18 +11,21 @@ import com.g42.platform.gms.warehouse.api.dto.request.UpdateStockEntryRequest;
 import com.g42.platform.gms.warehouse.api.dto.response.StockEntryItemResponse;
 import com.g42.platform.gms.warehouse.api.dto.response.StockEntryResponse;
 import com.g42.platform.gms.warehouse.domain.entity.Inventory;
+import com.g42.platform.gms.warehouse.domain.entity.InventoryTransaction;
 import com.g42.platform.gms.warehouse.domain.entity.StockEntry;
 import com.g42.platform.gms.warehouse.domain.entity.StockEntryItem;
+import com.g42.platform.gms.warehouse.domain.entity.Warehouse;
+import com.g42.platform.gms.warehouse.domain.entity.WarehouseAttachment;
 import com.g42.platform.gms.warehouse.domain.enums.InventoryTransactionType;
 import com.g42.platform.gms.warehouse.domain.enums.StockEntryStatus;
 import com.g42.platform.gms.warehouse.domain.repository.InventoryRepo;
 import com.g42.platform.gms.warehouse.domain.repository.InventoryTransactionRepo;
 import com.g42.platform.gms.warehouse.domain.repository.StockEntryRepo;
 import com.g42.platform.gms.warehouse.domain.repository.WarehouseAttachmentRepo;
-import com.g42.platform.gms.warehouse.infrastructure.entity.InventoryTransactionJpa;
-import com.g42.platform.gms.warehouse.infrastructure.entity.WarehouseJpa;
-import com.g42.platform.gms.warehouse.infrastructure.entity.WarehouseAttachmentJpa;
-import com.g42.platform.gms.warehouse.infrastructure.repository.WarehouseJpaRepo;
+import com.g42.platform.gms.warehouse.domain.repository.WarehouseRepo;
+import com.g42.platform.gms.warehouse.domain.repository.PartCatalogRepo;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -36,8 +37,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -64,9 +63,9 @@ public class StockEntryService {
     private final InventoryTransactionRepo transactionRepo;
     private final ImageUploadService imageUploadService;
     private final WarehouseAttachmentRepo attachmentRepo;
-    private final WarehouseJpaRepo warehouseJpaRepo;
+    private final WarehouseRepo warehouseRepo;
     private final StaffProfileRepo staffProfileRepo;
-    private final CatalogItemRepository catalogItemRepository;
+    private final PartCatalogRepo partCatalogRepo;
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
 
     @Transactional(readOnly = true)
@@ -131,20 +130,7 @@ public class StockEntryService {
         if (request.getNotes() != null) entry.setNotes(request.getNotes());
 
         if (request.getItems() != null) {
-            List<StockEntryItem> newItems = new ArrayList<>();
-            for (StockEntryItemRequest itemReq : request.getItems()) {
-                newItems.add(StockEntryItem.builder()
-                        .entryId(entry.getEntryId())
-                        .itemId(itemReq.getItemId())
-                        .quantity(itemReq.getQuantity())
-                        .importPrice(itemReq.getImportPrice())
-                        .markupMultiplier(itemReq.getMarkupMultiplier() != null
-                                ? itemReq.getMarkupMultiplier() : BigDecimal.ONE)
-                        .remainingQuantity(itemReq.getQuantity())
-                        .notes(itemReq.getNotes())
-                        .build());
-            }
-            entry.setItems(newItems);
+            entry.setItems(buildEntryItems(request.getItems(), entry.getEntryId()));
         }
         return toResponse(stockEntryRepo.save(entry));
     }
@@ -163,20 +149,7 @@ public class StockEntryService {
 
         StockEntry saved = stockEntryRepo.save(entry);
 
-        List<StockEntryItem> items = new ArrayList<>();
-        for (StockEntryItemRequest itemReq : request.getItems()) {
-            items.add(StockEntryItem.builder()
-                    .entryId(saved.getEntryId())
-                    .itemId(itemReq.getItemId())
-                    .quantity(itemReq.getQuantity())
-                    .importPrice(itemReq.getImportPrice())
-                    .markupMultiplier(itemReq.getMarkupMultiplier() != null
-                            ? itemReq.getMarkupMultiplier() : BigDecimal.ONE)
-                    .remainingQuantity(itemReq.getQuantity())
-                    .notes(itemReq.getNotes())
-                    .build());
-        }
-        saved.setItems(items);
+        saved.setItems(buildEntryItems(request.getItems(), saved.getEntryId()));
         return toResponse(stockEntryRepo.save(saved));
     }
 
@@ -190,8 +163,8 @@ public class StockEntryService {
         StockEntryResponse created = create(request, staffId);
 
         String url = imageUploadService.uploadImage(file, FOLDER_STOCK_ENTRY);
-        WarehouseAttachmentJpa attachment = new WarehouseAttachmentJpa();
-        attachment.setRefType(WarehouseAttachmentJpa.RefType.STOCK_ENTRY);
+        WarehouseAttachment attachment = new WarehouseAttachment();
+        attachment.setRefType(WarehouseAttachment.RefType.STOCK_ENTRY);
         attachment.setRefId(created.getEntryId());
         attachment.setFileUrl(url);
         attachment.setUploadedBy(staffId);
@@ -235,8 +208,8 @@ public class StockEntryService {
         }
 
         String url = imageUploadService.uploadImage(file, FOLDER_STOCK_ENTRY);
-        WarehouseAttachmentJpa attachment = new WarehouseAttachmentJpa();
-        attachment.setRefType(WarehouseAttachmentJpa.RefType.STOCK_ENTRY);
+        WarehouseAttachment attachment = new WarehouseAttachment();
+        attachment.setRefType(WarehouseAttachment.RefType.STOCK_ENTRY);
         attachment.setRefId(entryId);
         attachment.setFileUrl(url);
         attachment.setUploadedBy(staffId);
@@ -251,7 +224,7 @@ public class StockEntryService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Phiếu đã được xác nhận");
         }
         boolean hasAttachment = attachmentRepo.existsByRefTypeAndRefId(
-                WarehouseAttachmentJpa.RefType.STOCK_ENTRY, entryId);
+            WarehouseAttachment.RefType.STOCK_ENTRY, entryId);
         if (!hasAttachment) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                     "Cần đính kèm ảnh chứng từ trước khi xác nhận");
@@ -261,8 +234,9 @@ public class StockEntryService {
                     "Phiếu nhập không có sản phẩm nào");
         }
 
+        // Dùng lock theo warehouse/item để tránh lệch tồn khi nhiều request confirm đồng thời.
         for (StockEntryItem item : entry.getItems()) {
-            Inventory inv = inventoryRepo
+            Inventory inventory = inventoryRepo
                     .findByWarehouseAndItemWithLock(entry.getWarehouseId(), item.getItemId())
                     .orElseGet(() -> Inventory.builder()
                             .warehouseId(entry.getWarehouseId())
@@ -271,21 +245,18 @@ public class StockEntryService {
                             .reservedQuantity(0)
                             .build());
 
-            int newQty = inv.getQuantity() + item.getQuantity();
-            inv.setQuantity(newQty);
-            inventoryRepo.save(inv);
+            int balanceAfter = inventory.getQuantity() + item.getQuantity();
+            inventory.setQuantity(balanceAfter);
+            inventoryRepo.save(inventory);
 
-            InventoryTransactionJpa tx = new InventoryTransactionJpa();
-            tx.setWarehouseId(entry.getWarehouseId());
-            tx.setItemId(item.getItemId());
-            tx.setTransactionType(InventoryTransactionType.IN);
-            tx.setQuantity(item.getQuantity());
-            tx.setBalanceAfter(newQty);
-            tx.setReferenceType("stock_entry");
-            tx.setReferenceId(entryId);
-            tx.setCreatedById(staffId);
-            tx.setCreatedAt(Instant.now());
-            transactionRepo.save(tx);
+            saveInventoryInTransaction(
+                entry.getWarehouseId(),
+                item.getItemId(),
+                item.getQuantity(),
+                balanceAfter,
+                entryId,
+                staffId
+            );
         }
 
         entry.setStatus(StockEntryStatus.CONFIRMED);
@@ -299,7 +270,44 @@ public class StockEntryService {
         return stockEntryRepo.findLatesFallBackPrice(itemId, warehouseId);
     }
 
-    // ── helpers ──────────────────────────────────────────────────────────────
+    private List<StockEntryItem> buildEntryItems(List<StockEntryItemRequest> itemRequests, Integer entryId) {
+        List<StockEntryItem> items = new ArrayList<>();
+        for (StockEntryItemRequest itemRequest : itemRequests) {
+            items.add(StockEntryItem.builder()
+                    .entryId(entryId)
+                    .itemId(itemRequest.getItemId())
+                    .quantity(itemRequest.getQuantity())
+                    .importPrice(itemRequest.getImportPrice())
+                    .markupMultiplier(itemRequest.getMarkupMultiplier() != null
+                            ? itemRequest.getMarkupMultiplier()
+                            : BigDecimal.ONE)
+                    .remainingQuantity(itemRequest.getQuantity())
+                    .notes(itemRequest.getNotes())
+                    .build());
+        }
+        return items;
+    }
+
+    private void saveInventoryInTransaction(
+            Integer warehouseId,
+            Integer itemId,
+            Integer quantity,
+            Integer balanceAfter,
+            Integer entryId,
+            Integer staffId
+    ) {
+        InventoryTransaction transaction = new InventoryTransaction();
+        transaction.setWarehouseId(warehouseId);
+        transaction.setItemId(itemId);
+        transaction.setTransactionType(InventoryTransactionType.IN);
+        transaction.setQuantity(quantity);
+        transaction.setBalanceAfter(balanceAfter);
+        transaction.setReferenceType("stock_entry");
+        transaction.setReferenceId(entryId);
+        transaction.setCreatedById(staffId);
+        transaction.setCreatedAt(Instant.now());
+        transactionRepo.save(transaction);
+    }
 
     private StockEntry findOrThrow(Integer entryId) {
         return stockEntryRepo.findById(entryId)
@@ -332,7 +340,7 @@ public class StockEntryService {
         r.setCreatedAt(e.getCreatedAt());
 
         if (e.getWarehouseId() != null) {
-            WarehouseJpa warehouse = warehouseJpaRepo.findById(e.getWarehouseId()).orElse(null);
+            Warehouse warehouse = warehouseRepo.findById(e.getWarehouseId()).orElse(null);
             if (warehouse != null) {
                 r.setWarehouseCode(warehouse.getWarehouseCode());
                 r.setWarehouseName(warehouse.getWarehouseName());
@@ -356,8 +364,7 @@ public class StockEntryService {
         Set<Integer> itemIds = e.getItems().stream()
                 .map(StockEntryItem::getItemId)
                 .collect(Collectors.toSet());
-        Map<Integer, String> itemNameById = catalogItemRepository.findAllById(itemIds).stream()
-                .collect(Collectors.toMap(CatalogItemJpaEntity::getItemId, CatalogItemJpaEntity::getItemName));
+        Map<Integer, String> itemNameById = partCatalogRepo.findNamesByIds(itemIds.stream().toList());
 
         List<StockEntryItemResponse> itemResponses = e.getItems().stream().map(i -> {
             StockEntryItemResponse ir = new StockEntryItemResponse();
@@ -375,9 +382,9 @@ public class StockEntryService {
 
         if (e.getEntryId() != null) {
             List<String> urls = attachmentRepo
-                    .findByRefTypeAndRefId(WarehouseAttachmentJpa.RefType.STOCK_ENTRY, e.getEntryId())
+                    .findByRefTypeAndRefId(WarehouseAttachment.RefType.STOCK_ENTRY, e.getEntryId())
                     .stream()
-                    .map(WarehouseAttachmentJpa::getFileUrl)
+                    .map(WarehouseAttachment::getFileUrl)
                     .collect(Collectors.toList());
             r.setAttachments(urls);
         }
