@@ -254,6 +254,10 @@ public class ServiceTicketManageService {
         int reservedAllocationCount = (int) allocations.stream()
             .filter(allocation -> allocation.getStatus() == AllocationStatus.RESERVED)
             .count();
+        int pendingIssueRequestAllocationCount = (int) allocations.stream()
+            .filter(allocation -> allocation.getStatus() == AllocationStatus.RESERVED)
+            .filter(allocation -> allocation.getIssueId() == null)
+            .count();
         int committedAllocationCount = (int) allocations.stream()
             .filter(allocation -> allocation.getStatus() == AllocationStatus.COMMITTED)
             .count();
@@ -266,6 +270,8 @@ public class ServiceTicketManageService {
         response.setBillId(bill != null ? bill.getBillId() : null);
 
         response.setReservedAllocationCount(reservedAllocationCount);
+        response.setPendingIssueRequestAllocationCount(pendingIssueRequestAllocationCount);
+        response.setCanRequestIssueDraft(pendingIssueRequestAllocationCount > 0);
         response.setCommittedAllocationCount(committedAllocationCount);
         response.setWarehouseReadyForRepair(hasConfirmedStockIssue && committedAllocationCount > 0);
 

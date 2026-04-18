@@ -63,6 +63,8 @@ public class ServiceTicketDetailResponse {
     private Boolean hasBill;
     private Integer billId;
     private Integer reservedAllocationCount;
+    private Integer pendingIssueRequestAllocationCount;
+    private Boolean canRequestIssueDraft;
     private Integer committedAllocationCount;
     private Boolean warehouseReadyForRepair;
     
