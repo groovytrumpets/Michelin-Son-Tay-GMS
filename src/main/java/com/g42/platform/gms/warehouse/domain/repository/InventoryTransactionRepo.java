@@ -1,8 +1,8 @@
 package com.g42.platform.gms.warehouse.domain.repository;
 
-import com.g42.platform.gms.warehouse.infrastructure.entity.InventoryTransactionJpa;
+import com.g42.platform.gms.warehouse.domain.entity.InventoryTransaction;
 
 public interface InventoryTransactionRepo {
 
-    InventoryTransactionJpa save(InventoryTransactionJpa transaction);
+    InventoryTransaction save(InventoryTransaction transaction);
 }

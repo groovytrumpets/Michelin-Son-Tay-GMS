@@ -2,8 +2,8 @@ package com.g42.platform.gms.warehouse.domain.repository;
 
 import com.g42.platform.gms.warehouse.domain.enums.ReturnEntryStatus;
 import com.g42.platform.gms.warehouse.domain.enums.ReturnType;
-import com.g42.platform.gms.warehouse.infrastructure.entity.ReturnEntryItemJpa;
-import com.g42.platform.gms.warehouse.infrastructure.entity.ReturnEntryJpa;
+import com.g42.platform.gms.warehouse.domain.entity.ReturnEntry;
+import com.g42.platform.gms.warehouse.domain.entity.ReturnEntryItem;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -13,23 +13,23 @@ import java.util.Optional;
 
 public interface ReturnEntryRepo {
 
-    Optional<ReturnEntryJpa> findById(Integer returnId);
+    Optional<ReturnEntry> findById(Integer returnId);
 
-    List<ReturnEntryJpa> findByWarehouseId(Integer warehouseId);
+    List<ReturnEntry> findByWarehouseId(Integer warehouseId);
 
-    Page<ReturnEntryJpa> search(Integer warehouseId,
-                                ReturnEntryStatus status,
-                                ReturnType returnType,
-                                LocalDate fromDate,
-                                LocalDate toDate,
-                                String search,
-                                Pageable pageable);
+    Page<ReturnEntry> search(Integer warehouseId,
+                             ReturnEntryStatus status,
+                             ReturnType returnType,
+                             LocalDate fromDate,
+                             LocalDate toDate,
+                             String search,
+                             Pageable pageable);
 
-    ReturnEntryJpa save(ReturnEntryJpa entry);
+    ReturnEntry save(ReturnEntry entry);
 
     boolean existsByCode(String returnCode);
 
-    Optional<ReturnEntryItemJpa> findItemById(Integer returnItemId);
+    Optional<ReturnEntryItem> findItemById(Integer returnItemId);
 
-    ReturnEntryItemJpa saveItem(ReturnEntryItemJpa item);
+    ReturnEntryItem saveItem(ReturnEntryItem item);
 }
