@@ -1,6 +1,7 @@
 package com.g42.platform.gms.warehouse.infrastructure.repository.impl;
 
 import com.g42.platform.gms.warehouse.domain.enums.AllocationStatus;
+import com.g42.platform.gms.warehouse.domain.entity.StockAllocation;
 import com.g42.platform.gms.warehouse.domain.repository.StockAllocationRepo;
 import com.g42.platform.gms.warehouse.infrastructure.entity.StockAllocationJpa;
 import com.g42.platform.gms.warehouse.infrastructure.repository.StockAllocationJpaRepo;
@@ -17,32 +18,77 @@ public class StockAllocationRepoImpl implements StockAllocationRepo {
     private final StockAllocationJpaRepo jpaRepo;
 
     @Override
-    public Optional<StockAllocationJpa> findById(Integer allocationId) {
-        return jpaRepo.findById(allocationId);
+    public Optional<StockAllocation> findById(Integer allocationId) {
+        return jpaRepo.findById(allocationId).map(this::toDomain);
     }
 
     @Override
-    public List<StockAllocationJpa> findByTicketAndStatus(Integer serviceTicketId, AllocationStatus status) {
-        return jpaRepo.findByServiceTicketIdAndStatus(serviceTicketId, status);
+    public List<StockAllocation> findByTicketAndStatus(Integer serviceTicketId, AllocationStatus status) {
+        return jpaRepo.findByServiceTicketIdAndStatus(serviceTicketId, status)
+                .stream()
+                .map(this::toDomain)
+                .toList();
     }
 
     @Override
-    public List<StockAllocationJpa> findByTicketAndWarehouseAndStatus(Integer serviceTicketId, Integer warehouseId, AllocationStatus status) {
-        return jpaRepo.findByServiceTicketIdAndWarehouseIdAndStatus(serviceTicketId, warehouseId, status);
+    public List<StockAllocation> findByTicketAndWarehouseAndStatus(Integer serviceTicketId, Integer warehouseId, AllocationStatus status) {
+        return jpaRepo.findByServiceTicketIdAndWarehouseIdAndStatus(serviceTicketId, warehouseId, status)
+                .stream()
+                .map(this::toDomain)
+                .toList();
     }
 
     @Override
-    public List<StockAllocationJpa> findByIssueIdAndStatus(Integer issueId, AllocationStatus status) {
-        return jpaRepo.findByIssueIdAndStatus(issueId, status);
+    public List<StockAllocation> findByIssueIdAndStatus(Integer issueId, AllocationStatus status) {
+        return jpaRepo.findByIssueIdAndStatus(issueId, status)
+                .stream()
+                .map(this::toDomain)
+                .toList();
     }
 
     @Override
-    public List<StockAllocationJpa> findByEstimateItemId(Integer estimateItemId) {
-        return jpaRepo.findByEstimateItemId(estimateItemId);
+    public List<StockAllocation> findByEstimateItemId(Integer estimateItemId) {
+        return jpaRepo.findByEstimateItemId(estimateItemId)
+                .stream()
+                .map(this::toDomain)
+                .toList();
     }
 
     @Override
-    public StockAllocationJpa save(StockAllocationJpa allocation) {
-        return jpaRepo.save(allocation);
+    public StockAllocation save(StockAllocation allocation) {
+        StockAllocationJpa saved = jpaRepo.save(toJpa(allocation));
+        return toDomain(saved);
+    }
+
+    private StockAllocation toDomain(StockAllocationJpa jpa) {
+        StockAllocation domain = new StockAllocation();
+        domain.setAllocationId(jpa.getAllocationId());
+        domain.setServiceTicketId(jpa.getServiceTicketId());
+        domain.setIssueId(jpa.getIssueId());
+        domain.setEstimateItemId(jpa.getEstimateItemId());
+        domain.setWarehouseId(jpa.getWarehouseId());
+        domain.setItemId(jpa.getItemId());
+        domain.setQuantity(jpa.getQuantity());
+        domain.setStatus(jpa.getStatus());
+        domain.setCreatedBy(jpa.getCreatedBy());
+        domain.setCreatedAt(jpa.getCreatedAt());
+        domain.setUpdatedAt(jpa.getUpdatedAt());
+        return domain;
+    }
+
+    private StockAllocationJpa toJpa(StockAllocation domain) {
+        StockAllocationJpa jpa = new StockAllocationJpa();
+        jpa.setAllocationId(domain.getAllocationId());
+        jpa.setServiceTicketId(domain.getServiceTicketId());
+        jpa.setIssueId(domain.getIssueId());
+        jpa.setEstimateItemId(domain.getEstimateItemId());
+        jpa.setWarehouseId(domain.getWarehouseId());
+        jpa.setItemId(domain.getItemId());
+        jpa.setQuantity(domain.getQuantity());
+        jpa.setStatus(domain.getStatus());
+        jpa.setCreatedBy(domain.getCreatedBy());
+        jpa.setCreatedAt(domain.getCreatedAt());
+        jpa.setUpdatedAt(domain.getUpdatedAt());
+        return jpa;
     }
 }
