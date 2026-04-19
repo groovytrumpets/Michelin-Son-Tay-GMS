@@ -1,6 +1,8 @@
 package com.g42.platform.gms.booking_management.infrastructure.repository;
 
 import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedRespond;
+import com.g42.platform.gms.booking_management.domain.entity.Booking;
+import com.g42.platform.gms.booking_management.domain.enums.BookingEnum;
 import com.g42.platform.gms.booking_management.infrastructure.entity.BookingJpa;
 import com.g42.platform.gms.booking_management.infrastructure.entity.BookingRequestJpa;
 import org.springframework.data.domain.Page;
@@ -30,4 +32,6 @@ public interface BookingManageJpaRepository extends JpaRepository<BookingJpa, In
     select max(b.queueOrder)from BookingJpa b where b.scheduledDate=:scheduledDate and b.scheduledTime=:scheduledTime
     """)
     Integer findMaxQueueOrderBySLotDate(LocalDate scheduledDate, LocalTime scheduledTime);
+
+    List<BookingJpa> getAllByStatus(BookingEnum status);
 }
