@@ -18,15 +18,24 @@ public class DiscountService {
 
     private final DiscountConfigRepo discountConfigRepo;
     private final StockEntryRepo stockEntryRepo;
+
+        @Transactional(readOnly = true)
+        public BigDecimal resolveDiscountRate(Integer itemId, IssueType issueType, int quantity) {
+        return discountConfigRepo.findActiveByItemIdAndIssueType(itemId, issueType)
+            .stream()
+            .filter(c -> c.getQuantityThreshold() == null || quantity >= c.getQuantityThreshold())
+            .max(java.util.Comparator
+                .comparingInt(this::specificityScore)
+                .thenComparingInt(c -> c.getQuantityThreshold() != null ? c.getQuantityThreshold() : 0)
+                .thenComparing(DiscountConfigJpa::getDiscountRate))
+            .map(DiscountConfigJpa::getDiscountRate)
+            .orElse(BigDecimal.ZERO);
+        }
+
     @Transactional(readOnly = true)
     public BigDecimal calculateFinalPrice(Integer itemId, IssueType issueType,
                                           int quantity, BigDecimal exportPrice) {
-        BigDecimal bestRate = discountConfigRepo.findActiveByItemIdAndIssueType(itemId, issueType)
-                .stream()
-                .filter(c -> c.getQuantityThreshold() == null || quantity >= c.getQuantityThreshold())
-                .max(Comparator.comparing(DiscountConfigJpa::getDiscountRate))
-                .map(DiscountConfigJpa::getDiscountRate)
-                .orElse(BigDecimal.ZERO);
+        BigDecimal bestRate = resolveDiscountRate(itemId, issueType, quantity);
 
         if (bestRate.compareTo(BigDecimal.ZERO) == 0) return exportPrice;
 
@@ -53,5 +62,16 @@ public class DiscountService {
         config.setIsActive(true);
         config.setCreatedBy(createdBy);
         return discountConfigRepo.save(config);
+    }
+
+    private int specificityScore(DiscountConfigJpa config) {
+        int score = 0;
+        if (config.getItemId() != null) {
+            score += 2;
+        }
+        if (config.getIssueType() != null) {
+            score += 1;
+        }
+        return score;
     }
 }

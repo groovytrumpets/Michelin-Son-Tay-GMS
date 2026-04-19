@@ -124,11 +124,6 @@ public class StockAllocationService {
     }
     @Transactional
         public List<StockIssueResponse> requestIssueDraft(Integer serviceTicketId, Integer staffId) {
-        if (stockIssueRepo.existsDraftServiceTicketIssue(serviceTicketId)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                "Service ticket da co phieu xuat DRAFT");
-        }
-
         List<StockAllocationJpa> reserved = allocationRepo
                 .findByTicketAndStatus(serviceTicketId, AllocationStatus.RESERVED);
 
@@ -140,6 +135,11 @@ public class StockAllocationService {
         Map<Integer, List<CreateStockIssueRequest.IssueItemRequest>> issueItemsByWarehouse = new HashMap<>();
 
         for (StockAllocationJpa alloc : reserved) {
+            // Only create new drafts from allocations not yet linked to any issue.
+            if (alloc.getIssueId() != null) {
+                continue;
+            }
+
             CreateStockIssueRequest.IssueItemRequest item = new CreateStockIssueRequest.IssueItemRequest();
             item.setItemId(alloc.getItemId());
             item.setQuantity(alloc.getQuantity());
@@ -160,6 +160,11 @@ public class StockAllocationService {
             issueRequest.setItems(entry.getValue());
 
             createdIssues.add(stockIssueService.create(issueRequest, staffId));
+        }
+
+        if (createdIssues.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                "Khong co allocation RESERVED moi de tao phieu xuat kho");
         }
 
         ServiceTicket ticket = serviceTicketRepo.findByServiceTicketId(serviceTicketId);

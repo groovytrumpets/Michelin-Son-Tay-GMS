@@ -10,6 +10,8 @@ import com.g42.platform.gms.booking.customer.domain.entity.Booking;
 import com.g42.platform.gms.booking.customer.domain.repository.BookingRepository;
 import com.g42.platform.gms.catalog.infrastructure.repository.CatalogItemRepository;
 import com.g42.platform.gms.common.service.ExcelService;
+import com.g42.platform.gms.billing.domain.entity.ServiceBill;
+import com.g42.platform.gms.billing.domain.repository.BillingRepository;
 import com.g42.platform.gms.estimation.api.internal.EstimateInternalApi;
 import com.g42.platform.gms.estimation.domain.entity.Estimate;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceQueueResponse;
@@ -77,6 +79,7 @@ public class ServiceTicketManageService {
     private final ServiceTicketDetailMapper detailMapper;
     private final TicketAssignmentService ticketAssignmentService;
     private final ServiceTicketDtoMapper serviceTicketDtoMapper;
+    private final BillingRepository billingRepository;
     private final CustomerInternalApi customerInternalApi;
     private final VehicleInternalApi vehicleInternalApi;
     private final EstimateInternalApi estimateInternalApi;
@@ -149,7 +152,11 @@ public class ServiceTicketManageService {
         }
 
 
-        return listMapper.toManageListResponse(ticket, customer, vehicle, booking);
+        ServiceTicketListResponse response = listMapper.toManageListResponse(ticket, customer, vehicle, booking);
+        ServiceBill bill = billingRepository.getBillingByServiceTicket(ticket.getServiceTicketId());
+        response.setHasBill(bill != null);
+        response.setBillId(bill != null ? bill.getBillId() : null);
+        return response;
     }
 
     @Transactional(readOnly = true)
@@ -247,13 +254,24 @@ public class ServiceTicketManageService {
         int reservedAllocationCount = (int) allocations.stream()
             .filter(allocation -> allocation.getStatus() == AllocationStatus.RESERVED)
             .count();
+        int pendingIssueRequestAllocationCount = (int) allocations.stream()
+            .filter(allocation -> allocation.getStatus() == AllocationStatus.RESERVED)
+            .filter(allocation -> allocation.getIssueId() == null)
+            .count();
         int committedAllocationCount = (int) allocations.stream()
             .filter(allocation -> allocation.getStatus() == AllocationStatus.COMMITTED)
             .count();
 
         response.setHasDraftStockIssue(hasDraftStockIssue);
         response.setHasConfirmedStockIssue(hasConfirmedStockIssue);
+
+        ServiceBill bill = billingRepository.getBillingByServiceTicket(ticket.getServiceTicketId());
+        response.setHasBill(bill != null);
+        response.setBillId(bill != null ? bill.getBillId() : null);
+
         response.setReservedAllocationCount(reservedAllocationCount);
+        response.setPendingIssueRequestAllocationCount(pendingIssueRequestAllocationCount);
+        response.setCanRequestIssueDraft(pendingIssueRequestAllocationCount > 0);
         response.setCommittedAllocationCount(committedAllocationCount);
         response.setWarehouseReadyForRepair(hasConfirmedStockIssue && committedAllocationCount > 0);
 
