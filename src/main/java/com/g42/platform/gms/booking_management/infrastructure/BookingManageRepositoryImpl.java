@@ -53,7 +53,7 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
             LocalDateTime scheduledDateTime = LocalDateTime.of(
                     booking.getScheduledDate(),
                     booking.getScheduledTime()
-            );
+            ).plusMinutes(30);;
             if (scheduledDateTime.isBefore(LocalDateTime.now())) {
                 booking.setStatus(BookingEnum.NOT_ARRIVED);
                 bookingManageJpaRepository.save(bookingManagerMapper.toJpaBook(booking));
