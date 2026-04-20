@@ -59,4 +59,15 @@ public class PromotionRepoImpl implements PromotionRepo {
         PromotionJpa saved = promotionJpaRepo.save(promotionJpa);
         return promotionJpaMapper.toDomain(saved);
     }
+
+    @Override
+    public void countUsed(Integer promotionId) {
+        PromotionJpa promotionJpa = promotionJpaRepo.findById(promotionId).orElse(null);
+        if (promotionJpa == null) {
+            System.err.println("PROMOTION UPDATE USEDCOUNT NOT FOUND");
+            return;
+        }
+        promotionJpa.setUsedCount(promotionJpa.getUsedCount() + 1);
+        promotionJpaRepo.save(promotionJpa);
+    }
 }

@@ -47,6 +47,19 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
 
     @Override
     public Page<BookedRespond> getBookedList(int page, int size, LocalDate date, Boolean isGuest, BookingEnum status, String search) {
+        //check booking status and update it
+        List<Booking> bookings = bookingManageJpaRepository.getAllByStatus(BookingEnum.CONFIRMED).stream().map(bookingManagerMapper::toDomain).toList();
+        for (Booking booking : bookings) {
+            LocalDateTime scheduledDateTime = LocalDateTime.of(
+                    booking.getScheduledDate(),
+                    booking.getScheduledTime()
+            ).plusMinutes(30);;
+            if (scheduledDateTime.isBefore(LocalDateTime.now())) {
+                booking.setStatus(BookingEnum.NOT_ARRIVED);
+                bookingManageJpaRepository.save(bookingManagerMapper.toJpaBook(booking));
+                System.out.println(booking.getBookingCode());
+            }
+        }
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         Specification<BookingJpa> specification = Specification.unrestricted();
         specification = specification.and(BookingRequestSpecification.filterBooking(date, isGuest, status));
@@ -72,6 +85,7 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
                     b.getBookingId(),
                     b.getBookingCode(),
                     new CustomerDto(
+                            customer != null ? customer.getCustomerId() : null,
                             customer != null ? customer.getFullName() : null,
                             customer != null ? customer.getPhone() : null,
                             null
@@ -92,7 +106,6 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
     public Booking getBookedDetailById(String bookingId) {
         BookingJpa bookingJpa = bookingManageJpaRepository.getBookingJpaByBookingCode(bookingId);
         return bookingManagerMapper.toDomain(bookingJpa);
-
     }
     @Override
     public Page<BookingRequest> getBookingRequestList(int page, int size, LocalDate date, Boolean isGuest, BookingRequestStatus status, String search) {
@@ -150,7 +163,10 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
         List<CatalogItem> catalogItems = request.getServices();
         int estimateTime = catalogItems.stream()
                 .filter(item -> item.getServiceService() != null)
-                .mapToInt(item -> item.getServiceService().getEstimateTime())
+                .mapToInt(item -> {
+                    Integer time = item.getServiceService().getEstimateTime();
+                    return time != null ? time : 0;
+                })
                 .sum();
         booking.setEstimateTime(estimateTime);
         BookingJpa bookingJpa = bookingManageJpaRepository.save(bookingManagerMapper.toBooking(booking));
@@ -220,6 +236,12 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
     public Booking save(Booking booking) {
         BookingJpa bookingJpa = bookingManageJpaRepository.save(bookingManagerMapper.toBooking(booking));
         return bookingManagerMapper.toDomain(bookingJpa);
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional
+    public void bulkExpireOldRequests() {
+        bookingMRequestJpaRepo.bulkExpireOldRequests(LocalDateTime.now());
     }
 
 }

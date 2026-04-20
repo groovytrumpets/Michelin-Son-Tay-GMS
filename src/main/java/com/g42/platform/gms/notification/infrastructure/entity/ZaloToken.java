@@ -17,11 +17,11 @@ public class ZaloToken {
     @Column(name = "idzalo_token", nullable = false)
     private Long id;
 
-    @Size(max = 255)
+
     @Column(name = "access_token")
     private String accessToken;
 
-    @Size(max = 255)
+
     @Column(name = "refresh_token")
     private String refreshToken;
 

@@ -44,5 +44,6 @@ public interface BookingManageRepository {
     Booking getBookedById(Integer bookingId);
 
     Booking save(Booking booking);
-    ;
+
+    void bulkExpireOldRequests();
 }

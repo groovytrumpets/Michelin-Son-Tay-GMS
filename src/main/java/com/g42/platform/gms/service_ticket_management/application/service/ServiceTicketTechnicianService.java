@@ -6,7 +6,7 @@ import com.g42.platform.gms.auth.repository.CustomerProfileRepository;
 import com.g42.platform.gms.auth.repository.StaffProfileRepo;
 import com.g42.platform.gms.booking.customer.domain.entity.Booking;
 import com.g42.platform.gms.booking.customer.domain.repository.BookingRepository;
-import com.g42.platform.gms.catalog.repository.CatalogItemRepository;
+import com.g42.platform.gms.catalog.infrastructure.repository.CatalogItemRepository;
 import com.g42.platform.gms.service_ticket_management.api.dto.technician.TechnicianTicketDetailResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.technician.TechnicianTicketListResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.technician.UpdateTechnicianNotesRequest;
@@ -25,6 +25,9 @@ import com.g42.platform.gms.service_ticket_management.api.mapper.ServiceTicketLi
 import com.g42.platform.gms.service_ticket_management.api.mapper.ServiceTicketDetailMapper;
 import com.g42.platform.gms.vehicle.entity.Vehicle;
 import com.g42.platform.gms.vehicle.repository.VehicleRepository;
+import com.g42.platform.gms.warehouse.domain.enums.AllocationStatus;
+import com.g42.platform.gms.warehouse.domain.repository.StockAllocationRepo;
+import com.g42.platform.gms.warehouse.domain.repository.StockIssueRepo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -59,6 +62,8 @@ public class ServiceTicketTechnicianService {
     private final SafetyInspectionRepo safetyInspectionRepo;
     private final ServiceTicketListMapper listMapper;
     private final ServiceTicketDetailMapper detailMapper;
+    private final StockAllocationRepo stockAllocationRepo;
+    private final StockIssueRepo stockIssueRepo;
     
     /**
      * Get paginated list of service tickets assigned to a specific technician.
@@ -212,8 +217,8 @@ public class ServiceTicketTechnicianService {
         ServiceTicket ticket = serviceTicketRepo.findByTicketCode(ticketCode)
             .orElseThrow(() -> new CheckInException("Không tìm thấy service ticket: " + ticketCode));
 
-        if (ticket.getTicketStatus() != TicketStatus.DRAFT) {
-            throw new CheckInException("Chỉ có thể bắt đầu khi phiếu đang ở trạng thái DRAFT");
+        if (ticket.getTicketStatus() != TicketStatus.CREATED) {
+            throw new CheckInException("Chỉ có thể bắt đầu khi phiếu đang ở trạng thái CREATED");
         }
 
         SafetyInspection inspection = safetyInspectionRepo.findByServiceTicketId(ticket.getServiceTicketId())
@@ -223,9 +228,8 @@ public class ServiceTicketTechnicianService {
             throw new CheckInException("Phiếu này đã hoàn thành kiểm tra an toàn, không thể bắt đầu lại");
         }
 
-        // Luôn chuyển sang INSPECTION khi technician bắt đầu nhận xe
-        // dù skip hay không skip safety inspection
-        ticket.setTicketStatus(TicketStatus.INSPECTION);
+        // Chuyển sang INSPECTING khi technician bắt đầu nhận xe
+        ticket.setTicketStatus(TicketStatus.INSPECTING);
         ticket.setUpdatedAt(java.time.LocalDateTime.now());
         serviceTicketRepo.save(ticket);
 
@@ -252,9 +256,11 @@ public class ServiceTicketTechnicianService {
         ServiceTicket ticket = serviceTicketRepo.findByTicketCode(ticketCode)
             .orElseThrow(() -> new CheckInException("Không tìm thấy service ticket: " + ticketCode));
 
-        if (ticket.getTicketStatus() != TicketStatus.IN_PROGRESS) {
-            throw new CheckInException("Chỉ có thể báo hoàn thành khi phiếu đang ở trạng thái IN_PROGRESS");
+        if (ticket.getTicketStatus() != TicketStatus.REPAIRING) {
+            throw new CheckInException("Chỉ có thể báo hoàn thành khi phiếu đang ở trạng thái REPAIRING");
         }
+
+        validateWarehouseBeforeFinish(ticket.getServiceTicketId());
 
         ticket.setTicketStatus(TicketStatus.COMPLETED);
         ticket.setCompletedAt(java.time.LocalDateTime.now());
@@ -263,6 +269,26 @@ public class ServiceTicketTechnicianService {
 
         log.info("Ticket {} marked as COMPLETED by technician", ticketCode);
         return getTechnicianTicketDetail(ticketCode);
+    }
+
+    private void validateWarehouseBeforeFinish(Integer serviceTicketId) {
+        int reservedCount = stockAllocationRepo
+                .findByTicketAndStatus(serviceTicketId, AllocationStatus.RESERVED)
+                .size();
+        if (reservedCount > 0) {
+            throw new CheckInException("Chưa thể hoàn thành: vẫn còn vật tư ở trạng thái RESERVED");
+        }
+
+        if (stockIssueRepo.existsDraftServiceTicketIssue(serviceTicketId)) {
+            throw new CheckInException("Chưa thể hoàn thành: vẫn còn phiếu xuất kho DRAFT");
+        }
+
+        int committedCount = stockAllocationRepo
+                .findByTicketAndStatus(serviceTicketId, AllocationStatus.COMMITTED)
+                .size();
+        if (committedCount > 0 && !stockIssueRepo.existsConfirmedServiceTicketIssue(serviceTicketId)) {
+            throw new CheckInException("Chưa thể hoàn thành: chưa có phiếu xuất kho CONFIRMED tương ứng");
+        }
     }
 
 }

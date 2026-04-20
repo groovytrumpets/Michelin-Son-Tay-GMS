@@ -47,6 +47,13 @@ public class ServiceJpaEntity {
     private LocalDateTime updatedAt;
     private String mediaThumbnail;
 
+    public Integer getEstimateTime() {
+        if (estimateTime == null) {
+            return 0;
+        }
+        return estimateTime;
+    }
+
     @OneToMany(mappedBy = "service", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ServiceMediaJpaEntity> media = new ArrayList<>();
     @Column(name = "estimate_time")

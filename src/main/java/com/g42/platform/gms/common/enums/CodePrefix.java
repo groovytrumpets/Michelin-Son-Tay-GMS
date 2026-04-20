@@ -9,8 +9,8 @@ import lombok.Getter;
 @Getter
 public enum CodePrefix {
     BOOKING("MST"),          // Booking codes: MST_XXXXXX (Maintenance Service Ticket)
-    REQUEST("MST"),           // Request codes: MST_XXXXXX
-    SERVICE_TICKET("MST");    // Service Ticket codes: ST_XXXXXX (deprecated, use BOOKING instead)
+    REQUEST("MST"),          // Request codes: MST_XXXXXX
+    SERVICE_TICKET("MST");   // Service Ticket codes: MST_XXXXXX
     
     private final String prefix;
     

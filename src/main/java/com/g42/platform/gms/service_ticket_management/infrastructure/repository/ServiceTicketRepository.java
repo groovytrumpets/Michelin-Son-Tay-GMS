@@ -1,5 +1,6 @@
 package com.g42.platform.gms.service_ticket_management.infrastructure.repository;
 
+import com.g42.platform.gms.marketing.service_catalog.infrastructure.entity.ServiceJpaEntity;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -59,4 +60,12 @@ public interface ServiceTicketRepository extends JpaRepository<ServiceTicketJpa,
     ServiceTicketJpa findFirstByCustomerIdAndServiceTicketIdNotOrderByReceivedAtDesc(Integer customerId, Integer serviceTicketId);
 
     ServiceTicketJpa findFirstByCustomerIdAndVehicleIdAndServiceTicketIdNotOrderByReceivedAtDesc(Integer customerId, Integer vehicleId, Integer serviceTicketId);
+
+    ServiceTicketJpa findServiceTicketJpasByTicketCode(String ticketCode);
+
+    List<ServiceTicketJpa> findAllByCustomerIdAndVehicleId(Integer customerId, Integer vehicleId);
+
+    List<ServiceTicketJpa> findAllByCustomerIdAndVehicleIdOrderByReceivedAtDesc(Integer customerId, Integer vehicleId);
+
+    List<ServiceTicketJpa> findAllByCustomerIdOrderByReceivedAtDesc(Integer customerId);
 }

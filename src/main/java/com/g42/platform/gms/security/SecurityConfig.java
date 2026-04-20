@@ -63,6 +63,7 @@ public class SecurityConfig {
                                 "/zalo/callback",
                                 "/zalo/login",
                                 "/home/**",
+                                "/api/webhook/**",
                                 "/error"
                         ).permitAll()
                         .anyRequest().authenticated()

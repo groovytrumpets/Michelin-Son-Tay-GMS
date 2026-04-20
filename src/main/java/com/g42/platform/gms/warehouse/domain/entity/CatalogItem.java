@@ -41,6 +41,17 @@ public class CatalogItem {
     private Integer workCategoryId;
     private String partNumber;
     private String barcode;
+    private String color;
+
+    public Integer getBrandId() {
+        if (brandId == null) return 0;
+        return brandId;
+    }
+
+    public Integer getProductLineId() {
+        if (productLineId == null) return 0;
+        return productLineId;
+    }
 
     public void validateBrandConsistency(Brand brand, ProductLine productLine) {
         if (!productLine.getBrandId().equals(brand.getBrandId())) {

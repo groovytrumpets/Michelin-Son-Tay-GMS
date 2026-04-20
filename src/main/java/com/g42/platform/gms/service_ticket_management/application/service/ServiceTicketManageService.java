@@ -8,8 +8,10 @@ import com.g42.platform.gms.auth.repository.CustomerProfileRepository;
 import com.g42.platform.gms.auth.repository.StaffProfileRepo;
 import com.g42.platform.gms.booking.customer.domain.entity.Booking;
 import com.g42.platform.gms.booking.customer.domain.repository.BookingRepository;
-import com.g42.platform.gms.catalog.repository.CatalogItemRepository;
+import com.g42.platform.gms.catalog.infrastructure.repository.CatalogItemRepository;
 import com.g42.platform.gms.common.service.ExcelService;
+import com.g42.platform.gms.billing.domain.entity.ServiceBill;
+import com.g42.platform.gms.billing.domain.repository.BillingRepository;
 import com.g42.platform.gms.estimation.api.internal.EstimateInternalApi;
 import com.g42.platform.gms.estimation.domain.entity.Estimate;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceQueueResponse;
@@ -32,6 +34,12 @@ import com.g42.platform.gms.service_ticket_management.api.mapper.ServiceTicketDe
 import com.g42.platform.gms.vehicle.api.internal.VehicleInternalApi;
 import com.g42.platform.gms.vehicle.entity.Vehicle;
 import com.g42.platform.gms.vehicle.repository.VehicleRepository;
+import com.g42.platform.gms.warehouse.domain.enums.AllocationStatus;
+import com.g42.platform.gms.warehouse.domain.enums.StockIssueStatus;
+import com.g42.platform.gms.warehouse.infrastructure.entity.StockAllocationJpa;
+import com.g42.platform.gms.warehouse.infrastructure.entity.StockIssueJpa;
+import com.g42.platform.gms.warehouse.infrastructure.repository.StockAllocationJpaRepo;
+import com.g42.platform.gms.warehouse.infrastructure.repository.StockIssueJpaRepo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -71,10 +79,13 @@ public class ServiceTicketManageService {
     private final ServiceTicketDetailMapper detailMapper;
     private final TicketAssignmentService ticketAssignmentService;
     private final ServiceTicketDtoMapper serviceTicketDtoMapper;
+    private final BillingRepository billingRepository;
     private final CustomerInternalApi customerInternalApi;
     private final VehicleInternalApi vehicleInternalApi;
     private final EstimateInternalApi estimateInternalApi;
     private final SafetyInspectionService safetyInspectionService;
+    private final StockIssueJpaRepo stockIssueJpaRepo;
+    private final StockAllocationJpaRepo stockAllocationJpaRepo;
 
     /**
      * Get paginated list of service tickets with filters.
@@ -141,7 +152,11 @@ public class ServiceTicketManageService {
         }
 
 
-        return listMapper.toManageListResponse(ticket, customer, vehicle, booking);
+        ServiceTicketListResponse response = listMapper.toManageListResponse(ticket, customer, vehicle, booking);
+        ServiceBill bill = billingRepository.getBillingByServiceTicket(ticket.getServiceTicketId());
+        response.setHasBill(bill != null);
+        response.setBillId(bill != null ? bill.getBillId() : null);
+        return response;
     }
 
     @Transactional(readOnly = true)
@@ -163,6 +178,7 @@ public class ServiceTicketManageService {
         response.setCheckInNotes(ticket.getCheckInNotes());
         response.setReceivedAt(ticket.getReceivedAt());
         response.setDeliveredAt(ticket.getDeliveredAt());
+        response.setEstimatedDeliveryAt(ticket.getEstimatedDeliveryAt());
         response.setCreatedAt(ticket.getCreatedAt());
         response.setUpdatedAt(ticket.getUpdatedAt());
         response.setImmutable(ticket.getImmutable());
@@ -227,6 +243,38 @@ public class ServiceTicketManageService {
                     response.setAdvisorName(a.getFullName());
                 });
 
+        // Warehouse status info for advisor UI gating
+        List<StockIssueJpa> stockIssues = stockIssueJpaRepo.findByServiceTicketId(ticket.getServiceTicketId());
+        boolean hasDraftStockIssue = stockIssues.stream()
+            .anyMatch(issue -> issue.getStatus() == StockIssueStatus.DRAFT);
+        boolean hasConfirmedStockIssue = stockIssues.stream()
+            .anyMatch(issue -> issue.getStatus() == StockIssueStatus.CONFIRMED);
+
+        List<StockAllocationJpa> allocations = stockAllocationJpaRepo.findByServiceTicketId(ticket.getServiceTicketId());
+        int reservedAllocationCount = (int) allocations.stream()
+            .filter(allocation -> allocation.getStatus() == AllocationStatus.RESERVED)
+            .count();
+        int pendingIssueRequestAllocationCount = (int) allocations.stream()
+            .filter(allocation -> allocation.getStatus() == AllocationStatus.RESERVED)
+            .filter(allocation -> allocation.getIssueId() == null)
+            .count();
+        int committedAllocationCount = (int) allocations.stream()
+            .filter(allocation -> allocation.getStatus() == AllocationStatus.COMMITTED)
+            .count();
+
+        response.setHasDraftStockIssue(hasDraftStockIssue);
+        response.setHasConfirmedStockIssue(hasConfirmedStockIssue);
+
+        ServiceBill bill = billingRepository.getBillingByServiceTicket(ticket.getServiceTicketId());
+        response.setHasBill(bill != null);
+        response.setBillId(bill != null ? bill.getBillId() : null);
+
+        response.setReservedAllocationCount(reservedAllocationCount);
+        response.setPendingIssueRequestAllocationCount(pendingIssueRequestAllocationCount);
+        response.setCanRequestIssueDraft(pendingIssueRequestAllocationCount > 0);
+        response.setCommittedAllocationCount(committedAllocationCount);
+        response.setWarehouseReadyForRepair(hasConfirmedStockIssue && committedAllocationCount > 0);
+
 
         log.info("Service ticket detail retrieved: {}", ticketCode);
         return response;
@@ -263,6 +311,37 @@ public class ServiceTicketManageService {
 
         // TODO: trigger ZNS feedback notification here
         log.info("Ticket {} → PAID", ticketCode);
+
+        return getServiceTicketDetail(ticketCode);
+    }
+
+    /**
+     * Advisor/lễ tân đặt thời gian hẹn lấy xe dự kiến.
+     * Lưu vào estimated_delivery_at.
+     */
+    @Transactional
+    public ServiceTicketDetailResponse setEstimatedDelivery(String ticketCode, LocalDateTime estimatedDeliveryAt) {
+        ServiceTicket ticket = serviceTicketRepo.findByTicketCode(ticketCode)
+                .orElseThrow(() -> new CheckInException("Không tìm thấy service ticket: " + ticketCode));
+        ticket.setEstimatedDeliveryAt(estimatedDeliveryAt);
+        ticket.setUpdatedAt(LocalDateTime.now());
+        serviceTicketRepo.save(ticket);
+        log.info("Ticket {} → estimatedDeliveryAt={}", ticketCode, estimatedDeliveryAt);
+        return getServiceTicketDetail(ticketCode);
+    }
+
+    /**
+     * Lễ tân xác nhận khách đã lấy xe thật sự.
+     * Update delivered_at = now().
+     */
+    @Transactional
+    public ServiceTicketDetailResponse confirmDelivered(String ticketCode) {
+        ServiceTicket ticket = serviceTicketRepo.findByTicketCode(ticketCode)
+                .orElseThrow(() -> new CheckInException("Không tìm thấy service ticket: " + ticketCode));
+        ticket.setDeliveredAt(LocalDateTime.now());
+        ticket.setUpdatedAt(LocalDateTime.now());
+        serviceTicketRepo.save(ticket);
+        log.info("Ticket {} → deliveredAt={}", ticketCode, ticket.getDeliveredAt());
         return getServiceTicketDetail(ticketCode);
     }
 
@@ -278,8 +357,8 @@ public class ServiceTicketManageService {
         ServiceTicket ticket = serviceTicketRepo.findByTicketCode(ticketCode)
                 .orElseThrow(() -> new CheckInException("Không tìm thấy service ticket: " + ticketCode));
 
-        if (ticket.getTicketStatus() != TicketStatus.DRAFT) {
-            throw new CheckInException("Lễ tân chỉ được đổi advisor khi phiếu đang DRAFT. Hiện tại: " + ticket.getTicketStatus());
+        if (ticket.getTicketStatus() != TicketStatus.CREATED) {
+            throw new CheckInException("Lễ tân chỉ được đổi advisor khi phiếu đang CREATED. Hiện tại: " + ticket.getTicketStatus());
         }
 
         // Delegate sang TicketAssignmentService — sẽ validate advisor PENDING bên trong
@@ -422,6 +501,21 @@ public class ServiceTicketManageService {
             }
         }
         return null;
+    }
+
+    public List<ServiceTicketListResponse> getServiceTicketsHistory(Integer customerId, Integer vehicleId) {
+        if (customerId == null || vehicleId == null) {
+            throw new AssignmentException("CustomerId or VehicleId are null!",AssignmentErrorCode.BAD_REQUEST);
+        }
+        List<ServiceTicket> serviceTickets = serviceTicketRepo.findByCustomerAndVehicle(customerId,vehicleId);
+        return serviceTickets.stream().map(serviceTicketDtoMapper::toDto).toList();
+    }
+    public List<ServiceTicketListResponse> getBookedHistory(Integer customerId) {
+        if (customerId == null) {
+            throw new AssignmentException("CustomerId or VehicleId are null!",AssignmentErrorCode.BAD_REQUEST);
+        }
+        List<ServiceTicket> serviceTickets = serviceTicketRepo.findByCustomerId(customerId);
+        return serviceTickets.stream().map(serviceTicketDtoMapper::toDto).toList();
     }
 }
 

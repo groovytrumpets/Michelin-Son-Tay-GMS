@@ -3,8 +3,8 @@ package com.g42.platform.gms.warehouse.api.controller;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.warehouse.api.dto.*;
-import com.g42.platform.gms.warehouse.app.service.CatalogItemService;
-import com.g42.platform.gms.warehouse.app.service.WarehouseService;
+import com.g42.platform.gms.warehouse.app.service.catalog.CatalogItemService;
+import com.g42.platform.gms.warehouse.app.service.catalog.WarehouseService;
 import com.g42.platform.gms.warehouse.domain.entity.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -77,6 +77,11 @@ public class WarehouseController {
     @PostMapping("/specs-attribute/create")
     public ResponseEntity<ApiResponse<SpecAttribute>> createSpecAttribute(@RequestBody SpecAttribute specAttribute) {
         return ResponseEntity.ok(ApiResponses.success(catalogItemService.saveSpecAttribute(specAttribute)));
+    }
+    @GetMapping("/warehouse/all")
+    public ResponseEntity<ApiResponse<List<WarehouseDto>>> getAllWarehouse() {
+        List<WarehouseDto> promotionCreateDtoList = catalogItemService.getAllWarehouse();
+        return ResponseEntity.ok(ApiResponses.success(promotionCreateDtoList));
     }
 
 }

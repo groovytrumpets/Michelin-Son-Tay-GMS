@@ -8,5 +8,6 @@ public enum WarehouseErrorCode {
     WRONG_ENUM,
     INVALID_CATEGORY,
     PARENT_REQUIRE,
-    WRONG_CODE
+    WRONG_CODE,
+    CATALOG_404
 }

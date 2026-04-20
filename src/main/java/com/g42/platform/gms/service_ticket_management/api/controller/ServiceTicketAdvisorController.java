@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 
 
 import java.time.LocalDate;
+import java.util.List;
 
 
 /**
@@ -99,10 +100,16 @@ public class ServiceTicketAdvisorController {
     }
 
 
-    /** PENDING/IN_PROGRESS → DRAFT: thêm dịch vụ mới vào báo giá. */
-    @PostMapping("/tickets/{ticketCode}/back-to-draft")
-    public ResponseEntity<ApiResponse<ServiceTicketDetailResponse>> backToDraft(@PathVariable String ticketCode) {
-        return ResponseEntity.ok(ApiResponses.success(advisorService.backToDraft(ticketCode)));
+    /** REPAIRING → ESTIMATED: khách yêu cầu thêm dịch vụ, advisor cập nhật báo giá. */
+    @PostMapping("/tickets/{ticketCode}/request-add-service")
+    public ResponseEntity<ApiResponse<ServiceTicketDetailResponse>> requestAddService(@PathVariable String ticketCode) {
+        return ResponseEntity.ok(ApiResponses.success(advisorService.requestAddService(ticketCode)));
+    }
+
+    /** INSPECTED → ESTIMATED: advisor lập báo giá sau khi kiểm tra xong. */
+    @PostMapping("/tickets/{ticketCode}/create-estimate")
+    public ResponseEntity<ApiResponse<ServiceTicketDetailResponse>> createEstimate(@PathVariable String ticketCode) {
+        return ResponseEntity.ok(ApiResponses.success(advisorService.createEstimate(ticketCode)));
     }
 
 
@@ -153,9 +160,33 @@ public class ServiceTicketAdvisorController {
         return ResponseEntity.ok(ApiResponses.success(
                 advisorService.changeTechnician(ticketCode, oldTechnicianId, newTechnicianId, note)));
     }
+    /**
+     * Advisor đặt thời gian hẹn lấy xe dự kiến cho khách.
+     * Lưu vào estimated_delivery_at.
+     */
+    @PutMapping("/tickets/{ticketCode}/estimated-delivery")
+    public ResponseEntity<ApiResponse<ServiceTicketDetailResponse>> setEstimatedDelivery(
+            @PathVariable String ticketCode,
+            @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME)
+            java.time.LocalDateTime estimatedDeliveryAt) {
+        return ResponseEntity.ok(ApiResponses.success(
+                manageService.setEstimatedDelivery(ticketCode, estimatedDeliveryAt)));
+    }
+
     @GetMapping("/recommend/{serviceTicketId}")
     public ResponseEntity<ApiResponse<String>> getRecommend(@PathVariable Integer serviceTicketId) {
         return ResponseEntity.ok(ApiResponses.success(manageService.getCustomerPerviousRecomment(serviceTicketId)));
+    }
+
+    @GetMapping("/tickets/history")
+    public ResponseEntity<ApiResponse<List<ServiceTicketListResponse>>> getTicketsHistory
+            (@RequestParam Integer customerId, @RequestParam Integer vehicleId) {
+        return ResponseEntity.ok(ApiResponses.success(manageService.getServiceTicketsHistory(customerId,vehicleId)));
+    }
+    @GetMapping("/booking/history")
+    public ResponseEntity<ApiResponse<List<ServiceTicketListResponse>>> getBookedHistory
+            (@RequestParam Integer customerId) {
+        return ResponseEntity.ok(ApiResponses.success(manageService.getBookedHistory(customerId)));
     }
 }
 

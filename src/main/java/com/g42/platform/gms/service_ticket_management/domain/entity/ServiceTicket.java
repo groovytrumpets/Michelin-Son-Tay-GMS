@@ -25,6 +25,7 @@ public class ServiceTicket {
     private String customerRequest;
     private String technicianNotes;
     private LocalDateTime deliveredAt;
+    private LocalDateTime estimatedDeliveryAt;
     private Boolean isDeleted;
     private String checkInNotes;
     private Boolean immutable;
@@ -48,7 +49,7 @@ public class ServiceTicket {
             createdAt = LocalDateTime.now();
         }
         if (ticketStatus == null) {
-            ticketStatus = TicketStatus.DRAFT;  // Start as DRAFT, complete check-in will change to CREATED
+            ticketStatus = TicketStatus.CREATED;
         }
         if (immutable == null) {
             immutable = false;

@@ -1,7 +1,7 @@
-package com.g42.platform.gms.catalog.api.controller;
+package com.g42.platform.gms.catalog.controller;
 
-import com.g42.platform.gms.catalog.api.dto.CatalogItemResponse;
-import com.g42.platform.gms.catalog.application.service.CatalogItemService;
+import com.g42.platform.gms.catalog.dto.CatalogItemResponse;
+import com.g42.platform.gms.catalog.service.CatalogItemService;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import lombok.RequiredArgsConstructor;

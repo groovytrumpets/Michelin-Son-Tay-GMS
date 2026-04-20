@@ -1,0 +1,53 @@
+package com.g42.platform.gms.warehouse.infrastructure.repository.impl;
+
+import com.g42.platform.gms.warehouse.domain.repository.WarehousePricingRepo;
+import com.g42.platform.gms.warehouse.infrastructure.entity.WarehousePricingJpa;
+import com.g42.platform.gms.warehouse.infrastructure.repository.WarehousePricingJpaRepo;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+@RequiredArgsConstructor
+public class WarehousePricingRepoImpl implements WarehousePricingRepo {
+
+    private final WarehousePricingJpaRepo jpaRepo;
+
+    @Override
+    public List<WarehousePricingJpa> findActiveByWarehouse(Integer warehouseId) {
+        return jpaRepo.findByWarehouseIdAndIsActiveTrueOrderByItemId(warehouseId);
+    }
+
+    @Override
+    public Page<WarehousePricingJpa> search(Integer warehouseId,
+                                            Boolean isActive,
+                                            String search,
+                                            Pageable pageable) {
+        String normalizedSearch = (search == null || search.isBlank()) ? null : search.trim();
+        return jpaRepo.search(warehouseId, isActive, normalizedSearch, pageable);
+    }
+
+    @Override
+    public Optional<WarehousePricingJpa> findActiveByWarehouseAndItem(Integer warehouseId, Integer itemId) {
+        return jpaRepo.findByWarehouseIdAndItemIdAndIsActiveTrue(warehouseId, itemId);
+    }
+
+    @Override
+    public Optional<WarehousePricingJpa> findById(Integer pricingId) {
+        return jpaRepo.findById(pricingId);
+    }
+
+    @Override
+    public Optional<WarehousePricingJpa> findByItemIdAndWarehouseId(Integer itemId, Integer warehouseId) {
+        return jpaRepo.findByWarehouseIdAndItemIdAndIsActiveTrue(warehouseId, itemId);
+    }
+
+    @Override
+    public WarehousePricingJpa save(WarehousePricingJpa pricing) {
+        return jpaRepo.save(pricing);
+    }
+}

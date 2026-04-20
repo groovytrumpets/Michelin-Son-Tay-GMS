@@ -45,6 +45,7 @@ public class ServiceTicketDetailResponse {
     private TicketStatus ticketStatus;
     private LocalDateTime receivedAt;
     private LocalDateTime deliveredAt;
+    private LocalDateTime estimatedDeliveryAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     
@@ -55,6 +56,17 @@ public class ServiceTicketDetailResponse {
     // Assignment info — advisor phụ trách
     private String advisorName;
     private Integer advisorId;
+
+    // Warehouse export/allocation status
+    private Boolean hasDraftStockIssue;
+    private Boolean hasConfirmedStockIssue;
+    private Boolean hasBill;
+    private Integer billId;
+    private Integer reservedAllocationCount;
+    private Integer pendingIssueRequestAllocationCount;
+    private Boolean canRequestIssueDraft;
+    private Integer committedAllocationCount;
+    private Boolean warehouseReadyForRepair;
     
     // Flags
     private Boolean immutable;

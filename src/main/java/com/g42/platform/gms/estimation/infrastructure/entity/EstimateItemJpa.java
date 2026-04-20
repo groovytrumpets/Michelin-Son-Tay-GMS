@@ -66,6 +66,11 @@ public class EstimateItemJpa {
     private BigDecimal taxAmount;
     @Column(name = "applied_tax_rate", precision = 5, scale = 2)
     private BigDecimal appliedTaxRate;
+    @Size(max = 50)
+    @Column(name = "unit", length = 50)
+    private String unit;
+    @Column(name = "revised_from_item_id")
+    private Integer revisedFromItemId;
 
 
 }

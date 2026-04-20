@@ -24,6 +24,7 @@ public class Service {
     private String mediaThumbnail;
     private String title;
     private ServiceStatus status;
+    private LocalDateTime createdAt;
     private List<ServiceMedia> media;
     private List<CatalogItem> catalogItems;
 

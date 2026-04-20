@@ -43,4 +43,8 @@ public interface ServiceTicketRepo {
     List<ServiceTicket> findBetween(LocalDateTime start, LocalDateTime end);
 
     ServiceTicket findPerviousCustomerService(Integer customerId, Integer serviceTicketId,Integer vehicleId);
+
+    List<ServiceTicket> findByCustomerAndVehicle(Integer customerId, Integer vehicleId);
+
+    List<ServiceTicket> findByCustomerId(Integer customerId);
 }
