@@ -22,4 +22,5 @@ public class StaffCreateDto {
     private List<RoleDto> roles;
     private String googleId;
     private String authProvider;
+    private String employeeNo; // Mã nhân viên trên Hikvision (dùng để sync điểm danh)
 }
