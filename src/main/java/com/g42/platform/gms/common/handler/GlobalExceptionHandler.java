@@ -12,6 +12,7 @@ import com.g42.platform.gms.estimation.domain.exception.EstimateException;
 import com.g42.platform.gms.manager.attendance.domain.exception.AttendanceException;
 import com.g42.platform.gms.manager.schedule.domain.exception.ScheduleException;
 import com.g42.platform.gms.marketing.service_catalog.domain.exception.ServiceException;
+import com.g42.platform.gms.marketing.service_combo.domain.exception.ComboItemException;
 import com.g42.platform.gms.service_ticket_management.domain.exception.AssignmentException;
 import com.g42.platform.gms.promotion.domain.exception.PromotionException;
 import com.g42.platform.gms.staff.attendance.domain.exception.StaffAttendanceException;
@@ -239,6 +240,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BillingException.class)
     public ResponseEntity<ApiResponse<?>> handleBookingException(BillingException ex) {
         System.err.println("Billing Error: " + ex.getCode() + " - " + ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponses.errorBill(ex.getCode().name(), ex.getMessage()));
+    }
+    @ExceptionHandler(BillingException.class)
+    public ResponseEntity<ApiResponse<?>> handleBookingException(ComboItemException ex) {
+        System.err.println("ComboItem Error: " + ex.getCode() + " - " + ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponses.errorBill(ex.getCode().name(), ex.getMessage()));
