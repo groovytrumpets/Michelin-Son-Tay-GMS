@@ -278,11 +278,18 @@ public class BookingService {
         booking.setDescription(description);
         booking.setIsGuest(false);
         booking.setStatus(BookingStatus.CONFIRMED);
+        booking.setEstimateId(request.getEstimateId());
 
         if (request.getSelectedServiceIds() != null && !request.getSelectedServiceIds().isEmpty()) {
             booking.setCatalogItemIds(request.getSelectedServiceIds());
         } else {
             booking.setCatalogItemIds(new ArrayList<>());
+        }
+        if (request.getEstimateId() != null) {
+            Estimate estimate = estimateInternalApi.findById(request.getEstimateId());
+            if (estimate == null) {
+                throw new BookingException("Khong tim thay bao gia voi estimateId: " + request.getEstimateId());
+            }
         }
         
         // === 3. VALIDATE THỜI GIAN (CHỈ CHECK KHÔNG ĐƯỢC QUÁ KHỨ) ===
