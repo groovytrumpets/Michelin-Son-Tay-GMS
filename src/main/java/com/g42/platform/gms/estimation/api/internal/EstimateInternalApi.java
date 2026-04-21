@@ -7,5 +7,7 @@ import java.util.List;
 public interface EstimateInternalApi {
     List<Estimate> findAllByServiceTicketId(List<Integer> ticketIds);
 
+    Estimate findLatestByServiceTicketId(Integer serviceTicketId);
+
     void updateBookingToRemindById(Integer reminderId, Integer bookingId);
 }

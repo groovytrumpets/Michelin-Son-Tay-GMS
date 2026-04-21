@@ -26,6 +26,16 @@ public class EstimateInternalApiImpl implements EstimateInternalApi {
     }
 
     @Override
+    public Estimate findLatestByServiceTicketId(Integer serviceTicketId) {
+        if (serviceTicketId == null) {
+            return null;
+        }
+        return estimateRepositoryJpa.findTopByServiceTicketIdOrderByVersionDesc(serviceTicketId)
+                .map(estimateJpaMapper::toDomain)
+                .orElse(null);
+    }
+
+    @Override
     public void updateBookingToRemindById(Integer reminderId, Integer bookingId) {
         ServiceReminderJpa sr = serviceRemindJpaRepo.findById(reminderId).orElse(null);
         if (sr==null||bookingId==null) {
