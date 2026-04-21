@@ -9,5 +9,9 @@ public interface EstimateInternalApi {
 
     Estimate findLatestByServiceTicketId(Integer serviceTicketId);
 
+    Estimate findById(Integer estimateId);
+
+    void linkEstimateToServiceTicket(Integer estimateId, Integer serviceTicketId);
+
     void updateBookingToRemindById(Integer reminderId, Integer bookingId);
 }

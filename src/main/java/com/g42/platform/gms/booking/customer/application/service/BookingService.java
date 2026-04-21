@@ -16,6 +16,7 @@ import com.g42.platform.gms.booking.customer.domain.repository.BookingRepository
 import com.g42.platform.gms.booking.customer.domain.repository.IpBlacklistRepository;
 import com.g42.platform.gms.catalog.infrastructure.repository.CatalogItemRepository;
 import com.g42.platform.gms.estimation.api.internal.EstimateInternalApi;
+import com.g42.platform.gms.estimation.domain.entity.Estimate;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -152,6 +153,8 @@ public class BookingService {
         } else {
             booking.setCatalogItemIds(new ArrayList<>());
         }
+
+
 
         // === 5. VALIDATE THỜI GIAN (PHẢI TRƯỚC ÍT NHẤT 2 GIỜ) ===
         LocalDateTime now = LocalDateTime.now();
@@ -328,7 +331,7 @@ public class BookingService {
                 savedBooking.getBookingId(), savedBooking.getBookingCode(), customerId);
         //todo:update remind if exist
         if (request.getReminderId()!=null) {
-            estimateInternalApi.updateBookingToRemindById(request.getReminderId(),booking.getBookingId());
+            estimateInternalApi.updateBookingToRemindById(request.getReminderId(), savedBooking.getBookingId());
         }
         return savedBooking;
     }

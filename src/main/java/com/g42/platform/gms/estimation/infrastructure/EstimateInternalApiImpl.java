@@ -2,6 +2,7 @@ package com.g42.platform.gms.estimation.infrastructure;
 
 import com.g42.platform.gms.estimation.api.internal.EstimateInternalApi;
 import com.g42.platform.gms.estimation.domain.entity.Estimate;
+import com.g42.platform.gms.estimation.infrastructure.entity.EstimateJpa;
 import com.g42.platform.gms.estimation.infrastructure.entity.ServiceReminderJpa;
 import com.g42.platform.gms.estimation.infrastructure.mapper.EstimateJpaMapper;
 import com.g42.platform.gms.estimation.infrastructure.repository.EstimateRepositoryJpa;
@@ -33,6 +34,29 @@ public class EstimateInternalApiImpl implements EstimateInternalApi {
         return estimateRepositoryJpa.findTopByServiceTicketIdOrderByVersionDesc(serviceTicketId)
                 .map(estimateJpaMapper::toDomain)
                 .orElse(null);
+    }
+
+    @Override
+    public Estimate findById(Integer estimateId) {
+        if (estimateId == null) {
+            return null;
+        }
+        return estimateRepositoryJpa.findById(estimateId)
+                .map(estimateJpaMapper::toDomain)
+                .orElse(null);
+    }
+
+    @Override
+    public void linkEstimateToServiceTicket(Integer estimateId, Integer serviceTicketId) {
+        if (estimateId == null || serviceTicketId == null) {
+            return;
+        }
+        EstimateJpa estimateJpa = estimateRepositoryJpa.findById(estimateId).orElse(null);
+        if (estimateJpa == null) {
+            return;
+        }
+        estimateJpa.setServiceTicketId(serviceTicketId);
+        estimateRepositoryJpa.save(estimateJpa);
     }
 
     @Override
