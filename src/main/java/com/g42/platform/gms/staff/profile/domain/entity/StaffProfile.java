@@ -21,4 +21,5 @@ public class StaffProfile {
     private String avatar;
     private java.sql.Timestamp createdAt;
     private List<Role> roles;
+    private String employeeNo;
 }
