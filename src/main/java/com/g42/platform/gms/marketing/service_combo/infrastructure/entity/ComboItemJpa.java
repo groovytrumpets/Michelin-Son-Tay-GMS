@@ -21,7 +21,4 @@ public class ComboItemJpa {
 
     @Column(name = "quantity")
     private Integer quantity = 1;
-
-    @Column(name = "included_item_id", insertable = false, updatable = false)
-    private Integer includedItem;
 }

@@ -19,19 +19,19 @@ public class ComboItemController {
     @Autowired
     private ComboItemService comboItemService;
     @GetMapping("/{catalogId}")
-    public ResponseEntity<ApiResponse<List<ComboResDto>>> getComboByCatalogId(@PathVariable String catalogId){
+    public ResponseEntity<ApiResponse<List<ComboResDto>>> getComboByCatalogId(@PathVariable Integer catalogId){
     List<ComboResDto> apiResponse = comboItemService.getListItemByCombo(catalogId);
         return ResponseEntity.ok(ApiResponses.success(apiResponse));
     }
-    @PostMapping("/create")
-    public ResponseEntity<ApiResponse<List<ComboCreateDto>>> createComboByCatalogId(@RequestBody List<ComboCreateDto> comboCreateDtos){
-        List<ComboCreateDto> apiResponse = comboItemService.createListItemByCatalogId(comboCreateDtos);
+    @PostMapping("/{catalogId}")
+    public ResponseEntity<ApiResponse<List<ComboCreateDto>>> createComboByCatalogId(@RequestBody List<ComboCreateDto> comboCreateDtos,@PathVariable Integer catalogId){
+        List<ComboCreateDto> apiResponse = comboItemService.createListItemByCatalogId(comboCreateDtos,catalogId);
         return ResponseEntity.ok(ApiResponses.success(apiResponse));
     }
-//    @PutMapping("/update/{catalogId}")
-//    public ResponseEntity<ApiResponse<List<ComboCreateDto>>> updateComboByCatalogId(@PathVariable String catalogId,@RequestBody List<ComboCreateDto> comboCreateDtos){
-//        List<ComboCreateDto> apiResponse = comboItemService.updateListItemByCatalogId(comboCreateDtos,catalogId);
-//        return ResponseEntity.ok(ApiResponses.success(apiResponse));
-//    }
+    @PutMapping("/{catalogId}")
+    public ResponseEntity<ApiResponse<List<ComboResDto>>> updateComboByCatalogId(@PathVariable Integer catalogId,@RequestBody List<ComboResDto> comboResDto){
+        List<ComboResDto> apiResponse = comboItemService.updateListItemByCatalogId(comboResDto,catalogId);
+        return ResponseEntity.ok(ApiResponses.success(apiResponse));
+    }
 
 }

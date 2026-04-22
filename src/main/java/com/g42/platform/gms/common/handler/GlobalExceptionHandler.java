@@ -244,8 +244,8 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponses.errorBill(ex.getCode().name(), ex.getMessage()));
     }
-    @ExceptionHandler(BillingException.class)
-    public ResponseEntity<ApiResponse<?>> handleBookingException(ComboItemException ex) {
+    @ExceptionHandler(ComboItemException.class)
+    public ResponseEntity<ApiResponse<?>> handleComboException(ComboItemException ex) {
         System.err.println("ComboItem Error: " + ex.getCode() + " - " + ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)

@@ -24,8 +24,9 @@ public class ComboItemRepoImp implements ComboItemRepo {
     }
 
     @Override
-    public List<ComboItem> getListItemByCatalog(String catalogId) {
-        return null;
+    public List<ComboItem> getListItemByCatalog(Integer catalogId) {
+        List<ComboItemJpa> comboItemJpas = comboItemRepoJpa.findAllByComboId(catalogId);
+        return comboItemRepoJpa.saveAll(comboItemJpas).stream().map(comboItemJpaMapper::toDomain).toList();
     }
 
     @Override
@@ -33,5 +34,11 @@ public class ComboItemRepoImp implements ComboItemRepo {
         List<ComboItemJpa> comboItemJpas = comboCreateDtos.stream().map(comboItemJpaMapper::toJpa).toList();
         return comboItemRepoJpa.saveAll(comboItemJpas).stream().map(comboItemJpaMapper::toDomain).toList();
 
+    }
+
+    @Override
+    public void deleteAll(List<ComboItem> itemsToDelete) {
+        List<ComboItemJpa> comboItemJpas = itemsToDelete.stream().map(comboItemJpaMapper::toJpa).toList();
+        comboItemRepoJpa.deleteAll(comboItemJpas);
     }
 }

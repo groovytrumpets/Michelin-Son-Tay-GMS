@@ -8,8 +8,10 @@ import java.util.List;
 
 @Repository
 public interface ComboItemRepo {
-    List<ComboItem> getListItemByCatalog(String catalogId);
+    List<ComboItem> getListItemByCatalog(Integer catalogId);
 
 
     List<ComboItem> saveListOfComboItems(List<ComboItem> apiResponse);
+
+    void deleteAll(List<ComboItem> itemsToDelete);
 }

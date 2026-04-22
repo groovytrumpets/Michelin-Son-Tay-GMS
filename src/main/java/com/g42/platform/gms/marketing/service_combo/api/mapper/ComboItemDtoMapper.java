@@ -13,4 +13,8 @@ public interface ComboItemDtoMapper {
     ComboItem toDomain(ComboCreateDto comboCreateDto);
 
     ComboCreateDto toCreateDto(ComboItem comboItem);
+
+    ComboItem toDomainRes(ComboResDto comboResDto);
+
+    ComboItem fromRestDto(ComboResDto updateItem);
 }
