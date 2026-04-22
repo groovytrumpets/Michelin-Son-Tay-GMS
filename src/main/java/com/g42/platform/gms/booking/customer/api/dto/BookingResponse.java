@@ -23,6 +23,7 @@ public class BookingResponse {
     private List<ServiceItemDto> services;
     private Integer totalEstimatedTime;
     private Integer queueOrder;
+    private Integer estimateId;
 
     // Progress tracking
     private List<ProgressStep> progressSteps;

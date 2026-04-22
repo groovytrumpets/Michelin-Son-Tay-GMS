@@ -21,6 +21,7 @@ public class ServiceTicketDetailResponse {
     
     private Integer serviceTicketId;
     private String ticketCode;
+    private Integer estimateId;
     
     // Customer info
     private CustomerInfo customer;

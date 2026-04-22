@@ -23,7 +23,8 @@ public class BookingLookupResponse {
     private LocalTime scheduledTime;
     private String serviceCategory;
     private String description;
-    
+    private Integer estimateId;
+
     // Customer information
     private Integer customerId;
     private String customerName;

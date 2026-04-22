@@ -22,8 +22,8 @@
         @Column(name = "estimate_id", nullable = false)
         private Integer id;
 
-        @NotNull
-        @Column(name = "service_ticket_id", nullable = false)
+
+        @Column(name = "service_ticket_id", nullable = true)
         private Integer serviceTicketId;
         @Enumerated(EnumType.STRING)
         @NotNull
