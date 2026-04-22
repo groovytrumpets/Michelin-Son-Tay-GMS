@@ -173,6 +173,10 @@ public class ServiceTicketManageService {
 
         response.setServiceTicketId(ticket.getServiceTicketId());
         response.setTicketCode(ticket.getTicketCode());
+        Estimate latestEstimate = estimateInternalApi.findLatestByServiceTicketId(ticket.getServiceTicketId());
+        if (latestEstimate != null) {
+            response.setEstimateId(latestEstimate.getId());
+        }
         response.setTicketStatus(ticket.getTicketStatus());
         response.setCustomerRequest(ticket.getCustomerRequest());
         response.setCheckInNotes(ticket.getCheckInNotes());
