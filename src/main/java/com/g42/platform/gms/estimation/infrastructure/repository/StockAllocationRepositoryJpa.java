@@ -19,6 +19,7 @@ public interface StockAllocationRepositoryJpa extends JpaRepository<StockAllocat
                 set s.status='RELEASED'
                 where s.estimateId = :revisedFromId
                     and s.status = 'RESERVED'
+                            and s.status!='COMMITTED'
         """)
     void updateReleasedEstimateById(@Param("revisedFromId")Integer revisedFromId);
 
