@@ -42,7 +42,7 @@ public class StockAllocationService {
         if (newEstimate.getRevisedFromId() != null) {
             List<StockAllocation> oldAllocations = new ArrayList<>();
             while (currentRevIdToCheck !=null){
-                List<StockAllocation> oldAllocations2 = stockAllocationRepository.findByEstimateId(newEstimate.getRevisedFromId());
+                List<StockAllocation> oldAllocations2 = stockAllocationRepository.findByEstimateId(currentRevIdToCheck);
                 oldAllocations.addAll(oldAllocations2);
                 Estimate prevEstimate = estimateService.findById(currentRevIdToCheck);
                 currentRevIdToCheck = prevEstimate.getRevisedFromId();

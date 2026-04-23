@@ -6,8 +6,10 @@ import com.g42.platform.gms.estimation.domain.entity.EstimateItem;
 import com.g42.platform.gms.estimation.domain.entity.StockAllocation;
 import com.g42.platform.gms.estimation.domain.repository.StockAllocationRepository;
 import com.g42.platform.gms.estimation.infrastructure.entity.EstimateItemJpa;
+import com.g42.platform.gms.estimation.infrastructure.entity.EstimateJpa;
 import com.g42.platform.gms.estimation.infrastructure.entity.StockAllocationJpa;
 import com.g42.platform.gms.estimation.infrastructure.mapper.StockAllocationJpaMapper;
+import com.g42.platform.gms.estimation.infrastructure.repository.EstimateRepositoryJpa;
 import com.g42.platform.gms.estimation.infrastructure.repository.StockAllocationRepositoryJpa;
 import org.springframework.stereotype.Service;
 
@@ -20,12 +22,14 @@ public class StockAllocationRepoImpl implements StockAllocationRepository {
     private final StockAllocationRepositoryJpa stockAllocationRepositoryJpa;
     private final EstimateItemJpaRepository estimateItemJpaRepository;
     private final EstimateDtoMapper estimateDtoMapper;
+    private final EstimateRepositoryJpa estimateRepositoryJpa;
 
-    public StockAllocationRepoImpl(StockAllocationJpaMapper stockAllocationJpaMapper, StockAllocationRepositoryJpa stockAllocationRepositoryJpa, EstimateItemJpaRepository estimateItemJpaRepository, EstimateDtoMapper estimateDtoMapper) {
+    public StockAllocationRepoImpl(StockAllocationJpaMapper stockAllocationJpaMapper, StockAllocationRepositoryJpa stockAllocationRepositoryJpa, EstimateItemJpaRepository estimateItemJpaRepository, EstimateDtoMapper estimateDtoMapper, EstimateRepositoryJpa estimateRepositoryJpa) {
         this.stockAllocationJpaMapper = stockAllocationJpaMapper;
         this.stockAllocationRepositoryJpa = stockAllocationRepositoryJpa;
         this.estimateItemJpaRepository = estimateItemJpaRepository;
         this.estimateDtoMapper = estimateDtoMapper;
+        this.estimateRepositoryJpa = estimateRepositoryJpa;
     }
 
     @Override
@@ -91,32 +95,42 @@ public class StockAllocationRepoImpl implements StockAllocationRepository {
 
     @Override
     public List<EstimateViaAllocationDto> findEstimateAndAllocationById(Integer estimateId) {
-        List<EstimateItemJpa> allItems = estimateItemJpaRepository.findByEstimateId(estimateId);
-        List<StockAllocationJpa> allAllocations = stockAllocationRepositoryJpa.findAllByEstimateId(estimateId);
+        // 1. Lấy thông tin Estimate hiện tại để lấy được serviceTicketId
+        EstimateJpa currentEstimate = estimateRepositoryJpa.findById(estimateId).orElseThrow();
 
-        // Chỉ lấy active items để trả về frontend
-        List<EstimateItemJpa> activeItems = allItems.stream()
-                .filter(i -> Boolean.FALSE.equals(i.getIsRemoved()))
+        // 2. Lấy TOÀN BỘ EstimateItem của TICKET NÀY (để vòng lặp while không bị gãy đoạn)
+        List<EstimateItemJpa> allItemsInTicket = estimateItemJpaRepository.findByServiceTicketId(currentEstimate.getServiceTicketId());
+
+        // 3. Lấy TOÀN BỘ StockAllocation của TICKET NÀY (Tầm nhìn bao quát cả V1, V2, V3...)
+        List<StockAllocationJpa> allAllocationsInTicket = stockAllocationRepositoryJpa.findAllByServiceTicketId(currentEstimate.getServiceTicketId());
+
+        // 4. Lọc ra danh sách item CHỈ CỦA VERSION HIỆN TẠI để hiển thị
+        List<EstimateItemJpa> activeItemsInCurrentVersion = allItemsInTicket.stream()
+//                .filter(i -> i.getEstimateId().equals(estimateId)) // Chỉ lấy của version này
+                .filter(i -> Boolean.FALSE.equals(i.getIsRemoved())) // Chỉ lấy item chưa bị xóa
                 .toList();
 
-        // Map allocation theo estimateItemId để lookup O(1)
-        Map<Integer, StockAllocationJpa> allocationByItemId = allAllocations.stream()
+        // 5. Xây dựng 2 Map tra cứu TOÀN CỤC (Global Lookup Maps)
+        Map<Integer, StockAllocationJpa> globalAllocationMap = allAllocationsInTicket.stream()
                 .collect(Collectors.toMap(
                         StockAllocationJpa::getEstimateItemId,
                         a -> a,
-                        (a1, a2) -> a1
+                        (a1, a2) -> a1 // Lấy bản đầu tiên nếu trùng
                 ));
-        Map<Integer, EstimateItemJpa> itemById = allItems.stream()
+
+        Map<Integer, EstimateItemJpa> globalItemMap = allItemsInTicket.stream()
                 .collect(Collectors.toMap(EstimateItemJpa::getId, i -> i));
 
-        return activeItems.stream().map(activeItem -> {
+        // 6. Map dữ liệu
+        return activeItemsInCurrentVersion.stream().map(activeItem -> {
             EstimateViaAllocationDto dto = new EstimateViaAllocationDto();
             dto.setEstimateItemDto(estimateDtoMapper.toEstimateItemDtoJpa(activeItem));
 
+            // Sử dụng Map Toàn cục để Resolve
             StockAllocationJpa allocation = resolveAllocation(
                     activeItem,
-                    allocationByItemId,
-                    itemById
+                    globalAllocationMap, // Truyền Map toàn cục vào
+                    globalItemMap        // Truyền Map toàn cục vào
             );
 
             dto.setStockAllocationDto(allocation != null
