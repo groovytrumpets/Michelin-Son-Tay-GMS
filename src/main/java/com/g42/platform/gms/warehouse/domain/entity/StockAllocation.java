@@ -16,7 +16,6 @@ public class StockAllocation {
     private String itemName;
     private Integer quantity;
     private AllocationStatus status;
-    private Integer issueId;
     private Integer createdBy;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
