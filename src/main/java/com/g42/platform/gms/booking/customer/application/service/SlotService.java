@@ -230,25 +230,25 @@ public class SlotService {
                     continue;
                 }
 
-                boolean available = isSlotAvailable(date, slotTime, estimatedDurationMinutes, null);
+                List<SlotReservation> reservations = reservationRepository.findByDateAndTime(date, slotTime);
+                int count = reservations.size();
+                int capacity = slotConfig.getCapacity();
+                int remainingCapacity = capacity - count;
+                boolean overCapacity = count >= capacity;
 
-                if (available) {
-                    List<SlotReservation> reservations = reservationRepository.findByDateAndTime(date, slotTime);
-                    int count = reservations.size();
-                    int remainingCapacity = slotConfig.getCapacity() - count;
+                TimeSlotResponse dto = new TimeSlotResponse();
+                dto.setSlotId(slotConfig.getSlotId());
+                dto.setStartTime(slotTime);
+                dto.setPeriod(slotConfig.getPeriod());
+                dto.setCapacity(capacity);
+                dto.setIsActive(slotConfig.getIsActive());
+                dto.setCurrentBookingCount(count);
+                dto.setRemainingCapacity(Math.max(0, remainingCapacity));
+                dto.setIsAvailable(!overCapacity);
+                dto.setIsOverCapacity(overCapacity);
+                dto.setStatus(overCapacity ? "Đã đầy (vượt capacity)" : "Còn trống");
 
-                    TimeSlotResponse dto = new TimeSlotResponse();
-                    dto.setSlotId(slotConfig.getSlotId());
-                    dto.setStartTime(slotTime);
-                    dto.setPeriod(slotConfig.getPeriod());
-                    dto.setCapacity(slotConfig.getCapacity());
-                    dto.setIsActive(slotConfig.getIsActive());
-                    dto.setRemainingCapacity(remainingCapacity);
-                    dto.setIsAvailable(true);
-                    dto.setStatus("Còn trống");
-
-                    result.add(dto);
-                }
+                result.add(dto);
             }
 
             return result;
