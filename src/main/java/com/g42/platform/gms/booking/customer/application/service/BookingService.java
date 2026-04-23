@@ -302,8 +302,11 @@ public class BookingService {
         }
         
         // === 4. CHECK SLOT AVAILABILITY ===
+        // Staff direct create không bị chặn bởi capacity - có thể vượt quá sức chứa
         int estimatedDuration = calculateEstimatedDuration(booking.getCatalogItemIds());
         
+        // Comment out kiểm tra capacity cho staffDirectCreate
+        /*
         boolean slotAvailable = slotService.isSlotAvailable(
                 booking.getScheduledDate(),
                 booking.getScheduledTime(),
@@ -313,6 +316,7 @@ public class BookingService {
         if (!slotAvailable) {
             throw new BookingException("Khung giờ này đã đầy, vui lòng chọn giờ khác.");
         }
+        */
         
         // === 5. GENERATE BOOKING CODE (MST_XXXXXX) ===
         try {
