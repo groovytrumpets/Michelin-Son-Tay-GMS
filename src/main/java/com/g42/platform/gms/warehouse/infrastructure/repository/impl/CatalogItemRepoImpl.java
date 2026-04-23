@@ -172,7 +172,7 @@ public class CatalogItemRepoImpl implements CatalogItemRepo {
     }
     @Override
     public Integer findCategoryCode(String categoryCode) {
-        WorkCategoryJpaEntity workCategoryJpaEntity = itemCategoryJpaRepo.findByCategoryCode(categoryCode);
+        WorkCategoryJpaEntity workCategoryJpaEntity = itemCategoryJpaRepo.findFirstByCategoryCode(categoryCode);
         if (workCategoryJpaEntity == null) {
             return null;
         }

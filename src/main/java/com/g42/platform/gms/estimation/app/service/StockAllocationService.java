@@ -16,9 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -34,80 +32,90 @@ public class StockAllocationService {
 
     @Transactional
     public List<StockAllocationDto> createStockAllocation(Integer estimateId, Integer staffId) {
-        Estimate estimate = estimateService.findById(estimateId);
-        Map<String, Integer> committedByItemWarehouse = new java.util.HashMap<>();
-
-        if (estimate.getRevisedFromId() != null) {
-            List<StockAllocation> oldAllocations = stockAllocationRepository.findByEstimateId(estimate.getRevisedFromId());
-
-            // Keep track of quantities already committed in previous estimate.
-            for (StockAllocation oldAlloc : oldAllocations) {
-                if ("COMMITTED".equals(oldAlloc.getStatus())) {
-                    String key = allocKey(oldAlloc.getWarehouseId(), oldAlloc.getItemId());
-                    committedByItemWarehouse.merge(key, oldAlloc.getQuantity(), Integer::sum);
-                }
-            }
-
-            for (StockAllocation oldAlloc : oldAllocations) {
-                if ("RESERVED".equals(oldAlloc.getStatus())) {
-                    inventoryService.decreaseReservedQuantity(
-                            oldAlloc.getItemId(),
-                            oldAlloc.getWarehouseId(),
-                            oldAlloc.getQuantity()
-                    );
-                }
-            }
-
-            // Release only old RESERVED rows; keep COMMITTED history intact.
-            stockAllocationRepository.updateReleasedOldEstimate(estimate.getRevisedFromId());
-        }
-
-        List<EstimateItem> estimateItems = estimateItemRepository.findByEstimateId(estimateId)
-                .stream()
-                .filter(i -> i.getItemId() != null)
-                .filter(i -> i.getWarehouseId() != null)
-                .filter(i -> i.getQuantity() != null && i.getQuantity() > 0)
-                .filter(i -> !Boolean.TRUE.equals(i.getIsRemoved()))
-                .filter(i -> Boolean.TRUE.equals(i.getIsChecked()))
-                .toList();
-
+        Estimate newEstimate = estimateService.findById(estimateId);
         List<StockAllocation> stockAllocations = new ArrayList<>();
-        for (EstimateItem estimateItem : estimateItems) {
-            String key = allocKey(estimateItem.getWarehouseId(), estimateItem.getItemId());
-            int alreadyCommitted = committedByItemWarehouse.getOrDefault(key, 0);
-            int toReserve = Math.max(estimateItem.getQuantity() - alreadyCommitted, 0);
+        Integer currentRevIdToCheck = newEstimate.getRevisedFromId();
 
-            if (toReserve > 0) {
-                // Check if allocation already exists in current estimate for same warehouse + item
-                StockAllocation existing = stockAllocationRepository.findByEstimateIdAndWarehouseIdAndItemIdAndStatus(
-                        estimateId, 
-                        estimateItem.getWarehouseId(), 
-                        estimateItem.getItemId(), 
-                        "RESERVED"
-                );
-                
-                if (existing != null) {
-                    // Update existing allocation with new quantity
-                    int quantityDiff = toReserve - existing.getQuantity();
-                    existing.setQuantity(toReserve);
-                    stockAllocationRepository.save(existing);
-                    
-                    if (quantityDiff != 0) {
-                        inventoryService.updateReservedQuantityByDelta(
-                                existing.getItemId(),
-                                existing.getWarehouseId(),
-                                quantityDiff
-                        );
-                    }
-                    stockAllocations.add(existing);
-                } else {
-                    // Create new allocation
+        // =========================================================================
+        // TRƯỜNG HỢP 1: TẠO VERSION MỚI TỪ VERSION CŨ (REVISION)
+        // =========================================================================
+        if (newEstimate.getRevisedFromId() != null) {
+            List<StockAllocation> oldAllocations = new ArrayList<>();
+            while (currentRevIdToCheck !=null){
+                List<StockAllocation> oldAllocations2 = stockAllocationRepository.findByEstimateId(newEstimate.getRevisedFromId());
+                oldAllocations.addAll(oldAllocations2);
+                Estimate prevEstimate = estimateService.findById(currentRevIdToCheck);
+                currentRevIdToCheck = prevEstimate.getRevisedFromId();
+            }
+
+            // 1. Lấy toàn bộ Allocation cũ của Ver 1 (Cả COMMITTED)
+
+            List<EstimateItem> oldEstimateItems = estimateItemRepository.findByEstimateId(newEstimate.getRevisedFromId());
+            System.out.println("Debug");
+            for (StockAllocation oldAllocation : oldAllocations) {
+                System.out.println("estimate: "+oldAllocation.getEstimateId());
+                System.out.println("estimateItemID :"+oldAllocation.getEstimateItemId());
+                System.out.println("item: "+oldAllocation.getItemId());
+                System.out.println("warehouse :"+oldAllocation.getWarehouseId());
+
+            }
+
+            // 2. Lấy các EstimateItem của Ver 2
+            List<EstimateItem> newEstimateItems = estimateItemRepository.findByEstimateId(estimateId);
+            for (EstimateItem newEstimate2 : newEstimateItems) {
+                System.out.println("estimate2: "+newEstimate2.getEstimateId());
+                System.out.println("estimateItemID2 :"+newEstimate2.getId());
+                System.out.println("item2: "+newEstimate2.getItemId());
+                System.out.println("warehouse2 :"+newEstimate2.getWarehouseId());
+                System.out.println("getRevisedFromItemId :"+newEstimate2.getRevisedFromItemId());
+
+            }
+            //check by estimateId compare
+            Set<Integer> existingItemIds = oldAllocations.stream()
+                    .map(StockAllocation::getEstimateItemId)
+                    .collect(Collectors.toSet());
+            List<EstimateItem> brandNewItems = newEstimateItems.stream()
+                    .filter(newItem -> newItem.getRevisedFromItemId() == null)
+                    .toList();
+            for (EstimateItem createItem : brandNewItems) {
+                System.out.println("estimate cr: "+createItem.getEstimateId());
+                System.out.println("estimateItemID cr :"+createItem.getId());
+                System.out.println("item cr: "+createItem.getItemId());
+                System.out.println("warehouse cr :"+createItem.getWarehouseId());
+                System.out.println("getRevisedFromItemId cr:"+createItem.getRevisedFromItemId());
+
+            }
+            for (EstimateItem newItem : brandNewItems) {
+                if (newItem.getRevisedFromItemId()==null || !existingItemIds.contains(newItem.getRevisedFromItemId())) {
+                System.out.println("Đây là món đồ mới tinh: " + newItem.getItemName());
+                StockAllocation stockAllocation = new StockAllocation();
+                stockAllocation.setServiceTicketId(newEstimate.getServiceTicketId());
+                stockAllocation.setEstimateItemId(newItem.getId());
+                stockAllocation.setWarehouseId(newItem.getWarehouseId());
+                stockAllocation.setItemId(newItem.getItemId());
+                stockAllocation.setQuantity(newItem.getQuantity());
+                stockAllocation.setEstimateId(estimateId);
+                stockAllocation.setStatus("RESERVED");
+                stockAllocation.setCreatedBy(staffId);
+                stockAllocation.setCreatedAt(Instant.now());
+                StockAllocation savedStockAllocation = stockAllocationRepository.createNewAllocation(stockAllocation);
+                stockAllocations.add(savedStockAllocation);
+                }
+            }
+        }
+        // =========================================================================
+        // TRƯỜNG HỢP 2: TẠO BÁO GIÁ LẦN ĐẦU TIÊN (Không có Version cũ)
+        // =========================================================================
+        else {
+            List<EstimateItem> estimateItems = estimateItemRepository.findByEstimateId(estimateId);
+            for (EstimateItem estimateItem : estimateItems) {
+                if (estimateItem.getItemId() != null && estimateItem.getWarehouseId() != null) {
                     StockAllocation stockAllocation = new StockAllocation();
-                    stockAllocation.setServiceTicketId(estimate.getServiceTicketId());
+                    stockAllocation.setServiceTicketId(newEstimate.getServiceTicketId());
                     stockAllocation.setEstimateItemId(estimateItem.getId());
                     stockAllocation.setWarehouseId(estimateItem.getWarehouseId());
                     stockAllocation.setItemId(estimateItem.getItemId());
-                    stockAllocation.setQuantity(toReserve);
+                    stockAllocation.setQuantity(estimateItem.getQuantity());
                     stockAllocation.setEstimateId(estimateId);
                     stockAllocation.setStatus("RESERVED");
                     stockAllocation.setCreatedBy(staffId);
@@ -116,6 +124,7 @@ public class StockAllocationService {
                     StockAllocation savedStockAllocation = stockAllocationRepository.createNewAllocation(stockAllocation);
                     stockAllocations.add(savedStockAllocation);
 
+                    // Vì là mới tinh nên chắc chắn phải giữ kho
                     inventoryService.increaseReservedQuantity(
                             savedStockAllocation.getItemId(),
                             savedStockAllocation.getWarehouseId(),
@@ -124,11 +133,8 @@ public class StockAllocationService {
                 }
             }
         }
-        return stockAllocations.stream().map(stockAllocationDtoMapper::toDto).toList();
-    }
 
-    private String allocKey(Integer warehouseId, Integer itemId) {
-        return warehouseId + ":" + itemId;
+        return stockAllocations.stream().map(stockAllocationDtoMapper::toDto).toList();
     }
     @Transactional
     public List<StockAllocationDto> updateStockAllocation(Integer estimateId, Integer staffId, List<StockAllocationDto> stockAllocationDtos) {
