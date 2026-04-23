@@ -8,6 +8,7 @@ import java.math.BigDecimal;
 public class StockEntryItemResponse {
     private Integer entryItemId;
     private Integer itemId;
+    private String itemName;
     private Integer quantity;
     private BigDecimal importPrice;
     private BigDecimal markupMultiplier;

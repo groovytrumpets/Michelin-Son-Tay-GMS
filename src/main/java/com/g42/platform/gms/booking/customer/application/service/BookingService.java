@@ -16,6 +16,8 @@ import com.g42.platform.gms.booking.customer.domain.repository.BookingRepository
 import com.g42.platform.gms.booking.customer.domain.repository.IpBlacklistRepository;
 import com.g42.platform.gms.catalog.infrastructure.repository.CatalogItemRepository;
 import com.g42.platform.gms.estimation.api.internal.EstimateInternalApi;
+import com.g42.platform.gms.estimation.domain.entity.Estimate;
+import com.g42.platform.gms.notification.infrastructure.ZaloNotificationSender;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -64,6 +66,7 @@ public class BookingService {
     /** Giới hạn số lần đặt lịch (100 lần/giờ/customer - giá trị cao để tránh block nhầm) */
     private static final int MAX_REQUESTS_PER_CUSTOMER_PER_HOUR = 100;
 
+    private final ZaloNotificationSender zaloNotificationSender;
     // === DEPENDENCIES - Các dependency injection ===
     
     private final BookingRepository bookingRepository;
@@ -153,6 +156,8 @@ public class BookingService {
             booking.setCatalogItemIds(new ArrayList<>());
         }
 
+
+
         // === 5. VALIDATE THỜI GIAN (PHẢI TRƯỚC ÍT NHẤT 2 GIỜ) ===
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime scheduledDateTime = LocalDateTime.of(
@@ -203,10 +208,65 @@ public class BookingService {
         // === 9. RESERVE SLOT CHO BOOKING NÀY ===
         slotService.reserveForBooking(savedBooking.getBookingId(), estimatedDuration);
 
+        // === 10. GỬI THÔNG BÁO XÁC NHẬN BOOKING QUA ZALO ===
+        // Lưu booking thành công trước, sau đó mới gửi thông báo để lỗi Zalo không rollback booking.
+        sendBookingConfirmNotification(customer, request.getSelectedServiceIds(), savedBooking);
+
         log.info("Customer booking created: bookingId={}, bookingCode={}, customerId={}",
                 savedBooking.getBookingId(), savedBooking.getBookingCode(), customerId);
 
         return savedBooking;
+    }
+
+    private void sendBookingConfirmNotification(
+            CustomerProfile customer,
+            List<Integer> selectedServiceIds,
+            Booking savedBooking
+    ) {
+        if (customer == null || savedBooking == null) {
+            return;
+        }
+
+        try {
+            List<String> serviceNames = resolveServiceNames(selectedServiceIds);
+            LocalDateTime bookingTime = LocalDateTime.of(
+                    savedBooking.getScheduledDate(),
+                    savedBooking.getScheduledTime()
+            );
+
+            zaloNotificationSender.sendBookingConfirm(
+                    customer.getPhone(),
+                    customer.getFullName(),
+                    serviceNames,
+                    savedBooking.getBookingCode(),
+                    bookingTime,
+                    "Michelin Sơn Tây"
+            );
+        } catch (Exception ex) {
+            log.warn(
+                    "Zalo booking confirmation failed: bookingCode={}, reason={}",
+                    savedBooking.getBookingCode(),
+                    ex.getMessage()
+            );
+        }
+    }
+
+    private List<String> resolveServiceNames(List<Integer> selectedServiceIds) {
+        if (selectedServiceIds == null || selectedServiceIds.isEmpty()) {
+            return List.of("Dịch vụ bảo dưỡng");
+        }
+
+        List<String> names = catalogItemRepository.findAllById(selectedServiceIds)
+                .stream()
+                .map(CatalogItemJpaEntity::getItemName)
+                .filter(name -> name != null && !name.isBlank())
+                .toList();
+
+        if (!names.isEmpty()) {
+            return names;
+        }
+
+        return List.of("Dịch vụ đã chọn");
     }
 
     /**
@@ -275,11 +335,18 @@ public class BookingService {
         booking.setDescription(description);
         booking.setIsGuest(false);
         booking.setStatus(BookingStatus.CONFIRMED);
+        booking.setEstimateId(request.getEstimateId());
 
         if (request.getSelectedServiceIds() != null && !request.getSelectedServiceIds().isEmpty()) {
             booking.setCatalogItemIds(request.getSelectedServiceIds());
         } else {
             booking.setCatalogItemIds(new ArrayList<>());
+        }
+        if (request.getEstimateId() != null) {
+            Estimate estimate = estimateInternalApi.findById(request.getEstimateId());
+            if (estimate == null) {
+                throw new BookingException("Khong tim thay bao gia voi estimateId: " + request.getEstimateId());
+            }
         }
         
         // === 3. VALIDATE THỜI GIAN (CHỈ CHECK KHÔNG ĐƯỢC QUÁ KHỨ) ===
@@ -292,8 +359,11 @@ public class BookingService {
         }
         
         // === 4. CHECK SLOT AVAILABILITY ===
+        // Staff direct create không bị chặn bởi capacity - có thể vượt quá sức chứa
         int estimatedDuration = calculateEstimatedDuration(booking.getCatalogItemIds());
         
+        // Comment out kiểm tra capacity cho staffDirectCreate
+        /*
         boolean slotAvailable = slotService.isSlotAvailable(
                 booking.getScheduledDate(),
                 booking.getScheduledTime(),
@@ -303,6 +373,7 @@ public class BookingService {
         if (!slotAvailable) {
             throw new BookingException("Khung giờ này đã đầy, vui lòng chọn giờ khác.");
         }
+        */
         
         // === 5. GENERATE BOOKING CODE (MST_XXXXXX) ===
         try {
@@ -328,7 +399,7 @@ public class BookingService {
                 savedBooking.getBookingId(), savedBooking.getBookingCode(), customerId);
         //todo:update remind if exist
         if (request.getReminderId()!=null) {
-            estimateInternalApi.updateBookingToRemindById(request.getReminderId(),booking.getBookingId());
+            estimateInternalApi.updateBookingToRemindById(request.getReminderId(), savedBooking.getBookingId());
         }
         return savedBooking;
     }

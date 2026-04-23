@@ -1,6 +1,7 @@
 package com.g42.platform.gms.billing.app.service;
 
 import com.g42.platform.gms.auth.api.internal.CustomerInternalApi;
+import com.g42.platform.gms.billing.api.dto.BillEstimateDto;
 import com.g42.platform.gms.billing.api.dto.PaymentTransactionDto;
 import com.g42.platform.gms.billing.api.dto.ServiceBillDto;
 import com.g42.platform.gms.billing.api.mapper.ServiceBillDtoMapper;
@@ -13,8 +14,10 @@ import com.g42.platform.gms.billing.domain.exception.BillingErrorCode;
 import com.g42.platform.gms.billing.domain.exception.BillingException;
 import com.g42.platform.gms.billing.domain.repository.BillingRepository;
 import com.g42.platform.gms.billing.domain.repository.PaymentTransationRepo;
+import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.common.enums.EstimateEnum;
 import com.g42.platform.gms.customer.domain.entity.CustomerProfile;
+import com.g42.platform.gms.estimation.api.dto.EstimateRespondDto;
 import com.g42.platform.gms.estimation.app.service.EstimateService;
 import com.g42.platform.gms.estimation.domain.entity.Estimate;
 import com.g42.platform.gms.estimation.domain.repository.EstimateRepository;
@@ -28,10 +31,14 @@ import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
 import com.g42.platform.gms.service_ticket_management.infrastructure.repository.ServiceTicketRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -63,6 +70,9 @@ public class BillingService {
     private CustomerInternalApi customerInternalApi;
     @Autowired
     private ZaloNotificationSender zaloNotificationSender;
+    @Autowired
+    @Qualifier("warehouseStockAllocationService")
+    private com.g42.platform.gms.warehouse.app.service.allocation.StockAllocationService warehouseStockAllocationService;
 
     //todo: get available promotion
     @Transactional
@@ -73,25 +83,32 @@ public class BillingService {
         System.out.println("DEBUG: Estimate: " + estimate.getId());
         ServiceTicketJpa serviceTicket = serviceTicketRepository.findByServiceTicketId(serviceBillDto.getServiceTicketId());
         validateBillingRequest(estimate, serviceTicket);
+        serviceBill.setSubTotal(estimate.getTotalPrice());
         serviceBill.setEstimateId(estimate.getId());
         //todo: check promotion available for billing
         Promotion promotion = resolvePromotion(serviceBillDto);
         if (promotion != null) {
-            BigDecimal discountAmount = serviceBillDto.getSubTotal()
+        System.out.println("DEBUG: Promotion: " + promotion.getPromotionId());
+            System.out.println("DEBUG: Promotion: " + promotion.getDiscountPercent());
+            BigDecimal baseAmount = estimate.getTotalPrice();
+            BigDecimal discountAmount = baseAmount
                     .multiply(promotion.getDiscountPercent())
-                    .divide(BigDecimal.valueOf(100));
+                    .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
             serviceBill.setDiscountAmount(discountAmount);
+            System.out.println("DEBUG: Promotion: " + discountAmount);
+            promotionRepo.countUsed(promotion.getPromotionId());
             serviceBill.setFinalAmount(estimate.getTotalPrice().subtract(discountAmount));
         }else {
             serviceBill.setDiscountAmount(BigDecimal.ZERO);
             serviceBill.setFinalAmount(estimate.getTotalPrice());
+//            throw new BillingException("Đơn hàng chưa đủ điều kiện áp dụng Promotion",BillingErrorCode.PROMOTION404);
         }
         //todo: change status of estimate and service ticket
         serviceTicket.setTicketStatus(TicketStatus.COMPLETED);
         serviceTicketRepository.save(serviceTicket);
         estimate.setStatus(EstimateEnum.ARCHIVED);
         estimateRepository.save(estimate);
-        serviceBill.setPaidAt(Instant.now());
+//        serviceBill.setPaidAt(Instant.now());
         ServiceBill saved = billingRepository.createNewBilling(serviceBill);
         return serviceBillDtoMapper.mapToDto(saved);
     }
@@ -119,7 +136,7 @@ public class BillingService {
         }
     }
     @Transactional
-    public PaymentTransactionDto createNewPayment(PaymentTransactionDto dto) {
+    public PaymentTransactionDto createNewPayment(PaymentTransactionDto dto, Integer staffId) {
         PaymentTransaction paymentTransactionDto = serviceBillDtoMapper.mapPaymentToEntity(dto);
         paymentTransactionDto.setPaidAt(Instant.now());
         PaymentTransaction paymentTransaction = paymentTransationRepo.createNewPayment(paymentTransactionDto);
@@ -129,6 +146,11 @@ public class BillingService {
         serviceTicketJpa.setDeliveredAt(LocalDateTime.now());
         serviceTicketRepository.save(serviceTicketJpa);
         serviceBill.setPaymentStatus(PaymentStatus.PAID.name());
+        serviceBill.setPaidAt(Instant.now());
+
+        // Luong moi: chi chuyen ticket sang PAID, viec tao phieu xuat kho DRAFT
+        // duoc goi bang API yeu cau xuat kho tu stock allocation.
+
         //todo: send feedback
         String code = serviceTicketInternalApi.getCodeByServiceTicketId(serviceBill.getServiceTicketId());
         String phone = customerInternalApi.getCustomerPhoneByServiceTicketId(serviceBill.getServiceTicketId());
@@ -142,5 +164,20 @@ public class BillingService {
 
         ticketAssignmentService.markAssignmentDone(serviceBill.getServiceTicketId());
         return serviceBillDtoMapper.mapPaymentToDto(paymentTransaction);
+    }
+
+    public BillEstimateDto getBillWithEstimate(Integer serviceTicketId) {
+        BillEstimateDto billEstimateDto = new BillEstimateDto();
+        ServiceBill serviceBill = billingRepository.getBillingByServiceTicket(serviceTicketId);
+        if (serviceBill == null) {
+            throw new BillingException("Bill not found!", BillingErrorCode.ESTIMATE_404);
+        }
+        billEstimateDto = serviceBillDtoMapper.toBillEstimateDto(serviceBill);
+        List<EstimateRespondDto> estimateRespondDtos = estimateService.getEstimateByCode(serviceTicketId);
+        if (estimateRespondDtos!=null||billEstimateDto!=null) {
+
+        billEstimateDto.setEstimate(estimateRespondDtos);
+        }
+        return  billEstimateDto;
     }
 }

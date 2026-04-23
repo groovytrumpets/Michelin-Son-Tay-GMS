@@ -22,6 +22,7 @@ import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 @Repository
@@ -89,6 +90,11 @@ public class WarehouseRepoImpl implements WarehouseRepo {
 
     @Override
     public List<Warehouse> getAllWarehouse() {
-        return warehouseJpaRepo.findAllByIsActive(true);
+        return warehouseJpaRepo.findAllByIsActive(true).stream().map(warehouseJpaMapper::toDomain).toList();
+    }
+
+    @Override
+    public Optional<Warehouse> findById(Integer warehouseId) {
+        return warehouseJpaRepo.findById(warehouseId).map(warehouseJpaMapper::toDomain);
     }
 }

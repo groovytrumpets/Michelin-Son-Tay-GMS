@@ -9,9 +9,12 @@ import com.g42.platform.gms.warehouse.infrastructure.entity.StockEntryJpa;
 import com.g42.platform.gms.warehouse.infrastructure.repository.StockEntryItemJpaRepo;
 import com.g42.platform.gms.warehouse.infrastructure.repository.StockEntryJpaRepo;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -57,6 +60,8 @@ public class StockEntryRepoImpl implements StockEntryRepo {
         jpa.setConfirmedBy(domain.getConfirmedBy());
         jpa.setConfirmedAt(domain.getConfirmedAt());
         jpa.setCreatedBy(domain.getCreatedBy());
+        jpa.setCreatedAt(domain.getCreatedAt());
+        jpa.setUpdatedAt(domain.getUpdatedAt());
         return jpa;
     }
 
@@ -108,6 +113,18 @@ public class StockEntryRepoImpl implements StockEntryRepo {
     }
 
     @Override
+    public Page<StockEntry> search(Integer warehouseId,
+                                   StockEntryStatus status,
+                                   LocalDate fromDate,
+                                   LocalDate toDate,
+                                   String search,
+                                   Pageable pageable) {
+        String normalizedSearch = (search == null || search.isBlank()) ? null : search.trim();
+        return jpaRepo.search(warehouseId, status, fromDate, toDate, normalizedSearch, pageable)
+                .map(this::toDomain);
+    }
+
+    @Override
     public StockEntry save(StockEntry entry) {
         StockEntryJpa jpa = toJpa(entry);
 
@@ -116,7 +133,9 @@ public class StockEntryRepoImpl implements StockEntryRepo {
             jpa.getItems().clear();
             for (StockEntryItem item : entry.getItems()) {
                 StockEntryItemJpa itemJpa = toJpaItem(item);
-                itemJpa.setEntryId(null); // will be set by cascade after persist
+                if (itemJpa.getEntryId() == null) {
+                    itemJpa.setEntryId(entry.getEntryId());
+                }
                 jpa.getItems().add(itemJpa);
             }
         }

@@ -1,5 +1,6 @@
 package com.g42.platform.gms.marketing.service_catalog.application.service;
 
+import com.g42.platform.gms.catalog.service.CatalogItemService;
 import com.g42.platform.gms.common.service.ImageUploadService;
 import com.g42.platform.gms.marketing.service_catalog.api.dto.ServiceCreateRequest;
 import com.g42.platform.gms.marketing.service_catalog.api.dto.ServiceDetailRespond;
@@ -32,6 +33,7 @@ public class ServiceCatalogService {
     private final ServiceDtoMapper serviceDtoMapper;
     private final ImageUploadService imageUploadService;
     private final WarehouseInternalApi warehouseInternalApi;
+    private final CatalogItemService catalogItemService;
 
     public List<ServiceSumaryRespond> getListActiveServices() {
         LocalDateTime now = LocalDateTime.now();
@@ -131,8 +133,12 @@ public class ServiceCatalogService {
     }
 
     public Page<ServiceSumaryRespond> getListProducts(int page, int size, CatalogItemType itemType, String search, String sortBy, BigDecimal minPrice, BigDecimal maxPrice, String categoryCode, Integer brandId, Integer productLineId) {
+        Integer resolvedCategoryId = null;
+        if (categoryCode != null) {
+            resolvedCategoryId = warehouseInternalApi.findCodeByCategoryCode(categoryCode);
+        }
         Page<com.g42.platform.gms.marketing.service_catalog.domain.entity.Service> services =
-                serviceRepository.getListOfProductsByCatalogItem(page,size,itemType,search,sortBy,maxPrice,minPrice,categoryCode,brandId,productLineId);
+                serviceRepository.getListOfProductsByCatalogItem(page,size,itemType,search,sortBy,maxPrice,minPrice,resolvedCategoryId,brandId,productLineId);
         return services.map(serviceDtoMapper::toDto);
     }
 }

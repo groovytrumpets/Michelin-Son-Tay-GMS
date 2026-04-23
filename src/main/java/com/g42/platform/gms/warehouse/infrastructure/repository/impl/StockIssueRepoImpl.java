@@ -2,14 +2,20 @@ package com.g42.platform.gms.warehouse.infrastructure.repository.impl;
 
 import com.g42.platform.gms.warehouse.domain.entity.StockIssue;
 import com.g42.platform.gms.warehouse.domain.entity.StockIssueItem;
+import com.g42.platform.gms.warehouse.domain.enums.IssueType;
+import com.g42.platform.gms.warehouse.domain.enums.StockIssueStatus;
 import com.g42.platform.gms.warehouse.domain.repository.StockIssueRepo;
 import com.g42.platform.gms.warehouse.infrastructure.entity.StockIssueItemJpa;
 import com.g42.platform.gms.warehouse.infrastructure.entity.StockIssueJpa;
 import com.g42.platform.gms.warehouse.infrastructure.repository.StockIssueJpaRepo;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -32,6 +38,27 @@ public class StockIssueRepoImpl implements StockIssueRepo {
     }
 
     @Override
+    public List<StockIssue> findByServiceTicketId(Integer serviceTicketId) {
+        return jpaRepo.findByServiceTicketId(serviceTicketId)
+                .stream().map(this::toDomain).toList();
+    }
+
+    @Override
+    public Page<StockIssue> search(Integer warehouseId,
+                                   StockIssueStatus status,
+                                   IssueType issueType,
+                                   LocalDate fromDate,
+                                   LocalDate toDate,
+                                   String search,
+                                   Pageable pageable) {
+        String normalizedSearch = (search == null || search.isBlank()) ? null : search.trim();
+        LocalDateTime fromDateTime = fromDate != null ? fromDate.atStartOfDay() : null;
+        LocalDateTime toDateTime = toDate != null ? toDate.atTime(23, 59, 59) : null;
+        return jpaRepo.search(warehouseId, status, issueType, fromDateTime, toDateTime, normalizedSearch, pageable)
+                .map(this::toDomain);
+    }
+
+    @Override
     public StockIssue save(StockIssue issue) {
         return toDomain(jpaRepo.save(toJpa(issue)));
     }
@@ -39,6 +66,31 @@ public class StockIssueRepoImpl implements StockIssueRepo {
     @Override
     public boolean existsByCode(String issueCode) {
         return jpaRepo.existsByIssueCode(issueCode);
+    }
+
+    @Override
+    public boolean existsConfirmedServiceTicketIssue(Integer serviceTicketId) {
+        return jpaRepo.existsByServiceTicketIdAndIssueTypeAndStatus(
+                serviceTicketId,
+                IssueType.SERVICE_TICKET,
+                StockIssueStatus.CONFIRMED);
+    }
+
+    @Override
+    public boolean existsDraftServiceTicketIssue(Integer serviceTicketId) {
+        return jpaRepo.existsByServiceTicketIdAndIssueTypeAndStatus(
+                serviceTicketId,
+                IssueType.SERVICE_TICKET,
+                StockIssueStatus.DRAFT);
+    }
+
+    @Override
+    public boolean existsDraftServiceTicketIssueInWarehouse(Integer serviceTicketId, Integer warehouseId) {
+        return jpaRepo.existsByServiceTicketIdAndWarehouseIdAndIssueTypeAndStatus(
+                serviceTicketId,
+                warehouseId,
+                IssueType.SERVICE_TICKET,
+                StockIssueStatus.DRAFT);
     }
 
     // ── mappers ──────────────────────────────────────────────────────────────
@@ -78,6 +130,8 @@ public class StockIssueRepoImpl implements StockIssueRepo {
         jpa.setConfirmedBy(domain.getConfirmedBy());
         jpa.setConfirmedAt(domain.getConfirmedAt());
         jpa.setCreatedBy(domain.getCreatedBy());
+        jpa.setCreatedAt(domain.getCreatedAt());
+        jpa.setUpdatedAt(domain.getUpdatedAt());
         return jpa;
     }
 

@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 @Repository
@@ -20,4 +21,6 @@ public interface WarehouseRepo {
     List<WarehouseDetailDto> getWarehouseDetailsByItemId(Integer itemId);
 
     List<Warehouse> getAllWarehouse();
+
+    Optional<Warehouse> findById(Integer warehouseId);
 }

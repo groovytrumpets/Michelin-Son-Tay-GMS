@@ -10,6 +10,8 @@ import com.g42.platform.gms.booking.customer.domain.entity.Booking;
 import com.g42.platform.gms.booking.customer.domain.repository.BookingRepository;
 import com.g42.platform.gms.catalog.infrastructure.repository.CatalogItemRepository;
 import com.g42.platform.gms.common.service.ExcelService;
+import com.g42.platform.gms.billing.domain.entity.ServiceBill;
+import com.g42.platform.gms.billing.domain.repository.BillingRepository;
 import com.g42.platform.gms.estimation.api.internal.EstimateInternalApi;
 import com.g42.platform.gms.estimation.domain.entity.Estimate;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceQueueResponse;
@@ -32,6 +34,12 @@ import com.g42.platform.gms.service_ticket_management.api.mapper.ServiceTicketDe
 import com.g42.platform.gms.vehicle.api.internal.VehicleInternalApi;
 import com.g42.platform.gms.vehicle.entity.Vehicle;
 import com.g42.platform.gms.vehicle.repository.VehicleRepository;
+import com.g42.platform.gms.warehouse.domain.enums.AllocationStatus;
+import com.g42.platform.gms.warehouse.domain.enums.StockIssueStatus;
+import com.g42.platform.gms.warehouse.infrastructure.entity.StockAllocationJpa;
+import com.g42.platform.gms.warehouse.infrastructure.entity.StockIssueJpa;
+import com.g42.platform.gms.warehouse.infrastructure.repository.StockAllocationJpaRepo;
+import com.g42.platform.gms.warehouse.infrastructure.repository.StockIssueJpaRepo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -71,10 +79,13 @@ public class ServiceTicketManageService {
     private final ServiceTicketDetailMapper detailMapper;
     private final TicketAssignmentService ticketAssignmentService;
     private final ServiceTicketDtoMapper serviceTicketDtoMapper;
+    private final BillingRepository billingRepository;
     private final CustomerInternalApi customerInternalApi;
     private final VehicleInternalApi vehicleInternalApi;
     private final EstimateInternalApi estimateInternalApi;
     private final SafetyInspectionService safetyInspectionService;
+    private final StockIssueJpaRepo stockIssueJpaRepo;
+    private final StockAllocationJpaRepo stockAllocationJpaRepo;
 
     /**
      * Get paginated list of service tickets with filters.
@@ -141,7 +152,11 @@ public class ServiceTicketManageService {
         }
 
 
-        return listMapper.toManageListResponse(ticket, customer, vehicle, booking);
+        ServiceTicketListResponse response = listMapper.toManageListResponse(ticket, customer, vehicle, booking);
+        ServiceBill bill = billingRepository.getBillingByServiceTicket(ticket.getServiceTicketId());
+        response.setHasBill(bill != null);
+        response.setBillId(bill != null ? bill.getBillId() : null);
+        return response;
     }
 
     @Transactional(readOnly = true)
@@ -158,6 +173,10 @@ public class ServiceTicketManageService {
 
         response.setServiceTicketId(ticket.getServiceTicketId());
         response.setTicketCode(ticket.getTicketCode());
+        Estimate latestEstimate = estimateInternalApi.findLatestByServiceTicketId(ticket.getServiceTicketId());
+        if (latestEstimate != null) {
+            response.setEstimateId(latestEstimate.getId());
+        }
         response.setTicketStatus(ticket.getTicketStatus());
         response.setCustomerRequest(ticket.getCustomerRequest());
         response.setCheckInNotes(ticket.getCheckInNotes());
@@ -227,6 +246,38 @@ public class ServiceTicketManageService {
                     response.setAdvisorId(a.getStaffId());
                     response.setAdvisorName(a.getFullName());
                 });
+
+        // Warehouse status info for advisor UI gating
+        List<StockIssueJpa> stockIssues = stockIssueJpaRepo.findByServiceTicketId(ticket.getServiceTicketId());
+        boolean hasDraftStockIssue = stockIssues.stream()
+            .anyMatch(issue -> issue.getStatus() == StockIssueStatus.DRAFT);
+        boolean hasConfirmedStockIssue = stockIssues.stream()
+            .anyMatch(issue -> issue.getStatus() == StockIssueStatus.CONFIRMED);
+
+        List<StockAllocationJpa> allocations = stockAllocationJpaRepo.findByServiceTicketId(ticket.getServiceTicketId());
+        int reservedAllocationCount = (int) allocations.stream()
+            .filter(allocation -> allocation.getStatus() == AllocationStatus.RESERVED)
+            .count();
+        int pendingIssueRequestAllocationCount = (int) allocations.stream()
+            .filter(allocation -> allocation.getStatus() == AllocationStatus.RESERVED)
+            .filter(allocation -> allocation.getIssueId() == null)
+            .count();
+        int committedAllocationCount = (int) allocations.stream()
+            .filter(allocation -> allocation.getStatus() == AllocationStatus.COMMITTED)
+            .count();
+
+        response.setHasDraftStockIssue(hasDraftStockIssue);
+        response.setHasConfirmedStockIssue(hasConfirmedStockIssue);
+
+        ServiceBill bill = billingRepository.getBillingByServiceTicket(ticket.getServiceTicketId());
+        response.setHasBill(bill != null);
+        response.setBillId(bill != null ? bill.getBillId() : null);
+
+        response.setReservedAllocationCount(reservedAllocationCount);
+        response.setPendingIssueRequestAllocationCount(pendingIssueRequestAllocationCount);
+        response.setCanRequestIssueDraft(pendingIssueRequestAllocationCount > 0);
+        response.setCommittedAllocationCount(committedAllocationCount);
+        response.setWarehouseReadyForRepair(hasConfirmedStockIssue && committedAllocationCount > 0);
 
 
         log.info("Service ticket detail retrieved: {}", ticketCode);

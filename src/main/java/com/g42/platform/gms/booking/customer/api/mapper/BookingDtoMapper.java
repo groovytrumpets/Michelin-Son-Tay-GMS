@@ -7,6 +7,8 @@ import com.g42.platform.gms.booking.customer.domain.entity.Booking;
 import com.g42.platform.gms.booking.customer.domain.enums.BookingStatus;
 import com.g42.platform.gms.booking.customer.infrastructure.entity.CatalogItemJpaEntity;
 import com.g42.platform.gms.catalog.infrastructure.repository.CatalogItemRepository;
+import com.g42.platform.gms.estimation.api.internal.EstimateInternalApi;
+import com.g42.platform.gms.estimation.domain.entity.Estimate;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
 import com.g42.platform.gms.service_ticket_management.infrastructure.repository.ServiceTicketRepository;
@@ -27,6 +29,9 @@ public abstract class BookingDtoMapper {
 
     @Autowired
     protected ServiceTicketRepository serviceTicketRepository;
+
+    @Autowired
+    protected EstimateInternalApi estimateInternalApi;
 
     @Mapping(target = "customerName", ignore = true)
     @Mapping(target = "phone", ignore = true)
@@ -66,6 +71,10 @@ public abstract class BookingDtoMapper {
                 response.setTicketStatus(ticket.getTicketStatus() != null ? ticket.getTicketStatus().name() : null);
                 response.setTechnicianNotes(ticket.getTechnicianNotes());
                 response.setProgressSteps(buildProgressSteps(domain.getStatus(), ticket.getTicketStatus()));
+                Estimate latestEstimate = estimateInternalApi.findLatestByServiceTicketId(ticket.getServiceTicketId());
+                if (latestEstimate != null) {
+                    response.setEstimateId(latestEstimate.getId());
+                }
             });
         }
 

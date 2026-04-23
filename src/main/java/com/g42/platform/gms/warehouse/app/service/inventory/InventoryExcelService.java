@@ -1,18 +1,16 @@
 package com.g42.platform.gms.warehouse.app.service.inventory;
 
 import com.g42.platform.gms.common.service.ExcelService;
+import com.g42.platform.gms.warehouse.domain.entity.CatalogItem;
 import com.g42.platform.gms.warehouse.domain.entity.Inventory;
 import com.g42.platform.gms.warehouse.domain.entity.StockEntry;
 import com.g42.platform.gms.warehouse.domain.entity.StockEntryItem;
-import com.g42.platform.gms.warehouse.domain.enums.CatalogItemType;
 import com.g42.platform.gms.warehouse.domain.enums.StockEntryStatus;
 import com.g42.platform.gms.warehouse.domain.repository.InventoryRepo;
 import com.g42.platform.gms.warehouse.domain.repository.PartCatalogRepo;
 import com.g42.platform.gms.warehouse.domain.repository.StockEntryRepo;
-import com.g42.platform.gms.warehouse.infrastructure.entity.*;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.*;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -80,11 +78,10 @@ public class InventoryExcelService {
 
         // Build map itemId → catalog item
         List<Integer> itemIds = activeLots.stream().map(StockEntryItem::getItemId).distinct().toList();
-        Specification<CatalogItemJpa> spec = (root, query, cb) -> root.get("itemId").in(itemIds);
-        Map<Integer, CatalogItemJpa> catalogMap = itemIds.isEmpty()
+        Map<Integer, CatalogItem> catalogMap = itemIds.isEmpty()
                 ? Map.of()
-                : partCatalogRepo.findAll(spec).stream()
-                        .collect(Collectors.toMap(CatalogItemJpa::getItemId, c -> c));
+            : partCatalogRepo.findAllPartsByIds(itemIds).stream()
+                .collect(Collectors.toMap(CatalogItem::getItemId, c -> c));
 
         // Build map entryId → entry (để lấy entryCode và entryDate)
         Map<Integer, StockEntry> entryMap = activeLots.stream()
@@ -96,7 +93,7 @@ public class InventoryExcelService {
 
         int[] stt = {1};
         return ExcelService.exportToExcel(activeLots, HEADERS, lot -> {
-            CatalogItemJpa cat = catalogMap.get(lot.getItemId());
+            CatalogItem cat = catalogMap.get(lot.getItemId());
             StockEntry entry = entryMap.get(lot.getEntryId());
             return new Object[]{
                     stt[0]++,
@@ -130,9 +127,7 @@ public class InventoryExcelService {
     public SyncResult syncFromT3Excel(MultipartFile file, Integer warehouseId, Integer staffId) {
 
         // Build map SKU → catalog item
-        Specification<CatalogItemJpa> spec = (root, query, cb) ->
-                cb.equal(root.get("itemType"), CatalogItemType.PART);
-        Map<String, CatalogItemJpa> skuToCatalog = partCatalogRepo.findAll(spec).stream()
+        Map<String, CatalogItem> skuToCatalog = partCatalogRepo.findAllParts().stream()
                 .filter(p -> p.getSku() != null)
                 .collect(Collectors.toMap(
                         p -> p.getSku().trim().toLowerCase(),
@@ -183,7 +178,7 @@ public class InventoryExcelService {
             String notes   = lotCode != null ? "Lô " + lotCode : getCellString(row, COL_NOTE);
 
             // Tìm catalog item theo SKU — tạo mới nếu chưa có (item từ T3)
-            CatalogItemJpa catalogItem = skuToCatalog.get(sku.trim().toLowerCase());
+            CatalogItem catalogItem = skuToCatalog.get(sku.trim().toLowerCase());
             if (catalogItem == null) {
                 catalogItem = createDefaultCatalogItem(sku.trim(), itemName, unit);
                 catalogItem = partCatalogRepo.save(catalogItem);
@@ -269,11 +264,11 @@ public class InventoryExcelService {
      * Tạo catalog item mới từ T3 — brand/product_line/work_category để null.
      * Manager sẽ phân loại sau qua admin.
      */
-    private CatalogItemJpa createDefaultCatalogItem(String sku, String itemName, String unit) {
-        CatalogItemJpa item = new CatalogItemJpa();
+    private CatalogItem createDefaultCatalogItem(String sku, String itemName, String unit) {
+        CatalogItem item = new CatalogItem();
         item.setSku(sku);
         item.setItemName(itemName);
-        item.setItemType(CatalogItemType.PART);
+        item.setItemType(com.g42.platform.gms.warehouse.domain.enums.CatalogItemType.PART);
         item.setUnit(unit);
         item.setIsActive(true);
         // brand_id, product_line_id, work_category_id để null — manager cập nhật sau

@@ -4,8 +4,8 @@ import com.g42.platform.gms.auth.entity.StaffPrincipal;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.warehouse.app.service.discount.DiscountService;
+import com.g42.platform.gms.warehouse.domain.entity.DiscountConfig;
 import com.g42.platform.gms.warehouse.domain.enums.IssueType;
-import com.g42.platform.gms.warehouse.infrastructure.entity.DiscountConfigJpa;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -26,10 +26,10 @@ public class DiscountConfigController {
 
     @PostMapping
     @PreAuthorize("hasRole('MANAGER')")
-    public ResponseEntity<ApiResponse<DiscountConfigJpa>> create(
+    public ResponseEntity<ApiResponse<DiscountConfig>> create(
             @Valid @RequestBody CreateDiscountConfigRequest request,
             @AuthenticationPrincipal StaffPrincipal principal) {
-        DiscountConfigJpa saved = discountService.create(
+        DiscountConfig saved = discountService.create(
                 request.getItemId(),
                 request.getIssueType(),
                 request.getQuantityThreshold(),

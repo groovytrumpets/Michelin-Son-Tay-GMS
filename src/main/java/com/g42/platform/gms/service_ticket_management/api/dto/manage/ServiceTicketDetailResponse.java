@@ -21,6 +21,7 @@ public class ServiceTicketDetailResponse {
     
     private Integer serviceTicketId;
     private String ticketCode;
+    private Integer estimateId;
     
     // Customer info
     private CustomerInfo customer;
@@ -56,6 +57,17 @@ public class ServiceTicketDetailResponse {
     // Assignment info — advisor phụ trách
     private String advisorName;
     private Integer advisorId;
+
+    // Warehouse export/allocation status
+    private Boolean hasDraftStockIssue;
+    private Boolean hasConfirmedStockIssue;
+    private Boolean hasBill;
+    private Integer billId;
+    private Integer reservedAllocationCount;
+    private Integer pendingIssueRequestAllocationCount;
+    private Boolean canRequestIssueDraft;
+    private Integer committedAllocationCount;
+    private Boolean warehouseReadyForRepair;
     
     // Flags
     private Boolean immutable;

@@ -1,5 +1,6 @@
 package com.g42.platform.gms.service_ticket_management.application.service;
 
+import com.g42.platform.gms.estimation.api.internal.EstimateInternalApi;
 import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicket;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import com.g42.platform.gms.service_ticket_management.domain.repository.ServiceTicketRepo;
@@ -24,6 +25,7 @@ public class ServiceTicketService {
     private final ServiceTicketRepo serviceTicketRepo;
     private final ServiceTicketCodeGenerator ticketCodeGenerator;
     private final com.g42.platform.gms.booking.customer.domain.repository.BookingRepository bookingRepository;
+    private final EstimateInternalApi estimateInternalApi;
 
     /**
      * Create new service ticket using booking_code as ticket_code.
@@ -49,6 +51,9 @@ public class ServiceTicketService {
         ticket.initializeDefaults();
 
         ServiceTicket saved = serviceTicketRepo.save(ticket);
+        if (booking.getEstimateId() != null) {
+            estimateInternalApi.linkEstimateToServiceTicket(booking.getEstimateId(), saved.getServiceTicketId());
+        }
         log.info("Created service ticket with code: {}", ticketCode);
         return saved;
     }

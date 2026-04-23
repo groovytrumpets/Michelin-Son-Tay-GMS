@@ -1,11 +1,11 @@
 package com.g42.platform.gms.warehouse.app.service.commission;
 
 import com.g42.platform.gms.warehouse.api.dto.response.CommissionReportResponse;
+import com.g42.platform.gms.warehouse.domain.entity.CommissionRecord;
 import com.g42.platform.gms.warehouse.domain.repository.CommissionRepo;
 import com.g42.platform.gms.warehouse.domain.repository.StockIssueRepo;
 import com.g42.platform.gms.warehouse.domain.entity.StockIssue;
 import com.g42.platform.gms.warehouse.domain.entity.StockIssueItem;
-import com.g42.platform.gms.warehouse.infrastructure.entity.CommissionRecordJpa;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -48,7 +48,7 @@ public class CommissionService {
                                     .multiply(config.getCommissionRate())
                                     .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
 
-                            CommissionRecordJpa record = new CommissionRecordJpa();
+                            CommissionRecord record = new CommissionRecord();
                             record.setStaffId(staffId);
                             record.setItemId(item.getItemId());
                             record.setIssueId(issueId);
@@ -64,7 +64,7 @@ public class CommissionService {
     }
     @Transactional(readOnly = true)
     public List<CommissionReportResponse> getCommissionReport(String periodMonth, Integer staffId) {
-        List<CommissionRecordJpa> records = staffId != null
+        List<CommissionRecord> records = staffId != null
                 ? commissionRepo.findRecordsByStaffAndPeriod(staffId, periodMonth)
                 : commissionRepo.findRecordsByPeriod(periodMonth);
 

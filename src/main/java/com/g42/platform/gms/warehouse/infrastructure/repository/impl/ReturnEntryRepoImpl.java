@@ -1,13 +1,21 @@
 package com.g42.platform.gms.warehouse.infrastructure.repository.impl;
 
+import com.g42.platform.gms.warehouse.domain.entity.ReturnEntry;
+import com.g42.platform.gms.warehouse.domain.entity.ReturnEntryItem;
+import com.g42.platform.gms.warehouse.domain.enums.ReturnEntryStatus;
+import com.g42.platform.gms.warehouse.domain.enums.ReturnType;
 import com.g42.platform.gms.warehouse.domain.repository.ReturnEntryRepo;
 import com.g42.platform.gms.warehouse.infrastructure.entity.ReturnEntryItemJpa;
 import com.g42.platform.gms.warehouse.infrastructure.entity.ReturnEntryJpa;
 import com.g42.platform.gms.warehouse.infrastructure.repository.ReturnEntryItemJpaRepo;
 import com.g42.platform.gms.warehouse.infrastructure.repository.ReturnEntryJpaRepo;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -19,18 +27,37 @@ public class ReturnEntryRepoImpl implements ReturnEntryRepo {
     private final ReturnEntryItemJpaRepo itemJpaRepo;
 
     @Override
-    public Optional<ReturnEntryJpa> findById(Integer returnId) {
-        return jpaRepo.findById(returnId);
+    public Optional<ReturnEntry> findById(Integer returnId) {
+        return jpaRepo.findById(returnId).map(this::toDomain);
     }
 
     @Override
-    public List<ReturnEntryJpa> findByWarehouseId(Integer warehouseId) {
-        return jpaRepo.findByWarehouseIdOrderByCreatedAtDesc(warehouseId);
+    public List<ReturnEntry> findByWarehouseId(Integer warehouseId) {
+        return jpaRepo.findByWarehouseIdOrderByCreatedAtDesc(warehouseId)
+                .stream()
+                .map(this::toDomain)
+                .toList();
     }
 
     @Override
-    public ReturnEntryJpa save(ReturnEntryJpa entry) {
-        return jpaRepo.save(entry);
+    public Page<ReturnEntry> search(Integer warehouseId,
+                                    ReturnEntryStatus status,
+                                    ReturnType returnType,
+                                    LocalDate fromDate,
+                                    LocalDate toDate,
+                                    String search,
+                                    Pageable pageable) {
+        String normalizedSearch = (search == null || search.isBlank()) ? null : search.trim();
+        LocalDateTime fromDateTime = fromDate != null ? fromDate.atStartOfDay() : null;
+        LocalDateTime toDateTime = toDate != null ? toDate.atTime(23, 59, 59) : null;
+        return jpaRepo.search(warehouseId, status, returnType, fromDateTime, toDateTime, normalizedSearch, pageable)
+                .map(this::toDomain);
+    }
+
+    @Override
+    public ReturnEntry save(ReturnEntry entry) {
+        ReturnEntryJpa saved = jpaRepo.save(toJpa(entry));
+        return toDomain(saved);
     }
 
     @Override
@@ -39,12 +66,73 @@ public class ReturnEntryRepoImpl implements ReturnEntryRepo {
     }
 
     @Override
-    public Optional<ReturnEntryItemJpa> findItemById(Integer returnItemId) {
-        return itemJpaRepo.findById(returnItemId);
+    public Optional<ReturnEntryItem> findItemById(Integer returnItemId) {
+        return itemJpaRepo.findById(returnItemId).map(this::toDomainItem);
     }
 
     @Override
-    public ReturnEntryItemJpa saveItem(ReturnEntryItemJpa item) {
-        return itemJpaRepo.save(item);
+    public ReturnEntryItem saveItem(ReturnEntryItem item) {
+        ReturnEntryItemJpa saved = itemJpaRepo.save(toJpaItem(item));
+        return toDomainItem(saved);
+    }
+
+    private ReturnEntry toDomain(ReturnEntryJpa jpa) {
+        ReturnEntry domain = new ReturnEntry();
+        domain.setReturnId(jpa.getReturnId());
+        domain.setReturnCode(jpa.getReturnCode());
+        domain.setWarehouseId(jpa.getWarehouseId());
+        domain.setReturnReason(jpa.getReturnReason());
+        domain.setReturnType(jpa.getReturnType());
+        domain.setSourceIssueId(jpa.getSourceIssueId());
+        domain.setStatus(jpa.getStatus());
+        domain.setConfirmedBy(jpa.getConfirmedBy());
+        domain.setConfirmedAt(jpa.getConfirmedAt());
+        domain.setCreatedBy(jpa.getCreatedBy());
+        domain.setCreatedAt(jpa.getCreatedAt());
+        domain.setUpdatedAt(jpa.getUpdatedAt());
+        domain.setItems(jpa.getItems().stream().map(this::toDomainItem).toList());
+        return domain;
+    }
+
+    private ReturnEntryJpa toJpa(ReturnEntry domain) {
+        ReturnEntryJpa jpa = new ReturnEntryJpa();
+        jpa.setReturnId(domain.getReturnId());
+        jpa.setReturnCode(domain.getReturnCode());
+        jpa.setWarehouseId(domain.getWarehouseId());
+        jpa.setReturnReason(domain.getReturnReason());
+        jpa.setReturnType(domain.getReturnType());
+        jpa.setSourceIssueId(domain.getSourceIssueId());
+        jpa.setStatus(domain.getStatus());
+        jpa.setConfirmedBy(domain.getConfirmedBy());
+        jpa.setConfirmedAt(domain.getConfirmedAt());
+        jpa.setCreatedBy(domain.getCreatedBy());
+        jpa.setCreatedAt(domain.getCreatedAt());
+        jpa.setUpdatedAt(domain.getUpdatedAt());
+        if (domain.getItems() != null) {
+            jpa.setItems(domain.getItems().stream().map(this::toJpaItem).toList());
+        }
+        return jpa;
+    }
+
+    private ReturnEntryItem toDomainItem(ReturnEntryItemJpa jpa) {
+        ReturnEntryItem item = new ReturnEntryItem();
+        item.setReturnItemId(jpa.getReturnItemId());
+        item.setReturnId(jpa.getReturnId());
+        item.setItemId(jpa.getItemId());
+        item.setQuantity(jpa.getQuantity());
+        item.setConditionNote(jpa.getConditionNote());
+        item.setExchangeItem(jpa.isExchangeItem());
+        return item;
+    }
+
+    private ReturnEntryItemJpa toJpaItem(ReturnEntryItem domain) {
+        ReturnEntryItemJpa item = new ReturnEntryItemJpa();
+        item.setReturnItemId(domain.getReturnItemId());
+        item.setReturnId(domain.getReturnId());
+        item.setItemId(domain.getItemId());
+        item.setQuantity(domain.getQuantity());
+        item.setConditionNote(domain.getConditionNote());
+        item.setExchangeItem(domain.isExchangeItem());
+        return item;
     }
 }

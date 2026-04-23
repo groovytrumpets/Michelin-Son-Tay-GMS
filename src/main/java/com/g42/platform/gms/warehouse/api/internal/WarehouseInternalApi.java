@@ -9,4 +9,6 @@ public interface WarehouseInternalApi {
     void updateCatalogBlogService(Service serviceSaved, Integer catalogId);
 
     void updateInventoryEstimateAllocation(Integer itemId, Integer warehouseId,Integer quantity);
+
+    Integer findCodeByCategoryCode(String categoryCode);
 }

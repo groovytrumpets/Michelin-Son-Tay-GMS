@@ -4,14 +4,12 @@ import com.g42.platform.gms.common.service.ExcelService;
 import com.g42.platform.gms.warehouse.api.dto.entry.CreateStockEntryRequest;
 import com.g42.platform.gms.warehouse.api.dto.entry.StockEntryItemRequest;
 import com.g42.platform.gms.warehouse.api.dto.response.StockEntryResponse;
-import com.g42.platform.gms.warehouse.domain.enums.CatalogItemType;
+import com.g42.platform.gms.warehouse.domain.entity.CatalogItem;
 import com.g42.platform.gms.warehouse.domain.repository.PartCatalogRepo;
-import com.g42.platform.gms.warehouse.infrastructure.entity.CatalogItemJpa;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.Row;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -66,9 +64,7 @@ public class StockEntryExcelService {
      * để thủ kho tham khảo SKU khi điền phiếu nhập.
      */
     public byte[] exportCatalogTemplate() {
-        Specification<CatalogItemJpa> spec = (root, query, cb) ->
-                cb.equal(root.get("itemType"), CatalogItemType.PART);
-        List<CatalogItemJpa> parts = partCatalogRepo.findAll(spec);
+        List<CatalogItem> parts = partCatalogRepo.findAllParts();
 
         String[] headers = {"STT", "SKU", "Tên phụ tùng", "Đơn vị", "Part Number", "Barcode"};
         int[] stt = {1};
@@ -100,20 +96,17 @@ public class StockEntryExcelService {
             String supplierName,
             Integer staffId) {
 
-        // Build SKU → itemId map từ catalog
-        Specification<CatalogItemJpa> spec = (root, query, cb) ->
-                cb.equal(root.get("itemType"), CatalogItemType.PART);
-        Map<String, Integer> skuToItemId = partCatalogRepo.findAll(spec).stream()
+        // Build map SKU -> itemId từ catalog PART.
+        Map<String, Integer> skuToItemId = partCatalogRepo.findAllParts().stream()
                 .filter(p -> p.getSku() != null)
                 .collect(Collectors.toMap(
                         p -> p.getSku().trim().toLowerCase(),
-                        CatalogItemJpa::getItemId,
+                CatalogItem::getItemId,
                         (a, b) -> a // giữ cái đầu nếu trùng SKU
                 ));
 
         List<StockEntryItemRequest> validItems = new ArrayList<>();
         List<String> errors = new ArrayList<>();
-
         List<Row> rows = ExcelService.importFromExcel(file, row -> row);
 
         for (Row row : rows) {
@@ -164,7 +157,7 @@ public class StockEntryExcelService {
                     "Không có dòng hợp lệ nào. Lỗi: " + String.join("; ", errors));
         }
 
-        // Tạo phiếu nhập
+        // Gộp tất cả dòng hợp lệ vào cùng một phiếu nhập.
         CreateStockEntryRequest request = new CreateStockEntryRequest();
         request.setWarehouseId(warehouseId);
         request.setSupplierName(supplierName);
@@ -196,36 +189,58 @@ public class StockEntryExcelService {
     private Integer getCellInt(Row row, int col) {
         Cell cell = row.getCell(col);
         if (cell == null) return null;
+
         if (cell.getCellType() == CellType.NUMERIC) {
             double val = cell.getNumericCellValue();
             return (int) Math.round(val);
         }
+
         if (cell.getCellType() == CellType.STRING) {
             String s = cell.getStringCellValue().trim();
             if (s.isEmpty()) return null;
             try {
                 // Xử lý cả "20" và "20.0"
                 return (int) Math.round(Double.parseDouble(s));
-            } catch (Exception e) { return null; }
+            } catch (Exception e) {
+                return null;
+            }
         }
+
         if (cell.getCellType() == CellType.FORMULA) {
-            try { return (int) Math.round(cell.getNumericCellValue()); } catch (Exception e) { return null; }
+            try {
+                return (int) Math.round(cell.getNumericCellValue());
+            } catch (Exception e) {
+                return null;
+            }
         }
+
         return null;
     }
 
     private BigDecimal getCellDecimal(Row row, int col) {
         Cell cell = row.getCell(col);
         if (cell == null) return null;
+
         if (cell.getCellType() == CellType.NUMERIC) return BigDecimal.valueOf(cell.getNumericCellValue());
+
         if (cell.getCellType() == CellType.STRING) {
             String s = cell.getStringCellValue().trim();
             if (s.isEmpty()) return null;
-            try { return new BigDecimal(s); } catch (Exception e) { return null; }
+            try {
+                return new BigDecimal(s);
+            } catch (Exception e) {
+                return null;
+            }
         }
+
         if (cell.getCellType() == CellType.FORMULA) {
-            try { return BigDecimal.valueOf(cell.getNumericCellValue()); } catch (Exception e) { return null; }
+            try {
+                return BigDecimal.valueOf(cell.getNumericCellValue());
+            } catch (Exception e) {
+                return null;
+            }
         }
+
         return null;
     }
 

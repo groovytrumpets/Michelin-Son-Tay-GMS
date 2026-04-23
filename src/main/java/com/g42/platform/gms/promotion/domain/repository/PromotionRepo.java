@@ -20,4 +20,6 @@ public interface PromotionRepo {
     Promotion getPromotionByCode(String code);
 
     Promotion updatePromotion(Integer promotionId, Promotion promotion);
+
+    void countUsed(Integer promotionId);
 }

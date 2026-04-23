@@ -53,6 +53,7 @@ public class StockIssueItemRepoImpl implements StockIssueItemRepo {
                 .entryItemId(jpa.getEntryItemId())
                 .quantity(jpa.getQuantity())
                 .exportPrice(jpa.getExportPrice())
+                .estimateUnitPrice(jpa.getEstimateUnitPrice())
                 .importPrice(jpa.getImportPrice())
                 .discountRate(jpa.getDiscountRate())
                 .finalPrice(jpa.getFinalPrice())
@@ -68,6 +69,7 @@ public class StockIssueItemRepoImpl implements StockIssueItemRepo {
         jpa.setEntryItemId(domain.getEntryItemId());
         jpa.setQuantity(domain.getQuantity());
         jpa.setExportPrice(domain.getExportPrice());
+        jpa.setEstimateUnitPrice(domain.getEstimateUnitPrice());
         jpa.setImportPrice(domain.getImportPrice());
         jpa.setDiscountRate(domain.getDiscountRate() != null ? domain.getDiscountRate() : BigDecimal.ZERO);
         jpa.setFinalPrice(domain.getFinalPrice());

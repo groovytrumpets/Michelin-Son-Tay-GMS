@@ -1,9 +1,9 @@
 package com.g42.platform.gms.warehouse.app.service.discount;
 
+import com.g42.platform.gms.warehouse.domain.entity.DiscountConfig;
 import com.g42.platform.gms.warehouse.domain.enums.IssueType;
 import com.g42.platform.gms.warehouse.domain.repository.DiscountConfigRepo;
 import com.g42.platform.gms.warehouse.domain.repository.StockEntryRepo;
-import com.g42.platform.gms.warehouse.infrastructure.entity.DiscountConfigJpa;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,15 +18,24 @@ public class DiscountService {
 
     private final DiscountConfigRepo discountConfigRepo;
     private final StockEntryRepo stockEntryRepo;
+
+        @Transactional(readOnly = true)
+        public BigDecimal resolveDiscountRate(Integer itemId, IssueType issueType, int quantity) {
+        return discountConfigRepo.findActiveByItemIdAndIssueType(itemId, issueType)
+            .stream()
+            .filter(c -> c.getQuantityThreshold() == null || quantity >= c.getQuantityThreshold())
+            .max(java.util.Comparator
+                .comparingInt(this::specificityScore)
+                .thenComparingInt(c -> c.getQuantityThreshold() != null ? c.getQuantityThreshold() : 0)
+                .thenComparing(DiscountConfig::getDiscountRate))
+            .map(DiscountConfig::getDiscountRate)
+            .orElse(BigDecimal.ZERO);
+        }
+
     @Transactional(readOnly = true)
     public BigDecimal calculateFinalPrice(Integer itemId, IssueType issueType,
                                           int quantity, BigDecimal exportPrice) {
-        BigDecimal bestRate = discountConfigRepo.findActiveByItemIdAndIssueType(itemId, issueType)
-                .stream()
-                .filter(c -> c.getQuantityThreshold() == null || quantity >= c.getQuantityThreshold())
-                .max(Comparator.comparing(DiscountConfigJpa::getDiscountRate))
-                .map(DiscountConfigJpa::getDiscountRate)
-                .orElse(BigDecimal.ZERO);
+        BigDecimal bestRate = resolveDiscountRate(itemId, issueType, quantity);
 
         if (bestRate.compareTo(BigDecimal.ZERO) == 0) return exportPrice;
 
@@ -42,10 +51,10 @@ public class DiscountService {
                 .orElse(false);
     }
     @Transactional
-    public DiscountConfigJpa create(Integer itemId, IssueType issueType,
+    public DiscountConfig create(Integer itemId, IssueType issueType,
                                      Integer quantityThreshold, BigDecimal discountRate,
                                      Integer createdBy) {
-        DiscountConfigJpa config = new DiscountConfigJpa();
+        DiscountConfig config = new DiscountConfig();
         config.setItemId(itemId);
         config.setIssueType(issueType);
         config.setQuantityThreshold(quantityThreshold);
@@ -53,5 +62,16 @@ public class DiscountService {
         config.setIsActive(true);
         config.setCreatedBy(createdBy);
         return discountConfigRepo.save(config);
+    }
+
+    private int specificityScore(DiscountConfig config) {
+        int score = 0;
+        if (config.getItemId() != null) {
+            score += 2;
+        }
+        if (config.getIssueType() != null) {
+            score += 1;
+        }
+        return score;
     }
 }

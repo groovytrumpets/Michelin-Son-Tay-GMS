@@ -28,4 +28,5 @@ public class PromotionCreateDto {
     private LocalDate startDate;
     private LocalDate endDate;
     private Integer usageLimit;
+    private Integer usedCount;
 }

@@ -66,6 +66,7 @@ public class ZaloNotificationSender implements NotificationSender {
     }
     @Transactional
     public void sendBookingConfirm(String phone, String customerName, List<String> productName, String orderCode, LocalDateTime bookingTime, String garageLocation) {
+        System.out.println("Sending confirmation...");
         String template_id = "546916";
         String url = "https://business.openapi.zalo.me/message/template";
         ZaloToken zaloToken = zaloTokenRepo.getZaloTokensByState("active");

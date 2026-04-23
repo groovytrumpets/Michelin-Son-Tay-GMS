@@ -32,6 +32,7 @@ public class WarehouseDetailDto {
     private Integer minStockLevel;
     private Integer maxStockLevel;
     private Integer availableStockLevel;
+    private String notify;
 
     public Integer getAvailableStockLevel() {
         this.setAvailableStockLevel(this.quantity-this.reservedQuantity);

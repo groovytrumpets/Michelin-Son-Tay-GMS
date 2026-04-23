@@ -15,11 +15,22 @@ public interface StockAllocationRepositoryJpa extends JpaRepository<StockAllocat
     @Transactional
     @Modifying
     @Query("""
-        update StockAllocationJpa s set s.status='RELEASED' where s.estimateId = :revisedFromId
+                update StockAllocationJpa s
+                set s.status='RELEASED'
+                where s.estimateId = :revisedFromId
+                    and s.status = 'RESERVED'
+                            and s.status!='COMMITTED'
         """)
     void updateReleasedEstimateById(@Param("revisedFromId")Integer revisedFromId);
 
     List<StockAllocationJpa> findAllByEstimateId(Integer estimateId);
 
     StockAllocationJpa getStockAllocationJpaByAllocationId(Integer allocationId);
+
+    StockAllocationJpa findByEstimateItemId(Integer estimateItemId);
+
+    StockAllocationJpa findByEstimateIdAndWarehouseIdAndItemIdAndStatus(
+            Integer estimateId, Integer warehouseId, Integer itemId, String status);
+
+    List<StockAllocationJpa> findAllByServiceTicketId(Integer serviceTicketId);
 }

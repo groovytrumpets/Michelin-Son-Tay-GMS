@@ -21,7 +21,11 @@ public class TaxRuleInternalApiImpl implements TaxRuleInternalApi {
     @Override
     public Integer getTaxCodeFreeId(String free) {
         Integer code = null;
-        code = taxRuleRepositoryJpa.findByTaxCode(free).getTaxRuleId();
+        TaxRuleJpa taxRuleJpa = taxRuleRepositoryJpa.findByTaxCode(free);
+        if (taxRuleJpa == null) {
+            return -1;
+        }
+        code = taxRuleJpa.getTaxRuleId();
         if (code == null) {
             return -1;
         }

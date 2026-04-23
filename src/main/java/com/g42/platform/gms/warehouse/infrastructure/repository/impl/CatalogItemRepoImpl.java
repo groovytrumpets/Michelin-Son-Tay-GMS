@@ -1,4 +1,4 @@
-package com.g42.platform.gms.warehouse.infrastructure;
+package com.g42.platform.gms.warehouse.infrastructure.repository.impl;
 
 import com.g42.platform.gms.marketing.service_catalog.infrastructure.repository.ServiceJpaRepository;
 import com.g42.platform.gms.warehouse.api.dto.SpecificationRespondDto;
@@ -172,7 +172,7 @@ public class CatalogItemRepoImpl implements CatalogItemRepo {
     }
     @Override
     public Integer findCategoryCode(String categoryCode) {
-        WorkCategoryJpaEntity workCategoryJpaEntity = itemCategoryJpaRepo.findByCategoryCode(categoryCode);
+        WorkCategoryJpaEntity workCategoryJpaEntity = itemCategoryJpaRepo.findFirstByCategoryCode(categoryCode);
         if (workCategoryJpaEntity == null) {
             return null;
         }

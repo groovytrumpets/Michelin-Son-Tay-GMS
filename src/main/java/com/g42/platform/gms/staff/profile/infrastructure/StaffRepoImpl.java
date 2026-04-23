@@ -82,6 +82,9 @@ public class StaffRepoImpl implements StaffRepo {
 
         }
         StaffProfileJpa savedProfile = staffProfileJpaRepo.save(staffProfileJpa);
+        // Auto-generate employeeNo = staffId (no manual input needed)
+        savedProfile.setEmployeeNo(String.valueOf(savedProfile.getStaffId()));
+        savedProfile = staffProfileJpaRepo.save(savedProfile);
         //todo: create new staff auth by staffProfileId
         StaffAuthJpa staffAuthJpa = new StaffAuthJpa();
         staffAuthJpa.setStaffProfile(savedProfile);
@@ -111,7 +114,7 @@ public class StaffRepoImpl implements StaffRepo {
         }
 
         if (dto.getStatus() != null) {
-            StaffAuthJpa auth = staffAuthJpaRepo.findByStaffAuthId(staffId);
+            StaffAuthJpa auth = staffAuthJpaRepo.findByStaffProfile_StaffId(staffId);
             if (auth != null) {
                 auth.setStatus(dto.getStatus());
                 staffAuthJpaRepo.save(auth);

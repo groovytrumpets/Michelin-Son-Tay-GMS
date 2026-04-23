@@ -36,7 +36,7 @@ public class DiscountConfigJpa {
     @Column(name = "created_by", nullable = false)
     private Integer createdBy;
 
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @PrePersist

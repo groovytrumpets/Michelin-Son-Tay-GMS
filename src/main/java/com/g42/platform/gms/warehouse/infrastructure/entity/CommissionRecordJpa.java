@@ -40,7 +40,7 @@ public class CommissionRecordJpa {
     @Column(name = "period_month", length = 7, nullable = false)
     private String periodMonth; // YYYY-MM
 
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @PrePersist

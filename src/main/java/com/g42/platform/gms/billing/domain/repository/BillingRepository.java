@@ -10,4 +10,6 @@ public interface BillingRepository {
     ServiceBill getBillingByBillingId(Integer billId);
 
     void save(ServiceBill serviceBill);
+
+    ServiceBill getBillingByServiceTicket(Integer serviceTicketId);
 }

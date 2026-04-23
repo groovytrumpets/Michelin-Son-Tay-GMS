@@ -1,7 +1,6 @@
 package com.g42.platform.gms.warehouse.domain.repository;
 
-import com.g42.platform.gms.warehouse.infrastructure.entity.CatalogItemJpa;
-import org.springframework.data.jpa.domain.Specification;
+import com.g42.platform.gms.warehouse.domain.entity.CatalogItem;
 
 import java.util.List;
 import java.util.Map;
@@ -12,13 +11,15 @@ import java.util.Map;
  */
 public interface PartCatalogRepo {
 
-    List<CatalogItemJpa> findAll(Specification<CatalogItemJpa> spec);
+    List<CatalogItem> findAllParts();
 
-    List<CatalogItemJpa> findAllByIds(List<Integer> ids);
+    List<CatalogItem> searchParts(String keyword);
+
+    List<CatalogItem> findAllPartsByIds(List<Integer> ids);
 
     boolean existsBySku(String sku);
 
-    CatalogItemJpa save(CatalogItemJpa item);
+    CatalogItem save(CatalogItem item);
 
     /** Lấy tên item theo danh sách id — dùng cho enrichment response */
     Map<Integer, String> findNamesByIds(List<Integer> ids);

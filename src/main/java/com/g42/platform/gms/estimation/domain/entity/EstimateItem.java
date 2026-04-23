@@ -38,6 +38,7 @@ public class EstimateItem {
     private BigDecimal taxAmount;
     private BigDecimal appliedTaxRate;
     private String unit;
+    private Integer revisedFromItemId;
     public BigDecimal getSubTotal() {
         if (unitPrice == null || quantity == null) return BigDecimal.ZERO;
         return unitPrice.multiply(BigDecimal.valueOf(quantity));

@@ -1,5 +1,6 @@
 package com.g42.platform.gms.estimation.domain.repository;
 
+import com.g42.platform.gms.estimation.api.dto.EstimateViaAllocationDto;
 import com.g42.platform.gms.estimation.domain.entity.StockAllocation;
 import org.springframework.stereotype.Repository;
 
@@ -13,7 +14,14 @@ public interface StockAllocationRepository {
 
     List<StockAllocation> findByEstimateId(Integer estimateId);
 
+    StockAllocation findByEstimateItemId(Integer estimateItemId);
+
+    StockAllocation findByEstimateIdAndWarehouseIdAndItemIdAndStatus(
+            Integer estimateId, Integer warehouseId, Integer itemId, String status);
+
     void save(StockAllocation stockAllocationNew);
 
     void delete(StockAllocation deletedAlloc);
+
+    List<EstimateViaAllocationDto> findEstimateAndAllocationById(Integer estimateId);
 }

@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 @Table(name = "stock_allocation",
         indexes = {
                 @Index(name = "idx_alloc_ticket", columnList = "service_ticket_id"),
+        @Index(name = "idx_alloc_issue", columnList = "issue_id"),
                 @Index(name = "idx_alloc_item", columnList = "warehouse_id, item_id")
         })
 @Data
@@ -22,6 +23,9 @@ public class StockAllocationJpa {
 
     @Column(name = "service_ticket_id", nullable = false)
     private Integer serviceTicketId;
+
+    @Column(name = "issue_id")
+    private Integer issueId;
 
     @Column(name = "estimate_item_id", nullable = false)
     private Integer estimateItemId;
@@ -42,7 +46,7 @@ public class StockAllocationJpa {
     @Column(name = "created_by", nullable = false)
     private Integer createdBy;
 
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @Column(name = "updated_at", nullable = false)

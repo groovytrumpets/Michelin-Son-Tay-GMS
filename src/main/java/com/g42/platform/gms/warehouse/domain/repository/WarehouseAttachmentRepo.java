@@ -1,14 +1,14 @@
 package com.g42.platform.gms.warehouse.domain.repository;
 
-import com.g42.platform.gms.warehouse.infrastructure.entity.WarehouseAttachmentJpa;
+import com.g42.platform.gms.warehouse.domain.entity.WarehouseAttachment;
 
 import java.util.List;
 
 public interface WarehouseAttachmentRepo {
 
-    WarehouseAttachmentJpa save(WarehouseAttachmentJpa attachment);
+    WarehouseAttachment save(WarehouseAttachment attachment);
 
-    boolean existsByRefTypeAndRefId(WarehouseAttachmentJpa.RefType refType, Integer refId);
+    boolean existsByRefTypeAndRefId(WarehouseAttachment.RefType refType, Integer refId);
 
-    List<WarehouseAttachmentJpa> findByRefTypeAndRefId(WarehouseAttachmentJpa.RefType refType, Integer refId);
+    List<WarehouseAttachment> findByRefTypeAndRefId(WarehouseAttachment.RefType refType, Integer refId);
 }
