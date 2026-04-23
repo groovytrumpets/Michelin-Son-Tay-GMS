@@ -25,4 +25,5 @@ public interface StockIssueRepo {
     boolean existsByCode(String issueCode);
     boolean existsConfirmedServiceTicketIssue(Integer serviceTicketId);
     boolean existsDraftServiceTicketIssue(Integer serviceTicketId);
+    boolean existsDraftServiceTicketIssueInWarehouse(Integer serviceTicketId, Integer warehouseId);
 }

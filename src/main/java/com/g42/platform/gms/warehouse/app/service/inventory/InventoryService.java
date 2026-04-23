@@ -3,16 +3,15 @@ package com.g42.platform.gms.warehouse.app.service.inventory;
 import com.g42.platform.gms.warehouse.api.dto.response.InventoryResponse;
 import com.g42.platform.gms.warehouse.app.service.dto.StockRequest;
 import com.g42.platform.gms.warehouse.app.service.dto.StockShortageInfo;
+import com.g42.platform.gms.warehouse.domain.entity.CatalogItem;
 import com.g42.platform.gms.warehouse.domain.entity.Inventory;
+import com.g42.platform.gms.warehouse.domain.entity.WarehousePricing;
 import com.g42.platform.gms.warehouse.domain.enums.CatalogItemType;
 import com.g42.platform.gms.warehouse.domain.repository.InventoryRepo;
 import com.g42.platform.gms.warehouse.domain.repository.PartCatalogRepo;
 import com.g42.platform.gms.warehouse.domain.repository.StockEntryRepo;
 import com.g42.platform.gms.warehouse.domain.repository.WarehousePricingRepo;
-import com.g42.platform.gms.warehouse.infrastructure.entity.CatalogItemJpa;
-import com.g42.platform.gms.warehouse.infrastructure.entity.WarehousePricingJpa;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -98,9 +97,9 @@ public class InventoryService {
 
         List<Integer> itemIds = invList.stream().map(Inventory::getItemId).collect(Collectors.toList());
         // Chỉ lấy catalog item có type = PART
-        Map<Integer, CatalogItemJpa> catalogMap = partCatalogRepo.findAllByIds(itemIds).stream()
+        Map<Integer, CatalogItem> catalogMap = partCatalogRepo.findAllPartsByIds(itemIds).stream()
                 .filter(c -> c.getItemType() == CatalogItemType.PART)
-                .collect(Collectors.toMap(CatalogItemJpa::getItemId, c -> c));
+            .collect(Collectors.toMap(CatalogItem::getItemId, c -> c));
 
         return invList.stream()
                 .filter(inv -> catalogMap.containsKey(inv.getItemId()))
@@ -113,7 +112,7 @@ public class InventoryService {
                     r.setReservedQuantity(inv.getReservedQuantity());
                     r.setAvailableQuantity(inv.getAvailableQuantity());
 
-                    CatalogItemJpa catalog = catalogMap.get(inv.getItemId());
+                    CatalogItem catalog = catalogMap.get(inv.getItemId());
                     r.setItemName(catalog.getItemName());
                     r.setSku(catalog.getSku());
                     r.setUnit(catalog.getUnit());
@@ -121,7 +120,7 @@ public class InventoryService {
                     if (showSellingPrice) {
                         BigDecimal selling = pricingRepo
                                 .findActiveByWarehouseAndItem(warehouseId, inv.getItemId())
-                                .map(WarehousePricingJpa::getSellingPrice)
+                            .map(WarehousePricing::getSellingPrice)
                                 .orElse(null);
                         if (selling == null) {
                             selling = stockEntryRepo.findFifoLots(warehouseId, inv.getItemId()).stream()
@@ -145,29 +144,17 @@ public class InventoryService {
     }
     @Transactional(readOnly = true)
     public List<InventoryResponse> listAllPartsWithInventory(Integer warehouseId, boolean showImportPrice) {
-        // Lấy tất cả PART trong catalog (không filter keyword)
-        Specification<CatalogItemJpa> spec = (root, query, cb) ->
-                cb.equal(root.get("itemType"), CatalogItemType.PART);
-        return buildInventoryResponseFromCatalog(warehouseId, spec, showImportPrice);
+        return buildInventoryResponseFromCatalog(warehouseId, partCatalogRepo.findAllParts(), showImportPrice);
     }
     @Transactional(readOnly = true)
     public List<InventoryResponse> searchByWarehouse(Integer warehouseId, String keyword,
                                                      boolean showImportPrice) {
-        String like = "%" + keyword.toLowerCase() + "%";
-        Specification<CatalogItemJpa> spec = (root, query, cb) -> cb.and(
-                cb.equal(root.get("itemType"), CatalogItemType.PART),
-                cb.or(
-                        cb.like(cb.lower(root.get("itemName")), like),
-                        cb.like(cb.lower(cb.coalesce(root.get("sku"), "")), like),
-                        cb.like(cb.lower(cb.coalesce(root.get("partNumber"), "")), like)
-                )
-        );
-        return buildInventoryResponseFromCatalog(warehouseId, spec, showImportPrice);
+        return buildInventoryResponseFromCatalog(warehouseId, partCatalogRepo.searchParts(keyword), showImportPrice);
     }
 
     private List<InventoryResponse> buildInventoryResponseFromCatalog(
-            Integer warehouseId, Specification<CatalogItemJpa> spec, boolean showImportPrice) {
-        return partCatalogRepo.findAll(spec).stream().map(catalog -> {
+            Integer warehouseId, List<CatalogItem> catalogs, boolean showImportPrice) {
+        return catalogs.stream().map(catalog -> {
             InventoryResponse r = new InventoryResponse();
             r.setItemId(catalog.getItemId());
             r.setWarehouseId(warehouseId);

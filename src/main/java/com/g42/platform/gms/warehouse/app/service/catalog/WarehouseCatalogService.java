@@ -2,13 +2,12 @@ package com.g42.platform.gms.warehouse.app.service.catalog;
 
 import com.g42.platform.gms.warehouse.api.dto.request.CreatePartRequest;
 import com.g42.platform.gms.warehouse.api.dto.response.PartResponse;
+import com.g42.platform.gms.warehouse.domain.entity.CatalogItem;
 import com.g42.platform.gms.warehouse.domain.enums.CatalogItemType;
 import com.g42.platform.gms.warehouse.domain.repository.InventoryRepo;
 import com.g42.platform.gms.warehouse.domain.repository.PartCatalogRepo;
-import com.g42.platform.gms.warehouse.infrastructure.entity.CatalogItemJpa;
 import com.g42.platform.gms.warehouse.domain.entity.Inventory;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,16 +30,7 @@ public class WarehouseCatalogService {
     private final InventoryRepo inventoryRepo;
     @Transactional(readOnly = true)
     public List<PartResponse> search(String keyword) {
-        Specification<CatalogItemJpa> spec = (root, query, cb) -> {
-            String like = "%" + keyword.toLowerCase() + "%";
-            return cb.or(
-                    cb.like(cb.lower(root.get("itemName")), like),
-                    cb.like(cb.lower(cb.coalesce(root.get("sku"), "")), like),
-                    cb.like(cb.lower(cb.coalesce(root.get("partNumber"), "")), like),
-                    cb.like(cb.lower(cb.coalesce(root.get("barcode"), "")), like)
-            );
-        };
-        return partCatalogRepo.findAll(spec).stream()
+        return partCatalogRepo.searchParts(keyword).stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
     }
@@ -48,7 +38,7 @@ public class WarehouseCatalogService {
     public PartResponse createPart(CreatePartRequest request, Integer staffId) {
         String sku = resolveSku(request.getSku());
 
-        CatalogItemJpa item = new CatalogItemJpa();
+        CatalogItem item = new CatalogItem();
         item.setItemName(request.getItemName());
         item.setItemType(CatalogItemType.PART);
         item.setSku(sku);
@@ -63,7 +53,7 @@ public class WarehouseCatalogService {
         item.setIsActive(true);
         item.setWarrantyDurationMonths(0);
 
-        CatalogItemJpa saved = partCatalogRepo.save(item);
+        CatalogItem saved = partCatalogRepo.save(item);
 
         // Tạo inventory record (qty=0) cho kho được chỉ định
         Inventory inv = Inventory.builder()
@@ -93,7 +83,7 @@ public class WarehouseCatalogService {
         return candidate;
     }
 
-    private PartResponse toResponse(CatalogItemJpa e) {
+    private PartResponse toResponse(CatalogItem e) {
         PartResponse r = new PartResponse();
         r.setItemId(e.getItemId());
         r.setItemName(e.getItemName());

@@ -1,13 +1,11 @@
 package com.g42.platform.gms.warehouse.app.service.issue;
 
-import com.g42.platform.gms.estimation.infrastructure.entity.EstimateItemJpa;
-import com.g42.platform.gms.estimation.infrastructure.entity.EstimateJpa;
-import com.g42.platform.gms.estimation.infrastructure.repository.EstimateItemRepositoryJpa;
-import com.g42.platform.gms.estimation.infrastructure.repository.EstimateRepositoryJpa;
+import com.g42.platform.gms.estimation.domain.entity.Estimate;
+import com.g42.platform.gms.estimation.domain.entity.EstimateItem;
+import com.g42.platform.gms.estimation.domain.repository.EstimateItemRepository;
+import com.g42.platform.gms.estimation.domain.repository.EstimateRepository;
 import com.g42.platform.gms.auth.entity.StaffProfile;
 import com.g42.platform.gms.auth.repository.StaffProfileRepo;
-import com.g42.platform.gms.booking.customer.infrastructure.entity.CatalogItemJpaEntity;
-import com.g42.platform.gms.catalog.infrastructure.repository.CatalogItemRepository;
 import com.g42.platform.gms.billing.domain.entity.ServiceBill;
 import com.g42.platform.gms.billing.domain.repository.BillingRepository;
 import com.g42.platform.gms.common.service.ImageUploadService;
@@ -20,7 +18,12 @@ import com.g42.platform.gms.warehouse.api.dto.request.UpdateStockIssueRequest;
 import com.g42.platform.gms.warehouse.api.dto.response.StockIssueDetailResponse;
 import com.g42.platform.gms.warehouse.api.dto.response.StockIssueResponse;
 import com.g42.platform.gms.warehouse.domain.entity.Inventory;
+import com.g42.platform.gms.warehouse.domain.entity.InventoryTransaction;
+import com.g42.platform.gms.warehouse.domain.entity.StockAllocation;
 import com.g42.platform.gms.warehouse.domain.entity.StockEntryItem;
+import com.g42.platform.gms.warehouse.domain.entity.Warehouse;
+import com.g42.platform.gms.warehouse.domain.entity.WarehouseAttachment;
+import com.g42.platform.gms.warehouse.domain.entity.WarehousePricing;
 import com.g42.platform.gms.warehouse.domain.entity.StockIssue;
 import com.g42.platform.gms.warehouse.domain.entity.StockIssueItem;
 import com.g42.platform.gms.warehouse.domain.enums.AllocationStatus;
@@ -35,12 +38,8 @@ import com.g42.platform.gms.warehouse.domain.repository.StockIssueItemRepo;
 import com.g42.platform.gms.warehouse.domain.repository.StockIssueRepo;
 import com.g42.platform.gms.warehouse.domain.repository.WarehouseAttachmentRepo;
 import com.g42.platform.gms.warehouse.domain.repository.WarehousePricingRepo;
-import com.g42.platform.gms.warehouse.infrastructure.entity.InventoryTransactionJpa;
-import com.g42.platform.gms.warehouse.infrastructure.entity.StockAllocationJpa;
-import com.g42.platform.gms.warehouse.infrastructure.entity.WarehouseAttachmentJpa;
-import com.g42.platform.gms.warehouse.infrastructure.entity.WarehouseJpa;
-import com.g42.platform.gms.warehouse.infrastructure.entity.WarehousePricingJpa;
-import com.g42.platform.gms.warehouse.infrastructure.repository.WarehouseJpaRepo;
+import com.g42.platform.gms.warehouse.domain.repository.WarehouseRepo;
+import com.g42.platform.gms.warehouse.domain.repository.PartCatalogRepo;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -88,12 +87,12 @@ public class StockIssueService {
     private final WarehousePricingRepo pricingRepo;
     private final com.g42.platform.gms.warehouse.app.service.discount.DiscountService discountService;
     private final StockIssueItemRepo stockIssueItemRepo;
-    private final CatalogItemRepository catalogItemRepository;
+    private final PartCatalogRepo partCatalogRepo;
     private final StaffProfileRepo staffProfileRepo;
-    private final WarehouseJpaRepo warehouseJpaRepo;
+    private final WarehouseRepo warehouseRepo;
     private final ServiceTicketRepo serviceTicketRepo;
-    private final EstimateRepositoryJpa estimateRepositoryJpa;
-    private final EstimateItemRepositoryJpa estimateItemRepositoryJpa;
+    private final EstimateRepository estimateRepository;
+    private final EstimateItemRepository estimateItemRepository;
     private final WarehouseAttachmentRepo attachmentRepo;
     private final ImageUploadService imageUploadService;
     private final ObjectMapper objectMapper;
@@ -105,12 +104,12 @@ public class StockIssueService {
     public StockIssueResponse create(CreateStockIssueRequest request, Integer staffId) {
         Map<Integer, Integer> reservedByItem = new HashMap<>();
         if (request.getIssueType() == IssueType.SERVICE_TICKET && request.getServiceTicketId() != null) {
-            List<StockAllocationJpa> reservedAllocations = stockAllocationRepo
+            List<StockAllocation> reservedAllocations = stockAllocationRepo
                     .findByTicketAndWarehouseAndStatus(
                             request.getServiceTicketId(),
                             request.getWarehouseId(),
                             AllocationStatus.RESERVED);
-            for (StockAllocationJpa alloc : reservedAllocations) {
+            for (StockAllocation alloc : reservedAllocations) {
                 if (alloc.getIssueId() != null) {
                     continue;
                 }
@@ -118,6 +117,7 @@ public class StockIssueService {
             }
         }
 
+        // Với ticket service, phần đã reserve cho item sẽ được tính vào khả dụng hiệu lực.
         for (CreateStockIssueRequest.IssueItemRequest item : request.getItems()) {
             int available = inventoryRepo
                     .findByWarehouseAndItem(request.getWarehouseId(), item.getItemId())
@@ -145,9 +145,9 @@ public class StockIssueService {
         StockIssue saved = stockIssueRepo.save(issue);
 
         if (saved.getIssueType() == IssueType.SERVICE_TICKET && saved.getServiceTicketId() != null) {
-            List<StockAllocationJpa> reservedAllocations = stockAllocationRepo
+            List<StockAllocation> reservedAllocations = stockAllocationRepo
                     .findByTicketAndWarehouseAndStatus(saved.getServiceTicketId(), saved.getWarehouseId(), AllocationStatus.RESERVED);
-            for (StockAllocationJpa allocation : reservedAllocations) {
+            for (StockAllocation allocation : reservedAllocations) {
                 if (allocation.getIssueId() != null) {
                     continue;
                 }
@@ -156,17 +156,23 @@ public class StockIssueService {
             }
         }
 
-        List<StockIssueItem> placeholders = request.getItems().stream().map(req -> StockIssueItem.builder()
-                .issueId(saved.getIssueId())
-                .itemId(req.getItemId())
-                .quantity(req.getQuantity())
-                .entryItemId(0)
-                .exportPrice(BigDecimal.ZERO)
-            .estimateUnitPrice(resolveEstimateUnitPrice(saved.getServiceTicketId(), saved.getWarehouseId(), req.getItemId()))
-                .importPrice(BigDecimal.ZERO)
-                .discountRate(req.getDiscountRate() != null ? req.getDiscountRate() : BigDecimal.ZERO)
-                .finalPrice(BigDecimal.ZERO)
-                .build()).collect(Collectors.toList());
+            List<StockIssueItem> placeholders = request.getItems().stream()
+                .map(req -> StockIssueItem.builder()
+                    .issueId(saved.getIssueId())
+                    .itemId(req.getItemId())
+                    .quantity(req.getQuantity())
+                    .entryItemId(0)
+                    .exportPrice(BigDecimal.ZERO)
+                    .estimateUnitPrice(resolveEstimateUnitPrice(
+                        saved.getServiceTicketId(),
+                        saved.getWarehouseId(),
+                        req.getItemId()
+                    ))
+                    .importPrice(BigDecimal.ZERO)
+                    .discountRate(req.getDiscountRate() != null ? req.getDiscountRate() : BigDecimal.ZERO)
+                    .finalPrice(BigDecimal.ZERO)
+                    .build())
+                .collect(Collectors.toList());
 
         stockIssueItemRepo.saveAll(placeholders);
         return toResponse(findOrThrow(saved.getIssueId()));
@@ -179,8 +185,8 @@ public class StockIssueService {
         StockIssueResponse created = create(request, staffId);
 
         String url = imageUploadService.uploadImage(file, FOLDER_STOCK_ISSUE);
-        WarehouseAttachmentJpa attachment = new WarehouseAttachmentJpa();
-        attachment.setRefType(WarehouseAttachmentJpa.RefType.STOCK_ISSUE);
+        WarehouseAttachment attachment = new WarehouseAttachment();
+        attachment.setRefType(WarehouseAttachment.RefType.STOCK_ISSUE);
         attachment.setRefId(created.getIssueId());
         attachment.setFileUrl(url);
         attachment.setUploadedBy(staffId);
@@ -221,8 +227,8 @@ public class StockIssueService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Phiếu đã được xác nhận");
         }
         String url = imageUploadService.uploadImage(file, FOLDER_STOCK_ISSUE);
-        WarehouseAttachmentJpa attachment = new WarehouseAttachmentJpa();
-        attachment.setRefType(WarehouseAttachmentJpa.RefType.STOCK_ISSUE);
+        WarehouseAttachment attachment = new WarehouseAttachment();
+        attachment.setRefType(WarehouseAttachment.RefType.STOCK_ISSUE);
         attachment.setRefId(issueId);
         attachment.setFileUrl(url);
         attachment.setUploadedBy(staffId);
@@ -312,13 +318,13 @@ public class StockIssueService {
         
         // Kiểm tra xem phiếu có ảnh chứng từ không
         boolean hasAttachment = attachmentRepo.existsByRefTypeAndRefId(
-                WarehouseAttachmentJpa.RefType.STOCK_ISSUE, issueId);
+            WarehouseAttachment.RefType.STOCK_ISSUE, issueId);
         if (!hasAttachment) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                     "Cần đính kèm ảnh chứng từ trước khi xác nhận");
         }
 
-        List<StockAllocationJpa> ticketReservedAllocations = new ArrayList<>();
+        List<StockAllocation> ticketReservedAllocations = new ArrayList<>();
         Map<Integer, Integer> reservedByItem = new HashMap<>();
         if (issue.getIssueType() == IssueType.SERVICE_TICKET) {
             ticketReservedAllocations = stockAllocationRepo
@@ -330,7 +336,7 @@ public class StockIssueService {
                                 issue.getWarehouseId(),
                                 AllocationStatus.RESERVED);
             }
-            for (StockAllocationJpa alloc : ticketReservedAllocations) {
+            for (StockAllocation alloc : ticketReservedAllocations) {
                 reservedByItem.merge(alloc.getItemId(), alloc.getQuantity(), Integer::sum);
             }
         }
@@ -369,7 +375,7 @@ public class StockIssueService {
 
             BigDecimal marketSellingPrice = pricingRepo
                     .findActiveByWarehouseAndItem(issue.getWarehouseId(), itemId)
-                    .map(WarehousePricingJpa::getSellingPrice)
+                    .map(WarehousePricing::getSellingPrice)
                     .orElse(null);
 
             for (StockEntryItem lot : lots) {
@@ -424,7 +430,7 @@ public class StockIssueService {
             inv.setQuantity(newQty);
             inventoryRepo.save(inv);
 
-            InventoryTransactionJpa tx = new InventoryTransactionJpa();
+            InventoryTransaction tx = new InventoryTransaction();
             tx.setWarehouseId(issue.getWarehouseId());
             tx.setItemId(itemId);
             tx.setTransactionType(InventoryTransactionType.OUT);
@@ -444,7 +450,7 @@ public class StockIssueService {
         issue.setConfirmedAt(LocalDateTime.now());
         stockIssueRepo.save(issue);
 
-        for (StockAllocationJpa alloc : ticketReservedAllocations) {
+        for (StockAllocation alloc : ticketReservedAllocations) {
             Inventory inv = inventoryRepo
                 .findByWarehouseAndItemWithLock(alloc.getWarehouseId(), alloc.getItemId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
@@ -458,7 +464,7 @@ public class StockIssueService {
             inv.setReservedQuantity(inv.getReservedQuantity() - alloc.getQuantity());
             inventoryRepo.save(inv);
 
-            InventoryTransactionJpa reservedTx = new InventoryTransactionJpa();
+            InventoryTransaction reservedTx = new InventoryTransaction();
             reservedTx.setWarehouseId(alloc.getWarehouseId());
             reservedTx.setItemId(alloc.getItemId());
             reservedTx.setTransactionType(InventoryTransactionType.ADJUSTMENT);
@@ -508,8 +514,7 @@ public class StockIssueService {
         Set<Integer> itemIds = issue.getItems().stream()
             .map(StockIssueItem::getItemId)
             .collect(Collectors.toSet());
-        Map<Integer, String> itemNameById = catalogItemRepository.findAllById(itemIds).stream()
-            .collect(Collectors.toMap(CatalogItemJpaEntity::getItemId, CatalogItemJpaEntity::getItemName));
+        Map<Integer, String> itemNameById = partCatalogRepo.findNamesByIds(itemIds.stream().toList());
 
         StockIssueDetailResponse resp = new StockIssueDetailResponse();
         resp.setIssueId(issue.getIssueId());
@@ -582,9 +587,9 @@ public class StockIssueService {
         // Thêm thông tin attachments
         resp.setAttachmentUrls(
             attachmentRepo.findByRefTypeAndRefId(
-                    WarehouseAttachmentJpa.RefType.STOCK_ISSUE, issueId)
+                    WarehouseAttachment.RefType.STOCK_ISSUE, issueId)
                     .stream()
-                    .map(WarehouseAttachmentJpa::getFileUrl)
+                    .map(WarehouseAttachment::getFileUrl)
                     .collect(Collectors.toList())
         );
 
@@ -637,7 +642,7 @@ public class StockIssueService {
 
         BigDecimal sellingPrice = pricingRepo
                 .findActiveByWarehouseAndItem(issue.getWarehouseId(), item.getItemId())
-                .map(WarehousePricingJpa::getSellingPrice)
+            .map(WarehousePricing::getSellingPrice)
                 .orElseGet(() -> {
                     if (!lots.isEmpty()) {
                         StockEntryItem first = lots.get(0);
@@ -710,17 +715,17 @@ public class StockIssueService {
         if (serviceTicketId == null || itemId == null) {
             return null;
         }
-        Optional<EstimateJpa> latestEstimateOpt = estimateRepositoryJpa.findTopByServiceTicketIdOrderByVersionDesc(serviceTicketId);
-        if (latestEstimateOpt.isEmpty()) {
+        Estimate latestEstimate = estimateRepository.findEstimateByServiceIdAndLatestVerson(serviceTicketId);
+        if (latestEstimate == null) {
             return null;
         }
-        Integer estimateId = latestEstimateOpt.get().getId();
-        return estimateItemRepositoryJpa.findByEstimateId(estimateId).stream()
+        Integer estimateId = latestEstimate.getId();
+        return estimateItemRepository.findByEstimateId(estimateId).stream()
                 .filter(i -> itemId.equals(i.getItemId()))
                 .filter(i -> warehouseId == null || warehouseId.equals(i.getWarehouseId()))
                 .filter(i -> !Boolean.TRUE.equals(i.getIsRemoved()))
                 .filter(i -> Boolean.TRUE.equals(i.getIsChecked()))
-                .map(EstimateItemJpa::getUnitPrice)
+                .map(EstimateItem::getUnitPrice)
                 .filter(p -> p != null)
                 .findFirst()
                 .orElse(null);
@@ -750,8 +755,8 @@ public class StockIssueService {
         r.setCreatedAt(e.getCreatedAt());
         enrichBillFields(e.getServiceTicketId(), r);
 
-        WarehouseJpa warehouse = e.getWarehouseId() != null
-                ? warehouseJpaRepo.findById(e.getWarehouseId()).orElse(null)
+        Warehouse warehouse = e.getWarehouseId() != null
+            ? warehouseRepo.findById(e.getWarehouseId()).orElse(null)
                 : null;
         if (warehouse != null) {
             r.setWarehouseCode(warehouse.getWarehouseCode());
@@ -781,7 +786,7 @@ public class StockIssueService {
 
         // Thêm số lượng attachments
         int attachmentCount = (int) attachmentRepo.findByRefTypeAndRefId(
-                WarehouseAttachmentJpa.RefType.STOCK_ISSUE, e.getIssueId()).size();
+            WarehouseAttachment.RefType.STOCK_ISSUE, e.getIssueId()).size();
         r.setAttachmentCount(attachmentCount);
 
         return r;
@@ -793,7 +798,7 @@ public class StockIssueService {
                                     Integer confirmedById,
                                     StockIssueDetailResponse resp) {
         if (warehouseId != null) {
-            WarehouseJpa warehouse = warehouseJpaRepo.findById(warehouseId).orElse(null);
+            Warehouse warehouse = warehouseRepo.findById(warehouseId).orElse(null);
             if (warehouse != null) {
                 resp.setWarehouseCode(warehouse.getWarehouseCode());
                 resp.setWarehouseName(warehouse.getWarehouseName());

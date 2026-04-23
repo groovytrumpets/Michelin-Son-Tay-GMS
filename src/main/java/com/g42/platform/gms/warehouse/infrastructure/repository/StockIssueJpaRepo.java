@@ -49,4 +49,10 @@ public interface StockIssueJpaRepo extends JpaRepository<StockIssueJpa, Integer>
             Integer serviceTicketId,
             IssueType issueType,
             StockIssueStatus status);
+
+        boolean existsByServiceTicketIdAndWarehouseIdAndIssueTypeAndStatus(
+            Integer serviceTicketId,
+            Integer warehouseId,
+            IssueType issueType,
+            StockIssueStatus status);
 }

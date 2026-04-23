@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 public class StockAllocation {
     private Integer allocationId;
     private Integer serviceTicketId;
+    private Integer issueId;
     private Integer estimateItemId;
     private Integer warehouseId;
     private Integer itemId;

@@ -84,6 +84,15 @@ public class StockIssueRepoImpl implements StockIssueRepo {
                 StockIssueStatus.DRAFT);
     }
 
+    @Override
+    public boolean existsDraftServiceTicketIssueInWarehouse(Integer serviceTicketId, Integer warehouseId) {
+        return jpaRepo.existsByServiceTicketIdAndWarehouseIdAndIssueTypeAndStatus(
+                serviceTicketId,
+                warehouseId,
+                IssueType.SERVICE_TICKET,
+                StockIssueStatus.DRAFT);
+    }
+
     // ── mappers ──────────────────────────────────────────────────────────────
 
     private StockIssue toDomain(StockIssueJpa jpa) {
