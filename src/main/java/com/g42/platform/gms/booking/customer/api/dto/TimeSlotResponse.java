@@ -17,4 +17,6 @@ public class TimeSlotResponse {
     private Integer remainingCapacity;
     private Boolean isAvailable;
     private String status;
+    private Integer currentBookingCount;
+    private Boolean isOverCapacity;
 }
