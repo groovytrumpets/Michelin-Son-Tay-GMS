@@ -18,6 +18,7 @@ public class ServiceTicketResponse {
     private Integer serviceTicketId;
     private String ticketCode;
     private Integer bookingId;
+    private Integer estimateId;
     private Integer vehicleId;
     private Integer customerId;
     private TicketStatus ticketStatus;

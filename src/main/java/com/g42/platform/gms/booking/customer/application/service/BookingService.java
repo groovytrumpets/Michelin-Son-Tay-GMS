@@ -16,6 +16,7 @@ import com.g42.platform.gms.booking.customer.domain.repository.BookingRepository
 import com.g42.platform.gms.booking.customer.domain.repository.IpBlacklistRepository;
 import com.g42.platform.gms.catalog.infrastructure.repository.CatalogItemRepository;
 import com.g42.platform.gms.estimation.api.internal.EstimateInternalApi;
+import com.g42.platform.gms.estimation.domain.entity.Estimate;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -153,6 +154,8 @@ public class BookingService {
             booking.setCatalogItemIds(new ArrayList<>());
         }
 
+
+
         // === 5. VALIDATE THỜI GIAN (PHẢI TRƯỚC ÍT NHẤT 2 GIỜ) ===
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime scheduledDateTime = LocalDateTime.of(
@@ -275,11 +278,18 @@ public class BookingService {
         booking.setDescription(description);
         booking.setIsGuest(false);
         booking.setStatus(BookingStatus.CONFIRMED);
+        booking.setEstimateId(request.getEstimateId());
 
         if (request.getSelectedServiceIds() != null && !request.getSelectedServiceIds().isEmpty()) {
             booking.setCatalogItemIds(request.getSelectedServiceIds());
         } else {
             booking.setCatalogItemIds(new ArrayList<>());
+        }
+        if (request.getEstimateId() != null) {
+            Estimate estimate = estimateInternalApi.findById(request.getEstimateId());
+            if (estimate == null) {
+                throw new BookingException("Khong tim thay bao gia voi estimateId: " + request.getEstimateId());
+            }
         }
         
         // === 3. VALIDATE THỜI GIAN (CHỈ CHECK KHÔNG ĐƯỢC QUÁ KHỨ) ===
@@ -292,8 +302,11 @@ public class BookingService {
         }
         
         // === 4. CHECK SLOT AVAILABILITY ===
+        // Staff direct create không bị chặn bởi capacity - có thể vượt quá sức chứa
         int estimatedDuration = calculateEstimatedDuration(booking.getCatalogItemIds());
         
+        // Comment out kiểm tra capacity cho staffDirectCreate
+        /*
         boolean slotAvailable = slotService.isSlotAvailable(
                 booking.getScheduledDate(),
                 booking.getScheduledTime(),
@@ -303,6 +316,7 @@ public class BookingService {
         if (!slotAvailable) {
             throw new BookingException("Khung giờ này đã đầy, vui lòng chọn giờ khác.");
         }
+        */
         
         // === 5. GENERATE BOOKING CODE (MST_XXXXXX) ===
         try {
@@ -328,7 +342,7 @@ public class BookingService {
                 savedBooking.getBookingId(), savedBooking.getBookingCode(), customerId);
         //todo:update remind if exist
         if (request.getReminderId()!=null) {
-            estimateInternalApi.updateBookingToRemindById(request.getReminderId(),booking.getBookingId());
+            estimateInternalApi.updateBookingToRemindById(request.getReminderId(), savedBooking.getBookingId());
         }
         return savedBooking;
     }

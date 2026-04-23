@@ -22,6 +22,7 @@ public class Booking {
     private Boolean isGuest = false;
     private LocalDateTime createdAt;
     private Integer queueOrder;
+    private Integer estimateId;
     private List<Integer> catalogItemIds = new ArrayList<>();
     
     public void initializeDefaults() {

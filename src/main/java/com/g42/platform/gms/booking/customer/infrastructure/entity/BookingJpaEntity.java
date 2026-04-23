@@ -46,6 +46,8 @@ public class BookingJpaEntity {
     private LocalDateTime createdAt;
     @Column(name = "queue_order")
     private Integer queueOrder;
+    @Column(name = "estimate_id")
+    private Integer estimateId;
 
     @ManyToMany
     @JoinTable(

@@ -4,12 +4,15 @@ import com.g42.platform.gms.estimation.domain.entity.Estimate;
 import com.g42.platform.gms.estimation.domain.entity.EstimateItem;
 import com.g42.platform.gms.estimation.domain.repository.EstimateItemRepository;
 import com.g42.platform.gms.estimation.infrastructure.entity.EstimateItemJpa;
+import com.g42.platform.gms.estimation.infrastructure.entity.EstimateJpa;
 import com.g42.platform.gms.estimation.infrastructure.mapper.EstimateItemJpaMapper;
 import com.g42.platform.gms.estimation.infrastructure.mapper.EstimateJpaMapper;
 import com.g42.platform.gms.estimation.infrastructure.repository.EstimateItemRepositoryJpa;
+import com.g42.platform.gms.estimation.infrastructure.repository.EstimateRepositoryJpa;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Repository;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Repository
@@ -17,6 +20,7 @@ import java.util.List;
 public class EstimateItemRepositoryImpl implements EstimateItemRepository {
     private final EstimateItemRepositoryJpa estimateItemRepositoryJpa;
     private final EstimateItemJpaMapper estimateItemJpaMapper;
+    private final EstimateRepositoryJpa estimateRepositoryJpa;
 
     @Override
     public List<EstimateItem> findByEstimateIds(List<Integer> estimateIds) {

@@ -1,6 +1,7 @@
 package com.g42.platform.gms.estimation.infrastructure.repository;
 
 import com.g42.platform.gms.estimation.domain.entity.Estimate;
+import com.g42.platform.gms.estimation.infrastructure.entity.EstimateItemJpa;
 import com.g42.platform.gms.estimation.infrastructure.entity.EstimateJpa;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -36,4 +37,6 @@ public interface EstimateRepositoryJpa extends JpaRepository<EstimateJpa, Intege
     select e.id from EstimateJpa  e where e.serviceTicketId = :serviceTicketId and e.version = :latestEstimateVersion
     """)
     Integer findRevisedEstimateId(Integer serviceTicketId, int latestEstimateVersion);
+
+    List<EstimateJpa> findAllByServiceTicketId(Integer serviceTicketId);
 }

@@ -1,5 +1,6 @@
 package com.g42.platform.gms.staff.profile.app.service;
 
+import com.g42.platform.gms.hikvision.client.HikvisionUserClient;
 import com.g42.platform.gms.staff.profile.api.dto.RoleDto;
 import com.g42.platform.gms.staff.profile.api.dto.StaffCreateDto;
 import com.g42.platform.gms.staff.profile.api.dto.StaffProfileDto;
@@ -25,6 +26,8 @@ public class StaffService {
     StaffAuthDtoMapper staffAuthDtoMapper;
     @Autowired
     StaffProfileDtoMapper staffProfileDtoMapper;
+    @Autowired
+    HikvisionUserClient hikvisionUserClient;
 
 
     public Page<StaffProfileDto> getListOfAllStaffProfile(int page, int size, Boolean isActive, String search, List<Integer> roleIds, String status) {
@@ -46,21 +49,41 @@ public class StaffService {
 
     public StaffProfileDto createStaff(StaffCreateDto staffCreateDto) {
         StaffProfile staffProfile = staffRepo.createStaff(staffCreateDto);
-        return  staffProfileDtoMapper.toStaffProfileDto(staffProfile);
+        StaffProfileDto result = staffProfileDtoMapper.toStaffProfileDto(staffProfile);
+
+        // Sau khi tạo nhân viên trong GMS, tạo luôn trên Hikvision (employeeNo = staffId, auto-generated)
+        if (result.getEmployeeNo() != null && !result.getEmployeeNo().isBlank()) {
+            hikvisionUserClient.createPerson(result.getEmployeeNo(), result.getFullName());
+        }
+
+        return result;
     }
 
-    public StaffProfileDto updateStaff(Integer staffId,StaffUpdateDto staffProfileDto) {
-        StaffProfile staffProfile = staffRepo.updateStaff(staffId,staffProfileDto);
-        return  staffProfileDtoMapper.toStaffProfileDto(staffProfile);
+    public StaffProfileDto updateStaff(Integer staffId, StaffUpdateDto staffProfileDto) {
+        StaffProfile staffProfile = staffRepo.updateStaff(staffId, staffProfileDto);
+        StaffProfileDto result = staffProfileDtoMapper.toStaffProfileDto(staffProfile);
+
+        // Sync tên mới lên Hikvision — employeeNo = staffId (auto-generated)
+        if (staffProfileDto.getFullName() != null) {
+            String employeeNo = String.valueOf(staffId);
+            hikvisionUserClient.updatePerson(employeeNo, staffProfileDto.getFullName());
+        }
+
+        return result;
     }
 
     public StaffProfileDto deleteStaff(Integer staffId) {
         StaffProfile staffProfile = staffRepo.deleteStaff(staffId);
-        return  staffProfileDtoMapper.toStaffProfileDto(staffProfile);
+        StaffProfileDto result = staffProfileDtoMapper.toStaffProfileDto(staffProfile);
+
+        // Xóa person trên Hikvision — employeeNo = staffId
+        hikvisionUserClient.deletePerson(String.valueOf(staffId));
+
+        return result;
     }
 
     public StaffProfileDto lockStaff(Integer staffId) {
         StaffProfile staffProfile = staffRepo.lockStaff(staffId);
-        return  staffProfileDtoMapper.toStaffProfileDto(staffProfile);
+        return staffProfileDtoMapper.toStaffProfileDto(staffProfile);
     }
 }

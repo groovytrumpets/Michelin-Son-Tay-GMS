@@ -9,6 +9,8 @@ import com.g42.platform.gms.booking.customer.domain.repository.BookingRepository
 import com.g42.platform.gms.catalog.infrastructure.repository.CatalogItemRepository;
 import com.g42.platform.gms.common.constant.FileUploadConstants;
 import com.g42.platform.gms.common.service.ImageUploadService;
+import com.g42.platform.gms.estimation.api.internal.EstimateInternalApi;
+import com.g42.platform.gms.estimation.domain.entity.Estimate;
 import com.g42.platform.gms.service_ticket_management.api.dto.assign.AssignStaffDto;
 import com.g42.platform.gms.service_ticket_management.api.dto.checkin.*;
 import com.g42.platform.gms.service_ticket_management.api.mapper.BookingLookupMapper;
@@ -65,6 +67,7 @@ public class CheckInService {
     private final PhotoResponseMapper photoResponseMapper;
     private final SafetyInspectionService safetyInspectionService;
     private final TicketAssignmentService ticketAssignmentService;
+    private final EstimateInternalApi estimateInternalApi;
 
     @Transactional(readOnly = true)
     public BookingLookupResponse lookupBooking(BookingLookupRequest request) {
@@ -84,6 +87,12 @@ public class CheckInService {
 
         BookingLookupResponse response = bookingLookupMapper.toResponse(booking, customer);
         response.setServices(bookingLookupMapper.toServiceInfoList(catalogItems));
+        serviceTicketRepo.findByBookingId(booking.getBookingId()).ifPresent(ticket -> {
+            Estimate latestEstimate = estimateInternalApi.findLatestByServiceTicketId(ticket.getServiceTicketId());
+            if (latestEstimate != null) {
+                response.setEstimateId(latestEstimate.getId());
+            }
+        });
 
         log.info("Booking lookup successful: bookingId={}, customerId={}", booking.getBookingId(), customer.getCustomerId());
         return response;
@@ -308,6 +317,10 @@ public class CheckInService {
 
         // 10. Build response
         ServiceTicketResponse response = serviceTicketDtoMapper.toResponse(savedTicketAll);
+        Estimate latestEstimate = estimateInternalApi.findLatestByServiceTicketId(savedTicketAll.getServiceTicketId());
+        if (latestEstimate != null) {
+            response.setEstimateId(latestEstimate.getId());
+        }
 
         List<VehicleConditionPhoto> photos = photoRepo.findByServiceTicketId(savedTicketAll.getServiceTicketId());
         response.setPhotos(photoResponseMapper.toPhotoInfoList(photos));
