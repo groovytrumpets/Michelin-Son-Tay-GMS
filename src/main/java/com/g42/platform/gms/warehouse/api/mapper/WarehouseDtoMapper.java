@@ -9,4 +9,6 @@ import org.mapstruct.Mapper;
 @Mapper(componentModel = "spring")
 public interface WarehouseDtoMapper {
     WarehouseDto toDto(Warehouse warehouse);
+
+    com.g42.platform.gms.estimation.api.dto.WarehouseDto toDtoInternal(Warehouse wc);
 }
