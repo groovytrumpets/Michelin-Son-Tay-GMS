@@ -75,7 +75,8 @@ public class StockAllocationService {
                     .map(StockAllocation::getEstimateItemId)
                     .collect(Collectors.toSet());
             List<EstimateItem> brandNewItems = newEstimateItems.stream()
-                    .filter(newItem -> newItem.getRevisedFromItemId() == null)
+                    .filter(newItem -> newItem.getRevisedFromItemId() == null
+                            && newItem.getIsRemoved()==false)
                     .toList();
             for (EstimateItem createItem : brandNewItems) {
                 System.out.println("estimate cr: "+createItem.getEstimateId());
@@ -109,7 +110,7 @@ public class StockAllocationService {
         else {
             List<EstimateItem> estimateItems = estimateItemRepository.findByEstimateId(estimateId);
             for (EstimateItem estimateItem : estimateItems) {
-                if (estimateItem.getItemId() != null && estimateItem.getWarehouseId() != null) {
+                if (estimateItem.getItemId() != null && estimateItem.getWarehouseId() != null && estimateItem.getIsRemoved()==false) {
                     StockAllocation stockAllocation = new StockAllocation();
                     stockAllocation.setServiceTicketId(newEstimate.getServiceTicketId());
                     stockAllocation.setEstimateItemId(estimateItem.getId());
