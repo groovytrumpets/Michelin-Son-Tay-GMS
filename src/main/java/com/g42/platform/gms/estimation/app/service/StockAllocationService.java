@@ -110,7 +110,7 @@ public class StockAllocationService {
         else {
             List<EstimateItem> estimateItems = estimateItemRepository.findByEstimateId(estimateId);
             for (EstimateItem estimateItem : estimateItems) {
-                if (estimateItem.getItemId() != null && estimateItem.getWarehouseId() != null) {
+                if (estimateItem.getItemId() != null && estimateItem.getWarehouseId() != null && estimateItem.getIsRemoved()==false) {
                     StockAllocation stockAllocation = new StockAllocation();
                     stockAllocation.setServiceTicketId(newEstimate.getServiceTicketId());
                     stockAllocation.setEstimateItemId(estimateItem.getId());
