@@ -45,7 +45,7 @@ public class BookingRequestJpaEntity {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
-    @Column(name = "service_category", length = 50)
+    @Column(name = "service_category", length = 225)
     private String serviceCategory;
 
     @Enumerated(EnumType.STRING)
