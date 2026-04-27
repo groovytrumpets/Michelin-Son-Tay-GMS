@@ -18,6 +18,8 @@ import com.g42.platform.gms.estimation.domain.repository.TaxRuleRepository;
 import com.g42.platform.gms.estimation.domain.repository.WorkCategoryRepository;
 import com.g42.platform.gms.warehouse.api.dto.CatalogItemDto;
 import com.g42.platform.gms.warehouse.api.internal.WarehouseInternalApi;
+import com.g42.platform.gms.warehouse.api.mapper.WarehouseDtoMapper;
+import com.g42.platform.gms.warehouse.domain.entity.Warehouse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +39,7 @@ public class EstimateService {
 
     private final WarehouseInternalApi warehouseInternalApi;
     private final TaxRuleInternalApi taxRuleInternalApi;
+    private final WarehouseDtoMapper warehouseDtoMapper;
 
 
     public List<EstimateRespondDto> getEstimateByCode(Integer serviceTicketId) {
@@ -56,7 +59,11 @@ public class EstimateService {
                 .stream()
                 .filter(item -> Boolean.FALSE.equals(item.getIsRemoved()))
                 .toList();
-
+        List<Integer> warehouseIds = estimateItems.stream()
+                .map(EstimateItem::getWarehouseId)
+//                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
         // 4. Lấy danh sách work-catalog của estimateItem an toàn
         List<Integer> workCategoryIds = estimateItems.stream()
                 .map(EstimateItem::getWorkCategoryId)
@@ -72,6 +79,14 @@ public class EstimateService {
                     .collect(Collectors.toMap(WorkCategory::getId, wc -> wc));
         } else {
             categoryMap = new HashMap<>();
+        }
+        Map<Integer, Warehouse> warehouseMap;
+        if (!workCategoryIds.isEmpty()) {
+            warehouseMap = warehouseInternalApi.findAllById(warehouseIds)
+                    .stream()
+                    .collect(Collectors.toMap(Warehouse::getWarehouseId, wc -> wc));
+        } else {
+            warehouseMap = new HashMap<>();
         }
 
         // 5. Group estimateItem by estimateId
@@ -95,6 +110,13 @@ public class EstimateService {
                     WorkCategory wc = categoryMap.get(item.getWorkCategoryId());
                     if (wc != null) {
                         itemDto.setWorkCategory(estimateDtoMapper.toWorkCateDto(wc));
+                    }
+                }
+
+                if (item.getWarehouseId() != null) {
+                    Warehouse wc = warehouseMap.get(item.getWarehouseId());
+                    if (wc != null) {
+                        itemDto.setWarehouse(warehouseDtoMapper.toDtoInternal(wc));
                     }
                 }
 
