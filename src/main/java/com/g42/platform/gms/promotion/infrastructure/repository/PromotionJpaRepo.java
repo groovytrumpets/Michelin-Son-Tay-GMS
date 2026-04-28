@@ -1,6 +1,5 @@
 package com.g42.platform.gms.promotion.infrastructure.repository;
 
-import com.g42.platform.gms.billing.api.dto.ServiceBillDto;
 import com.g42.platform.gms.promotion.infrastructure.entity.PromotionJpa;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -21,9 +20,9 @@ public interface PromotionJpaRepo extends JpaRepository<PromotionJpa,Integer> {
     """)
     PromotionJpa findPromotionOfBilling(LocalDate now, BigDecimal subTotal, Integer promotionId);
     @Query("""
-    select p from PromotionJpa p where p.targetType = 'ALL' and p.applyTo ='ALL'
+    select p from PromotionJpa p where p.targetType = 'ALL' and p.applyTo ='ALL' and p.type=:promotionType
     """)
-    List<PromotionJpa> findAllAvailable();
+    List<PromotionJpa> findAllAvailable(String promotionType);
 
     PromotionJpa findPromotionJpasByCode(String code);
 

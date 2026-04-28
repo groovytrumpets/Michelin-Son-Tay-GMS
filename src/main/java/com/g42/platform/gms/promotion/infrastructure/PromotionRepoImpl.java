@@ -1,7 +1,6 @@
 package com.g42.platform.gms.promotion.infrastructure;
 
 import com.g42.platform.gms.billing.api.dto.ServiceBillDto;
-import com.g42.platform.gms.promotion.api.dto.PromotionCreateDto;
 import com.g42.platform.gms.promotion.domain.entity.Promotion;
 import com.g42.platform.gms.promotion.domain.entity.PromotionCustomer;
 import com.g42.platform.gms.promotion.domain.entity.PromotionItem;
@@ -18,7 +17,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 
 @Repository
@@ -58,8 +56,8 @@ public class PromotionRepoImpl implements PromotionRepo {
     }
 
     @Override
-    public List<Promotion> getAllAvailablePromotion() {
-        List<PromotionJpa> promotionJpa = promotionJpaRepo.findAllAvailable();
+    public List<Promotion> getAllAvailablePromotion(String promotionType) {
+        List<PromotionJpa> promotionJpa = promotionJpaRepo.findAllAvailable(promotionType);
         return promotionJpa.stream().map(promotionJpaMapper::toDomain).toList();
     }
 

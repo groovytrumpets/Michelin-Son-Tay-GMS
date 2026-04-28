@@ -1,7 +1,6 @@
 package com.g42.platform.gms.promotion.domain.repository;
 
 import com.g42.platform.gms.billing.api.dto.ServiceBillDto;
-import com.g42.platform.gms.promotion.api.dto.PromotionCreateDto;
 import com.g42.platform.gms.promotion.domain.entity.Promotion;
 import com.g42.platform.gms.promotion.domain.entity.PromotionCustomer;
 import com.g42.platform.gms.promotion.domain.entity.PromotionItem;
@@ -17,7 +16,7 @@ public interface PromotionRepo {
 
     Promotion getAllPromotionForBilling(ServiceBillDto serviceBillDto);
 
-    List<Promotion> getAllAvailablePromotion();
+    List<Promotion> getAllAvailablePromotion(String promotionType);
 
     Promotion getPromotionByCode(String code);
 

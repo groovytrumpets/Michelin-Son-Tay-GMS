@@ -43,8 +43,14 @@ public class PromotionService {
         return promotionDtoMapper.toDto(promotion);
     }
 
-    public List<PromotionCreateDto> getAllAvailablePromotion() {
-        List<Promotion> promotions = promotionRepo.getAllAvailablePromotion();
+    public List<PromotionCreateDto> getAllAvailablePromotion(String promotionType) {
+        if (promotionType==null) {
+            throw new PromotionException("Promotion Type MUST NOT NULL", PromotionErrorCode.BAD_REQUEST);
+        }
+        if (!(promotionType.equals("PERCENT") || promotionType.equals("BUY_X_GET_Y"))) {
+            throw new PromotionException("Promotion Type MUST BE 'PERCENT' or 'BUY_X_GET_Y'", PromotionErrorCode.BAD_REQUEST);
+        }
+        List<Promotion> promotions = promotionRepo.getAllAvailablePromotion(promotionType);
         return promotions.stream().map(promotionDtoMapper::toDto).toList();
     }
 
