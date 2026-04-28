@@ -6,6 +6,7 @@ import lombok.Data;
 public class ReturnEntryItemResponse {
     private Integer returnItemId;
     private Integer itemId;
+    private Integer sourceIssueItemId;
     private String itemName;
     private Integer quantity;
     private String conditionNote;

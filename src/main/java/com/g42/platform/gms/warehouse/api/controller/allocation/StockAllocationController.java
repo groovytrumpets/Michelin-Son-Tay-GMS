@@ -7,10 +7,12 @@ import com.g42.platform.gms.warehouse.api.dto.response.StockIssueResponse;
 import com.g42.platform.gms.warehouse.app.service.allocation.StockAllocationService;
 import com.g42.platform.gms.warehouse.app.service.dto.StockShortageInfo;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -26,8 +28,13 @@ public class StockAllocationController {
     public ResponseEntity<ApiResponse<List<StockShortageInfo>>> reserve(
             @RequestParam Integer estimateId,
             @AuthenticationPrincipal StaffPrincipal principal) {
-        return ResponseEntity.ok(ApiResponses.success(
-                stockAllocationService.reserve(estimateId, principal.getStaffId())));
+        // TEMP DISABLED: Estimate module is current owner of reserve/update reserved_quantity.
+        // Keep endpoint blocked to avoid accidental double-reserve from warehouse side.
+        // Old logic (keep for future re-enable):
+        // return ResponseEntity.ok(ApiResponses.success(
+        //         stockAllocationService.reserve(estimateId, principal.getStaffId())));
+        throw new ResponseStatusException(HttpStatus.CONFLICT,
+            "Warehouse reserve endpoint is temporarily disabled. Use estimate allocation flow.");
     }
 
     @PostMapping("/{ticketId}/request-issue")

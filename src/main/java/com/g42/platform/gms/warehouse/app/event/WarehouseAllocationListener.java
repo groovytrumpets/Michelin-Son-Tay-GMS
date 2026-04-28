@@ -21,14 +21,15 @@ public class WarehouseAllocationListener {
     @EventListener
     @Async
     public void onEstimateApproved(EstimateApprovedEvent event) {
-        try {
-            var shortages = stockAllocationService.reserve(event.getEstimateId(), event.getStaffId());
-            if (!shortages.isEmpty()) {
-                log.warn("Stock shortages detected for estimateId={}: {}", event.getEstimateId(), shortages);
-            }
-        } catch (Exception e) {
-            log.error("Failed to reserve stock for estimateId={}", event.getEstimateId(), e);
-        }
+        // TEMP DISABLED: Reserve ownership is handled by estimation flow.
+        // Avoid duplicate reserved_quantity updates from warehouse listener.
+        // Old logic (keep for future re-enable):
+        // try {
+        //     stockAllocationService.reserve(event.getEstimateId(), event.getStaffId());
+        // } catch (Exception e) {
+        //     log.error("Failed to reserve stock for estimateId={}", event.getEstimateId(), e);
+        // }
+        log.info("Skip warehouse auto-reserve for estimateId={} because estimate is reserve owner", event.getEstimateId());
     }
 
     /**
