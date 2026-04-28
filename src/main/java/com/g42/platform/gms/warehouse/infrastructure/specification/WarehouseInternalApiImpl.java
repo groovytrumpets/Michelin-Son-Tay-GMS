@@ -3,15 +3,21 @@ package com.g42.platform.gms.warehouse.infrastructure.specification;
 import com.g42.platform.gms.warehouse.api.dto.CatalogItemDto;
 import com.g42.platform.gms.warehouse.api.internal.WarehouseInternalApi;
 import com.g42.platform.gms.warehouse.app.service.inventory.InventoryService;
+import com.g42.platform.gms.warehouse.domain.entity.Warehouse;
 import com.g42.platform.gms.warehouse.domain.exception.WarehouseErrorCode;
 import com.g42.platform.gms.warehouse.domain.exception.WarehouseException;
 import com.g42.platform.gms.warehouse.infrastructure.entity.CatalogItemJpa;
+import com.g42.platform.gms.warehouse.infrastructure.entity.WarehouseJpa;
 import com.g42.platform.gms.warehouse.infrastructure.entity.WorkCategoryJpaEntity;
 import com.g42.platform.gms.warehouse.infrastructure.mapper.CatalogItemJpaMapper;
+import com.g42.platform.gms.warehouse.infrastructure.mapper.WarehouseJpaMapper;
 import com.g42.platform.gms.warehouse.infrastructure.repository.CatalogItemJpaRepo;
+import com.g42.platform.gms.warehouse.infrastructure.repository.WarehouseJpaRepo;
 import com.g42.platform.gms.warehouse.infrastructure.repository.WorkCategoryJpaEntityRepo;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 @Service
 public class WarehouseInternalApiImpl implements WarehouseInternalApi {
@@ -23,6 +29,10 @@ public class WarehouseInternalApiImpl implements WarehouseInternalApi {
     private InventoryService inventoryService;
     @Autowired
     private WorkCategoryJpaEntityRepo itemCategoryJpaRepo;
+    @Autowired
+    private WarehouseJpaRepo warehouseJpaRepo;
+    @Autowired
+    private WarehouseJpaMapper warehouseJpaMapper;
 
     @Override
     public CatalogItemDto getItemInfo(Integer itemId) {
@@ -55,5 +65,11 @@ public class WarehouseInternalApiImpl implements WarehouseInternalApi {
             return null;
         }
         return workCategoryJpaEntity.getWorkCategoryId();
+    }
+
+    @Override
+    public List<Warehouse> findAllById(List<Integer> workCategoryIds) {
+        List<WarehouseJpa> warehouseJpas = warehouseJpaRepo.findAllById(workCategoryIds);
+        return warehouseJpas.stream().map(warehouseJpaMapper::toDomain).toList();
     }
 }
