@@ -39,6 +39,7 @@ public class TaxRuleInternalApiImpl implements TaxRuleInternalApi {
         taxRule.setTaxName("Miễn thuế");
         taxRule.setTaxRate(BigDecimal.ZERO);
         taxRule.setEffectiveFrom(LocalDate.now());
+        taxRule.setIsActive((byte)1);
         return taxRuleRepositoryJpa.save(taxRule).getTaxRuleId();
     }
 

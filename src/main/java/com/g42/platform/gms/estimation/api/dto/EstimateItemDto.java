@@ -28,6 +28,10 @@ public class EstimateItemDto {
     private BigDecimal subTotalWithVat;
     private String unit;
     private Integer revisedFromItemId;
+    private Boolean isGift;
+    private Integer triggeredByItemId;
+    private BigDecimal discountAmount;
+    private BigDecimal finalPrice;
     private WarehouseDto warehouse;
 
 }
