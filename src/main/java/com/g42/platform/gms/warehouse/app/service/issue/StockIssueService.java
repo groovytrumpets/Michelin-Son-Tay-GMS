@@ -486,6 +486,43 @@ public class StockIssueService {
         return toResponse(findOrThrow(issueId));
     }
 
+    @Transactional
+    public StockIssueResponse cancel(Integer issueId, Integer staffId) {
+        StockIssue issue = findOrThrow(issueId);
+
+        if (issue.getStatus() == StockIssueStatus.CANCELLED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Phiếu đã bị hủy");
+        }
+        if (issue.getStatus() == StockIssueStatus.CONFIRMED) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Không thể hủy phiếu đã được xác nhận");
+        }
+
+        if (issue.getIssueType() == IssueType.SERVICE_TICKET && issue.getServiceTicketId() != null) {
+            List<StockAllocation> allocations = stockAllocationRepo
+                    .findByIssueIdAndStatus(issueId, AllocationStatus.RESERVED);
+
+            for (StockAllocation allocation : allocations) {
+                Inventory inventory = inventoryRepo
+                        .findByWarehouseAndItemWithLock(allocation.getWarehouseId(), allocation.getItemId())
+                        .orElse(null);
+
+                if (inventory != null) {
+                    int updatedReserved = Math.max(0, inventory.getReservedQuantity() - allocation.getQuantity());
+                    inventory.setReservedQuantity(updatedReserved);
+                    inventoryRepo.save(inventory);
+                }
+
+                allocation.setIssueId(null);
+                allocation.setStatus(AllocationStatus.RELEASED);
+                stockAllocationRepo.save(allocation);
+            }
+        }
+
+        issue.setStatus(StockIssueStatus.CANCELLED);
+        return toResponse(stockIssueRepo.save(issue));
+    }
+
     @Transactional(readOnly = true)
     public List<StockIssueResponse> listByWarehouse(Integer warehouseId) {
         return stockIssueRepo.findByWarehouseId(warehouseId).stream()
