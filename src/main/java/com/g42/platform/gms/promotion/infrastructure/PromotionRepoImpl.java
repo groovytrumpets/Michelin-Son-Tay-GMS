@@ -39,8 +39,9 @@ public class PromotionRepoImpl implements PromotionRepo {
 
     @Override
     public Promotion createNewPromotion(Promotion promotionCreateDto) {
-        PromotionJpa promotionJpa = promotionJpaRepo.save(promotionJpaMapper.fromDomain(promotionCreateDto));
-        return promotionJpaMapper.toDomain(promotionJpa);
+        PromotionJpa promotionJpa = promotionJpaMapper.fromDomain(promotionCreateDto);
+        promotionJpa.setUsedCount(0);
+        return promotionJpaMapper.toDomain(promotionJpaRepo.save(promotionJpa));
     }
 
     @Override

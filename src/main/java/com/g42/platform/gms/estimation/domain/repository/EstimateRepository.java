@@ -19,4 +19,6 @@ public interface EstimateRepository {
     int findLatestEstimate(Integer serviceTicketId);
 
     Integer findEstimateIdByVersionAndServiceTicket(Integer serviceTicketId, int latestEstimateVersion);
+
+    void deleteOldGitItemsByEstimateId(Integer estimateId);
 }

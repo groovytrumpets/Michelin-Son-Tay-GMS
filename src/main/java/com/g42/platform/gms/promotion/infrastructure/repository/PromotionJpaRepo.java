@@ -26,4 +26,6 @@ public interface PromotionJpaRepo extends JpaRepository<PromotionJpa,Integer> {
     List<PromotionJpa> findAllAvailable();
 
     PromotionJpa findPromotionJpasByCode(String code);
+
+    PromotionJpa findByCode(String code);
 }

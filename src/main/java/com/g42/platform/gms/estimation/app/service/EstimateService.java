@@ -12,19 +12,26 @@ import com.g42.platform.gms.estimation.domain.entity.Estimate;
 import com.g42.platform.gms.estimation.domain.entity.EstimateItem;
 import com.g42.platform.gms.estimation.domain.entity.TaxRule;
 import com.g42.platform.gms.estimation.domain.entity.WorkCategory;
+import com.g42.platform.gms.estimation.domain.exception.EstimateErrorCode;
+import com.g42.platform.gms.estimation.domain.exception.EstimateException;
 import com.g42.platform.gms.estimation.domain.repository.EstimateItemRepository;
 import com.g42.platform.gms.estimation.domain.repository.EstimateRepository;
 import com.g42.platform.gms.estimation.domain.repository.TaxRuleRepository;
 import com.g42.platform.gms.estimation.domain.repository.WorkCategoryRepository;
+import com.g42.platform.gms.promotion.api.internal.PromotionInternalApi;
+import com.g42.platform.gms.promotion.domain.entity.Promotion;
 import com.g42.platform.gms.warehouse.api.dto.CatalogItemDto;
 import com.g42.platform.gms.warehouse.api.internal.WarehouseInternalApi;
 import com.g42.platform.gms.warehouse.api.mapper.WarehouseDtoMapper;
+import com.g42.platform.gms.warehouse.domain.entity.CatalogItem;
 import com.g42.platform.gms.warehouse.domain.entity.Warehouse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -40,6 +47,8 @@ public class EstimateService {
     private final WarehouseInternalApi warehouseInternalApi;
     private final TaxRuleInternalApi taxRuleInternalApi;
     private final WarehouseDtoMapper warehouseDtoMapper;
+
+    private final PromotionInternalApi promotionInternalApi;
 
 
     public List<EstimateRespondDto> getEstimateByCode(Integer serviceTicketId) {
@@ -276,6 +285,8 @@ public class EstimateService {
             item.setIsChecked(req.getIsChecked() != null ? req.getIsChecked() : false);
             item.setRevisedFromItemId(req.getRevisedFromItemId());
 
+            item.setIsGift(Boolean.FALSE);
+
             TaxRule taxRule = null;
             Integer ruleId = null;
             //todo: check item taxt
@@ -300,6 +311,7 @@ public class EstimateService {
 
             BigDecimal totalPrice = unitPrice.multiply(quantity);
             item.setTotalPrice(totalPrice);
+            item.setFinalPrice(totalPrice);
             applyTax(item,ruleId);
             return item;
         }).toList();
@@ -459,5 +471,127 @@ public class EstimateService {
 
     public Estimate findById(Integer estimateId) {
         return estimateRepository.findEstimateById(estimateId);
+    }
+    @Transactional
+    public EstimateRespondDto applyPromotionToEstimate(Integer promotionId, Integer estimateId, String promotionCode) {
+        Promotion promotion;
+        if (promotionId != null){
+            promotion = promotionInternalApi.findById(promotionId);
+        }else
+        if (promotionCode != null) {
+            promotion = promotionInternalApi.findByPromotionCode(promotionCode);
+        }else {
+            throw new EstimateException("PROMOTION_404", EstimateErrorCode.PROMOTION_404);
+        }
+        Estimate estimate = estimateRepository.findEstimateById(estimateId);
+        List<EstimateItem> items = estimateItemRepository.findByEstimateId(estimateId);
+        validatePromotion(promotion,estimate,items);
+        //todo: update estimateItems and estimate
+        if (promotion.getType().equals("PERCENT")){
+            //todo: apply %
+            applyPercentPromotion(promotion, items);
+        }else if (promotion.getType().equals("BUY_X_GET_Y")){
+            //todo: apply buy x get y
+            applyBuyXGetY(promotion, items, estimateId);
+        }
+    return getEstimateRespondDto(estimateId);
+    }
+
+    private void applyBuyXGetY(Promotion promotion, List<EstimateItem> items, Integer estimateId) {
+        EstimateItem triggerItem = items.stream()
+        .filter(item -> item.getItemId().equals(promotion.getBuyItemId()))
+        .findFirst()
+        .orElseThrow();
+        //count gift quantity
+        int giftQuantity = (triggerItem.getQuantity()/promotion.getBuyQuantity())*promotion.getGetQuantity();
+
+        //todo:delete old gift items
+        estimateRepository.deleteOldGitItemsByEstimateId(estimateId);
+
+        //find catalog that become gift
+        CatalogItem catalogItem = warehouseInternalApi.findCatalogById(promotion.getGetItemId());
+
+        EstimateItem giftItem = new EstimateItem();
+        giftItem.setEstimateId(estimateId);
+        giftItem.setItemId(promotion.getGetItemId());
+        giftItem.setItemName(catalogItem.getItemName());
+        giftItem.setQuantity(giftQuantity);
+        //before promotion
+        giftItem.setUnitPrice(triggerItem.getUnitPrice());
+
+        giftItem.setTotalPrice(BigDecimal.ZERO);
+
+        //after promotion
+        giftItem.setDiscountAmount(giftItem.getTotalPrice());
+        giftItem.setFinalPrice(BigDecimal.ZERO);
+        giftItem.setPromotionId(promotion.getPromotionId());
+        giftItem.setIsGift(Boolean.TRUE);
+        //todo: find FREE workCate if Catalog have no W
+        if (catalogItem.getWorkCategoryId()==null||catalogItem.getWorkCategoryId()==0){
+            throw new EstimateException("CATALOG HAVE NO CATEGORY!", EstimateErrorCode.BAD_DATA);
+        }
+        giftItem.setWorkCategoryId(catalogItem.getWorkCategoryId());
+        estimateItemRepository.save(giftItem);
+
+    }
+
+    private void applyPercentPromotion(Promotion promotion, List<EstimateItem> items) {
+        List<EstimateItem> targetItems;
+
+        if (promotion.getApplyTo().equals("ALL")){
+            targetItems = items.stream()
+            .filter(item -> !item.getIsGift())
+            .toList();
+        }else {
+            List<Integer> eligibleItemIds = promotionInternalApi
+            .findItemIdsByPromotionId(promotion);
+        targetItems = items.stream()
+            .filter(item -> eligibleItemIds.contains(item.getItemId()))
+            .toList();
+        }
+
+        //todo:update each items
+        targetItems.forEach(estimateItem -> {
+            BigDecimal discount = estimateItem.getTotalPrice().multiply(promotion.getDiscountPercent())
+                    .divide(BigDecimal.valueOf(100),2, RoundingMode.HALF_UP);
+            estimateItem.setDiscountAmount(discount);
+            estimateItem.setFinalPrice(estimateItem.getTotalPrice().subtract(discount));
+            estimateItem.setPromotionId(promotion.getPromotionId());
+        });
+        estimateItemRepository.saveAll(targetItems);
+    }
+
+    private void validatePromotion(Promotion promotion, Estimate estimate, List<EstimateItem> items) {
+        if (promotion == null) {
+            throw new EstimateException("PROMOTION_404", EstimateErrorCode.PROMOTION_404);
+        }
+        if (promotion.getIsActive().equals(Boolean.FALSE)) {
+            throw new EstimateException("PROMOTION_INACTIVE", EstimateErrorCode.PROMOTION_404);
+        }
+        if (promotion.getEndDate().isBefore(LocalDate.now())){
+            throw new EstimateException("PROMOTION_EXPIRED", EstimateErrorCode.PROMOTION_404);
+        }
+        if (promotion.getUsageLimit() != null && promotion.getUsedCount()>=promotion.getUsageLimit()){
+            throw new EstimateException("PROMOTION_USED_ALL", EstimateErrorCode.PROMOTION_404);
+        }
+        if (promotion.getMinOrderValue() != null && promotion.getMinOrderValue().compareTo(estimate.getTotalPrice()) > 0){
+            throw new EstimateException("PROMOTION_MinOrderValue_Bigger", EstimateErrorCode.PROMOTION_404);
+        }
+        if (promotion.getType().equals("PERCENT")&&promotion.getApplyTo().equals("SPECIFIC")){
+            List<Integer> promotionItems = promotionInternalApi.findItemIdsByPromotionId(promotion);
+            boolean hasMatchItems = items.stream().anyMatch(item -> promotionItems.contains(item.getId()));
+            if (!hasMatchItems) {
+                throw new EstimateException("PROMOTION_NOT_MATCH_ITEMS", EstimateErrorCode.PROMOTION_404);
+            }
+        }
+        if (promotion.getType().equals("BUY_X_GET_Y")){
+            boolean hasMatchItems = items.stream().anyMatch(estimateItem ->
+                    estimateItem.getItemId().equals(promotion.getBuyItemId())
+                            &&estimateItem.getQuantity().equals(promotion.getBuyQuantity()));
+            if (!hasMatchItems) {
+                throw new EstimateException("PROMOTION_TRIGGER_ITEM_NOT_MET", EstimateErrorCode.PROMOTION_404);
+            }
+        }
+
     }
 }

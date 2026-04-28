@@ -3,6 +3,7 @@ package com.g42.platform.gms.warehouse.infrastructure.specification;
 import com.g42.platform.gms.warehouse.api.dto.CatalogItemDto;
 import com.g42.platform.gms.warehouse.api.internal.WarehouseInternalApi;
 import com.g42.platform.gms.warehouse.app.service.inventory.InventoryService;
+import com.g42.platform.gms.warehouse.domain.entity.CatalogItem;
 import com.g42.platform.gms.warehouse.domain.entity.Warehouse;
 import com.g42.platform.gms.warehouse.domain.exception.WarehouseErrorCode;
 import com.g42.platform.gms.warehouse.domain.exception.WarehouseException;
@@ -71,5 +72,11 @@ public class WarehouseInternalApiImpl implements WarehouseInternalApi {
     public List<Warehouse> findAllById(List<Integer> workCategoryIds) {
         List<WarehouseJpa> warehouseJpas = warehouseJpaRepo.findAllById(workCategoryIds);
         return warehouseJpas.stream().map(warehouseJpaMapper::toDomain).toList();
+    }
+
+    @Override
+    public CatalogItem findCatalogById(Integer getItemId) {
+        CatalogItemJpa catalogItemJpa = catalogItemRepo.findById(getItemId).orElse(null);
+        return catalogItemJpaMapper.toDomain(catalogItemJpa);
     }
 }

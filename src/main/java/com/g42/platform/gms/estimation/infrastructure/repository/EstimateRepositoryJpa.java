@@ -4,6 +4,7 @@ import com.g42.platform.gms.estimation.domain.entity.Estimate;
 import com.g42.platform.gms.estimation.infrastructure.entity.EstimateItemJpa;
 import com.g42.platform.gms.estimation.infrastructure.entity.EstimateJpa;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
@@ -39,4 +40,9 @@ public interface EstimateRepositoryJpa extends JpaRepository<EstimateJpa, Intege
     Integer findRevisedEstimateId(Integer serviceTicketId, int latestEstimateVersion);
 
     List<EstimateJpa> findAllByServiceTicketId(Integer serviceTicketId);
+    @Modifying
+    @Query("""
+    delete from EstimateItemJpa e where e.estimateId=:estimateId and e.isGift=true
+    """)
+    void deleteEstimateItemsByEstimateId(Integer estimateId);
 }

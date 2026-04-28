@@ -2,6 +2,7 @@ package com.g42.platform.gms.warehouse.api.internal;
 
 import com.g42.platform.gms.marketing.service_catalog.domain.entity.Service;
 import com.g42.platform.gms.warehouse.api.dto.CatalogItemDto;
+import com.g42.platform.gms.warehouse.domain.entity.CatalogItem;
 import com.g42.platform.gms.warehouse.domain.entity.Warehouse;
 
 import java.util.List;
@@ -17,4 +18,6 @@ public interface WarehouseInternalApi {
     Integer findCodeByCategoryCode(String categoryCode);
 
     List<Warehouse> findAllById(List<Integer> workCategoryIds);
+
+    CatalogItem findCatalogById(Integer getItemId);
 }
