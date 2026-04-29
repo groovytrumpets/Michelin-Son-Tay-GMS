@@ -330,8 +330,8 @@ public class EstimateService {
 
             BigDecimal totalPrice = unitPrice.multiply(quantity);
             item.setTotalPrice(totalPrice);
-            item.setFinalPrice(totalPrice);
             applyTax(item,ruleId);
+            item.setFinalPrice(item.getFinalPrice());
             return item;
         }).toList();
     }
