@@ -610,7 +610,7 @@ public class EstimateService {
 
         //todo:update each items
         targetItems.forEach(estimateItem -> {
-            BigDecimal discount = estimateItem.getTotalPrice()
+            BigDecimal discount = estimateItem.getSubTotal()
                     .multiply(promotion.getDiscountPercent())
                     .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP)
                     .setScale(2, RoundingMode.HALF_UP);
