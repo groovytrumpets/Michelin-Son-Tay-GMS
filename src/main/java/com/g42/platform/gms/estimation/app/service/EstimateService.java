@@ -193,7 +193,7 @@ public class EstimateService {
         BigDecimal totalPrice = items.stream()
                 .filter(item -> Boolean.TRUE.equals(item.getIsChecked()))
                 .filter(item -> Boolean.FALSE.equals(item.getIsRemoved()))
-                .map(item -> item.getTotalPrice() != null ? item.getTotalPrice() : BigDecimal.ZERO)
+                .map(item -> item.getFinalPrice() != null ? item.getFinalPrice() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         saved.setTotalPrice(totalPrice);
@@ -252,7 +252,7 @@ public class EstimateService {
         BigDecimal totalPrice = toSave.stream()
                 .filter(item -> Boolean.TRUE.equals(item.getIsChecked()))
                 .filter(item -> Boolean.FALSE.equals(item.getIsRemoved()))
-                .map(item -> item.getTotalPrice() != null ? item.getTotalPrice() : BigDecimal.ZERO)
+                .map(item -> item.getFinalPrice() != null ? item.getFinalPrice() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         estimate.setEstimateType(request.getEstimateType());
