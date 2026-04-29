@@ -436,7 +436,7 @@ public class EstimateService {
         BigDecimal totalPrice = allItems.stream()
                 .filter(i -> Boolean.TRUE.equals(i.getIsChecked()))
                 .filter(i -> Boolean.FALSE.equals(i.getIsRemoved()))
-                .map(i -> i.getTotalPrice() != null ? i.getTotalPrice() : BigDecimal.ZERO)
+                .map(i -> i.getFinalPrice() != null ? i.getFinalPrice() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         Estimate estimate = estimateRepository.findEstimateById(saved.getEstimateId());
