@@ -117,6 +117,7 @@ public class EstimateService {
 
             BigDecimal totalTax = BigDecimal.ZERO;
             BigDecimal subTotal = BigDecimal.ZERO;
+            BigDecimal finalPrice =  BigDecimal.ZERO;
             List<EstimateItemDto> itemDtos = new ArrayList<>();
 
             for (EstimateItem item : items) {
@@ -153,13 +154,15 @@ public class EstimateService {
 
                     // 2. Cộng dồn tiền hàng
                     BigDecimal itemQty = BigDecimal.valueOf(item.getQuantity() != null ? item.getQuantity() : 0);
-                    BigDecimal itemPrice = item.getFinalPrice() != null ? item.getUnitPrice() : BigDecimal.ZERO;
-                    subTotal = subTotal.add(itemPrice);
+                    BigDecimal itemPrice = item.getUnitPrice() != null ? item.getUnitPrice() : BigDecimal.ZERO;
+                    subTotal = subTotal.add(itemPrice.multiply(itemQty));
+                    BigDecimal itemFinalPrice = item.getFinalPrice() != null ? item.getFinalPrice() : BigDecimal.ZERO;
+                    finalPrice = finalPrice.add(itemFinalPrice);
                 }
                 itemDtos.add(itemDto);
             }
 
-            dto.setTotalPrice(subTotal.add(totalTax));
+            dto.setTotalPrice(finalPrice);
             dto.setSubTotal(subTotal);
             dto.setTotalTaxAmount(totalTax);
             dto.setItems(itemDtos);
