@@ -331,6 +331,9 @@ public class EstimateService {
             BigDecimal totalPrice = unitPrice.multiply(quantity);
             item.setTotalPrice(totalPrice);
             applyTax(item,ruleId);
+            if (item.getIsGift()==true){
+                item.setFinalPrice(BigDecimal.ZERO);
+            }else
             item.setFinalPrice(item.getTotalPrice());
             return item;
         }).toList();
@@ -595,12 +598,20 @@ public class EstimateService {
 
         //todo:update each items
         targetItems.forEach(estimateItem -> {
-            BigDecimal discount = estimateItem.getTotalPrice().multiply(promotion.getDiscountPercent())
-                    .divide(BigDecimal.valueOf(100),2, RoundingMode.HALF_UP);
+            BigDecimal discount = estimateItem.getTotalPrice()
+                    .multiply(promotion.getDiscountPercent())
+                    .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP)
+                    .setScale(2, RoundingMode.HALF_UP);
             estimateItem.setDiscountAmount(discount);
             BigDecimal quantity = BigDecimal.valueOf(estimateItem.getQuantity());
             BigDecimal newTotalPrice = estimateItem.getUnitPrice().multiply(quantity);
-            estimateItem.setFinalPrice((newTotalPrice.subtract(discount)).multiply(estimateItem.getAppliedTaxRate().divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP)));
+            BigDecimal taxRate = estimateItem.getAppliedTaxRate()
+                    .divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
+            BigDecimal finalPrice = newTotalPrice
+                    .subtract(discount)
+                    .multiply(BigDecimal.ONE.add(taxRate))
+                    .setScale(2, RoundingMode.HALF_UP);
+            estimateItem.setFinalPrice(finalPrice);
             estimateItem.setPromotionId(promotion.getPromotionId());
         });
         estimateItemRepository.saveAll(targetItems);
