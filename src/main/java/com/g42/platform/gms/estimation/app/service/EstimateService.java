@@ -8,16 +8,11 @@ import com.g42.platform.gms.estimation.api.dto.request.EstimateItemReqDto;
 import com.g42.platform.gms.estimation.api.dto.request.EstimateRequestDto;
 import com.g42.platform.gms.estimation.api.internal.TaxRuleInternalApi;
 import com.g42.platform.gms.estimation.api.mapper.EstimateDtoMapper;
-import com.g42.platform.gms.estimation.domain.entity.Estimate;
-import com.g42.platform.gms.estimation.domain.entity.EstimateItem;
-import com.g42.platform.gms.estimation.domain.entity.TaxRule;
-import com.g42.platform.gms.estimation.domain.entity.WorkCategory;
+import com.g42.platform.gms.estimation.api.mapper.StockAllocationDtoMapper;
+import com.g42.platform.gms.estimation.domain.entity.*;
 import com.g42.platform.gms.estimation.domain.exception.EstimateErrorCode;
 import com.g42.platform.gms.estimation.domain.exception.EstimateException;
-import com.g42.platform.gms.estimation.domain.repository.EstimateItemRepository;
-import com.g42.platform.gms.estimation.domain.repository.EstimateRepository;
-import com.g42.platform.gms.estimation.domain.repository.TaxRuleRepository;
-import com.g42.platform.gms.estimation.domain.repository.WorkCategoryRepository;
+import com.g42.platform.gms.estimation.domain.repository.*;
 import com.g42.platform.gms.promotion.api.internal.PromotionInternalApi;
 import com.g42.platform.gms.promotion.domain.entity.Promotion;
 import com.g42.platform.gms.warehouse.api.dto.CatalogItemDto;
@@ -50,6 +45,8 @@ public class EstimateService {
     private final WarehouseDtoMapper warehouseDtoMapper;
 
     private final PromotionInternalApi promotionInternalApi;
+    private final StockAllocationRepository stockAllocationRepository;
+    private final StockAllocationDtoMapper stockAllocationDtoMapper;
 
 
     public List<EstimateRespondDto> getEstimateByCode(Integer serviceTicketId) {
@@ -69,6 +66,7 @@ public class EstimateService {
                 .stream()
                 .filter(item -> Boolean.FALSE.equals(item.getIsRemoved()))
                 .toList();
+        List<Integer> estimateItemIds = estimateItems.stream().map(EstimateItem::getId).toList();
         List<Integer> warehouseIds = estimateItems.stream()
                 .map(EstimateItem::getWarehouseId)
 //                .filter(Objects::nonNull)
@@ -91,12 +89,21 @@ public class EstimateService {
             categoryMap = new HashMap<>();
         }
         Map<Integer, Warehouse> warehouseMap;
-        if (!workCategoryIds.isEmpty()) {
+        if (!warehouseIds.isEmpty()) {
             warehouseMap = warehouseInternalApi.findAllById(warehouseIds)
                     .stream()
                     .collect(Collectors.toMap(Warehouse::getWarehouseId, wc -> wc));
         } else {
             warehouseMap = new HashMap<>();
+        }
+
+        Map<Integer, StockAllocation> allocationMap;
+        if (!estimateItemIds.isEmpty()) {
+            allocationMap = stockAllocationRepository.findAllByEstimateId(estimateItemIds)
+                    .stream()
+                    .collect(Collectors.toMap(StockAllocation::getEstimateItemId, stockAllocation -> stockAllocation));
+        } else {
+            allocationMap = new HashMap<>();
         }
 
         // 5. Group estimateItem by estimateId
@@ -127,6 +134,13 @@ public class EstimateService {
                     Warehouse wc = warehouseMap.get(item.getWarehouseId());
                     if (wc != null) {
                         itemDto.setWarehouse(warehouseDtoMapper.toDtoInternal(wc));
+                    }
+                }
+
+                if (item.getId() != null) {
+                    StockAllocation allocation = allocationMap.get(item.getId());
+                    if (allocation != null) {
+                        itemDto.setStockAllocation(stockAllocationDtoMapper.toDto(allocation));
                     }
                 }
 
@@ -212,7 +226,6 @@ public class EstimateService {
                 existing.setIsGift(req.getIsGift());
                 existing.setTriggeredByItemId(req.getTriggeredByItemId());
                 existing.setDiscountAmount(req.getDiscountAmount());
-                existing.setFinalPrice(req.getFinalPrice());
                 WorkCategory wc = workCategoryRepo.findById(req.getWorkCategoryId());
                 TaxRule taxRule = (wc != null) ? taxRuleRepository.findById(wc.getTaxRuleId()) : null;
                 Integer taxRuleId = (wc != null && wc.getTaxRuleId() != null)
@@ -221,6 +234,7 @@ public class EstimateService {
                 if (taxRule != null) {
                 applyTax(existing,taxRuleId);
                 }
+                existing.setFinalPrice(existing.getFinalPrice());
                 toSave.add(existing);
                 incomingIds.add(req.getItemId());
             } else {

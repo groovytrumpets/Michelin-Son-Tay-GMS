@@ -140,6 +140,12 @@ public class StockAllocationRepoImpl implements StockAllocationRepository {
             return dto;
         }).toList();
     }
+
+    @Override
+    public List<StockAllocation> findAllByEstimateId(List<Integer> estimateItemIds) {
+        return stockAllocationRepositoryJpa.findAllByEstimateIds(estimateItemIds).stream().map(stockAllocationJpaMapper::toDomain).toList();
+    }
+
     private StockAllocationJpa resolveAllocation(
             EstimateItemJpa item,
             Map<Integer, StockAllocationJpa> allocationByItemId,

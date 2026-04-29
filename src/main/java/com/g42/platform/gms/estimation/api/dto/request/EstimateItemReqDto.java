@@ -26,5 +26,5 @@ public class EstimateItemReqDto {
     private Boolean isGift;
     private Integer triggeredByItemId;
     private BigDecimal discountAmount;
-    private BigDecimal finalPrice;
+//    private BigDecimal finalPrice;
 }

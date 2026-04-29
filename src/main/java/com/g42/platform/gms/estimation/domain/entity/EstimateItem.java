@@ -48,4 +48,9 @@ public class EstimateItem {
         if (unitPrice == null || quantity == null) return BigDecimal.ZERO;
         return unitPrice.multiply(BigDecimal.valueOf(quantity));
     }
+    public BigDecimal getFinalPrice() {
+        if (isGift==null || discountAmount == null) return getSubTotal();
+        return discountAmount.multiply(getSubTotal());
+    }
+
 }

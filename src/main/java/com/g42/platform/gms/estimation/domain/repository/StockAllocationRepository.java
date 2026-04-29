@@ -24,4 +24,6 @@ public interface StockAllocationRepository {
     void delete(StockAllocation deletedAlloc);
 
     List<EstimateViaAllocationDto> findEstimateAndAllocationById(Integer estimateId);
+
+    List<StockAllocation> findAllByEstimateId(List<Integer> estimateItemIds);
 }
