@@ -153,8 +153,8 @@ public class EstimateService {
 
                     // 2. Cộng dồn tiền hàng
                     BigDecimal itemQty = BigDecimal.valueOf(item.getQuantity() != null ? item.getQuantity() : 0);
-                    BigDecimal itemPrice = item.getUnitPrice() != null ? item.getUnitPrice() : BigDecimal.ZERO;
-                    subTotal = subTotal.add(itemPrice.multiply(itemQty));
+                    BigDecimal itemPrice = item.getFinalPrice() != null ? item.getUnitPrice() : BigDecimal.ZERO;
+                    subTotal = subTotal.add(itemPrice);
                 }
                 itemDtos.add(itemDto);
             }
