@@ -516,7 +516,19 @@ public class EstimateService {
             //todo: apply buy x get y
             applyBuyXGetY(promotion, items, estimateId);
         }
-    return getEstimateRespondDto(estimateId);
+        //todo: update total_price
+
+        BigDecimal totalPrice = items.stream()
+                .filter(item -> Boolean.TRUE.equals(item.getIsChecked()))
+                .filter(item -> Boolean.FALSE.equals(item.getIsRemoved()))
+                .map(item -> item.getFinalPrice() != null ? item.getFinalPrice() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        estimate.setTotalPrice(totalPrice);
+        System.out.println("Total_price: " + totalPrice); // dùng biến totalPrice trực tiếp
+        estimateRepository.save(estimate);
+
+        return getEstimateRespondDto(estimateId);
     }
 
     private void applyBuyXGetY(Promotion promotion, List<EstimateItem> items, Integer estimateId) {
