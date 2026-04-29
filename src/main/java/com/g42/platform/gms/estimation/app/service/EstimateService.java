@@ -331,7 +331,7 @@ public class EstimateService {
             BigDecimal totalPrice = unitPrice.multiply(quantity);
             item.setTotalPrice(totalPrice);
             applyTax(item,ruleId);
-            item.setFinalPrice(item.getFinalPrice());
+            item.setFinalPrice(item.getTotalPrice());
             return item;
         }).toList();
     }
@@ -598,7 +598,9 @@ public class EstimateService {
             BigDecimal discount = estimateItem.getTotalPrice().multiply(promotion.getDiscountPercent())
                     .divide(BigDecimal.valueOf(100),2, RoundingMode.HALF_UP);
             estimateItem.setDiscountAmount(discount);
-            estimateItem.setFinalPrice(estimateItem.getTotalPrice().subtract(discount));
+            BigDecimal quantity = BigDecimal.valueOf(estimateItem.getQuantity());
+            BigDecimal newTotalPrice = estimateItem.getUnitPrice().multiply(quantity);
+            estimateItem.setFinalPrice((newTotalPrice.subtract(discount)).multiply(estimateItem.getAppliedTaxRate()));
             estimateItem.setPromotionId(promotion.getPromotionId());
         });
         estimateItemRepository.saveAll(targetItems);
