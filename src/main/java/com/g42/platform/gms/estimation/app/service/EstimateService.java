@@ -656,7 +656,6 @@ public class EstimateService {
         .filter(item -> Boolean.TRUE.equals(item.getIsGift())
                 && promotion.getPromotionId().equals(item.getPromotionId()))
         .toList();
-
     estimateItemRepository.deleteAll(giftItems);
     }
 

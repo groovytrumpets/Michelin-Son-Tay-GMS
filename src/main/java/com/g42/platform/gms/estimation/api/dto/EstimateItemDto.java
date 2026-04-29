@@ -28,6 +28,7 @@ public class EstimateItemDto {
     private BigDecimal subTotalWithVat;
     private String unit;
     private Integer revisedFromItemId;
+    private Integer promotionId;
     private Boolean isGift;
     private Integer triggeredByItemId;
     private BigDecimal discountAmount;
