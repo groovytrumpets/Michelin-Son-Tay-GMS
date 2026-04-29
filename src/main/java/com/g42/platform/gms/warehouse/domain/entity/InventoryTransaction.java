@@ -24,6 +24,7 @@ public class InventoryTransaction {
     private InventoryTransactionType transactionType;
     private Integer quantity;
     private Integer balanceAfter;
+    private Integer entryItemId;
     private String referenceType;
     private Integer referenceId;
     private String notes;

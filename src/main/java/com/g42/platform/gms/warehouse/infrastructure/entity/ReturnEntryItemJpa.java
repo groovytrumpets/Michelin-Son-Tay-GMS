@@ -28,6 +28,10 @@ public class ReturnEntryItemJpa {
     @Column(name = "source_issue_item_id")
     private Integer sourceIssueItemId;
 
+    /** Lô nhập (entry_item_id) sẽ nhận hàng trả nếu trả về đúng lô */
+    @Column(name = "entry_item_id")
+    private Integer entryItemId;
+
     @Column(name = "quantity", nullable = false)
     private Integer quantity;
 

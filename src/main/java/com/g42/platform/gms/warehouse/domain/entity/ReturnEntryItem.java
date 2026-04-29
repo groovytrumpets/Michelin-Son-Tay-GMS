@@ -8,6 +8,7 @@ public class ReturnEntryItem {
     private Integer returnId;
     private Integer itemId;
     private Integer sourceIssueItemId;
+    private Integer entryItemId;
     private Integer quantity;
     private String conditionNote;
     private boolean exchangeItem;

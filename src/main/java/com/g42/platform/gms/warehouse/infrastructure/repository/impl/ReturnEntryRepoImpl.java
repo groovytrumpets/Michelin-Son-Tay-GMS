@@ -138,6 +138,7 @@ public class ReturnEntryRepoImpl implements ReturnEntryRepo {
         item.setReturnId(jpa.getReturnId());
         item.setItemId(jpa.getItemId());
         item.setSourceIssueItemId(jpa.getSourceIssueItemId());
+        item.setEntryItemId(jpa.getEntryItemId());
         item.setQuantity(jpa.getQuantity());
         item.setConditionNote(jpa.getConditionNote());
         item.setExchangeItem(jpa.isExchangeItem());
@@ -150,6 +151,7 @@ public class ReturnEntryRepoImpl implements ReturnEntryRepo {
         item.setReturnId(domain.getReturnId());
         item.setItemId(domain.getItemId());
         item.setSourceIssueItemId(domain.getSourceIssueItemId());
+        item.setEntryItemId(domain.getEntryItemId());
         item.setQuantity(domain.getQuantity());
         item.setConditionNote(domain.getConditionNote());
         item.setExchangeItem(domain.isExchangeItem());

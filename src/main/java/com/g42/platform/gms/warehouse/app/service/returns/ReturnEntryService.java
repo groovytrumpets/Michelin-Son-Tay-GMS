@@ -66,6 +66,8 @@ public class ReturnEntryService {
     private final ImageUploadService imageUploadService;
     private final WarehouseRepo warehouseRepo;
     private final StockIssueRepo stockIssueRepo;
+    private final com.g42.platform.gms.warehouse.domain.repository.StockIssueItemRepo stockIssueItemRepo;
+    private final com.g42.platform.gms.warehouse.domain.repository.StockEntryRepo stockEntryRepo;
     private final StaffProfileRepo staffProfileRepo;
     private final PartCatalogRepo partCatalogRepo;
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
@@ -94,6 +96,13 @@ public class ReturnEntryService {
             item.setReturnId(saved.getReturnId());
             item.setItemId(itemReq.getItemId());
             item.setSourceIssueItemId(itemReq.getSourceIssueItemId());
+            if (itemReq.getSourceIssueItemId() != null) {
+                stockIssueItemRepo.findById(itemReq.getSourceIssueItemId()).ifPresent(si ->
+                        item.setEntryItemId(si.getEntryItemId())
+                );
+            } else if (itemReq.getEntryItemId() != null) {
+                item.setEntryItemId(itemReq.getEntryItemId());
+            }
             item.setQuantity(itemReq.getQuantity());
             item.setConditionNote(itemReq.getConditionNote());
             item.setExchangeItem(false);
@@ -106,6 +115,13 @@ public class ReturnEntryService {
                 item.setReturnId(saved.getReturnId());
                 item.setItemId(itemReq.getItemId());
                 item.setSourceIssueItemId(itemReq.getSourceIssueItemId());
+                if (itemReq.getSourceIssueItemId() != null) {
+                    stockIssueItemRepo.findById(itemReq.getSourceIssueItemId()).ifPresent(si ->
+                            item.setEntryItemId(si.getEntryItemId())
+                    );
+                } else if (itemReq.getEntryItemId() != null) {
+                    item.setEntryItemId(itemReq.getEntryItemId());
+                }
                 item.setQuantity(itemReq.getQuantity());
                 item.setConditionNote(null);
                 item.setExchangeItem(true);
@@ -144,26 +160,27 @@ public class ReturnEntryService {
             }
         }
 
+        MultipartFile[] files = {
+            req.getFile_0(), req.getFile_1(), req.getFile_2(), req.getFile_3(), req.getFile_4()
+        };
+        validateRequiredAttachments(items, files);
+
         ReturnEntryResponse created = create(request, staffId);
 
-        MultipartFile[] files = {
-                req.getFile_0(), req.getFile_1(), req.getFile_2(), req.getFile_3(), req.getFile_4()
-        };
-
         ReturnEntry saved = findOrThrow(created.getReturnId());
-        List<ReturnEntryItem> savedItems = saved.getItems();
+        List<ReturnEntryItem> savedItems = saved.getItems().stream()
+                .filter(i -> !i.isExchangeItem())
+                .toList();
 
-        for (int i = 0; i < savedItems.size() && i < files.length; i++) {
+        for (int i = 0; i < savedItems.size(); i++) {
             MultipartFile file = files[i];
-            if (file != null && !file.isEmpty()) {
-                String url = imageUploadService.uploadImage(file, FOLDER_RETURN_ENTRY);
-                WarehouseAttachment attachment = new WarehouseAttachment();
-                attachment.setRefType(WarehouseAttachment.RefType.RETURN_ENTRY_ITEM);
-                attachment.setRefId(savedItems.get(i).getReturnItemId());
-                attachment.setFileUrl(url);
-                attachment.setUploadedBy(staffId);
-                attachmentRepo.save(attachment);
-            }
+            String url = imageUploadService.uploadImage(file, FOLDER_RETURN_ENTRY);
+            WarehouseAttachment attachment = new WarehouseAttachment();
+            attachment.setRefType(WarehouseAttachment.RefType.RETURN_ENTRY_ITEM);
+            attachment.setRefId(savedItems.get(i).getReturnItemId());
+            attachment.setFileUrl(url);
+            attachment.setUploadedBy(staffId);
+            attachmentRepo.save(attachment);
         }
 
         return toResponse(findOrThrow(created.getReturnId()));
@@ -182,8 +199,8 @@ public class ReturnEntryService {
 
         String url = imageUploadService.uploadImage(file, FOLDER_RETURN_ENTRY);
 
-        WarehouseAttachment attachment = new WarehouseAttachment();
-        attachment.setRefType(WarehouseAttachment.RefType.RETURN_ENTRY_ITEM);
+    WarehouseAttachment attachment = new WarehouseAttachment();
+    attachment.setRefType(WarehouseAttachment.RefType.RETURN_ENTRY_ITEM);
         attachment.setRefId(returnItemId);
         attachment.setFileUrl(url);
         attachment.setUploadedBy(staffId);
@@ -255,6 +272,13 @@ public class ReturnEntryService {
                     item.setReturnId(returnId);
                     item.setItemId(itemReq.getItemId());
                     item.setSourceIssueItemId(itemReq.getSourceIssueItemId());
+                    if (itemReq.getSourceIssueItemId() != null) {
+                        stockIssueItemRepo.findById(itemReq.getSourceIssueItemId()).ifPresent(si ->
+                                item.setEntryItemId(si.getEntryItemId())
+                        );
+                    } else if (itemReq.getEntryItemId() != null) {
+                        item.setEntryItemId(itemReq.getEntryItemId());
+                    }
                     item.setQuantity(itemReq.getQuantity());
                     item.setConditionNote(itemReq.getConditionNote());
                     item.setExchangeItem(false);
@@ -267,6 +291,13 @@ public class ReturnEntryService {
                     item.setReturnId(returnId);
                     item.setItemId(itemReq.getItemId());
                     item.setSourceIssueItemId(itemReq.getSourceIssueItemId());
+                    if (itemReq.getSourceIssueItemId() != null) {
+                        stockIssueItemRepo.findById(itemReq.getSourceIssueItemId()).ifPresent(si ->
+                                item.setEntryItemId(si.getEntryItemId())
+                        );
+                    } else if (itemReq.getEntryItemId() != null) {
+                        item.setEntryItemId(itemReq.getEntryItemId());
+                    }
                     item.setQuantity(itemReq.getQuantity());
                     item.setConditionNote(null);
                     item.setExchangeItem(true);
@@ -289,7 +320,7 @@ public class ReturnEntryService {
         List<ReturnEntryItem> returnItems = entry.getItems().stream()
                 .filter(i -> !i.isExchangeItem()).collect(Collectors.toList());
         List<ReturnEntryItem> exchangeItems = entry.getItems().stream()
-                .filter(ReturnEntryItem::isExchangeItem).collect(Collectors.toList());
+            .filter(ReturnEntryItem::isExchangeItem).collect(Collectors.toList());
 
         if (returnItems.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
@@ -314,8 +345,12 @@ public class ReturnEntryService {
 
             inv.setQuantity(newQty);
             inventoryRepo.save(inv);
-            saveTransaction(entry.getWarehouseId(), item.getItemId(), txType,
+                saveTransaction(entry.getWarehouseId(), item.getItemId(), item.getEntryItemId(), txType,
                     item.getQuantity(), newQty, returnId, staffId);
+
+                if (item.getEntryItemId() != null) {
+                stockEntryRepo.increaseRemainingQuantity(item.getEntryItemId(), item.getQuantity());
+                }
         }
 
         if (type == ReturnType.EXCHANGE) {
@@ -324,8 +359,11 @@ public class ReturnEntryService {
                 int newQty = Math.max(0, inv.getQuantity() - item.getQuantity());
                 inv.setQuantity(newQty);
                 inventoryRepo.save(inv);
-                saveTransaction(entry.getWarehouseId(), item.getItemId(),
+                saveTransaction(entry.getWarehouseId(), item.getItemId(), item.getEntryItemId(),
                         InventoryTransactionType.OUT, item.getQuantity(), newQty, returnId, staffId);
+                if (item.getEntryItemId() != null) {
+                    stockEntryRepo.increaseRemainingQuantity(item.getEntryItemId(), item.getQuantity());
+                }
             }
         }
 
@@ -348,12 +386,13 @@ public class ReturnEntryService {
                         .build());
     }
 
-    private void saveTransaction(Integer warehouseId, Integer itemId,
-                                 InventoryTransactionType type, int qty, int balance,
-                                 Integer returnId, Integer staffId) {
+    private void saveTransaction(Integer warehouseId, Integer itemId, Integer entryItemId,
+                                  InventoryTransactionType type, int qty, int balance,
+                                  Integer returnId, Integer staffId) {
         InventoryTransaction tx = new InventoryTransaction();
         tx.setWarehouseId(warehouseId);
         tx.setItemId(itemId);
+        tx.setEntryItemId(entryItemId);
         tx.setTransactionType(type);
         tx.setQuantity(qty);
         tx.setBalanceAfter(balance);
@@ -421,7 +460,7 @@ public class ReturnEntryService {
         }
 
         Set<Integer> itemIds = e.getItems().stream()
-                .map(ReturnEntryItem::getItemId)
+            .map(ReturnEntryItem::getItemId)
                 .collect(Collectors.toSet());
         Map<Integer, String> itemNameById = partCatalogRepo.findNamesByIds(itemIds.stream().toList());
 
@@ -430,9 +469,18 @@ public class ReturnEntryService {
             ir.setReturnItemId(i.getReturnItemId());
             ir.setItemId(i.getItemId());
             ir.setSourceIssueItemId(i.getSourceIssueItemId());
+            ir.setEntryItemId(i.getEntryItemId());
             ir.setItemName(itemNameById.get(i.getItemId()));
             ir.setQuantity(i.getQuantity());
             ir.setConditionNote(i.getConditionNote());
+            ir.setAttachmentUrls(
+                    attachmentRepo.findByRefTypeAndRefId(
+                                    WarehouseAttachment.RefType.RETURN_ENTRY_ITEM,
+                                    i.getReturnItemId())
+                            .stream()
+                            .map(WarehouseAttachment::getFileUrl)
+                            .collect(Collectors.toList())
+            );
             return ir;
         }).collect(Collectors.toList()));
 
@@ -458,14 +506,40 @@ public class ReturnEntryService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
                         "Không tìm thấy phiếu xuất nguồn id=" + sourceIssueId));
 
-        boolean matched = sourceIssue.getItems().stream().anyMatch(issueItem ->
-                issueItem.getIssueItemId() != null
+        com.g42.platform.gms.warehouse.domain.entity.StockIssueItem matchedIssueItem = sourceIssue.getItems().stream()
+                .filter(issueItem -> issueItem.getIssueItemId() != null
                         && issueItem.getIssueItemId().equals(itemReq.getSourceIssueItemId())
-                        && issueItem.getItemId().equals(itemReq.getItemId()));
+                        && issueItem.getItemId().equals(itemReq.getItemId()))
+                .findFirst()
+                .orElse(null);
 
-        if (!matched) {
+        if (matchedIssueItem == null) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                     "sourceIssueItemId không khớp với phiếu xuất nguồn hoặc itemId");
+        }
+
+        if (itemReq.getQuantity() != null && itemReq.getQuantity() > matchedIssueItem.getQuantity()) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Số lượng hoàn vượt quá số lượng đã xuất của dòng nguồn");
+        }
+    }
+
+    private void validateRequiredAttachments(List<ReturnEntryItemRequest> items, MultipartFile[] files) {
+        if (items == null || items.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "items không được rỗng");
+        }
+
+        if (items.size() > files.length) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Hiện chỉ hỗ trợ tối đa 5 ảnh (file_0..file_4) cho 5 dòng hàng trả");
+        }
+
+        for (int i = 0; i < items.size(); i++) {
+            MultipartFile file = files[i];
+            if (file == null || file.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                        "Thiếu ảnh chứng minh cho item index " + i + " (file_" + i + ")");
+            }
         }
     }
 
@@ -489,12 +563,11 @@ public class ReturnEntryService {
             return;
         }
 
-        if (returnEntryRepo.existsActiveBySourceIssueItemId(sourceIssueItemId)) {
+        if (returnEntryRepo.existsAnyBySourceIssueItemId(sourceIssueItemId)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Đã có phiếu hoàn đang xử lý cho dòng xuất này");
+                    "Dòng xuất này đã có phiếu hoàn, không thể tạo trùng");
         }
     }
-
 
     private void validateDuplicateSourceIssueItemOnUpdate(Integer sourceIssueItemId, Integer returnId) {
         if (sourceIssueItemId == null) {
