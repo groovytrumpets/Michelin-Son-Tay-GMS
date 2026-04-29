@@ -208,6 +208,10 @@ public class EstimateService {
                 existing.setWorkCategoryId(req.getWorkCategoryId());
                 existing.setIsChecked(req.getIsChecked());
                 existing.setIsRemoved(req.getIsRemoved());
+                existing.setIsGift(req.getIsGift());
+                existing.setTriggeredByItemId(req.getTriggeredByItemId());
+                existing.setDiscountAmount(req.getDiscountAmount());
+                existing.setFinalPrice(req.getFinalPrice());
                 WorkCategory wc = workCategoryRepo.findById(req.getWorkCategoryId());
                 TaxRule taxRule = (wc != null) ? taxRuleRepository.findById(wc.getTaxRuleId()) : null;
                 Integer taxRuleId = (wc != null && wc.getTaxRuleId() != null)
@@ -579,7 +583,7 @@ public class EstimateService {
         }
         if (promotion.getType().equals("PERCENT")&&promotion.getApplyTo().equals("SPECIFIC")){
             List<Integer> promotionItems = promotionInternalApi.findItemIdsByPromotionId(promotion);
-            boolean hasMatchItems = items.stream().anyMatch(item -> promotionItems.contains(item.getId()));
+            boolean hasMatchItems = items.stream().anyMatch(item -> promotionItems.contains(item.getItemId()));
             if (!hasMatchItems) {
                 throw new EstimateException("PROMOTION_NOT_MATCH_ITEMS", EstimateErrorCode.PROMOTION_404);
             }
