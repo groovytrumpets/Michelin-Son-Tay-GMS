@@ -531,15 +531,15 @@ public class EstimateService {
         giftItem.setFinalPrice(BigDecimal.ZERO);
         giftItem.setPromotionId(promotion.getPromotionId());
         giftItem.setIsGift(Boolean.TRUE);
-        giftItem.setWarehouseId(triggerItem.getWarehouseId());
         giftItem.setUnit(triggerItem.getUnit());
         //todo: find FREE workCate if Catalog have no W
         if (catalogItem.getWorkCategoryId()==null||catalogItem.getWorkCategoryId()==0){
             throw new EstimateException("CATALOG HAVE NO CATEGORY!", EstimateErrorCode.BAD_DATA);
         }
+        giftItem.setWorkCategoryId(catalogItem.getWorkCategoryId());
         //todo: check warehouse quantity available
         Integer warehouseId = resolveGiftItemWarehouse(giftItem,triggerItem);
-        giftItem.setWorkCategoryId(warehouseId);
+        giftItem.setWarehouseId(warehouseId);
 
         estimateItemRepository.save(giftItem);
     }
