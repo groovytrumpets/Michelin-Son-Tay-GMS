@@ -49,7 +49,7 @@ public class EstimateItem {
         return unitPrice.multiply(BigDecimal.valueOf(quantity));
     }
     public BigDecimal getFinalPrice() {
-        if (isGift==null || discountAmount == null) return getSubTotal();
+        if (isGift==null || discountAmount == null) return getTotalPrice();
         return discountAmount.multiply(getSubTotal());
     }
 
