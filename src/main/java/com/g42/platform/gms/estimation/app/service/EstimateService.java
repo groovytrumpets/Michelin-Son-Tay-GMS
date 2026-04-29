@@ -119,6 +119,7 @@ public class EstimateService {
             BigDecimal subTotal = BigDecimal.ZERO;
             BigDecimal finalPrice =  BigDecimal.ZERO;
             List<EstimateItemDto> itemDtos = new ArrayList<>();
+            List<Integer> prmotionIds = new ArrayList<>();
 
             for (EstimateItem item : items) {
                 EstimateItemDto itemDto = estimateDtoMapper.toEstimateItemDto(item);
@@ -157,6 +158,9 @@ public class EstimateService {
                     BigDecimal itemPrice = item.getUnitPrice() != null ? item.getUnitPrice() : BigDecimal.ZERO;
                     subTotal = subTotal.add(itemPrice.multiply(itemQty));
                     BigDecimal itemFinalPrice = item.getFinalPrice() != null ? item.getFinalPrice() : BigDecimal.ZERO;
+                    if (item.getPromotionId() != null) {
+                    prmotionIds .add(item.getPromotionId());
+                    }
                     finalPrice = finalPrice.add(itemFinalPrice);
                 }
                 itemDtos.add(itemDto);
@@ -166,6 +170,7 @@ public class EstimateService {
             dto.setSubTotal(subTotal);
             dto.setTotalTaxAmount(totalTax);
             dto.setItems(itemDtos);
+            dto.setPromotions(prmotionIds);
 
             return dto;
         }).toList();
