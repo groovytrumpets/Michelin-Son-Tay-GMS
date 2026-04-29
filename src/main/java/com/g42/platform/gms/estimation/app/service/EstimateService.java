@@ -24,6 +24,7 @@ import com.g42.platform.gms.warehouse.api.dto.CatalogItemDto;
 import com.g42.platform.gms.warehouse.api.internal.WarehouseInternalApi;
 import com.g42.platform.gms.warehouse.api.mapper.WarehouseDtoMapper;
 import com.g42.platform.gms.warehouse.domain.entity.CatalogItem;
+import com.g42.platform.gms.warehouse.domain.entity.Inventory;
 import com.g42.platform.gms.warehouse.domain.entity.Warehouse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -530,12 +531,34 @@ public class EstimateService {
         giftItem.setFinalPrice(BigDecimal.ZERO);
         giftItem.setPromotionId(promotion.getPromotionId());
         giftItem.setIsGift(Boolean.TRUE);
+        giftItem.setWarehouseId(triggerItem.getWarehouseId());
+        giftItem.setUnit(triggerItem.getUnit());
         //todo: find FREE workCate if Catalog have no W
         if (catalogItem.getWorkCategoryId()==null||catalogItem.getWorkCategoryId()==0){
             throw new EstimateException("CATALOG HAVE NO CATEGORY!", EstimateErrorCode.BAD_DATA);
         }
-        giftItem.setWorkCategoryId(catalogItem.getWorkCategoryId());
+        //todo: check warehouse quantity available
+        Integer warehouseId = resolveGiftItemWarehouse(giftItem,triggerItem);
+        giftItem.setWorkCategoryId(warehouseId);
+
         estimateItemRepository.save(giftItem);
+    }
+
+    private Integer resolveGiftItemWarehouse(EstimateItem giftItem, EstimateItem triggerItem) {
+        //find by triggerItem warehouse
+        if (triggerItem.getWarehouseId()!=null){
+            Inventory inventory = warehouseInternalApi.findInventoryByWarehouseIdAndItemIds(triggerItem.getWarehouseId(),giftItem.getItemId());
+            if (inventory!=null&&inventory.getAvailableQuantity()>0){
+                return triggerItem.getWarehouseId();
+            }
+        }
+        //find another warehouse
+        Inventory fallback = warehouseInternalApi.findItemAvailableInOtherWarehouse(giftItem.getItemId(),0);
+        if (fallback!=null&&fallback.getAvailableQuantity()>0){
+            return fallback.getItemId();
+        }
+        // not available
+        return null;
 
     }
 
@@ -597,5 +620,60 @@ public class EstimateService {
             }
         }
 
+    }
+
+    public EstimateRespondDto unapplyPromotionToEstimate(Integer promotionId, Integer estimateId, String promotionCode) {
+        Promotion promotion;
+        if (promotionId != null){
+            promotion = promotionInternalApi.findById(promotionId);
+        }else
+        if (promotionCode != null) {
+            promotion = promotionInternalApi.findByPromotionCode(promotionCode);
+        }else {
+            throw new EstimateException("PROMOTION_404", EstimateErrorCode.PROMOTION_404);
+        }
+        Estimate estimate = estimateRepository.findEstimateById(estimateId);
+        if (estimate.getStatus().equals(EstimateEnum.ARCHIVED)){
+            throw new EstimateException("ESTIMATE_ARCHIVED", EstimateErrorCode.BAD_REQUEST);
+        }
+
+        List<EstimateItem> items = estimateItemRepository.findByEstimateId(estimateId);
+
+
+        //todo: update estimateItems and estimate
+        if (promotion.getType().equals("PERCENT")){
+            //todo: apply %
+            unapplyPercentPromotion(promotion, items);
+        }else if (promotion.getType().equals("BUY_X_GET_Y")){
+            //todo: apply buy x get y
+            unapplyBuyXGetY(promotion, items, estimateId);
+        }
+        return getEstimateRespondDto(estimateId);
+    }
+
+    private void unapplyBuyXGetY(Promotion promotion, List<EstimateItem> items, Integer estimateId) {
+        List<EstimateItem> giftItems = items.stream()
+        .filter(item -> Boolean.TRUE.equals(item.getIsGift())
+                && promotion.getPromotionId().equals(item.getPromotionId()))
+        .toList();
+
+    estimateItemRepository.deleteAll(giftItems);
+    }
+
+    private void unapplyPercentPromotion(Promotion promotion, List<EstimateItem> items) {
+        List<EstimateItem> affectedItems = items.stream().filter(estimateItem -> promotion.getPromotionId().equals(estimateItem.getPromotionId())).toList();
+        affectedItems.forEach(estimateItem -> {
+            estimateItem.setDiscountAmount(null);
+            estimateItem.setFinalPrice(estimateItem.getTotalPrice());
+            estimateItem.setPromotionId(null);
+            if (estimateItem.getAppliedTaxRate()!=null){
+                BigDecimal tax = estimateItem.getFinalPrice()
+                        .multiply(estimateItem.getAppliedTaxRate())
+                        .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+                estimateItem.setTaxAmount(tax);
+            }
+
+        });
+        estimateItemRepository.saveAll(affectedItems);
     }
 }

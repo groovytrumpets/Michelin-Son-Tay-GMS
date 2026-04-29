@@ -4,15 +4,19 @@ import com.g42.platform.gms.warehouse.api.dto.CatalogItemDto;
 import com.g42.platform.gms.warehouse.api.internal.WarehouseInternalApi;
 import com.g42.platform.gms.warehouse.app.service.inventory.InventoryService;
 import com.g42.platform.gms.warehouse.domain.entity.CatalogItem;
+import com.g42.platform.gms.warehouse.domain.entity.Inventory;
 import com.g42.platform.gms.warehouse.domain.entity.Warehouse;
 import com.g42.platform.gms.warehouse.domain.exception.WarehouseErrorCode;
 import com.g42.platform.gms.warehouse.domain.exception.WarehouseException;
 import com.g42.platform.gms.warehouse.infrastructure.entity.CatalogItemJpa;
+import com.g42.platform.gms.warehouse.infrastructure.entity.InventoryJpa;
 import com.g42.platform.gms.warehouse.infrastructure.entity.WarehouseJpa;
 import com.g42.platform.gms.warehouse.infrastructure.entity.WorkCategoryJpaEntity;
 import com.g42.platform.gms.warehouse.infrastructure.mapper.CatalogItemJpaMapper;
+import com.g42.platform.gms.warehouse.infrastructure.mapper.InventoryJpaMapper;
 import com.g42.platform.gms.warehouse.infrastructure.mapper.WarehouseJpaMapper;
 import com.g42.platform.gms.warehouse.infrastructure.repository.CatalogItemJpaRepo;
+import com.g42.platform.gms.warehouse.infrastructure.repository.InventoryJpaRepo;
 import com.g42.platform.gms.warehouse.infrastructure.repository.WarehouseJpaRepo;
 import com.g42.platform.gms.warehouse.infrastructure.repository.WorkCategoryJpaEntityRepo;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +38,10 @@ public class WarehouseInternalApiImpl implements WarehouseInternalApi {
     private WarehouseJpaRepo warehouseJpaRepo;
     @Autowired
     private WarehouseJpaMapper warehouseJpaMapper;
+    @Autowired
+    private InventoryJpaRepo inventoryJpaRepo;
+    @Autowired
+    private InventoryJpaMapper inventoryJpaMapper;
 
     @Override
     public CatalogItemDto getItemInfo(Integer itemId) {
@@ -78,5 +86,16 @@ public class WarehouseInternalApiImpl implements WarehouseInternalApi {
     public CatalogItem findCatalogById(Integer getItemId) {
         CatalogItemJpa catalogItemJpa = catalogItemRepo.findById(getItemId).orElse(null);
         return catalogItemJpaMapper.toDomain(catalogItemJpa);
+    }
+
+    @Override
+    public Inventory findInventoryByWarehouseIdAndItemIds(Integer warehouseId, Integer itemId) {
+        return inventoryJpaMapper.toDomain(inventoryJpaRepo.findByWarehouseIdAndItemId(warehouseId,itemId).orElse(null));
+    }
+
+    @Override
+    public Inventory findItemAvailableInOtherWarehouse(Integer itemId, int i) {
+//        InventoryJpa inventoryJpa = inventoryJpaRepo.findByItemIdThatAvailable(itemId);
+        return null;
     }
 }
