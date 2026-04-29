@@ -290,7 +290,7 @@ public class EstimateService {
             item.setIsChecked(req.getIsChecked() != null ? req.getIsChecked() : false);
             item.setRevisedFromItemId(req.getRevisedFromItemId());
 
-            item.setIsGift(Boolean.FALSE);
+            item.setIsGift(req.getIsGift() != null ? req.getIsGift() : false);
 
             TaxRule taxRule = null;
             Integer ruleId = null;
@@ -522,7 +522,7 @@ public class EstimateService {
         giftItem.setItemName(catalogItem.getItemName());
         giftItem.setQuantity(giftQuantity);
         //before promotion
-        giftItem.setUnitPrice(triggerItem.getUnitPrice());
+        //find price in db
 
         giftItem.setTotalPrice(BigDecimal.ZERO);
 
@@ -540,6 +540,8 @@ public class EstimateService {
         //todo: check warehouse quantity available
         Integer warehouseId = resolveGiftItemWarehouse(giftItem,triggerItem);
         giftItem.setWarehouseId(warehouseId);
+        BigDecimal unitPrice = warehouseInternalApi.findItemPricing(catalogItem.getItemId(),warehouseId!= null ? warehouseId : triggerItem.getWarehouseId(),catalogItem.getPrice());
+        giftItem.setUnitPrice(unitPrice!=null?unitPrice:BigDecimal.ZERO);
 
         estimateItemRepository.save(giftItem);
     }

@@ -6,8 +6,8 @@ import com.g42.platform.gms.warehouse.domain.entity.CatalogItem;
 import com.g42.platform.gms.warehouse.domain.entity.Inventory;
 import com.g42.platform.gms.warehouse.domain.entity.Warehouse;
 
+import java.math.BigDecimal;
 import java.util.List;
-import java.util.Map;
 
 public interface WarehouseInternalApi {
     CatalogItemDto getItemInfo(Integer itemId);
@@ -25,4 +25,6 @@ public interface WarehouseInternalApi {
     Inventory findInventoryByWarehouseIdAndItemIds(Integer warehouseId, Integer itemId);
 
     Inventory findItemAvailableInOtherWarehouse(Integer itemId, int i);
+
+    BigDecimal findItemPricing(Integer itemId, Integer integer, BigDecimal price);
 }

@@ -3,13 +3,13 @@ package com.g42.platform.gms.warehouse.infrastructure.specification;
 import com.g42.platform.gms.warehouse.api.dto.CatalogItemDto;
 import com.g42.platform.gms.warehouse.api.internal.WarehouseInternalApi;
 import com.g42.platform.gms.warehouse.app.service.inventory.InventoryService;
+import com.g42.platform.gms.warehouse.app.service.pricing.PricingService;
 import com.g42.platform.gms.warehouse.domain.entity.CatalogItem;
 import com.g42.platform.gms.warehouse.domain.entity.Inventory;
 import com.g42.platform.gms.warehouse.domain.entity.Warehouse;
 import com.g42.platform.gms.warehouse.domain.exception.WarehouseErrorCode;
 import com.g42.platform.gms.warehouse.domain.exception.WarehouseException;
 import com.g42.platform.gms.warehouse.infrastructure.entity.CatalogItemJpa;
-import com.g42.platform.gms.warehouse.infrastructure.entity.InventoryJpa;
 import com.g42.platform.gms.warehouse.infrastructure.entity.WarehouseJpa;
 import com.g42.platform.gms.warehouse.infrastructure.entity.WorkCategoryJpaEntity;
 import com.g42.platform.gms.warehouse.infrastructure.mapper.CatalogItemJpaMapper;
@@ -22,6 +22,7 @@ import com.g42.platform.gms.warehouse.infrastructure.repository.WorkCategoryJpaE
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Service
@@ -42,6 +43,8 @@ public class WarehouseInternalApiImpl implements WarehouseInternalApi {
     private InventoryJpaRepo inventoryJpaRepo;
     @Autowired
     private InventoryJpaMapper inventoryJpaMapper;
+    @Autowired
+    private PricingService pricingService;
 
     @Override
     public CatalogItemDto getItemInfo(Integer itemId) {
@@ -97,5 +100,10 @@ public class WarehouseInternalApiImpl implements WarehouseInternalApi {
     public Inventory findItemAvailableInOtherWarehouse(Integer itemId, int i) {
 //        InventoryJpa inventoryJpa = inventoryJpaRepo.findByItemIdThatAvailable(itemId);
         return null;
+    }
+
+    @Override
+    public BigDecimal findItemPricing(Integer itemId, Integer integer, BigDecimal price) {
+        return pricingService.getEffectivePrice(itemId,integer,price).getFinalPrice();
     }
 }
