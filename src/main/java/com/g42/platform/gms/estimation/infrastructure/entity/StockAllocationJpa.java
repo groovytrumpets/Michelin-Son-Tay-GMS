@@ -40,7 +40,6 @@ public class StockAllocationJpa {
     @NotNull
     @Column(name = "quantity", nullable = false)
     private Integer quantity;
-
     @NotNull
     @ColumnDefault("'RESERVED'")
     @Lob
@@ -60,6 +59,7 @@ public class StockAllocationJpa {
     @NotNull
     @Column(name = "estimate_id", nullable = false)
     private Integer estimateId;
-
+    @Column(name = "issue_id")
+    private Integer issueId;
 
 }

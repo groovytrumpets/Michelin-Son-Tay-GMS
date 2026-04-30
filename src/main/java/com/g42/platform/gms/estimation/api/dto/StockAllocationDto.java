@@ -21,4 +21,5 @@ public class StockAllocationDto {
     private Integer quantity;
     private String status;
     private Integer createdBy;
+    private Integer issueId;
 }
