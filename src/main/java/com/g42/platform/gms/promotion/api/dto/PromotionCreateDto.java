@@ -7,6 +7,8 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -29,4 +31,6 @@ public class PromotionCreateDto {
     private LocalDate endDate;
     private Integer usageLimit;
     private Integer usedCount;
+    private List<Integer> promotionItems;
+    private List<Integer> promotionCustomers;
 }

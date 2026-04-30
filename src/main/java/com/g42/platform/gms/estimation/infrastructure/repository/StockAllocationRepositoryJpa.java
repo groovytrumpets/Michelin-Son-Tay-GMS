@@ -23,7 +23,7 @@ public interface StockAllocationRepositoryJpa extends JpaRepository<StockAllocat
         """)
     void updateReleasedEstimateById(@Param("revisedFromId")Integer revisedFromId);
 
-    List<StockAllocationJpa> findAllByEstimateId(Integer estimateId);
+ 
 
     StockAllocationJpa getStockAllocationJpaByAllocationId(Integer allocationId);
 
@@ -33,4 +33,11 @@ public interface StockAllocationRepositoryJpa extends JpaRepository<StockAllocat
             Integer estimateId, Integer warehouseId, Integer itemId, String status);
 
     List<StockAllocationJpa> findAllByServiceTicketId(Integer serviceTicketId);
+
+    List<StockAllocationJpa> findAllByEstimateId(Integer estimateId);
+
+    @Query("""
+    select s from StockAllocationJpa s where s.estimateItemId in :estimateItemIds
+    """)
+    List<StockAllocationJpa> findAllByEstimateIds(List<Integer> estimateItemIds);
 }

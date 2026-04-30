@@ -17,11 +17,11 @@ public class PromotionCustomerJpa {
 
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "promotion_promotion_id", nullable = false)
-    private PromotionJpa promotionPromotion;
+    @JoinColumn(name = "promotion_id", nullable = false)
+    private PromotionJpa promotion;
 
     @NotNull
-    @Column(name = "customer_profile_customer_id", nullable = false)
+    @Column(name = "customer_id", nullable = false)
     private Integer customerProfileId;
 
 

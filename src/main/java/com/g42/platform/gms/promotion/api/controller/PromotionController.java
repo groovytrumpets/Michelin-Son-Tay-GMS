@@ -28,8 +28,8 @@ public class PromotionController {
         return ResponseEntity.ok(ApiResponses.success(promotionCreateDtoList));
     }
     @GetMapping("/available")
-    public ResponseEntity<ApiResponse<List<PromotionCreateDto>>> getAllAvailablePromotions() {
-        List<PromotionCreateDto> promotionCreateDtoList = promotionService.getAllAvailablePromotion();
+    public ResponseEntity<ApiResponse<List<PromotionCreateDto>>> getAllAvailablePromotions(@RequestParam String promotionType,@RequestParam(required = false) String customerId) {
+        List<PromotionCreateDto> promotionCreateDtoList = promotionService.getAllAvailablePromotion(promotionType,customerId);
         return ResponseEntity.ok(ApiResponses.success(promotionCreateDtoList));
     }
     @GetMapping("/")

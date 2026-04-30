@@ -23,4 +23,8 @@ public class EstimateItemReqDto {
     private Boolean isRemoved;
     private String unit;
     private Integer revisedFromItemId;
+    private Boolean isGift;
+    private Integer triggeredByItemId;
+    private BigDecimal discountAmount;
+//    private BigDecimal finalPrice;
 }

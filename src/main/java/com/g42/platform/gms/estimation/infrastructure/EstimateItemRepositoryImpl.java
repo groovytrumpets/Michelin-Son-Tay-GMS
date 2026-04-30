@@ -55,5 +55,10 @@ public class EstimateItemRepositoryImpl implements EstimateItemRepository {
         EstimateItemJpa saved = estimateItemRepositoryJpa.save(estimateItemJpaMapper.toJpa(estimateItem));
         return estimateItemJpaMapper.toDomain(saved);
     }
+
+    @Override
+    public void deleteAll(List<EstimateItem> giftItems) {
+        estimateItemRepositoryJpa.deleteAll(giftItems.stream().map(estimateItemJpaMapper::toJpa).toList());
+    }
 }
 
