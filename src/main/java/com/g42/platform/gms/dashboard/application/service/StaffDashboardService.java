@@ -124,7 +124,7 @@ public class StaffDashboardService {
                     dto.setNotificationId(n.getNotificationId());
                     dto.setTitle(n.getTitle());
                     dto.setMessage(n.getMessage());
-                    dto.setNotificationType(n.getNotificationType());
+                    dto.setNotificationType(n.getNotificationType().name());
                     dto.setIsRead(n.getIsRead());
                     dto.setSentAt(n.getSentAt() != null ? n.getSentAt().toString() : null);
                     return dto;

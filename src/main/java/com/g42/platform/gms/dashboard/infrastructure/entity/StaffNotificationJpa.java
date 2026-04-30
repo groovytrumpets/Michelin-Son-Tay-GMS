@@ -1,5 +1,6 @@
 package com.g42.platform.gms.dashboard.infrastructure.entity;
 
+import com.g42.platform.gms.dashboard.domain.enums.NotificationType;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -23,9 +24,9 @@ public class StaffNotificationJpa {
 
     @Column(name = "message", nullable = false, columnDefinition = "TEXT")
     private String message;
-
+    @Enumerated(EnumType.STRING)
     @Column(name = "notification_type", length = 20)
-    private String notificationType = "INFO";
+    private NotificationType notificationType;
 
     @Column(name = "is_read")
     private Boolean isRead = false;
