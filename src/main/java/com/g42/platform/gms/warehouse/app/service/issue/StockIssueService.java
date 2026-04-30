@@ -513,7 +513,7 @@ public class StockIssueService {
                     inventoryRepo.save(inventory);
                 }
 
-                allocation.setIssueId(null);
+
                 allocation.setStatus(AllocationStatus.RELEASED);
                 stockAllocationRepo.save(allocation);
             }
