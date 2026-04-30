@@ -64,7 +64,8 @@ public class SecurityConfig {
                                 "/zalo/login",
                                 "/home/**",
                                 "/api/webhook/**",
-                                "/error"
+                                "/error",
+                                "/ws-notifications/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
