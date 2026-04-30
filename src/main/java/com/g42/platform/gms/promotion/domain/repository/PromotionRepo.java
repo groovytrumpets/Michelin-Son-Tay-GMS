@@ -16,7 +16,7 @@ public interface PromotionRepo {
 
     Promotion getAllPromotionForBilling(ServiceBillDto serviceBillDto);
 
-    List<Promotion> getAllAvailablePromotion(String promotionType);
+    List<Promotion> getAllAvailablePromotion(String promotionType,String customerId);
 
     Promotion getPromotionByCode(String code);
 

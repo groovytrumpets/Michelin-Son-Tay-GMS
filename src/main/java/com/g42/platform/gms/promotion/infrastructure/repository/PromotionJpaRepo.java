@@ -20,9 +20,11 @@ public interface PromotionJpaRepo extends JpaRepository<PromotionJpa,Integer> {
     """)
     PromotionJpa findPromotionOfBilling(LocalDate now, BigDecimal subTotal, Integer promotionId);
     @Query("""
-    select p from PromotionJpa p where p.targetType = 'ALL' and p.type=:promotionType
+    select distinct p from PromotionJpa p left join PromotionCustomerJpa pc on p=pc.promotion
+            where p.type=:promotionType 
+                and(p.targetType = 'ALL' or (p.targetType='SPECIFIC' and pc.customerProfileId = :customerId) )
     """)
-    List<PromotionJpa> findAllAvailable(String promotionType);
+    List<PromotionJpa> findAllAvailable(String promotionType, String customerId);
 
     PromotionJpa findPromotionJpasByCode(String code);
 

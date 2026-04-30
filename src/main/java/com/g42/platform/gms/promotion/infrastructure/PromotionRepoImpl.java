@@ -56,8 +56,8 @@ public class PromotionRepoImpl implements PromotionRepo {
     }
 
     @Override
-    public List<Promotion> getAllAvailablePromotion(String promotionType) {
-        List<PromotionJpa> promotionJpa = promotionJpaRepo.findAllAvailable(promotionType);
+    public List<Promotion> getAllAvailablePromotion(String promotionType,String customerId) {
+        List<PromotionJpa> promotionJpa = promotionJpaRepo.findAllAvailable(promotionType,customerId);
         return promotionJpa.stream().map(promotionJpaMapper::toDomain).toList();
     }
 

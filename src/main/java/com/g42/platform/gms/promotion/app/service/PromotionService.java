@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @AllArgsConstructor
@@ -43,15 +44,30 @@ public class PromotionService {
         return promotionDtoMapper.toDto(promotion);
     }
 
-    public List<PromotionCreateDto> getAllAvailablePromotion(String promotionType) {
+    public List<PromotionCreateDto> getAllAvailablePromotion(String promotionType,String customerId) {
         if (promotionType==null) {
             throw new PromotionException("Promotion Type MUST NOT NULL", PromotionErrorCode.BAD_REQUEST);
         }
         if (!(promotionType.equals("PERCENT") || promotionType.equals("BUY_X_GET_Y"))) {
             throw new PromotionException("Promotion Type MUST BE 'PERCENT' or 'BUY_X_GET_Y'", PromotionErrorCode.BAD_REQUEST);
         }
-        List<Promotion> promotions = promotionRepo.getAllAvailablePromotion(promotionType);
-        return promotions.stream().map(promotionDtoMapper::toDto).toList();
+//        if (customerId==null) {
+//            throw new PromotionException("Customer Id MUST NOT NULL", PromotionErrorCode.BAD_REQUEST);
+//        }
+        List<Promotion> promotions = promotionRepo.getAllAvailablePromotion(promotionType,customerId);
+        List<PromotionCreateDto> promotionCreateDtoList = new ArrayList<>();
+        for (Promotion promotion : promotions) {
+            PromotionCreateDto dto = promotionDtoMapper.toDto(promotion);
+            List<PromotionItem> promotionItems = promotionRepo.findPromotionItemById(promotion);
+            List<PromotionCustomer> customerIds = promotionRepo.findPromotionCustomerById(promotion);
+
+            dto.setPromotionItems(promotionItems.stream().map(PromotionItem::getCatalogItemId).toList());
+            dto.setPromotionCustomers(customerIds.stream().map(PromotionCustomer::getCustomerProfileId).
+                    toList());
+            promotionCreateDtoList.add(dto);
+        }
+
+        return promotionCreateDtoList;
     }
 
     public List<PromotionCreateDto> getAllPromotion() {
