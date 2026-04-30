@@ -28,7 +28,7 @@ public class StaffNotifyController {
     public ResponseEntity<ApiResponse<List<NotificationRespondDto>>> getMyNotification(@AuthenticationPrincipal StaffPrincipal staffPrincipal){
         return ResponseEntity.ok(ApiResponses.success(staffNotifyService.getMyNotifications(staffPrincipal.getStaffId())));
     }
-    @PutMapping("{notificationId}")
+    @PutMapping("{notificationId}/isReaded")
     public ResponseEntity<ApiResponse<Boolean>> markAsRead(@PathVariable Integer notificationId){
         staffNotifyService.markAsRead(notificationId);
         return ResponseEntity.ok(ApiResponses.success(true));
