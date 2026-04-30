@@ -14,4 +14,8 @@ public interface PromotionInternalApi {
     List<Integer> findItemIdsByPromotionId(Promotion promotionId);
 
     void initializePromotionCount(Promotion promotion);
+
+    int incrementUsedCountIfAvailable(Integer promotionId);
+
+    void savePromotion(Promotion promotion);
 }

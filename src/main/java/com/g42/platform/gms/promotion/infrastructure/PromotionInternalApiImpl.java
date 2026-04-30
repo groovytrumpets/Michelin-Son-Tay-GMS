@@ -51,4 +51,14 @@ public class PromotionInternalApiImpl implements PromotionInternalApi {
         promotionJpa.setUsedCount(0);
         promotionJpaRepo.save(promotionJpa);
     }
+
+    @Override
+    public int incrementUsedCountIfAvailable(Integer promotionId) {
+        return promotionJpaRepo.incrementUsedCountIfAvailable(promotionId);
+    }
+
+    @Override
+    public void savePromotion(Promotion promotion) {
+        promotionJpaRepo.save(promotionJpaMapper.toJpa(promotion));
+    }
 }

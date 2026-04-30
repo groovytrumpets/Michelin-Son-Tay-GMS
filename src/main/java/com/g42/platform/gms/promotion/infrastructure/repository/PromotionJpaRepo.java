@@ -2,6 +2,7 @@ package com.g42.platform.gms.promotion.infrastructure.repository;
 
 import com.g42.platform.gms.promotion.infrastructure.entity.PromotionJpa;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
 import java.math.BigDecimal;
@@ -29,4 +30,9 @@ public interface PromotionJpaRepo extends JpaRepository<PromotionJpa,Integer> {
     PromotionJpa findPromotionJpasByCode(String code);
 
     PromotionJpa findByCode(String code);
+    @Modifying
+    @Query("""
+    update PromotionJpa p set p.usedCount = p.usedCount+1 where p.promotionId=:promotionId and p.usedCount<p.usageLimit
+    """)
+    int incrementUsedCountIfAvailable(Integer promotionId);
 }

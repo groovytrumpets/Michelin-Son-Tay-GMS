@@ -537,6 +537,9 @@ public class EstimateService {
         System.out.println("Total_price: " + totalPrice); // dùng biến totalPrice trực tiếp
         estimateRepository.save(estimate);
 
+        //todo:update used race condition
+        int rowsUpdated = promotionInternalApi.incrementUsedCountIfAvailable(promotionId);
+        if (rowsUpdated==0) throw new EstimateException("UNFORTUNATE, LAST PROMOTION IS USED", EstimateErrorCode.PROMOTION_OUT);
         return getEstimateRespondDto(estimateId);
     }
 
@@ -698,6 +701,10 @@ public class EstimateService {
             //todo: apply buy x get y
             unapplyBuyXGetY(promotion, items, estimateId);
         }
+        if (promotion.getUsedCount()==null||promotion.getUsedCount()==0){
+            promotion.setUsedCount(0);
+        }else promotion.setUsedCount(promotion.getUsedCount()-1);
+        promotionInternalApi.savePromotion(promotion);
         return getEstimateRespondDto(estimateId);
     }
 
