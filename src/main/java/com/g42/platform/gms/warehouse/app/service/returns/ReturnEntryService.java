@@ -34,6 +34,8 @@ import com.g42.platform.gms.warehouse.domain.entity.Warehouse;
 import com.g42.platform.gms.warehouse.domain.entity.WarehouseAttachment;
 import com.g42.platform.gms.warehouse.domain.enums.AllocationStatus;
 import com.g42.platform.gms.warehouse.domain.repository.WarehouseRepo;
+import com.g42.platform.gms.estimation.domain.repository.EstimateItemRepository;
+import com.g42.platform.gms.estimation.domain.entity.EstimateItem;
 import com.g42.platform.gms.warehouse.domain.repository.StockAllocationRepo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -77,6 +79,7 @@ public class ReturnEntryService {
     private final com.g42.platform.gms.warehouse.domain.repository.StockEntryRepo stockEntryRepo;
     private final StaffProfileRepo staffProfileRepo;
     private final PartCatalogRepo partCatalogRepo;
+    private final EstimateItemRepository estimateItemRepository;
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
 
     @Transactional
@@ -425,8 +428,16 @@ public class ReturnEntryService {
 
         StockAllocation released = new StockAllocation();
         released.setServiceTicketId(allocation.getServiceTicketId());
-        released.setIssueId(null);
+
         released.setEstimateItemId(allocation.getEstimateItemId());
+        Integer estimateId = allocation.getEstimateId();
+        if (estimateId == null && allocation.getEstimateItemId() != null) {
+            EstimateItem estimateItem = estimateItemRepository.findByEstimateItemId(allocation.getEstimateItemId());
+            if (estimateItem != null) {
+                estimateId = estimateItem.getEstimateId();
+            }
+        }
+        released.setEstimateId(estimateId);
         released.setWarehouseId(allocation.getWarehouseId());
         released.setItemId(allocation.getItemId());
         released.setQuantity(returnQuantity);

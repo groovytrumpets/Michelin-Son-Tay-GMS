@@ -51,33 +51,22 @@ public class StockAllocationService {
     @Transactional
     public List<StockShortageInfo> reserve(Integer estimateId, Integer staffId) {
         List<EstimateItem> estimateItems = getCheckedEstimateItems(estimateId);
-
         List<StockShortageInfo> shortages = new ArrayList<>();
 
         for (EstimateItem estimateItem : estimateItems) {
             int requiredQuantity = estimateItem.getQuantity();
 
-            List<StockAllocation> existingAllocations = allocationRepo.findByEstimateItemId(estimateItem.getId());
-            StockAllocation existingAllocation = existingAllocations.isEmpty()
-                ? null
-                : existingAllocations.get(0);
-
-            Inventory inventory = inventoryRepo
-                    .findByWarehouseAndItemWithLock(estimateItem.getWarehouseId(), estimateItem.getItemId())
-                    .orElse(null);
-
-            int availableQuantity = inventory != null
-                    ? Math.max(0, inventory.getQuantity() - inventory.getReservedQuantity())
-                    : 0;
-
-            // delta > 0: reserve thêm, delta < 0: giảm phần đang reserve.
-            int reserveDelta = existingAllocation != null
-                    ? requiredQuantity - existingAllocation.getQuantity()
-                    : requiredQuantity;
-
+            StockAllocation existingAllocation = findFirstAllocationByEstimateItem(estimateItem.getId());
             if (existingAllocation != null && existingAllocation.getStatus() == AllocationStatus.COMMITTED) {
                 continue;
             }
+
+            Inventory inventory = getInventoryOrThrow(estimateItem.getWarehouseId(), estimateItem.getItemId());
+            int availableQuantity = getAvailableQuantity(inventory);
+            // reserveDelta là phần chênh lệch cần tăng/giảm reserved so với allocation hiện có.
+            int reserveDelta = existingAllocation != null
+                    ? requiredQuantity - existingAllocation.getQuantity()
+                    : requiredQuantity;
 
             if (reserveDelta > 0 && availableQuantity < reserveDelta) {
                 shortages.add(new StockShortageInfo(
@@ -90,23 +79,23 @@ public class StockAllocationService {
             }
 
             if (existingAllocation != null) {
-                if (reserveDelta != 0) {
-                    existingAllocation.setQuantity(requiredQuantity);
-                    allocationRepo.save(existingAllocation);
-                    inventory.setReservedQuantity(inventory.getReservedQuantity() + reserveDelta);
-                    inventoryRepo.save(inventory);
-
-                    logTransaction(
-                            estimateItem.getWarehouseId(),
-                            estimateItem.getItemId(),
-                            InventoryTransactionType.ADJUSTMENT,
-                            reserveDelta,
-                            inventory.getQuantity(),
-                            "stock_allocation",
-                            existingAllocation.getAllocationId(),
-                            staffId
-                    );
+                if (reserveDelta == 0) {
+                    continue;
                 }
+
+                existingAllocation.setQuantity(requiredQuantity);
+                allocationRepo.save(existingAllocation);
+
+                adjustReservedQuantity(inventory, reserveDelta);
+                logAdjustmentTransaction(
+                        estimateItem.getWarehouseId(),
+                        estimateItem.getItemId(),
+                        reserveDelta,
+                        inventory.getQuantity(),
+                        "stock_allocation",
+                        existingAllocation.getAllocationId(),
+                        staffId
+                );
                 continue;
             }
 
@@ -114,6 +103,7 @@ public class StockAllocationService {
             StockAllocation allocation = new StockAllocation();
             allocation.setServiceTicketId(serviceTicketId);
             allocation.setEstimateItemId(estimateItem.getId());
+            allocation.setEstimateId(estimateId);
             allocation.setWarehouseId(estimateItem.getWarehouseId());
             allocation.setItemId(estimateItem.getItemId());
             allocation.setQuantity(requiredQuantity);
@@ -121,13 +111,10 @@ public class StockAllocationService {
             allocation.setCreatedBy(staffId);
             StockAllocation savedAllocation = allocationRepo.save(allocation);
 
-            inventory.setReservedQuantity(inventory.getReservedQuantity() + requiredQuantity);
-            inventoryRepo.save(inventory);
-
-            logTransaction(
+            adjustReservedQuantity(inventory, requiredQuantity);
+            logAdjustmentTransaction(
                     estimateItem.getWarehouseId(),
                     estimateItem.getItemId(),
-                    InventoryTransactionType.ADJUSTMENT,
                     requiredQuantity,
                     inventory.getQuantity(),
                     "stock_allocation",
@@ -149,35 +136,16 @@ public class StockAllocationService {
                     "Khong co stock allocation RESERVED cho service ticket nay");
         }
 
-        Map<Integer, List<CreateStockIssueRequest.IssueItemRequest>> issueItemsByWarehouse = new HashMap<>();
+        // true = chỉ lấy allocation chưa gán issueId để tránh tạo draft trùng cho cùng allocation.
+        Map<Integer, List<CreateStockIssueRequest.IssueItemRequest>> issueItemsByWarehouse =
+                buildIssueItemsByWarehouseFromAllocations(reserved, true);
 
-        for (StockAllocation alloc : reserved) {
-            // Chỉ tạo phiếu cho allocation chưa được gắn issue.
-            if (alloc.getIssueId() != null) {
-                continue;
-            }
-
-            CreateStockIssueRequest.IssueItemRequest item = new CreateStockIssueRequest.IssueItemRequest();
-            item.setItemId(alloc.getItemId());
-            item.setQuantity(alloc.getQuantity());
-            item.setDiscountRate(BigDecimal.ZERO);
-
-            issueItemsByWarehouse
-                    .computeIfAbsent(alloc.getWarehouseId(), k -> new ArrayList<>())
-                    .add(item);
-        }
-
-        List<StockIssueResponse> createdIssues = new ArrayList<>();
-        for (Map.Entry<Integer, List<CreateStockIssueRequest.IssueItemRequest>> entry : issueItemsByWarehouse.entrySet()) {
-            CreateStockIssueRequest issueRequest = new CreateStockIssueRequest();
-            issueRequest.setWarehouseId(entry.getKey());
-            issueRequest.setIssueType(IssueType.SERVICE_TICKET);
-            issueRequest.setIssueReason("Yeu cau xuat kho tu ServiceTicket #" + serviceTicketId);
-            issueRequest.setServiceTicketId(serviceTicketId);
-            issueRequest.setItems(entry.getValue());
-
-            createdIssues.add(stockIssueService.create(issueRequest, staffId));
-        }
+        List<StockIssueResponse> createdIssues = createIssueDrafts(
+                issueItemsByWarehouse,
+                serviceTicketId,
+                "Yeu cau xuat kho tu ServiceTicket #" + serviceTicketId,
+                staffId
+        );
 
         if (createdIssues.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
@@ -209,13 +177,10 @@ public class StockAllocationService {
                         "Reserved quantity khong hop le cho itemId=" + alloc.getItemId());
             }
 
-            inventory.setReservedQuantity(inventory.getReservedQuantity() - alloc.getQuantity());
-            inventoryRepo.save(inventory);
-
-            logTransaction(
+            adjustReservedQuantity(inventory, -alloc.getQuantity());
+            logAdjustmentTransaction(
                     alloc.getWarehouseId(),
                     alloc.getItemId(),
-                    InventoryTransactionType.ADJUSTMENT,
                     -alloc.getQuantity(),
                     inventory.getQuantity(),
                     "stock_allocation_commit",
@@ -238,6 +203,7 @@ public class StockAllocationService {
                 .findByTicketAndStatus(serviceTicketId, AllocationStatus.RESERVED);
 
         if (!reserved.isEmpty()) {
+            // Luồng chính: đã có RESERVED thì tạo draft issue trực tiếp từ allocations.
             requestIssueDraft(serviceTicketId, staffId);
             return;
         }
@@ -248,32 +214,20 @@ public class StockAllocationService {
             return;
         }
 
-        Map<Integer, List<CreateStockIssueRequest.IssueItemRequest>> issueItemsByWarehouse = new HashMap<>();
-
-        for (EstimateItem estimateItem : estimateItems) {
-            CreateStockIssueRequest.IssueItemRequest item = new CreateStockIssueRequest.IssueItemRequest();
-            item.setItemId(estimateItem.getItemId());
-            item.setQuantity(estimateItem.getQuantity());
-            item.setDiscountRate(BigDecimal.ZERO);
-            issueItemsByWarehouse
-                    .computeIfAbsent(estimateItem.getWarehouseId(), k -> new ArrayList<>())
-                    .add(item);
-        }
+        Map<Integer, List<CreateStockIssueRequest.IssueItemRequest>> issueItemsByWarehouse =
+                buildIssueItemsByWarehouseFromEstimateItems(estimateItems);
 
         if (issueItemsByWarehouse.isEmpty()) {
             return;
         }
 
-        for (Map.Entry<Integer, List<CreateStockIssueRequest.IssueItemRequest>> entry : issueItemsByWarehouse.entrySet()) {
-            CreateStockIssueRequest issueRequest = new CreateStockIssueRequest();
-            issueRequest.setWarehouseId(entry.getKey());
-            issueRequest.setIssueType(IssueType.SERVICE_TICKET);
-            issueRequest.setIssueReason("Fallback yeu cau xuat kho theo Estimate #" + estimateId);
-            issueRequest.setServiceTicketId(serviceTicketId);
-            issueRequest.setItems(entry.getValue());
-
-            stockIssueService.create(issueRequest, staffId);
-        }
+        // Luồng fallback: chưa có allocation RESERVED thì dựng draft từ estimate items đã checked.
+        createIssueDrafts(
+                issueItemsByWarehouse,
+                serviceTicketId,
+                "Fallback yeu cau xuat kho theo Estimate #" + estimateId,
+                staffId
+        );
     }
 
     @Transactional
@@ -287,13 +241,13 @@ public class StockAllocationService {
                     .orElse(null);
 
             if (inventory != null) {
-                inventory.setReservedQuantity(Math.max(0, inventory.getReservedQuantity() - alloc.getQuantity()));
+                int updatedReserved = Math.max(0, inventory.getReservedQuantity() - alloc.getQuantity());
+                inventory.setReservedQuantity(updatedReserved);
                 inventoryRepo.save(inventory);
 
-                logTransaction(
+                logAdjustmentTransaction(
                         alloc.getWarehouseId(),
                         alloc.getItemId(),
-                        InventoryTransactionType.ADJUSTMENT,
                         -alloc.getQuantity(),
                         inventory.getQuantity(),
                         "stock_allocation_release",
@@ -304,6 +258,103 @@ public class StockAllocationService {
 
             alloc.setStatus(AllocationStatus.RELEASED);
             allocationRepo.save(alloc);
+        }
+    }
+
+    @Transactional
+    public void cancelStockAllocation(Integer estimateItemId, Integer issueId, Integer staffId) {
+        if (estimateItemId == null && issueId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Phải cung cấp estimateItemId hoặc issueId");
+        }
+
+        if (issueId != null) {
+            cancelReservedWithIssue(issueId, staffId);
+        } else {
+            cancelReservedWithoutIssue(estimateItemId, staffId);
+        }
+    }
+
+    private void cancelReservedWithoutIssue(Integer estimateItemId, Integer staffId) {
+        List<StockAllocation> allocations = allocationRepo.findByEstimateItemId(estimateItemId);
+
+        if (allocations.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "Không tìm thấy allocation cho estimateItemId=" + estimateItemId);
+        }
+
+        for (StockAllocation allocation : allocations) {
+            if (allocation.getIssueId() != null) {
+                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                        "Allocation id=" + allocation.getAllocationId() + " đã gắn phiếu xuất, không thể hủy giữ chỗ");
+            }
+
+            if (allocation.getStatus() == AllocationStatus.COMMITTED) {
+                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                        "Allocation id=" + allocation.getAllocationId() + " đã COMMITTED, không thể hủy giữ chỗ");
+            }
+
+            if (allocation.getStatus() == AllocationStatus.RELEASED) {
+                continue;
+            }
+
+            Inventory inventory = inventoryRepo
+                    .findByWarehouseAndItemWithLock(allocation.getWarehouseId(), allocation.getItemId())
+                    .orElse(null);
+
+            if (inventory != null) {
+                int updatedReserved = Math.max(0, inventory.getReservedQuantity() - allocation.getQuantity());
+                inventory.setReservedQuantity(updatedReserved);
+                inventoryRepo.save(inventory);
+
+                logAdjustmentTransaction(
+                        allocation.getWarehouseId(),
+                        allocation.getItemId(),
+                        -allocation.getQuantity(),
+                        inventory.getQuantity(),
+                        "stock_allocation_cancel",
+                        allocation.getAllocationId(),
+                        staffId
+                );
+            }
+
+            allocation.setStatus(AllocationStatus.RELEASED);
+            allocationRepo.save(allocation);
+        }
+    }
+
+    private void cancelReservedWithIssue(Integer issueId, Integer staffId) {
+        List<StockAllocation> allocations = allocationRepo.findByIssueIdAndStatus(issueId, AllocationStatus.RESERVED);
+
+        if (allocations.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "Không tìm thấy allocation RESERVED cho issueId=" + issueId);
+        }
+
+        for (StockAllocation allocation : allocations) {
+            Inventory inventory = inventoryRepo
+                    .findByWarehouseAndItemWithLock(allocation.getWarehouseId(), allocation.getItemId())
+                    .orElse(null);
+
+            if (inventory != null) {
+                // Giảm reserved quantity (allocation vẫn ở RESERVED)
+                int updatedReserved = Math.max(0, inventory.getReservedQuantity() - allocation.getQuantity());
+                inventory.setReservedQuantity(updatedReserved);
+                inventoryRepo.save(inventory);
+
+                logAdjustmentTransaction(
+                        allocation.getWarehouseId(),
+                        allocation.getItemId(),
+                        -allocation.getQuantity(),
+                        inventory.getQuantity(),
+                        "stock_allocation_cancel_with_issue",
+                        allocation.getAllocationId(),
+                        staffId
+                );
+            }
+
+            allocation.setStatus(AllocationStatus.RELEASED);
+            allocationRepo.save(allocation);
         }
     }
 
@@ -325,15 +376,14 @@ public class StockAllocationService {
 
         int delta = newQuantity - allocation.getQuantity();
         if (delta > 0) {
-            int available = Math.max(0, inventory.getQuantity() - inventory.getReservedQuantity());
+            int available = getAvailableQuantity(inventory);
             if (available < delta) {
                 throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                         "Khong du ton kho kha dung de tang allocation");
             }
         }
 
-        inventory.setReservedQuantity(inventory.getReservedQuantity() + delta);
-        inventoryRepo.save(inventory);
+        adjustReservedQuantity(inventory, delta);
 
         allocation.setQuantity(newQuantity);
         allocationRepo.save(allocation);
@@ -350,6 +400,110 @@ public class StockAllocationService {
                 .filter(i -> !Boolean.TRUE.equals(i.getIsRemoved()))
                 .filter(i -> Boolean.TRUE.equals(i.getIsChecked()))
                 .toList();
+    }
+
+    private StockAllocation findFirstAllocationByEstimateItem(Integer estimateItemId) {
+        List<StockAllocation> allocations = allocationRepo.findByEstimateItemId(estimateItemId);
+        return allocations.isEmpty() ? null : allocations.get(0);
+    }
+
+    private Inventory getInventoryOrThrow(Integer warehouseId, Integer itemId) {
+        return inventoryRepo.findByWarehouseAndItemWithLock(warehouseId, itemId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.UNPROCESSABLE_ENTITY,
+                        "Khong tim thay ton kho cho itemId=" + itemId + " tai warehouseId=" + warehouseId
+                ));
+    }
+
+    private int getAvailableQuantity(Inventory inventory) {
+        return Math.max(0, inventory.getQuantity() - inventory.getReservedQuantity());
+    }
+
+    private void adjustReservedQuantity(Inventory inventory, int delta) {
+        inventory.setReservedQuantity(inventory.getReservedQuantity() + delta);
+        inventoryRepo.save(inventory);
+    }
+
+    private Map<Integer, List<CreateStockIssueRequest.IssueItemRequest>> buildIssueItemsByWarehouseFromAllocations(
+            List<StockAllocation> allocations,
+            boolean skipAssignedIssue
+    ) {
+        Map<Integer, List<CreateStockIssueRequest.IssueItemRequest>> result = new HashMap<>();
+        for (StockAllocation allocation : allocations) {
+            if (skipAssignedIssue && allocation.getIssueId() != null) {
+                continue;
+            }
+            addIssueItem(result, allocation.getWarehouseId(), allocation.getItemId(), allocation.getQuantity());
+        }
+        return result;
+    }
+
+    private Map<Integer, List<CreateStockIssueRequest.IssueItemRequest>> buildIssueItemsByWarehouseFromEstimateItems(
+            List<EstimateItem> estimateItems
+    ) {
+        Map<Integer, List<CreateStockIssueRequest.IssueItemRequest>> result = new HashMap<>();
+        for (EstimateItem estimateItem : estimateItems) {
+            addIssueItem(result, estimateItem.getWarehouseId(), estimateItem.getItemId(), estimateItem.getQuantity());
+        }
+        return result;
+    }
+
+    private void addIssueItem(
+            Map<Integer, List<CreateStockIssueRequest.IssueItemRequest>> issueItemsByWarehouse,
+            Integer warehouseId,
+            Integer itemId,
+            Integer quantity
+    ) {
+        CreateStockIssueRequest.IssueItemRequest item = new CreateStockIssueRequest.IssueItemRequest();
+        item.setItemId(itemId);
+        item.setQuantity(quantity);
+        item.setDiscountRate(BigDecimal.ZERO);
+        issueItemsByWarehouse.computeIfAbsent(warehouseId, key -> new ArrayList<>()).add(item);
+    }
+
+    private List<StockIssueResponse> createIssueDrafts(
+            Map<Integer, List<CreateStockIssueRequest.IssueItemRequest>> issueItemsByWarehouse,
+            Integer serviceTicketId,
+            String issueReason,
+            Integer staffId
+    ) {
+        List<StockIssueResponse> createdIssues = new ArrayList<>();
+        for (Map.Entry<Integer, List<CreateStockIssueRequest.IssueItemRequest>> entry : issueItemsByWarehouse.entrySet()) {
+            Integer warehouseId = entry.getKey();
+            if (stockIssueRepo.existsDraftServiceTicketIssueInWarehouse(serviceTicketId, warehouseId)) {
+                continue;
+            }
+
+            CreateStockIssueRequest issueRequest = new CreateStockIssueRequest();
+            issueRequest.setWarehouseId(warehouseId);
+            issueRequest.setIssueType(IssueType.SERVICE_TICKET);
+            issueRequest.setIssueReason(issueReason);
+            issueRequest.setServiceTicketId(serviceTicketId);
+            issueRequest.setItems(entry.getValue());
+            createdIssues.add(stockIssueService.create(issueRequest, staffId));
+        }
+        return createdIssues;
+    }
+
+    private void logAdjustmentTransaction(
+            Integer warehouseId,
+            Integer itemId,
+            int qty,
+            int balanceAfter,
+            String refType,
+            Integer refId,
+            Integer staffId
+    ) {
+        logTransaction(
+                warehouseId,
+                itemId,
+                InventoryTransactionType.ADJUSTMENT,
+                qty,
+                balanceAfter,
+                refType,
+                refId,
+                staffId
+        );
     }
 
     private void logTransaction(

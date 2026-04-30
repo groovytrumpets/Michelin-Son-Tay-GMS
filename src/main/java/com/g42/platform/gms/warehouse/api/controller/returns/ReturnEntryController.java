@@ -58,19 +58,6 @@ public class ReturnEntryController {
     }
 
     /**
-     * Tạo phiếu hoàn + ảnh lỗi từng item trong 1 form (multipart/form-data).
-     * items: JSON string. file_0..file_4: ảnh lỗi theo index item.
-     */
-    @PostMapping(value = "/with-attachments", consumes = "multipart/form-data")
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<ReturnEntryResponse>> createWithAttachments(
-            @Valid @ModelAttribute CreateReturnEntryFormRequest request,
-            @AuthenticationPrincipal StaffPrincipal principal) throws IOException {
-        return ResponseEntity.ok(ApiResponses.success(
-                returnEntryService.createWithAttachments(request, principal.getStaffId())));
-    }
-
-    /**
      * Upload ảnh lỗi cho từng sản phẩm trong phiếu hoàn.
      * Path: /api/warehouse/return-entries/items/{returnItemId}/attachments
      */
@@ -114,5 +101,14 @@ public class ReturnEntryController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<ReturnEntryResponse>> getDetail(@PathVariable Integer id) {
         return ResponseEntity.ok(ApiResponses.success(returnEntryService.getDetail(id)));
+    }
+
+    @PostMapping(value = "/request", consumes = "multipart/form-data")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<ReturnEntryResponse>> requestWithAttachments(
+            @Valid @ModelAttribute CreateReturnEntryFormRequest request,
+            @AuthenticationPrincipal StaffPrincipal principal) throws IOException {
+        return ResponseEntity.ok(ApiResponses.success(
+                returnEntryService.createWithAttachments(request, principal.getStaffId())));
     }
 }

@@ -2,7 +2,6 @@ package com.g42.platform.gms.warehouse.api.dto.request;
 
 import com.g42.platform.gms.warehouse.domain.enums.ReturnType;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -15,7 +14,6 @@ import org.springframework.web.multipart.MultipartFile;
 @Data
 public class CreateReturnEntryFormRequest {
 
-    @NotNull
     private Integer warehouseId;
 
     @NotBlank

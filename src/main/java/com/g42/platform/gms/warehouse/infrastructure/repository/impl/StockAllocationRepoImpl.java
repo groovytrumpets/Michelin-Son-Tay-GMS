@@ -66,6 +66,7 @@ public class StockAllocationRepoImpl implements StockAllocationRepo {
         domain.setServiceTicketId(jpa.getServiceTicketId());
         domain.setIssueId(jpa.getIssueId());
         domain.setEstimateItemId(jpa.getEstimateItemId());
+        domain.setEstimateId(jpa.getEstimateId());
         domain.setWarehouseId(jpa.getWarehouseId());
         domain.setItemId(jpa.getItemId());
         domain.setQuantity(jpa.getQuantity());
@@ -82,6 +83,7 @@ public class StockAllocationRepoImpl implements StockAllocationRepo {
         jpa.setServiceTicketId(domain.getServiceTicketId());
         jpa.setIssueId(domain.getIssueId());
         jpa.setEstimateItemId(domain.getEstimateItemId());
+        jpa.setEstimateId(domain.getEstimateId());
         jpa.setWarehouseId(domain.getWarehouseId());
         jpa.setItemId(domain.getItemId());
         jpa.setQuantity(domain.getQuantity());
