@@ -16,13 +16,12 @@ public class PromotionItemJpa {
     private Integer promotionItemId;
 
     @NotNull
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "promotion_promotion_id", nullable = false)
-    private PromotionJpa promotionPromotion;
-
-    @NotNull
-    @Column(name = "catalog_item_item_id", nullable = false)
+    @Column(name = "catalog_item_id", nullable = false)
     private Integer catalogItemId;
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "promotion_id", nullable = false)
+    private PromotionJpa promotion;
 
 
 }

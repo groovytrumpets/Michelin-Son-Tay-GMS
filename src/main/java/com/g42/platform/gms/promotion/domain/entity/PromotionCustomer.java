@@ -1,5 +1,6 @@
 package com.g42.platform.gms.promotion.domain.entity;
 
+import com.g42.platform.gms.promotion.infrastructure.entity.PromotionJpa;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -13,7 +14,7 @@ import lombok.Setter;
 @AllArgsConstructor
 public class PromotionCustomer {
     private Integer promotionCustomerId;
-    private Promotion promotionPromotion;
+    private PromotionJpa promotion;
     private Integer customerProfileId;
 
 

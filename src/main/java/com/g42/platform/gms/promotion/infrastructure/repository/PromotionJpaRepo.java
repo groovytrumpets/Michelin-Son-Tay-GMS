@@ -1,8 +1,8 @@
 package com.g42.platform.gms.promotion.infrastructure.repository;
 
-import com.g42.platform.gms.billing.api.dto.ServiceBillDto;
 import com.g42.platform.gms.promotion.infrastructure.entity.PromotionJpa;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
 import java.math.BigDecimal;
@@ -21,9 +21,18 @@ public interface PromotionJpaRepo extends JpaRepository<PromotionJpa,Integer> {
     """)
     PromotionJpa findPromotionOfBilling(LocalDate now, BigDecimal subTotal, Integer promotionId);
     @Query("""
-    select p from PromotionJpa p where p.targetType = 'ALL' and p.applyTo ='ALL'
+    select distinct p from PromotionJpa p left join PromotionCustomerJpa pc on p=pc.promotion
+            where p.type=:promotionType 
+                and(p.targetType = 'ALL' or (p.targetType='SPECIFIC' and pc.customerProfileId = :customerId) )
     """)
-    List<PromotionJpa> findAllAvailable();
+    List<PromotionJpa> findAllAvailable(String promotionType, String customerId);
 
     PromotionJpa findPromotionJpasByCode(String code);
+
+    PromotionJpa findByCode(String code);
+    @Modifying
+    @Query("""
+    update PromotionJpa p set p.usedCount = p.usedCount+1 where p.promotionId=:promotionId and p.usedCount<p.usageLimit
+    """)
+    int incrementUsedCountIfAvailable(Integer promotionId);
 }

@@ -1,10 +1,15 @@
 package com.g42.platform.gms.promotion.infrastructure;
 
 import com.g42.platform.gms.billing.api.dto.ServiceBillDto;
-import com.g42.platform.gms.promotion.api.dto.PromotionCreateDto;
 import com.g42.platform.gms.promotion.domain.entity.Promotion;
+import com.g42.platform.gms.promotion.domain.entity.PromotionCustomer;
+import com.g42.platform.gms.promotion.domain.entity.PromotionItem;
 import com.g42.platform.gms.promotion.domain.repository.PromotionRepo;
+import com.g42.platform.gms.promotion.infrastructure.entity.PromotionCustomerJpa;
+import com.g42.platform.gms.promotion.infrastructure.entity.PromotionItemJpa;
 import com.g42.platform.gms.promotion.infrastructure.entity.PromotionJpa;
+import com.g42.platform.gms.promotion.infrastructure.mapper.PromotionCustomerJpaMapper;
+import com.g42.platform.gms.promotion.infrastructure.mapper.PromotionItemJpaMapper;
 import com.g42.platform.gms.promotion.infrastructure.mapper.PromotionJpaMapper;
 import com.g42.platform.gms.promotion.infrastructure.repository.PromotionJpaRepo;
 import lombok.AllArgsConstructor;
@@ -21,10 +26,20 @@ public class PromotionRepoImpl implements PromotionRepo {
     PromotionJpaRepo promotionJpaRepo;
     @Autowired
     PromotionJpaMapper promotionJpaMapper;
+    @Autowired
+    private PromotionItemJpaRepository promotionItemJpaRepository;
+    @Autowired
+    private PromotionCustomerJpaRepository promotionCustomerJpaRepository;
+    @Autowired
+    private PromotionItemJpaMapper promotionItemJpaMapper;
+    @Autowired
+    private PromotionCustomerJpaMapper promotionCustomerJpaMapper;
+
     @Override
     public Promotion createNewPromotion(Promotion promotionCreateDto) {
-        PromotionJpa promotionJpa = promotionJpaRepo.save(promotionJpaMapper.fromDomain(promotionCreateDto));
-        return promotionJpaMapper.toDomain(promotionJpa);
+        PromotionJpa promotionJpa = promotionJpaMapper.fromDomain(promotionCreateDto);
+        promotionJpa.setUsedCount(0);
+        return promotionJpaMapper.toDomain(promotionJpaRepo.save(promotionJpa));
     }
 
     @Override
@@ -41,8 +56,8 @@ public class PromotionRepoImpl implements PromotionRepo {
     }
 
     @Override
-    public List<Promotion> getAllAvailablePromotion() {
-        List<PromotionJpa> promotionJpa = promotionJpaRepo.findAllAvailable();
+    public List<Promotion> getAllAvailablePromotion(String promotionType,String customerId) {
+        List<PromotionJpa> promotionJpa = promotionJpaRepo.findAllAvailable(promotionType,customerId);
         return promotionJpa.stream().map(promotionJpaMapper::toDomain).toList();
     }
 
@@ -54,7 +69,7 @@ public class PromotionRepoImpl implements PromotionRepo {
     @Override
     public Promotion updatePromotion(Integer promotionId, Promotion promotion) {
 
-        PromotionJpa promotionJpa = new PromotionJpa();
+        PromotionJpa promotionJpa = promotionJpaMapper.fromDomain(promotion);
         promotionJpa.setPromotionId(promotionId);
         PromotionJpa saved = promotionJpaRepo.save(promotionJpa);
         return promotionJpaMapper.toDomain(saved);
@@ -69,5 +84,48 @@ public class PromotionRepoImpl implements PromotionRepo {
         }
         promotionJpa.setUsedCount(promotionJpa.getUsedCount() + 1);
         promotionJpaRepo.save(promotionJpa);
+    }
+
+    @Override
+    public void saveItems(List<Integer> items, Promotion promotion) {
+        PromotionJpa promotionJpa = promotionJpaMapper.fromDomain(promotion);
+        List<PromotionItemJpa> itemJpas = items.stream().map(itemId -> {
+            PromotionItemJpa itemJpa = new PromotionItemJpa();
+            itemJpa.setPromotion(promotionJpa);
+            itemJpa.setCatalogItemId(itemId);
+            return itemJpa;
+        }).toList();
+        promotionItemJpaRepository.saveAll(itemJpas);
+    }
+
+    @Override
+    public void saveCustomers(List<Integer> customers, Promotion promotion) {
+        PromotionJpa promotionJpa = promotionJpaMapper.fromDomain(promotion);
+        List<PromotionCustomerJpa> promotionCustomerJpas = customers.stream().map(integer ->  {
+            PromotionCustomerJpa customerJpa = new PromotionCustomerJpa();
+            customerJpa.setPromotion(promotionJpa);
+            customerJpa.setCustomerProfileId(integer);
+            return customerJpa;
+        }).toList();
+        promotionCustomerJpaRepository.saveAll(promotionCustomerJpas);
+    }
+
+    @Override
+    public List<PromotionItem> findPromotionItemById(Promotion promotion) {
+        return promotionItemJpaRepository.
+                getAllByPromotion(promotionJpaMapper.fromDomain(promotion)).
+                stream().map(promotionItemJpaMapper::toDomain).toList();
+    }
+
+    @Override
+    public List<PromotionCustomer> findPromotionCustomerById(Promotion promotion) {
+        return promotionCustomerJpaRepository.getAllByPromotion(promotionJpaMapper.fromDomain(promotion)).
+                stream().map(promotionCustomerJpaMapper::toDomain).toList();
+    }
+
+    @Override
+    public void deleteOldItems(Promotion promotion) {
+        promotionCustomerJpaRepository.deleteByPromotion(promotionJpaMapper.fromDomain(promotion));
+        promotionItemJpaRepository.deleteByPromotion(promotionJpaMapper.fromDomain(promotion));
     }
 }

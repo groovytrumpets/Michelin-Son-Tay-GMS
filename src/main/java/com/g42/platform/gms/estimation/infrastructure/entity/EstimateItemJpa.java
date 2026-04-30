@@ -1,6 +1,7 @@
 package com.g42.platform.gms.estimation.infrastructure.entity;
 
 import com.g42.platform.gms.booking_management.infrastructure.entity.CatalogItemJpa;
+import com.g42.platform.gms.promotion.infrastructure.entity.PromotionJpa;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -71,6 +72,17 @@ public class EstimateItemJpa {
     private String unit;
     @Column(name = "revised_from_item_id")
     private Integer revisedFromItemId;
+    @Column(name = "promotion_id")
+    private Integer promotionId;
+    @ColumnDefault("0")
+    @Column(name = "is_gift")
+    private Boolean isGift;
+    @Column(name = "triggered_by_item_id")
+    private Integer triggeredByItemId;
+    @Column(name = "discount_amount", precision = 12, scale = 2)
+    private BigDecimal discountAmount;
+    @Column(name = "final_price", precision = 12, scale = 2)
+    private BigDecimal finalPrice;
 
 
 }

@@ -81,4 +81,15 @@ public class EstimateController {
                 ApiResponses.success(stockAllocationService.getEstimateToAllocation(estimateId)));
     }
 
+    @PutMapping("/{promotionId}/apply-promotion/{estimateId}")
+    public ResponseEntity<ApiResponse<EstimateRespondDto>> applyPromotion(@PathVariable Integer promotionId,@PathVariable Integer estimateId,@RequestParam(required = false) String promotionCode){
+        EstimateRespondDto estimate = estimateService.applyPromotionToEstimate(promotionId,estimateId,promotionCode);
+        return ResponseEntity.ok(ApiResponses.success(estimate));
+    }
+    @PutMapping("/{promotionId}/unapply-promotion/{estimateId}")
+    public ResponseEntity<ApiResponse<EstimateRespondDto>> unapplyPromotion(@PathVariable Integer promotionId,@PathVariable Integer estimateId,@RequestParam(required = false) String promotionCode){
+        EstimateRespondDto estimate = estimateService.unapplyPromotionToEstimate(promotionId,estimateId,promotionCode);
+        return ResponseEntity.ok(ApiResponses.success(estimate));
+    }
+
 }

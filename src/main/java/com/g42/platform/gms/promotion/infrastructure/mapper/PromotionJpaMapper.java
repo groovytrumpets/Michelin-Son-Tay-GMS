@@ -8,4 +8,6 @@ import org.mapstruct.Mapper;
 public interface PromotionJpaMapper {
     Promotion toDomain(PromotionJpa domain);
     PromotionJpa fromDomain(Promotion domain);
+
+    PromotionJpa toJpa(Promotion promotion);
 }

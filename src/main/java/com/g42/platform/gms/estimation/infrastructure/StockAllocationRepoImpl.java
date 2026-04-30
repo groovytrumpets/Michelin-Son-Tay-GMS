@@ -8,6 +8,8 @@ import com.g42.platform.gms.estimation.domain.repository.StockAllocationReposito
 import com.g42.platform.gms.estimation.infrastructure.entity.EstimateItemJpa;
 import com.g42.platform.gms.estimation.infrastructure.entity.EstimateJpa;
 import com.g42.platform.gms.estimation.infrastructure.entity.StockAllocationJpa;
+import com.g42.platform.gms.estimation.infrastructure.mapper.EstimateItemJpaMapper;
+import com.g42.platform.gms.estimation.infrastructure.mapper.EstimateJpaMapper;
 import com.g42.platform.gms.estimation.infrastructure.mapper.StockAllocationJpaMapper;
 import com.g42.platform.gms.estimation.infrastructure.repository.EstimateRepositoryJpa;
 import com.g42.platform.gms.estimation.infrastructure.repository.StockAllocationRepositoryJpa;
@@ -23,13 +25,17 @@ public class StockAllocationRepoImpl implements StockAllocationRepository {
     private final EstimateItemJpaRepository estimateItemJpaRepository;
     private final EstimateDtoMapper estimateDtoMapper;
     private final EstimateRepositoryJpa estimateRepositoryJpa;
+    private final EstimateJpaMapper estimateJpaMapper;
+    private final EstimateItemJpaMapper estimateItemJpaMapper;
 
-    public StockAllocationRepoImpl(StockAllocationJpaMapper stockAllocationJpaMapper, StockAllocationRepositoryJpa stockAllocationRepositoryJpa, EstimateItemJpaRepository estimateItemJpaRepository, EstimateDtoMapper estimateDtoMapper, EstimateRepositoryJpa estimateRepositoryJpa) {
+    public StockAllocationRepoImpl(StockAllocationJpaMapper stockAllocationJpaMapper, StockAllocationRepositoryJpa stockAllocationRepositoryJpa, EstimateItemJpaRepository estimateItemJpaRepository, EstimateDtoMapper estimateDtoMapper, EstimateRepositoryJpa estimateRepositoryJpa, EstimateJpaMapper estimateJpaMapper, EstimateItemJpaMapper estimateItemJpaMapper) {
         this.stockAllocationJpaMapper = stockAllocationJpaMapper;
         this.stockAllocationRepositoryJpa = stockAllocationRepositoryJpa;
         this.estimateItemJpaRepository = estimateItemJpaRepository;
         this.estimateDtoMapper = estimateDtoMapper;
         this.estimateRepositoryJpa = estimateRepositoryJpa;
+        this.estimateJpaMapper = estimateJpaMapper;
+        this.estimateItemJpaMapper = estimateItemJpaMapper;
     }
 
     @Override
@@ -140,6 +146,44 @@ public class StockAllocationRepoImpl implements StockAllocationRepository {
             return dto;
         }).toList();
     }
+
+    @Override
+    public List<StockAllocation> findAllByEstimateId(List<EstimateItem> estimateItem) {
+        if (estimateItem == null||estimateItem.isEmpty()) {
+            return new ArrayList<>();
+        }
+        Integer estimateId = estimateItem.get(0).getEstimateId();
+        EstimateJpa currentEstimate = estimateRepositoryJpa.findById(estimateId).orElse(null);
+        if (currentEstimate == null) {
+            return new ArrayList<>();
+        }
+        Integer ticketId = currentEstimate.getServiceTicketId();
+
+        List<EstimateItemJpa> allItemsInTicket = estimateItemJpaRepository.findByServiceTicketId(ticketId);
+        List<StockAllocationJpa> allAllocationInTicket = stockAllocationRepositoryJpa.findAllByServiceTicketId(ticketId);
+
+        Map<Integer, StockAllocationJpa> gobalAllocationMap = allAllocationInTicket.stream()
+                .collect(Collectors.toMap(StockAllocationJpa::getEstimateItemId,stockAllocationJpa ->  stockAllocationJpa, (a,b) -> a));
+
+        Map<Integer,EstimateItemJpa> globalItemMap = allItemsInTicket.stream()
+                .collect(Collectors.toMap(EstimateItemJpa::getId, i -> i));
+
+        List<StockAllocation> result = new ArrayList<>();
+        for (EstimateItem esItem : estimateItem) {
+            EstimateItemJpa jpaItem = globalItemMap.get(esItem.getId());
+            if (jpaItem == null) continue;
+
+            StockAllocationJpa resolvedAllocationJpa = resolveAllocation(jpaItem,gobalAllocationMap,globalItemMap);
+            if (resolvedAllocationJpa != null) {
+                StockAllocation domainAllocation = stockAllocationJpaMapper.toDomain(resolvedAllocationJpa);
+                domainAllocation.setEstimateItemId(esItem.getId());
+
+                result.add(domainAllocation);
+            };
+        }
+        return result;
+    }
+
     private StockAllocationJpa resolveAllocation(
             EstimateItemJpa item,
             Map<Integer, StockAllocationJpa> allocationByItemId,

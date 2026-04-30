@@ -3,28 +3,32 @@ package com.g42.platform.gms.estimation.app.service;
 import com.g42.platform.gms.common.enums.EstimateEnum;
 import com.g42.platform.gms.estimation.api.dto.EstimateItemDto;
 import com.g42.platform.gms.estimation.api.dto.EstimateRespondDto;
+import com.g42.platform.gms.estimation.api.dto.EstimateViaAllocationDto;
 import com.g42.platform.gms.estimation.api.dto.WorkCataDto;
 import com.g42.platform.gms.estimation.api.dto.request.EstimateItemReqDto;
 import com.g42.platform.gms.estimation.api.dto.request.EstimateRequestDto;
 import com.g42.platform.gms.estimation.api.internal.TaxRuleInternalApi;
 import com.g42.platform.gms.estimation.api.mapper.EstimateDtoMapper;
-import com.g42.platform.gms.estimation.domain.entity.Estimate;
-import com.g42.platform.gms.estimation.domain.entity.EstimateItem;
-import com.g42.platform.gms.estimation.domain.entity.TaxRule;
-import com.g42.platform.gms.estimation.domain.entity.WorkCategory;
-import com.g42.platform.gms.estimation.domain.repository.EstimateItemRepository;
-import com.g42.platform.gms.estimation.domain.repository.EstimateRepository;
-import com.g42.platform.gms.estimation.domain.repository.TaxRuleRepository;
-import com.g42.platform.gms.estimation.domain.repository.WorkCategoryRepository;
+import com.g42.platform.gms.estimation.api.mapper.StockAllocationDtoMapper;
+import com.g42.platform.gms.estimation.domain.entity.*;
+import com.g42.platform.gms.estimation.domain.exception.EstimateErrorCode;
+import com.g42.platform.gms.estimation.domain.exception.EstimateException;
+import com.g42.platform.gms.estimation.domain.repository.*;
+import com.g42.platform.gms.promotion.api.internal.PromotionInternalApi;
+import com.g42.platform.gms.promotion.domain.entity.Promotion;
 import com.g42.platform.gms.warehouse.api.dto.CatalogItemDto;
 import com.g42.platform.gms.warehouse.api.internal.WarehouseInternalApi;
 import com.g42.platform.gms.warehouse.api.mapper.WarehouseDtoMapper;
+import com.g42.platform.gms.warehouse.domain.entity.CatalogItem;
+import com.g42.platform.gms.warehouse.domain.entity.Inventory;
 import com.g42.platform.gms.warehouse.domain.entity.Warehouse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -40,6 +44,10 @@ public class EstimateService {
     private final WarehouseInternalApi warehouseInternalApi;
     private final TaxRuleInternalApi taxRuleInternalApi;
     private final WarehouseDtoMapper warehouseDtoMapper;
+
+    private final PromotionInternalApi promotionInternalApi;
+    private final StockAllocationRepository stockAllocationRepository;
+    private final StockAllocationDtoMapper stockAllocationDtoMapper;
 
 
     public List<EstimateRespondDto> getEstimateByCode(Integer serviceTicketId) {
@@ -59,6 +67,7 @@ public class EstimateService {
                 .stream()
                 .filter(item -> Boolean.FALSE.equals(item.getIsRemoved()))
                 .toList();
+//        List<Integer> estimateItemIds = estimateItems.stream().map(EstimateItem::getId).toList();
         List<Integer> warehouseIds = estimateItems.stream()
                 .map(EstimateItem::getWarehouseId)
 //                .filter(Objects::nonNull)
@@ -81,12 +90,21 @@ public class EstimateService {
             categoryMap = new HashMap<>();
         }
         Map<Integer, Warehouse> warehouseMap;
-        if (!workCategoryIds.isEmpty()) {
+        if (!warehouseIds.isEmpty()) {
             warehouseMap = warehouseInternalApi.findAllById(warehouseIds)
                     .stream()
                     .collect(Collectors.toMap(Warehouse::getWarehouseId, wc -> wc));
         } else {
             warehouseMap = new HashMap<>();
+        }
+
+        Map<Integer, StockAllocation> allocationMap;
+        if (!estimateItems.isEmpty()) {
+            allocationMap = stockAllocationRepository.findAllByEstimateId(estimateItems)
+                    .stream()
+                    .collect(Collectors.toMap(StockAllocation::getEstimateItemId, stockAllocation -> stockAllocation));
+        } else {
+            allocationMap = new HashMap<>();
         }
 
         // 5. Group estimateItem by estimateId
@@ -100,7 +118,9 @@ public class EstimateService {
 
             BigDecimal totalTax = BigDecimal.ZERO;
             BigDecimal subTotal = BigDecimal.ZERO;
+            BigDecimal finalPrice =  BigDecimal.ZERO;
             List<EstimateItemDto> itemDtos = new ArrayList<>();
+            Set<Integer> prmotionIds = new HashSet<>();
 
             for (EstimateItem item : items) {
                 EstimateItemDto itemDto = estimateDtoMapper.toEstimateItemDto(item);
@@ -120,6 +140,13 @@ public class EstimateService {
                     }
                 }
 
+                if (item.getId() != null) {
+                    StockAllocation allocation = allocationMap.get(item.getId());
+                    if (allocation != null) {
+                        itemDto.setStockAllocation(stockAllocationDtoMapper.toDto(allocation));
+                    }
+                }
+
                 // Tính toán giá tiền cho các item được checked
                 if (Boolean.TRUE.equals(item.getIsChecked())) {
                     // 1. Cộng dồn tiền thuế
@@ -131,14 +158,20 @@ public class EstimateService {
                     BigDecimal itemQty = BigDecimal.valueOf(item.getQuantity() != null ? item.getQuantity() : 0);
                     BigDecimal itemPrice = item.getUnitPrice() != null ? item.getUnitPrice() : BigDecimal.ZERO;
                     subTotal = subTotal.add(itemPrice.multiply(itemQty));
+                    BigDecimal itemFinalPrice = item.getFinalPrice() != null ? item.getFinalPrice() : BigDecimal.ZERO;
+                    if (item.getPromotionId() != null) {
+                    prmotionIds.add(item.getPromotionId());
+                    }
+                    finalPrice = finalPrice.add(itemFinalPrice);
                 }
                 itemDtos.add(itemDto);
             }
 
-            dto.setTotalPrice(subTotal.add(totalTax));
+            dto.setTotalPrice(finalPrice);
             dto.setSubTotal(subTotal);
             dto.setTotalTaxAmount(totalTax);
             dto.setItems(itemDtos);
+            dto.setPromotions(new ArrayList<>(prmotionIds));
 
             return dto;
         }).toList();
@@ -169,7 +202,7 @@ public class EstimateService {
         BigDecimal totalPrice = items.stream()
                 .filter(item -> Boolean.TRUE.equals(item.getIsChecked()))
                 .filter(item -> Boolean.FALSE.equals(item.getIsRemoved()))
-                .map(item -> item.getTotalPrice() != null ? item.getTotalPrice() : BigDecimal.ZERO)
+                .map(item -> item.getFinalPrice() != null ? item.getFinalPrice() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         saved.setTotalPrice(totalPrice);
@@ -199,6 +232,9 @@ public class EstimateService {
                 existing.setWorkCategoryId(req.getWorkCategoryId());
                 existing.setIsChecked(req.getIsChecked());
                 existing.setIsRemoved(req.getIsRemoved());
+                existing.setIsGift(req.getIsGift());
+                existing.setTriggeredByItemId(req.getTriggeredByItemId());
+                existing.setDiscountAmount(req.getDiscountAmount());
                 WorkCategory wc = workCategoryRepo.findById(req.getWorkCategoryId());
                 TaxRule taxRule = (wc != null) ? taxRuleRepository.findById(wc.getTaxRuleId()) : null;
                 Integer taxRuleId = (wc != null && wc.getTaxRuleId() != null)
@@ -207,6 +243,7 @@ public class EstimateService {
                 if (taxRule != null) {
                 applyTax(existing,taxRuleId);
                 }
+                existing.setFinalPrice(existing.getFinalPrice());
                 toSave.add(existing);
                 incomingIds.add(req.getItemId());
             } else {
@@ -224,7 +261,7 @@ public class EstimateService {
         BigDecimal totalPrice = toSave.stream()
                 .filter(item -> Boolean.TRUE.equals(item.getIsChecked()))
                 .filter(item -> Boolean.FALSE.equals(item.getIsRemoved()))
-                .map(item -> item.getTotalPrice() != null ? item.getTotalPrice() : BigDecimal.ZERO)
+                .map(item -> item.getFinalPrice() != null ? item.getFinalPrice() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         estimate.setEstimateType(request.getEstimateType());
@@ -276,6 +313,8 @@ public class EstimateService {
             item.setIsChecked(req.getIsChecked() != null ? req.getIsChecked() : false);
             item.setRevisedFromItemId(req.getRevisedFromItemId());
 
+            item.setIsGift(req.getIsGift() != null ? req.getIsGift() : false);
+
             TaxRule taxRule = null;
             Integer ruleId = null;
             //todo: check item taxt
@@ -301,6 +340,10 @@ public class EstimateService {
             BigDecimal totalPrice = unitPrice.multiply(quantity);
             item.setTotalPrice(totalPrice);
             applyTax(item,ruleId);
+            if (item.getIsGift()==true){
+                item.setFinalPrice(BigDecimal.ZERO);
+            }else
+            item.setFinalPrice(item.getTotalPrice());
             return item;
         }).toList();
     }
@@ -402,7 +445,7 @@ public class EstimateService {
         BigDecimal totalPrice = allItems.stream()
                 .filter(i -> Boolean.TRUE.equals(i.getIsChecked()))
                 .filter(i -> Boolean.FALSE.equals(i.getIsRemoved()))
-                .map(i -> i.getTotalPrice() != null ? i.getTotalPrice() : BigDecimal.ZERO)
+                .map(i -> i.getFinalPrice() != null ? i.getFinalPrice() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         Estimate estimate = estimateRepository.findEstimateById(saved.getEstimateId());
@@ -459,5 +502,234 @@ public class EstimateService {
 
     public Estimate findById(Integer estimateId) {
         return estimateRepository.findEstimateById(estimateId);
+    }
+    @Transactional
+    public EstimateRespondDto applyPromotionToEstimate(Integer promotionId, Integer estimateId, String promotionCode) {
+        Promotion promotion;
+        if (promotionId != null){
+            promotion = promotionInternalApi.findById(promotionId);
+        }else
+        if (promotionCode != null) {
+            promotion = promotionInternalApi.findByPromotionCode(promotionCode);
+        }else {
+            throw new EstimateException("PROMOTION_404", EstimateErrorCode.PROMOTION_404);
+        }
+        Estimate estimate = estimateRepository.findEstimateById(estimateId);
+        List<EstimateItem> items = estimateItemRepository.findByEstimateId(estimateId);
+        validatePromotion(promotion,estimate,items);
+        //todo: update estimateItems and estimate
+        if (promotion.getType().equals("PERCENT")){
+            //todo: apply %
+            applyPercentPromotion(promotion, items);
+        }else if (promotion.getType().equals("BUY_X_GET_Y")){
+            //todo: apply buy x get y
+            applyBuyXGetY(promotion, items, estimateId);
+        }
+        //todo: update total_price
+
+        BigDecimal totalPrice = items.stream()
+                .filter(item -> Boolean.TRUE.equals(item.getIsChecked()))
+                .filter(item -> Boolean.FALSE.equals(item.getIsRemoved()))
+                .map(item -> item.getFinalPrice() != null ? item.getFinalPrice() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        estimate.setTotalPrice(totalPrice);
+        System.out.println("Total_price: " + totalPrice); // dùng biến totalPrice trực tiếp
+        estimateRepository.save(estimate);
+
+        //todo:update used race condition
+        int rowsUpdated = promotionInternalApi.incrementUsedCountIfAvailable(promotionId);
+        if (rowsUpdated==0) throw new EstimateException("UNFORTUNATE, LAST PROMOTION IS USED", EstimateErrorCode.PROMOTION_OUT);
+        return getEstimateRespondDto(estimateId);
+    }
+
+    private void applyBuyXGetY(Promotion promotion, List<EstimateItem> items, Integer estimateId) {
+        EstimateItem triggerItem = items.stream()
+        .filter(item -> item.getItemId().equals(promotion.getBuyItemId()))
+        .findFirst()
+        .orElseThrow();
+        //count gift quantity
+        int giftQuantity = (triggerItem.getQuantity()/promotion.getBuyQuantity())*promotion.getGetQuantity();
+
+        //todo:delete old gift items
+        estimateRepository.deleteOldGitItemsByEstimateId(estimateId);
+
+        //find catalog that become gift
+        CatalogItem catalogItem = warehouseInternalApi.findCatalogById(promotion.getGetItemId());
+
+        EstimateItem giftItem = new EstimateItem();
+        giftItem.setEstimateId(estimateId);
+        giftItem.setItemId(promotion.getGetItemId());
+        giftItem.setItemName(catalogItem.getItemName());
+        giftItem.setQuantity(giftQuantity);
+        //before promotion
+        //find price in db
+
+        giftItem.setTotalPrice(BigDecimal.ZERO);
+
+        //after promotion
+        giftItem.setDiscountAmount(giftItem.getTotalPrice());
+        giftItem.setFinalPrice(BigDecimal.ZERO);
+        giftItem.setPromotionId(promotion.getPromotionId());
+        giftItem.setIsGift(Boolean.TRUE);
+        giftItem.setUnit(triggerItem.getUnit());
+        //todo: find FREE workCate if Catalog have no W
+        if (catalogItem.getWorkCategoryId()==null||catalogItem.getWorkCategoryId()==0){
+            throw new EstimateException("CATALOG HAVE NO CATEGORY!", EstimateErrorCode.BAD_DATA);
+        }
+        giftItem.setWorkCategoryId(catalogItem.getWorkCategoryId());
+        //todo: check warehouse quantity available
+        Integer warehouseId = resolveGiftItemWarehouse(giftItem,triggerItem);
+        giftItem.setWarehouseId(warehouseId);
+        BigDecimal unitPrice = warehouseInternalApi.findItemPricing(catalogItem.getItemId(),warehouseId!= null ? warehouseId : triggerItem.getWarehouseId(),catalogItem.getPrice());
+        giftItem.setUnitPrice(unitPrice!=null?unitPrice:BigDecimal.ZERO);
+
+        estimateItemRepository.save(giftItem);
+    }
+
+    private Integer resolveGiftItemWarehouse(EstimateItem giftItem, EstimateItem triggerItem) {
+        //find by triggerItem warehouse
+        if (triggerItem.getWarehouseId()!=null){
+            Inventory inventory = warehouseInternalApi.findInventoryByWarehouseIdAndItemIds(triggerItem.getWarehouseId(),giftItem.getItemId());
+            if (inventory!=null&&inventory.getAvailableQuantity()>0){
+                return triggerItem.getWarehouseId();
+            }
+        }
+        //find another warehouse
+        Inventory fallback = warehouseInternalApi.findItemAvailableInOtherWarehouse(giftItem.getItemId(),0);
+        if (fallback!=null&&fallback.getAvailableQuantity()>0){
+            return fallback.getItemId();
+        }
+        // not available
+        return null;
+
+    }
+
+    private void applyPercentPromotion(Promotion promotion, List<EstimateItem> items) {
+        List<EstimateItem> targetItems;
+
+        if (promotion.getApplyTo().equals("ALL")){
+            targetItems = items.stream()
+            .filter(item -> !item.getIsGift())
+            .toList();
+        }else {
+            List<Integer> eligibleItemIds = promotionInternalApi
+            .findItemIdsByPromotionId(promotion);
+        targetItems = items.stream()
+            .filter(item -> eligibleItemIds.contains(item.getItemId()))
+            .toList();
+        }
+
+        //todo:update each items
+        targetItems.forEach(estimateItem -> {
+            BigDecimal discount = estimateItem.getSubTotal()
+                    .multiply(promotion.getDiscountPercent())
+                    .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP)
+                    .setScale(2, RoundingMode.HALF_UP);
+            estimateItem.setDiscountAmount(discount);
+            BigDecimal quantity = BigDecimal.valueOf(estimateItem.getQuantity());
+            BigDecimal newTotalPrice = estimateItem.getUnitPrice().multiply(quantity);
+            BigDecimal taxRate = estimateItem.getAppliedTaxRate()
+                    .divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
+            BigDecimal finalPrice = newTotalPrice
+                    .subtract(discount)
+                    .multiply(BigDecimal.ONE.add(taxRate))
+                    .setScale(2, RoundingMode.HALF_UP);
+            estimateItem.setFinalPrice(finalPrice);
+            estimateItem.setPromotionId(promotion.getPromotionId());
+        });
+        estimateItemRepository.saveAll(targetItems);
+    }
+
+    private void validatePromotion(Promotion promotion, Estimate estimate, List<EstimateItem> items) {
+        if (promotion == null) {
+            throw new EstimateException("PROMOTION_404", EstimateErrorCode.PROMOTION_404);
+        }
+        if (promotion.getIsActive().equals(Boolean.FALSE)) {
+            throw new EstimateException("PROMOTION_INACTIVE", EstimateErrorCode.PROMOTION_404);
+        }
+        if (promotion.getEndDate().isBefore(LocalDate.now())){
+            throw new EstimateException("PROMOTION_EXPIRED", EstimateErrorCode.PROMOTION_404);
+        }
+        if (promotion.getUsageLimit() != null && promotion.getUsedCount()>=promotion.getUsageLimit()){
+            throw new EstimateException("PROMOTION_USED_ALL", EstimateErrorCode.PROMOTION_404);
+        }
+        if (promotion.getMinOrderValue() != null && promotion.getMinOrderValue().compareTo(estimate.getTotalPrice()) > 0){
+            throw new EstimateException("PROMOTION_MinOrderValue_Bigger", EstimateErrorCode.PROMOTION_404);
+        }
+        if (promotion.getType().equals("PERCENT")&&promotion.getApplyTo().equals("SPECIFIC")){
+            List<Integer> promotionItems = promotionInternalApi.findItemIdsByPromotionId(promotion);
+            boolean hasMatchItems = items.stream().anyMatch(item -> promotionItems.contains(item.getItemId()));
+            if (!hasMatchItems) {
+                throw new EstimateException("PROMOTION_NOT_MATCH_ITEMS", EstimateErrorCode.PROMOTION_404);
+            }
+        }
+        if (promotion.getType().equals("BUY_X_GET_Y")){
+            boolean hasMatchItems = items.stream().anyMatch(estimateItem ->
+                    estimateItem.getItemId().equals(promotion.getBuyItemId())
+                            &&estimateItem.getQuantity().equals(promotion.getBuyQuantity()));
+            if (!hasMatchItems) {
+                throw new EstimateException("PROMOTION_TRIGGER_ITEM_NOT_MET", EstimateErrorCode.PROMOTION_404);
+            }
+        }
+
+    }
+
+    public EstimateRespondDto unapplyPromotionToEstimate(Integer promotionId, Integer estimateId, String promotionCode) {
+        Promotion promotion;
+        if (promotionId != null){
+            promotion = promotionInternalApi.findById(promotionId);
+        }else
+        if (promotionCode != null) {
+            promotion = promotionInternalApi.findByPromotionCode(promotionCode);
+        }else {
+            throw new EstimateException("PROMOTION_404", EstimateErrorCode.PROMOTION_404);
+        }
+        Estimate estimate = estimateRepository.findEstimateById(estimateId);
+        if (estimate.getStatus().equals(EstimateEnum.ARCHIVED)){
+            throw new EstimateException("ESTIMATE_ARCHIVED", EstimateErrorCode.BAD_REQUEST);
+        }
+
+        List<EstimateItem> items = estimateItemRepository.findByEstimateId(estimateId);
+
+
+        //todo: update estimateItems and estimate
+        if (promotion.getType().equals("PERCENT")){
+            //todo: apply %
+            unapplyPercentPromotion(promotion, items);
+        }else if (promotion.getType().equals("BUY_X_GET_Y")){
+            //todo: apply buy x get y
+            unapplyBuyXGetY(promotion, items, estimateId);
+        }
+        if (promotion.getUsedCount()==null||promotion.getUsedCount()==0){
+            promotion.setUsedCount(0);
+        }else promotion.setUsedCount(promotion.getUsedCount()-1);
+        promotionInternalApi.savePromotion(promotion);
+        return getEstimateRespondDto(estimateId);
+    }
+
+    private void unapplyBuyXGetY(Promotion promotion, List<EstimateItem> items, Integer estimateId) {
+        List<EstimateItem> giftItems = items.stream()
+        .filter(item -> Boolean.TRUE.equals(item.getIsGift())
+                && promotion.getPromotionId().equals(item.getPromotionId()))
+        .toList();
+    estimateItemRepository.deleteAll(giftItems);
+    }
+
+    private void unapplyPercentPromotion(Promotion promotion, List<EstimateItem> items) {
+        List<EstimateItem> affectedItems = items.stream().filter(estimateItem -> promotion.getPromotionId().equals(estimateItem.getPromotionId())).toList();
+        affectedItems.forEach(estimateItem -> {
+            estimateItem.setDiscountAmount(null);
+            estimateItem.setFinalPrice(estimateItem.getTotalPrice());
+            estimateItem.setPromotionId(null);
+            if (estimateItem.getAppliedTaxRate()!=null){
+                BigDecimal tax = estimateItem.getFinalPrice()
+                        .multiply(estimateItem.getAppliedTaxRate())
+                        .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+                estimateItem.setTaxAmount(tax);
+            }
+
+        });
+        estimateItemRepository.saveAll(affectedItems);
     }
 }

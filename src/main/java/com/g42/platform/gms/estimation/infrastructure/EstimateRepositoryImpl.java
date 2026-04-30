@@ -51,5 +51,10 @@ public class EstimateRepositoryImpl implements EstimateRepository {
         Integer estimateId = estimateRepositoryJpa.findRevisedEstimateId(serviceTicketId,latestEstimateVersion);
         return estimateId;
     }
+
+    @Override
+    public void deleteOldGitItemsByEstimateId(Integer estimateId) {
+        estimateRepositoryJpa.deleteEstimateItemsByEstimateId(estimateId);
+    }
 }
 

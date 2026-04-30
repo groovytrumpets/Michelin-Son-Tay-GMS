@@ -33,7 +33,7 @@ public class PricingService {
             return  pricingResolve;
         }
 
-        // 2. Giá từ catalog
+        // 3. Giá từ catalog
         if (price != null && price.compareTo(BigDecimal.ZERO) > 0) {
             pricingResolve.setFinalPrice(price);
             pricingResolve.setNotify("Đang dùng giá niêm yết của sản phẩm");
@@ -47,7 +47,7 @@ public class PricingService {
             return pricingResolve;
         }
 
-        // 3. Fallback: giá nhập mới nhất từ lô
+        // 2. Fallback: giá nhập mới nhất từ lô
         BigDecimal finalPrice = stockEntryService.findLatesFallBackPrice(itemId, warehouseId);
         if (finalPrice != null && finalPrice.compareTo(BigDecimal.ZERO) > 0) {
             pricingResolve.setFinalPrice(finalPrice);

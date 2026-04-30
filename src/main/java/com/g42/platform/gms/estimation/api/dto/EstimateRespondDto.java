@@ -28,4 +28,5 @@ public class EstimateRespondDto {
     private BigDecimal totalTaxAmount;
     private BigDecimal totalPrice;
     List<EstimateItemDto> items;
+    List<Integer> promotions;
 }

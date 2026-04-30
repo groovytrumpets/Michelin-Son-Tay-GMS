@@ -18,7 +18,6 @@ public class StockAllocation {
     private Integer allocationId;
     private Integer serviceTicketId;
     private Integer estimateItemId;
-    private Integer issueId;
     private Integer warehouseId;
     private Integer itemId;
     private Integer quantity;
@@ -27,4 +26,5 @@ public class StockAllocation {
     private Instant createdAt;
     private Instant updatedAt;
     private Integer estimateId;
+    private Integer issueId;
 }
