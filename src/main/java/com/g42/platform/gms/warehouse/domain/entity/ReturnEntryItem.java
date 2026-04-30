@@ -7,6 +7,7 @@ public class ReturnEntryItem {
     private Integer returnItemId;
     private Integer returnId;
     private Integer itemId;
+    private Integer allocationId;
     private Integer sourceIssueItemId;
     private Integer entryItemId;
     private Integer quantity;

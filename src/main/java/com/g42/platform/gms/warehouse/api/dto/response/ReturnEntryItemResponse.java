@@ -8,6 +8,7 @@ import java.util.List;
 public class ReturnEntryItemResponse {
     private Integer returnItemId;
     private Integer itemId;
+    private Integer allocationId;
     private Integer sourceIssueItemId;
     private Integer entryItemId;
     private String itemName;

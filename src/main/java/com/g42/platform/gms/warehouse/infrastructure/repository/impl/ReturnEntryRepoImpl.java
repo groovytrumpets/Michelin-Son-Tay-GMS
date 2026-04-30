@@ -72,14 +72,32 @@ public class ReturnEntryRepoImpl implements ReturnEntryRepo {
     }
 
     @Override
+    public boolean existsActiveByAllocationId(Integer allocationId) {
+        Long count = jpaRepo.countActiveByAllocationId(allocationId);
+        return count != null && count > 0;
+    }
+
+    @Override
     public boolean existsAnyBySourceIssueItemId(Integer sourceIssueItemId) {
         Long count = jpaRepo.countAnyBySourceIssueItemId(sourceIssueItemId);
         return count != null && count > 0;
     }
 
     @Override
+    public boolean existsAnyByAllocationId(Integer allocationId) {
+        Long count = jpaRepo.countAnyByAllocationId(allocationId);
+        return count != null && count > 0;
+    }
+
+    @Override
     public boolean existsAnyBySourceIssueItemIdExcludingReturnId(Integer sourceIssueItemId, Integer returnId) {
         Long count = jpaRepo.countAnyBySourceIssueItemIdExcludingReturnId(sourceIssueItemId, returnId);
+        return count != null && count > 0;
+    }
+
+    @Override
+    public boolean existsAnyByAllocationIdExcludingReturnId(Integer allocationId, Integer returnId) {
+        Long count = jpaRepo.countAnyByAllocationIdExcludingReturnId(allocationId, returnId);
         return count != null && count > 0;
     }
 
@@ -137,6 +155,7 @@ public class ReturnEntryRepoImpl implements ReturnEntryRepo {
         item.setReturnItemId(jpa.getReturnItemId());
         item.setReturnId(jpa.getReturnId());
         item.setItemId(jpa.getItemId());
+        item.setAllocationId(jpa.getAllocationId());
         item.setSourceIssueItemId(jpa.getSourceIssueItemId());
         item.setEntryItemId(jpa.getEntryItemId());
         item.setQuantity(jpa.getQuantity());
@@ -150,6 +169,7 @@ public class ReturnEntryRepoImpl implements ReturnEntryRepo {
         item.setReturnItemId(domain.getReturnItemId());
         item.setReturnId(domain.getReturnId());
         item.setItemId(domain.getItemId());
+        item.setAllocationId(domain.getAllocationId());
         item.setSourceIssueItemId(domain.getSourceIssueItemId());
         item.setEntryItemId(domain.getEntryItemId());
         item.setQuantity(domain.getQuantity());

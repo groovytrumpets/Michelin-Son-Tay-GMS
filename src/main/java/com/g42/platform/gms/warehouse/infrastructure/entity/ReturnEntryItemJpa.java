@@ -24,6 +24,10 @@ public class ReturnEntryItemJpa {
     @Column(name = "item_id", nullable = false)
     private Integer itemId;
 
+    /** Allocation liên quan đến dòng trả */
+    @Column(name = "allocation_id")
+    private Integer allocationId;
+
     /** Dòng issue gốc tương ứng để trả đúng sản phẩm đã xuất */
     @Column(name = "source_issue_item_id")
     private Integer sourceIssueItemId;
