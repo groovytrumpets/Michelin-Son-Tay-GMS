@@ -156,6 +156,12 @@
             <version>1.8.4</version>
             <scope>test</scope>
         </dependency>
+
+<!--        &#45;&#45;websocket-->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>
+        </dependency>
     </dependencies>
 
     <build>
