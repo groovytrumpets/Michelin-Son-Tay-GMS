@@ -100,6 +100,16 @@ public class StockIssueController {
                 stockIssueService.confirm(id, principal.getStaffId())));
     }
 
+        /** Hủy phiếu ở trạng thái DRAFT; nếu là SERVICE_TICKET thì trả reservation về kho */
+        @PostMapping("/{id}/cancel")
+        @PreAuthorize("isAuthenticated()")
+        public ResponseEntity<ApiResponse<StockIssueResponse>> cancel(
+            @PathVariable Integer id,
+            @AuthenticationPrincipal StaffPrincipal principal) {
+        return ResponseEntity.ok(ApiResponses.success(
+            stockIssueService.cancel(id, principal.getStaffId())));
+        }
+
     /** Upload ảnh riêng cho phiếu đã tạo */
     @PostMapping("/{id}/attachments")
     @PreAuthorize("isAuthenticated()")

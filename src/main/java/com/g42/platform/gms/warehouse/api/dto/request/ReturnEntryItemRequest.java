@@ -10,6 +10,9 @@ public class ReturnEntryItemRequest {
     @NotNull
     private Integer itemId;
 
+    /** Dòng issue gốc tương ứng, dùng để trả đúng sản phẩm/lô đã xuất */
+    private Integer sourceIssueItemId;
+
     @NotNull
     @Min(1)
     private Integer quantity;

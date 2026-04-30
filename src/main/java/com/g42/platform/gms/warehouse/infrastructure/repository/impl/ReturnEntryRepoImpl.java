@@ -66,6 +66,24 @@ public class ReturnEntryRepoImpl implements ReturnEntryRepo {
     }
 
     @Override
+    public boolean existsActiveBySourceIssueItemId(Integer sourceIssueItemId) {
+        Long count = jpaRepo.countActiveBySourceIssueItemId(sourceIssueItemId);
+        return count != null && count > 0;
+    }
+
+    @Override
+    public boolean existsAnyBySourceIssueItemId(Integer sourceIssueItemId) {
+        Long count = jpaRepo.countAnyBySourceIssueItemId(sourceIssueItemId);
+        return count != null && count > 0;
+    }
+
+    @Override
+    public boolean existsAnyBySourceIssueItemIdExcludingReturnId(Integer sourceIssueItemId, Integer returnId) {
+        Long count = jpaRepo.countAnyBySourceIssueItemIdExcludingReturnId(sourceIssueItemId, returnId);
+        return count != null && count > 0;
+    }
+
+    @Override
     public Optional<ReturnEntryItem> findItemById(Integer returnItemId) {
         return itemJpaRepo.findById(returnItemId).map(this::toDomainItem);
     }
@@ -90,7 +108,7 @@ public class ReturnEntryRepoImpl implements ReturnEntryRepo {
         domain.setCreatedBy(jpa.getCreatedBy());
         domain.setCreatedAt(jpa.getCreatedAt());
         domain.setUpdatedAt(jpa.getUpdatedAt());
-        domain.setItems(jpa.getItems().stream().map(this::toDomainItem).toList());
+        domain.setItems(new java.util.ArrayList<>(jpa.getItems().stream().map(this::toDomainItem).toList()));
         return domain;
     }
 
@@ -109,7 +127,7 @@ public class ReturnEntryRepoImpl implements ReturnEntryRepo {
         jpa.setCreatedAt(domain.getCreatedAt());
         jpa.setUpdatedAt(domain.getUpdatedAt());
         if (domain.getItems() != null) {
-            jpa.setItems(domain.getItems().stream().map(this::toJpaItem).toList());
+            jpa.setItems(new java.util.ArrayList<>(domain.getItems().stream().map(this::toJpaItem).toList()));
         }
         return jpa;
     }
@@ -119,6 +137,7 @@ public class ReturnEntryRepoImpl implements ReturnEntryRepo {
         item.setReturnItemId(jpa.getReturnItemId());
         item.setReturnId(jpa.getReturnId());
         item.setItemId(jpa.getItemId());
+        item.setSourceIssueItemId(jpa.getSourceIssueItemId());
         item.setQuantity(jpa.getQuantity());
         item.setConditionNote(jpa.getConditionNote());
         item.setExchangeItem(jpa.isExchangeItem());
@@ -130,6 +149,7 @@ public class ReturnEntryRepoImpl implements ReturnEntryRepo {
         item.setReturnItemId(domain.getReturnItemId());
         item.setReturnId(domain.getReturnId());
         item.setItemId(domain.getItemId());
+        item.setSourceIssueItemId(domain.getSourceIssueItemId());
         item.setQuantity(domain.getQuantity());
         item.setConditionNote(domain.getConditionNote());
         item.setExchangeItem(domain.isExchangeItem());

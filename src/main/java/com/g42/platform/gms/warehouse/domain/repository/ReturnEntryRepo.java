@@ -29,6 +29,12 @@ public interface ReturnEntryRepo {
 
     boolean existsByCode(String returnCode);
 
+    boolean existsActiveBySourceIssueItemId(Integer sourceIssueItemId);
+
+    boolean existsAnyBySourceIssueItemId(Integer sourceIssueItemId);
+
+    boolean existsAnyBySourceIssueItemIdExcludingReturnId(Integer sourceIssueItemId, Integer returnId);
+
     Optional<ReturnEntryItem> findItemById(Integer returnItemId);
 
     ReturnEntryItem saveItem(ReturnEntryItem item);

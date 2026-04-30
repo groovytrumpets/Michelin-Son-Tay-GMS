@@ -18,7 +18,7 @@ public interface ReturnEntryJpaRepo extends JpaRepository<ReturnEntryJpa, Intege
 
     List<ReturnEntryJpa> findByWarehouseIdOrderByCreatedAtDesc(Integer warehouseId);
 
-        @Query("""
+    @Query("""
         select r from ReturnEntryJpa r
         where r.warehouseId = :warehouseId
             and (:status is null or r.status = :status)
@@ -32,14 +32,39 @@ public interface ReturnEntryJpaRepo extends JpaRepository<ReturnEntryJpa, Intege
                 or str(r.sourceIssueId) like concat('%', :search, '%')
             )
         """)
-        Page<ReturnEntryJpa> search(
-                        @Param("warehouseId") Integer warehouseId,
-                        @Param("status") ReturnEntryStatus status,
-                        @Param("returnType") ReturnType returnType,
-                        @Param("fromDateTime") java.time.LocalDateTime fromDateTime,
-                        @Param("toDateTime") java.time.LocalDateTime toDateTime,
-                        @Param("search") String search,
-                        Pageable pageable);
+    Page<ReturnEntryJpa> search(
+            @Param("warehouseId") Integer warehouseId,
+            @Param("status") ReturnEntryStatus status,
+            @Param("returnType") ReturnType returnType,
+            @Param("fromDateTime") java.time.LocalDateTime fromDateTime,
+            @Param("toDateTime") java.time.LocalDateTime toDateTime,
+            @Param("search") String search,
+            Pageable pageable);
 
     boolean existsByReturnCode(String returnCode);
+
+    @Query(value = """
+                select count(*)
+                from return_entry_item ri
+                join return_entry r on r.return_id = ri.return_id
+                where ri.source_issue_item_id = :sourceIssueItemId
+                    and r.status in ('SUBMITTED', 'CONFIRMED')
+                """, nativeQuery = true)
+    Long countActiveBySourceIssueItemId(@Param("sourceIssueItemId") Integer sourceIssueItemId);
+
+    @Query(value = """
+            select count(*)
+            from return_entry_item ri
+            where ri.source_issue_item_id = :sourceIssueItemId
+            """, nativeQuery = true)
+    Long countAnyBySourceIssueItemId(@Param("sourceIssueItemId") Integer sourceIssueItemId);
+
+    @Query(value = """
+            select count(*)
+            from return_entry_item ri
+            where ri.source_issue_item_id = :sourceIssueItemId
+              and ri.return_id <> :returnId
+            """, nativeQuery = true)
+    Long countAnyBySourceIssueItemIdExcludingReturnId(@Param("sourceIssueItemId") Integer sourceIssueItemId,
+                                                      @Param("returnId") Integer returnId);
 }

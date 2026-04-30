@@ -25,6 +25,7 @@ import com.g42.platform.gms.warehouse.domain.entity.Inventory;
 import com.g42.platform.gms.warehouse.domain.entity.InventoryTransaction;
 import com.g42.platform.gms.warehouse.domain.entity.ReturnEntry;
 import com.g42.platform.gms.warehouse.domain.entity.ReturnEntryItem;
+import com.g42.platform.gms.warehouse.domain.entity.StockIssue;
 import com.g42.platform.gms.warehouse.domain.entity.Warehouse;
 import com.g42.platform.gms.warehouse.domain.entity.WarehouseAttachment;
 import com.g42.platform.gms.warehouse.domain.repository.WarehouseRepo;
@@ -71,6 +72,8 @@ public class ReturnEntryService {
 
     @Transactional
     public ReturnEntryResponse create(CreateReturnEntryRequest request, Integer staffId) {
+        validateSourceIssueConfirmed(request.getSourceIssueId());
+
         ReturnEntry entry = new ReturnEntry();
         entry.setReturnCode(generateCode());
         entry.setWarehouseId(request.getWarehouseId());
@@ -78,15 +81,19 @@ public class ReturnEntryService {
         entry.setSourceIssueId(request.getSourceIssueId());
         entry.setReturnType(request.getReturnType() != null
                 ? request.getReturnType() : ReturnType.CUSTOMER_RETURN);
-        entry.setStatus(ReturnEntryStatus.DRAFT);
+        entry.setStatus(ReturnEntryStatus.SUBMITTED);
         entry.setCreatedBy(staffId);
 
         ReturnEntry saved = returnEntryRepo.save(entry);
 
         for (ReturnEntryItemRequest itemReq : request.getItems()) {
+            validateSourceIssueItem(request.getSourceIssueId(), itemReq);
+            validateDuplicateSourceIssueItemOnCreate(itemReq.getSourceIssueItemId());
+
             ReturnEntryItem item = new ReturnEntryItem();
             item.setReturnId(saved.getReturnId());
             item.setItemId(itemReq.getItemId());
+            item.setSourceIssueItemId(itemReq.getSourceIssueItemId());
             item.setQuantity(itemReq.getQuantity());
             item.setConditionNote(itemReq.getConditionNote());
             item.setExchangeItem(false);
@@ -98,6 +105,7 @@ public class ReturnEntryService {
                 ReturnEntryItem item = new ReturnEntryItem();
                 item.setReturnId(saved.getReturnId());
                 item.setItemId(itemReq.getItemId());
+                item.setSourceIssueItemId(itemReq.getSourceIssueItemId());
                 item.setQuantity(itemReq.getQuantity());
                 item.setConditionNote(null);
                 item.setExchangeItem(true);
@@ -139,7 +147,7 @@ public class ReturnEntryService {
         ReturnEntryResponse created = create(request, staffId);
 
         MultipartFile[] files = {
-            req.getFile_0(), req.getFile_1(), req.getFile_2(), req.getFile_3(), req.getFile_4()
+                req.getFile_0(), req.getFile_1(), req.getFile_2(), req.getFile_3(), req.getFile_4()
         };
 
         ReturnEntry saved = findOrThrow(created.getReturnId());
@@ -174,8 +182,8 @@ public class ReturnEntryService {
 
         String url = imageUploadService.uploadImage(file, FOLDER_RETURN_ENTRY);
 
-    WarehouseAttachment attachment = new WarehouseAttachment();
-    attachment.setRefType(WarehouseAttachment.RefType.RETURN_ENTRY_ITEM);
+        WarehouseAttachment attachment = new WarehouseAttachment();
+        attachment.setRefType(WarehouseAttachment.RefType.RETURN_ENTRY_ITEM);
         attachment.setRefId(returnItemId);
         attachment.setFileUrl(url);
         attachment.setUploadedBy(staffId);
@@ -229,19 +237,24 @@ public class ReturnEntryService {
     @Transactional
     public ReturnEntryResponse update(Integer returnId, UpdateReturnEntryRequest request) {
         ReturnEntry entry = findOrThrow(returnId);
-        if (entry.getStatus() != ReturnEntryStatus.DRAFT) {
+        if (entry.getStatus() != ReturnEntryStatus.SUBMITTED) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
-                    "Chỉ có thể sửa phiếu ở trạng thái DRAFT");
+                    "Chỉ có thể sửa phiếu ở trạng thái SUBMITTED");
         }
+        validateSourceIssueConfirmed(entry.getSourceIssueId());
         if (request.getReturnReason() != null) entry.setReturnReason(request.getReturnReason());
 
         if (request.getItems() != null || request.getExchangeItems() != null) {
             entry.getItems().clear();
             if (request.getItems() != null) {
                 for (ReturnEntryItemRequest itemReq : request.getItems()) {
+                    validateSourceIssueItem(entry.getSourceIssueId(), itemReq);
+                    validateDuplicateSourceIssueItemOnUpdate(itemReq.getSourceIssueItemId(), returnId);
+
                     ReturnEntryItem item = new ReturnEntryItem();
                     item.setReturnId(returnId);
                     item.setItemId(itemReq.getItemId());
+                    item.setSourceIssueItemId(itemReq.getSourceIssueItemId());
                     item.setQuantity(itemReq.getQuantity());
                     item.setConditionNote(itemReq.getConditionNote());
                     item.setExchangeItem(false);
@@ -253,6 +266,7 @@ public class ReturnEntryService {
                     ReturnEntryItem item = new ReturnEntryItem();
                     item.setReturnId(returnId);
                     item.setItemId(itemReq.getItemId());
+                    item.setSourceIssueItemId(itemReq.getSourceIssueItemId());
                     item.setQuantity(itemReq.getQuantity());
                     item.setConditionNote(null);
                     item.setExchangeItem(true);
@@ -267,14 +281,15 @@ public class ReturnEntryService {
     public ReturnEntryResponse confirm(Integer returnId, Integer staffId) {
         ReturnEntry entry = findOrThrow(returnId);
 
-        if (entry.getStatus() == ReturnEntryStatus.CONFIRMED) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Phiếu đã được xác nhận");
+        if (entry.getStatus() != ReturnEntryStatus.SUBMITTED) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Chỉ có thể confirm phiếu ở trạng thái SUBMITTED");
         }
 
         List<ReturnEntryItem> returnItems = entry.getItems().stream()
                 .filter(i -> !i.isExchangeItem()).collect(Collectors.toList());
         List<ReturnEntryItem> exchangeItems = entry.getItems().stream()
-            .filter(ReturnEntryItem::isExchangeItem).collect(Collectors.toList());
+                .filter(ReturnEntryItem::isExchangeItem).collect(Collectors.toList());
 
         if (returnItems.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
@@ -334,8 +349,8 @@ public class ReturnEntryService {
     }
 
     private void saveTransaction(Integer warehouseId, Integer itemId,
-                                  InventoryTransactionType type, int qty, int balance,
-                                  Integer returnId, Integer staffId) {
+                                 InventoryTransactionType type, int qty, int balance,
+                                 Integer returnId, Integer staffId) {
         InventoryTransaction tx = new InventoryTransaction();
         tx.setWarehouseId(warehouseId);
         tx.setItemId(itemId);
@@ -406,7 +421,7 @@ public class ReturnEntryService {
         }
 
         Set<Integer> itemIds = e.getItems().stream()
-            .map(ReturnEntryItem::getItemId)
+                .map(ReturnEntryItem::getItemId)
                 .collect(Collectors.toSet());
         Map<Integer, String> itemNameById = partCatalogRepo.findNamesByIds(itemIds.stream().toList());
 
@@ -414,6 +429,7 @@ public class ReturnEntryService {
             ReturnEntryItemResponse ir = new ReturnEntryItemResponse();
             ir.setReturnItemId(i.getReturnItemId());
             ir.setItemId(i.getItemId());
+            ir.setSourceIssueItemId(i.getSourceIssueItemId());
             ir.setItemName(itemNameById.get(i.getItemId()));
             ir.setQuantity(i.getQuantity());
             ir.setConditionNote(i.getConditionNote());
@@ -421,5 +437,73 @@ public class ReturnEntryService {
         }).collect(Collectors.toList()));
 
         return r;
+    }
+
+    private void validateSourceIssueItem(Integer sourceIssueId, ReturnEntryItemRequest itemReq) {
+        if (sourceIssueId == null && itemReq.getSourceIssueItemId() == null) {
+            return;
+        }
+
+        if (sourceIssueId == null) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "sourceIssueId là bắt buộc khi truyền sourceIssueItemId");
+        }
+
+        if (itemReq.getSourceIssueItemId() == null) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "sourceIssueItemId là bắt buộc khi có sourceIssueId");
+        }
+
+        StockIssue sourceIssue = stockIssueRepo.findById(sourceIssueId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Không tìm thấy phiếu xuất nguồn id=" + sourceIssueId));
+
+        boolean matched = sourceIssue.getItems().stream().anyMatch(issueItem ->
+                issueItem.getIssueItemId() != null
+                        && issueItem.getIssueItemId().equals(itemReq.getSourceIssueItemId())
+                        && issueItem.getItemId().equals(itemReq.getItemId()));
+
+        if (!matched) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "sourceIssueItemId không khớp với phiếu xuất nguồn hoặc itemId");
+        }
+    }
+
+    private void validateSourceIssueConfirmed(Integer sourceIssueId) {
+        if (sourceIssueId == null) {
+            return;
+        }
+
+        StockIssue sourceIssue = stockIssueRepo.findById(sourceIssueId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Không tìm thấy phiếu xuất nguồn id=" + sourceIssueId));
+
+        if (sourceIssue.getStatus() != com.g42.platform.gms.warehouse.domain.enums.StockIssueStatus.CONFIRMED) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Chỉ được hoàn khi phiếu xuất nguồn đã CONFIRMED");
+        }
+    }
+
+    private void validateDuplicateSourceIssueItemOnCreate(Integer sourceIssueItemId) {
+        if (sourceIssueItemId == null) {
+            return;
+        }
+
+        if (returnEntryRepo.existsActiveBySourceIssueItemId(sourceIssueItemId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Đã có phiếu hoàn đang xử lý cho dòng xuất này");
+        }
+    }
+
+
+    private void validateDuplicateSourceIssueItemOnUpdate(Integer sourceIssueItemId, Integer returnId) {
+        if (sourceIssueItemId == null) {
+            return;
+        }
+
+        if (returnEntryRepo.existsAnyBySourceIssueItemIdExcludingReturnId(sourceIssueItemId, returnId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Dòng xuất này đã có phiếu hoàn khác, không thể cập nhật trùng");
+        }
     }
 }
