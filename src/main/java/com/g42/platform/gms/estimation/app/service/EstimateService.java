@@ -3,6 +3,7 @@ package com.g42.platform.gms.estimation.app.service;
 import com.g42.platform.gms.common.enums.EstimateEnum;
 import com.g42.platform.gms.estimation.api.dto.EstimateItemDto;
 import com.g42.platform.gms.estimation.api.dto.EstimateRespondDto;
+import com.g42.platform.gms.estimation.api.dto.EstimateViaAllocationDto;
 import com.g42.platform.gms.estimation.api.dto.WorkCataDto;
 import com.g42.platform.gms.estimation.api.dto.request.EstimateItemReqDto;
 import com.g42.platform.gms.estimation.api.dto.request.EstimateRequestDto;
@@ -66,7 +67,7 @@ public class EstimateService {
                 .stream()
                 .filter(item -> Boolean.FALSE.equals(item.getIsRemoved()))
                 .toList();
-        List<Integer> estimateItemIds = estimateItems.stream().map(EstimateItem::getId).toList();
+//        List<Integer> estimateItemIds = estimateItems.stream().map(EstimateItem::getId).toList();
         List<Integer> warehouseIds = estimateItems.stream()
                 .map(EstimateItem::getWarehouseId)
 //                .filter(Objects::nonNull)
@@ -98,8 +99,8 @@ public class EstimateService {
         }
 
         Map<Integer, StockAllocation> allocationMap;
-        if (!estimateItemIds.isEmpty()) {
-            allocationMap = stockAllocationRepository.findAllByEstimateId(estimateItemIds)
+        if (!estimateItems.isEmpty()) {
+            allocationMap = stockAllocationRepository.findAllByEstimateId(estimateItems)
                     .stream()
                     .collect(Collectors.toMap(StockAllocation::getEstimateItemId, stockAllocation -> stockAllocation));
         } else {
