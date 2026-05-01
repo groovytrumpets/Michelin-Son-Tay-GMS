@@ -1,5 +1,6 @@
 package com.g42.platform.gms.warehouse.app.service.allocation;
 
+import com.g42.platform.gms.estimation.api.internal.EstimateInternalApi;
 import com.g42.platform.gms.estimation.domain.entity.Estimate;
 import com.g42.platform.gms.estimation.domain.entity.EstimateItem;
 import com.g42.platform.gms.estimation.domain.repository.EstimateItemRepository;
@@ -47,6 +48,7 @@ public class StockAllocationService {
     private final StockIssueService stockIssueService;
     private final StockIssueRepo stockIssueRepo;
     private final ServiceTicketRepo serviceTicketRepo;
+    private final EstimateInternalApi estimateInternalApi;
 
     @Transactional
     public List<StockShortageInfo> reserve(Integer estimateId, Integer staffId) {
@@ -257,6 +259,7 @@ public class StockAllocationService {
             }
 
             alloc.setStatus(AllocationStatus.RELEASED);
+            estimateInternalApi.releaseEstimate(alloc.getAllocationId(), alloc.getQuantity(), staffId);
             allocationRepo.save(alloc);
         }
     }
