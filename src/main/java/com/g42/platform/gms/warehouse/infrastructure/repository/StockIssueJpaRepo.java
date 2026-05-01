@@ -55,4 +55,10 @@ public interface StockIssueJpaRepo extends JpaRepository<StockIssueJpa, Integer>
             Integer warehouseId,
             IssueType issueType,
             StockIssueStatus status);
+
+    Optional<StockIssueJpa> findByServiceTicketIdAndWarehouseIdAndIssueTypeAndStatus(
+            Integer serviceTicketId,
+            Integer warehouseId,
+            IssueType issueType,
+            StockIssueStatus status);
 }

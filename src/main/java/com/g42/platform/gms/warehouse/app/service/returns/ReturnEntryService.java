@@ -608,18 +608,16 @@ public class ReturnEntryService {
                     "allocationId phải ở trạng thái COMMITTED");
         }
 
-        if (itemReq.getQuantity() != null && itemReq.getQuantity() > allocation.getQuantity()) {
-            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
-                    "Số lượng hoàn vượt quá số lượng allocation đã chọn");
-        }
-
-        // Kiểm tra tổng quantity đã hoàn (active) không vượt quá allocation
+        // Kiểm tra tổng quantity đã hoàn (active) không vượt quá tổng quantity gốc của allocation
+        // Khi hoàn một phần, allocation bị tách: qty giảm xuống, tạo allocation mới RELEASED.
+        // Tổng gốc = qty hiện tại + tổng đã hoàn active trước đó.
         int alreadyReturned = returnEntryRepo.sumActiveReturnedQuantityByAllocationId(itemReq.getAllocationId());
         int requestedQty = itemReq.getQuantity() != null ? itemReq.getQuantity() : 0;
-        if (alreadyReturned + requestedQty > allocation.getQuantity()) {
+        int originalQty = allocation.getQuantity() + alreadyReturned; // tổng qty gốc
+        if (alreadyReturned + requestedQty > originalQty) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
-                    "Tổng số lượng hoàn (" + (alreadyReturned + requestedQty) + ") vượt quá allocation ("
-                            + allocation.getQuantity() + ")");
+                    "Tổng số lượng hoàn (" + (alreadyReturned + requestedQty) + ") vượt quá tổng allocation ("
+                            + originalQty + ")");
         }
 
     }

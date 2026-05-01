@@ -25,6 +25,8 @@ import com.g42.platform.gms.warehouse.domain.repository.StockAllocationRepo;
 import com.g42.platform.gms.warehouse.domain.repository.StockIssueItemRepo;
 import com.g42.platform.gms.warehouse.domain.repository.StockIssueRepo;
 import com.g42.platform.gms.warehouse.domain.entity.StockIssueItem;
+import com.g42.platform.gms.warehouse.domain.entity.StockEntryItem;
+import com.g42.platform.gms.warehouse.domain.repository.StockEntryRepo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -51,6 +53,7 @@ public class StockAllocationService {
     private final StockIssueRepo stockIssueRepo;
     private final StockIssueItemRepo stockIssueItemRepo;
     private final ServiceTicketRepo serviceTicketRepo;
+    private final StockEntryRepo stockEntryRepo;
     private final EstimateInternalApi estimateInternalApi;
 
     @Transactional
@@ -294,7 +297,8 @@ public class StockAllocationService {
     }
 
     private void cancelReservedWithoutIssue(Integer estimateItemId, Integer staffId) {
-        List<StockAllocation> allocations = allocationRepo.findByEstimateItemId(estimateItemId);
+        // Tìm tất cả allocation (không filter status) để check COMMITTED
+        List<StockAllocation> allocations = findAllocationsForEstimateItemAnyStatus(estimateItemId);
 
         if (allocations.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND,
@@ -349,32 +353,19 @@ public class StockAllocationService {
      * Dùng khi FE truyền cả estimateItemId + issueId (cancel 1 item cụ thể trong phiếu).
      */
     private void cancelReservedByEstimateItemInIssue(Integer estimateItemId, Integer issueId, Integer staffId) {
-        // Tìm allocation của estimateItemId đang gắn với issueId này
-        List<StockAllocation> allocations = allocationRepo.findByEstimateItemId(estimateItemId)
-                .stream()
-                .filter(a -> issueId.equals(a.getIssueId()) && a.getStatus() == AllocationStatus.RESERVED)
-                .toList();
+        // Tìm allocation của estimateItemId — nếu không có thì trace ngược qua revisedFromItemId
+        List<StockAllocation> allocations = findAllocationsForEstimateItem(estimateItemId, issueId);
 
         if (allocations.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND,
-                    "Không tìm thấy allocation RESERVED cho estimateItemId=" + estimateItemId
-                            + " trong phiếu issueId=" + issueId);
+                    "Không tìm thấy allocation RESERVED cho estimateItemId=" + estimateItemId);
         }
 
-        // Lấy itemId từ allocation để tìm issue item tương ứng
         Integer itemId = allocations.get(0).getItemId();
+        Integer warehouseId = allocations.get(0).getWarehouseId();
+        int cancelledQty = allocations.stream().mapToInt(StockAllocation::getQuantity).sum();
 
-        List<StockIssueItem> issueItems = stockIssueItemRepo.findByIssueId(issueId)
-                .stream()
-                .filter(i -> itemId.equals(i.getItemId()))
-                .toList();
-
-        if (issueItems.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
-                    "Không tìm thấy issue item cho itemId=" + itemId + " trong phiếu issueId=" + issueId);
-        }
-
-        // Release tất cả allocation của estimateItemId này
+        // Release allocation của estimateItemId này
         for (StockAllocation allocation : allocations) {
             inventoryRepo.findByWarehouseAndItemWithLock(allocation.getWarehouseId(), allocation.getItemId())
                     .ifPresent(inv -> {
@@ -387,18 +378,63 @@ public class StockAllocationService {
                     "stock_allocation_cancel_item", allocation.getAllocationId(), staffId
             );
             allocation.setStatus(AllocationStatus.RELEASED);
-
             allocationRepo.save(allocation);
         }
 
-        // Xóa issue item khỏi phiếu (xóa tất cả dòng của itemId này trong phiếu)
-        for (StockIssueItem issueItem : issueItems) {
+        // Tính tổng RESERVED còn lại cho itemId trong kho sau khi cancel
+        int remainingReservedQty = allocationRepo
+                .findByTicketAndWarehouseAndStatus(allocations.get(0).getServiceTicketId(), warehouseId, AllocationStatus.RESERVED)
+                .stream()
+                .filter(a -> itemId.equals(a.getItemId()))
+                .mapToInt(StockAllocation::getQuantity)
+                .sum();
+
+        // Xóa tất cả issue items của itemId này trong phiếu
+        List<StockIssueItem> existingIssueItems = stockIssueItemRepo.findByIssueId(issueId)
+                .stream()
+                .filter(i -> itemId.equals(i.getItemId()))
+                .toList();
+        for (StockIssueItem issueItem : existingIssueItems) {
             stockIssueItemRepo.deleteById(issueItem.getIssueItemId());
         }
 
-        // Nếu phiếu hết item → tự cancel phiếu
-        List<StockIssueItem> remaining = stockIssueItemRepo.findByIssueId(issueId);
-        if (remaining.isEmpty()) {
+        if (remainingReservedQty > 0) {
+            // Tính lại FIFO với quantity còn lại
+            BigDecimal estimateUnitPrice = stockIssueService.resolveEstimateUnitPricePublic(
+                    allocations.get(0).getServiceTicketId(), warehouseId, itemId);
+            BigDecimal discountRate = stockIssueService.resolveDiscountRatePublic(
+                    itemId, IssueType.SERVICE_TICKET, remainingReservedQty);
+            BigDecimal marketSellingPrice = stockIssueService.resolveMarketSellingPricePublic(warehouseId, itemId);
+
+            List<StockEntryItem> lots = stockEntryRepo.findFifoLots(warehouseId, itemId);
+            int remaining = remainingReservedQty;
+            List<StockIssueItem> newLotItems = new ArrayList<>();
+            for (StockEntryItem lot : lots) {
+                if (remaining <= 0) break;
+                int consume = Math.min(remaining, lot.getRemainingQuantity());
+                if (consume <= 0) continue;
+                BigDecimal sellingPrice = marketSellingPrice != null ? marketSellingPrice
+                        : lot.getImportPrice().multiply(lot.getMarkupMultiplier())
+                                .setScale(2, java.math.RoundingMode.HALF_UP);
+                BigDecimal finalPriceBase = stockIssueService.resolveFinalPriceBasePublic(
+                        IssueType.SERVICE_TICKET, estimateUnitPrice, sellingPrice);
+                BigDecimal finalPrice = finalPriceBase.multiply(BigDecimal.ONE.subtract(
+                        discountRate.divide(BigDecimal.valueOf(100), 4, java.math.RoundingMode.HALF_UP)))
+                        .setScale(2, java.math.RoundingMode.HALF_UP);
+                newLotItems.add(StockIssueItem.builder()
+                        .issueId(issueId).itemId(itemId).entryItemId(lot.getEntryItemId())
+                        .quantity(consume).exportPrice(sellingPrice).estimateUnitPrice(estimateUnitPrice)
+                        .importPrice(lot.getImportPrice()).discountRate(discountRate).finalPrice(finalPrice).build());
+                remaining -= consume;
+            }
+            if (!newLotItems.isEmpty()) {
+                stockIssueItemRepo.saveAll(newLotItems);
+            }
+        }
+
+        // Nếu phiếu hết item → cancel phiếu
+        List<StockIssueItem> remainingItems = stockIssueItemRepo.findByIssueId(issueId);
+        if (remainingItems.isEmpty()) {
             stockIssueService.cancel(issueId, staffId);
         }
     }
@@ -613,7 +649,107 @@ public class StockAllocationService {
         List<StockIssueResponse> createdIssues = new ArrayList<>();
         for (Map.Entry<Integer, List<CreateStockIssueRequest.IssueItemRequest>> entry : issueItemsByWarehouse.entrySet()) {
             Integer warehouseId = entry.getKey();
-            if (stockIssueRepo.existsDraftServiceTicketIssueInWarehouse(serviceTicketId, warehouseId)) {
+            List<CreateStockIssueRequest.IssueItemRequest> newItems = entry.getValue();
+
+            // Nếu đã có phiếu DRAFT cho kho này → merge item mới vào phiếu đó
+            java.util.Optional<com.g42.platform.gms.warehouse.domain.entity.StockIssue> existingDraft =
+                    stockIssueRepo.findDraftServiceTicketIssueInWarehouse(serviceTicketId, warehouseId);
+
+            if (existingDraft.isPresent()) {
+                Integer existingIssueId = existingDraft.get().getIssueId();
+
+                // Lấy tổng quantity từ TẤT CẢ allocation RESERVED của ticket trong kho này
+                Map<Integer, Integer> totalReservedByItem = allocationRepo
+                        .findByTicketAndWarehouseAndStatus(serviceTicketId, warehouseId, AllocationStatus.RESERVED)
+                        .stream()
+                        .collect(java.util.stream.Collectors.groupingBy(
+                                StockAllocation::getItemId,
+                                java.util.stream.Collectors.summingInt(StockAllocation::getQuantity)));
+
+                // Lấy quantity hiện tại trong phiếu
+                Map<Integer, Integer> existingQtyByItem = stockIssueItemRepo.findByIssueId(existingIssueId)
+                        .stream()
+                        .collect(java.util.stream.Collectors.groupingBy(
+                                com.g42.platform.gms.warehouse.domain.entity.StockIssueItem::getItemId,
+                                java.util.stream.Collectors.summingInt(
+                                        com.g42.platform.gms.warehouse.domain.entity.StockIssueItem::getQuantity)));
+
+                // Tìm các itemId cần cập nhật: tổng reserved khác với phiếu hiện có
+                java.util.Set<Integer> itemsToUpdate = new java.util.HashSet<>();
+                // Items từ allocation mới chưa có trong phiếu
+                for (CreateStockIssueRequest.IssueItemRequest req : newItems) {
+                    itemsToUpdate.add(req.getItemId());
+                }
+                // Items đã có trong phiếu nhưng tổng reserved thay đổi
+                for (Map.Entry<Integer, Integer> e : totalReservedByItem.entrySet()) {
+                    if (!e.getValue().equals(existingQtyByItem.getOrDefault(e.getKey(), 0))) {
+                        itemsToUpdate.add(e.getKey());
+                    }
+                }
+
+                if (!itemsToUpdate.isEmpty()) {
+                    for (Integer itemId : itemsToUpdate) {
+                        int totalNeeded = totalReservedByItem.getOrDefault(itemId, 0);
+                        if (totalNeeded <= 0) continue;
+
+                        // Xóa dòng cũ của itemId này
+                        stockIssueItemRepo.findByIssueId(existingIssueId).stream()
+                                .filter(i -> itemId.equals(i.getItemId()))
+                                .forEach(i -> stockIssueItemRepo.deleteById(i.getIssueItemId()));
+
+                        // Tính FIFO với tổng quantity mới
+                        BigDecimal estimateUnitPrice = stockIssueService.resolveEstimateUnitPricePublic(
+                                serviceTicketId, warehouseId, itemId);
+                        BigDecimal discountRate = stockIssueService.resolveDiscountRatePublic(
+                                itemId, IssueType.SERVICE_TICKET, totalNeeded);
+                        BigDecimal marketSellingPrice = stockIssueService.resolveMarketSellingPricePublic(
+                                warehouseId, itemId);
+
+                        List<StockEntryItem> lots = stockEntryRepo.findFifoLots(warehouseId, itemId);
+                        int remaining = totalNeeded;
+                        List<StockIssueItem> lotItems = new ArrayList<>();
+                        for (StockEntryItem lot : lots) {
+                            if (remaining <= 0) break;
+                            int consume = Math.min(remaining, lot.getRemainingQuantity());
+                            if (consume <= 0) continue;
+                            BigDecimal sellingPrice = marketSellingPrice != null ? marketSellingPrice
+                                    : lot.getImportPrice().multiply(lot.getMarkupMultiplier())
+                                            .setScale(2, java.math.RoundingMode.HALF_UP);
+                            BigDecimal finalPriceBase = stockIssueService.resolveFinalPriceBasePublic(
+                                    IssueType.SERVICE_TICKET, estimateUnitPrice, sellingPrice);
+                            BigDecimal finalPrice = finalPriceBase.multiply(BigDecimal.ONE.subtract(
+                                    discountRate.divide(BigDecimal.valueOf(100), 4, java.math.RoundingMode.HALF_UP)))
+                                    .setScale(2, java.math.RoundingMode.HALF_UP);
+                            lotItems.add(StockIssueItem.builder()
+                                    .issueId(existingIssueId).itemId(itemId)
+                                    .entryItemId(lot.getEntryItemId()).quantity(consume)
+                                    .exportPrice(sellingPrice).estimateUnitPrice(estimateUnitPrice)
+                                    .importPrice(lot.getImportPrice()).discountRate(discountRate)
+                                    .finalPrice(finalPrice).build());
+                            remaining -= consume;
+                        }
+                        if (remaining > 0) {
+                            lotItems.add(StockIssueItem.builder()
+                                    .issueId(existingIssueId).itemId(itemId).entryItemId(0)
+                                    .quantity(remaining).exportPrice(BigDecimal.ZERO)
+                                    .estimateUnitPrice(estimateUnitPrice).importPrice(BigDecimal.ZERO)
+                                    .discountRate(discountRate).finalPrice(BigDecimal.ZERO).build());
+                        }
+                        stockIssueItemRepo.saveAll(lotItems);
+                    }
+
+                    // Gắn allocation mới vào phiếu DRAFT hiện có
+                    List<StockAllocation> unassigned = allocationRepo
+                            .findByTicketAndWarehouseAndStatus(serviceTicketId, warehouseId, AllocationStatus.RESERVED)
+                            .stream()
+                            .filter(a -> a.getIssueId() == null)
+                            .toList();
+                    for (StockAllocation alloc : unassigned) {
+                        alloc.setIssueId(existingIssueId);
+                        allocationRepo.save(alloc);
+                    }
+                }
+                createdIssues.add(stockIssueService.toResponsePublic(existingIssueId));
                 continue;
             }
 
@@ -622,7 +758,7 @@ public class StockAllocationService {
             issueRequest.setIssueType(IssueType.SERVICE_TICKET);
             issueRequest.setIssueReason(issueReason);
             issueRequest.setServiceTicketId(serviceTicketId);
-            issueRequest.setItems(entry.getValue());
+            issueRequest.setItems(newItems);
             createdIssues.add(stockIssueService.create(issueRequest, staffId));
         }
         return createdIssues;
@@ -675,6 +811,54 @@ public class StockAllocationService {
     private Integer getServiceTicketIdFromEstimate(Integer estimateId) {
         Estimate estimate = estimateRepository.findEstimateById(estimateId);
         return estimate != null ? estimate.getServiceTicketId() : null;
+    }
+
+    /**
+     * Tìm allocation RESERVED cho estimateItemId.
+     * Nếu không tìm thấy trực tiếp, trace ngược qua revisedFromItemId (khi tạo báo giá mới,
+     * item mới có revisedFromItemId trỏ về item cũ — allocation vẫn gắn với item cũ).
+     */
+    private List<StockAllocation> findAllocationsForEstimateItem(Integer estimateItemId, Integer issueId) {
+        return findAllocationsForEstimateItemInternal(estimateItemId, issueId, true);
+    }
+
+    private List<StockAllocation> findAllocationsForEstimateItemAnyStatus(Integer estimateItemId) {
+        return findAllocationsForEstimateItemInternal(estimateItemId, null, false);
+    }
+
+    private List<StockAllocation> findAllocationsForEstimateItemInternal(
+            Integer estimateItemId, Integer issueId, boolean onlyReserved) {
+        // Thử tìm trực tiếp theo estimateItemId
+        List<StockAllocation> allocations = allocationRepo.findByEstimateItemId(estimateItemId)
+                .stream()
+                .filter(a -> !onlyReserved || a.getStatus() == AllocationStatus.RESERVED)
+                .filter(a -> issueId == null || issueId.equals(a.getIssueId()))
+                .toList();
+
+        if (!allocations.isEmpty()) {
+            return allocations;
+        }
+
+        // Trace ngược qua revisedFromItemId
+        Integer currentItemId = estimateItemId;
+        int maxDepth = 10;
+        while (maxDepth-- > 0) {
+            EstimateItem item = estimateItemRepository.findByEstimateItemId(currentItemId);
+            if (item == null || item.getRevisedFromItemId() == null) {
+                break;
+            }
+            currentItemId = item.getRevisedFromItemId();
+            allocations = allocationRepo.findByEstimateItemId(currentItemId)
+                    .stream()
+                    .filter(a -> !onlyReserved || a.getStatus() == AllocationStatus.RESERVED)
+                    .filter(a -> issueId == null || issueId.equals(a.getIssueId()))
+                    .toList();
+            if (!allocations.isEmpty()) {
+                return allocations;
+            }
+        }
+
+        return List.of();
     }
 
     private StockAllocationResult toResult(StockAllocation a) {

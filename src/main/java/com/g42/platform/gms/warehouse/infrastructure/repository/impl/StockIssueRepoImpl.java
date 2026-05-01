@@ -93,6 +93,16 @@ public class StockIssueRepoImpl implements StockIssueRepo {
                 StockIssueStatus.DRAFT);
     }
 
+    @Override
+    public Optional<StockIssue> findDraftServiceTicketIssueInWarehouse(Integer serviceTicketId, Integer warehouseId) {
+        return jpaRepo.findByServiceTicketIdAndWarehouseIdAndIssueTypeAndStatus(
+                serviceTicketId,
+                warehouseId,
+                IssueType.SERVICE_TICKET,
+                StockIssueStatus.DRAFT)
+                .map(this::toDomain);
+    }
+
     // ── mappers ──────────────────────────────────────────────────────────────
 
     private StockIssue toDomain(StockIssueJpa jpa) {
