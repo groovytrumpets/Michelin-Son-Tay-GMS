@@ -9,16 +9,11 @@ import com.g42.platform.gms.warehouse.domain.entity.Inventory;
 import com.g42.platform.gms.warehouse.domain.entity.Warehouse;
 import com.g42.platform.gms.warehouse.domain.exception.WarehouseErrorCode;
 import com.g42.platform.gms.warehouse.domain.exception.WarehouseException;
-import com.g42.platform.gms.warehouse.infrastructure.entity.CatalogItemJpa;
-import com.g42.platform.gms.warehouse.infrastructure.entity.WarehouseJpa;
-import com.g42.platform.gms.warehouse.infrastructure.entity.WorkCategoryJpaEntity;
+import com.g42.platform.gms.warehouse.infrastructure.entity.*;
 import com.g42.platform.gms.warehouse.infrastructure.mapper.CatalogItemJpaMapper;
 import com.g42.platform.gms.warehouse.infrastructure.mapper.InventoryJpaMapper;
 import com.g42.platform.gms.warehouse.infrastructure.mapper.WarehouseJpaMapper;
-import com.g42.platform.gms.warehouse.infrastructure.repository.CatalogItemJpaRepo;
-import com.g42.platform.gms.warehouse.infrastructure.repository.InventoryJpaRepo;
-import com.g42.platform.gms.warehouse.infrastructure.repository.WarehouseJpaRepo;
-import com.g42.platform.gms.warehouse.infrastructure.repository.WorkCategoryJpaEntityRepo;
+import com.g42.platform.gms.warehouse.infrastructure.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -45,6 +40,10 @@ public class WarehouseInternalApiImpl implements WarehouseInternalApi {
     private InventoryJpaMapper inventoryJpaMapper;
     @Autowired
     private PricingService pricingService;
+    @Autowired
+    private ReturnEntryItemJpaRepo returnEntryItemJpaRepo;
+    @Autowired
+    private ReturnEntryJpaRepo returnEntryJpaRepo;
 
     @Override
     public CatalogItemDto getItemInfo(Integer itemId) {
@@ -105,5 +104,19 @@ public class WarehouseInternalApiImpl implements WarehouseInternalApi {
     @Override
     public BigDecimal findItemPricing(Integer itemId, Integer integer, BigDecimal price) {
         return pricingService.getEffectivePrice(itemId,integer,price).getFinalPrice();
+    }
+
+    @Override
+    public String getReturnStatusByAlloId(Integer allocationId) {
+        ReturnEntryItemJpa returnEntryItemJpa = returnEntryItemJpaRepo.findTopByAllocationId(allocationId);
+        if (returnEntryItemJpa == null) {
+            return null;
+        }
+        ReturnEntryJpa returnEntryJpa = returnEntryJpaRepo.findById(returnEntryItemJpa.getReturnId()).orElse(null);
+        assert returnEntryJpa != null;
+        if (returnEntryJpa.getStatus() != null) {
+        return returnEntryJpa.getStatus().name();
+        }
+        return null;
     }
 }

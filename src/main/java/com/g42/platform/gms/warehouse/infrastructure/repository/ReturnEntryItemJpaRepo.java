@@ -8,4 +8,8 @@ import java.util.List;
 public interface ReturnEntryItemJpaRepo extends JpaRepository<ReturnEntryItemJpa, Integer> {
 
     List<ReturnEntryItemJpa> findByReturnId(Integer returnId);
+
+    ReturnEntryItemJpa findByAllocationId(Integer allocationId);
+
+    ReturnEntryItemJpa findTopByAllocationId(Integer allocationId);
 }

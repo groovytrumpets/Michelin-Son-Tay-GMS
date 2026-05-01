@@ -1,10 +1,7 @@
 package com.g42.platform.gms.estimation.app.service;
 
 import com.g42.platform.gms.common.enums.EstimateEnum;
-import com.g42.platform.gms.estimation.api.dto.EstimateItemDto;
-import com.g42.platform.gms.estimation.api.dto.EstimateRespondDto;
-import com.g42.platform.gms.estimation.api.dto.EstimateViaAllocationDto;
-import com.g42.platform.gms.estimation.api.dto.WorkCataDto;
+import com.g42.platform.gms.estimation.api.dto.*;
 import com.g42.platform.gms.estimation.api.dto.request.EstimateItemReqDto;
 import com.g42.platform.gms.estimation.api.dto.request.EstimateRequestDto;
 import com.g42.platform.gms.estimation.api.internal.TaxRuleInternalApi;
@@ -143,7 +140,10 @@ public class EstimateService {
                 if (item.getId() != null) {
                     StockAllocation allocation = allocationMap.get(item.getId());
                     if (allocation != null) {
-                        itemDto.setStockAllocation(stockAllocationDtoMapper.toDto(allocation));
+                        String returnStatus = warehouseInternalApi.getReturnStatusByAlloId(allocation.getAllocationId());
+                        StockAllocationDto allocationDto = stockAllocationDtoMapper.toDto(allocation);
+                        allocationDto.setReturnStatus(returnStatus);
+                        itemDto.setStockAllocation(allocationDto);
                     }
                 }
 
