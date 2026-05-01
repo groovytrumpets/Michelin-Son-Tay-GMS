@@ -13,6 +13,7 @@ import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicke
 import com.g42.platform.gms.service_ticket_management.domain.repository.ServiceTicketRepo;
 import com.g42.platform.gms.warehouse.api.dto.issue.CreateStockIssueRequest;
 import com.g42.platform.gms.warehouse.api.dto.issue.CreateStockIssueWithAttachmentRequest;
+import com.g42.platform.gms.warehouse.api.dto.issue.StockAllocationUpdatePayload;
 import com.g42.platform.gms.warehouse.api.dto.request.PatchIssueItemRequest;
 import com.g42.platform.gms.warehouse.api.dto.request.UpdateStockIssueRequest;
 import com.g42.platform.gms.warehouse.api.dto.response.StockIssueDetailResponse;
@@ -48,6 +49,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -97,6 +99,8 @@ public class StockIssueService {
     private final ImageUploadService imageUploadService;
     private final ObjectMapper objectMapper;
     private final BillingRepository billingRepository;
+
+    private final SimpMessagingTemplate messagingTemplate;
 
     private static final String FOLDER_STOCK_ISSUE = "stock-issues";
 
@@ -478,6 +482,15 @@ public class StockIssueService {
 
             alloc.setStatus(AllocationStatus.COMMITTED);
             stockAllocationRepo.save(alloc);
+            if (alloc.getEstimateItemId()!=null && alloc.getServiceTicketId()!=null) {
+                StockAllocationUpdatePayload payload = new StockAllocationUpdatePayload(
+                        alloc.getEstimateItemId(),
+                        alloc.getAllocationId(),
+                        alloc.getStatus().name()
+                );
+                messagingTemplate.convertAndSend
+                        ("/topic/service-ticket/"+alloc.getServiceTicketId()+"/stock-update", payload);
+            }
         }
 
         lotItems.forEach(item -> item.setIssueId(issueId));
