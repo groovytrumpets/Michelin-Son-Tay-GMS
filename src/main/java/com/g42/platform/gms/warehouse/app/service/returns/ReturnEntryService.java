@@ -349,8 +349,8 @@ public class ReturnEntryService {
             }
 
             if (item.getAllocationId() != null) {
-                Integer savedEstimateId = estimateInternalApi.releaseEstimate(item.getAllocationId(), item.getQuantity(), staffId);
-                releaseAllocation(item.getAllocationId(), item.getQuantity(), staffId,savedEstimateId);
+                Integer savedEstimateItemId = estimateInternalApi.releaseEstimate(item.getAllocationId(), item.getQuantity(), staffId);
+                releaseAllocation(item.getAllocationId(), item.getQuantity(), staffId,savedEstimateItemId);
             }
         }
 
@@ -404,7 +404,7 @@ public class ReturnEntryService {
         transactionRepo.save(tx);
     }
 
-    private void releaseAllocation(Integer allocationId, Integer returnQuantity, Integer staffId, Integer savedEstimateId) {
+    private void releaseAllocation(Integer allocationId, Integer returnQuantity, Integer staffId, Integer savedEstimateItemId) {
         StockAllocation allocation = stockAllocationRepo.findById(allocationId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Không tìm thấy allocation id=" + allocationId));
@@ -432,7 +432,7 @@ public class ReturnEntryService {
         StockAllocation released = new StockAllocation();
         released.setServiceTicketId(allocation.getServiceTicketId());
 
-        released.setEstimateItemId(allocation.getEstimateItemId());
+        released.setEstimateItemId(savedEstimateItemId);
         Integer estimateId = allocation.getEstimateId();
         if (estimateId == null && allocation.getEstimateItemId() != null) {
             EstimateItem estimateItem = estimateItemRepository.findByEstimateItemId(allocation.getEstimateItemId());
@@ -440,13 +440,14 @@ public class ReturnEntryService {
                 estimateId = estimateItem.getEstimateId();
             }
         }
-        released.setEstimateId(savedEstimateId);
+        released.setEstimateId(estimateId);
         released.setWarehouseId(allocation.getWarehouseId());
         released.setItemId(allocation.getItemId());
         released.setQuantity(returnQuantity);
         released.setStatus(AllocationStatus.RELEASED);
         released.setCreatedBy(allocation.getCreatedBy() != null ? allocation.getCreatedBy() : staffId);
-        stockAllocationRepo.save(released);
+        StockAllocation stockAllocation = stockAllocationRepo.save(released);
+        System.out.println("DEBUG: "+stockAllocation.getEstimateItemId());
     }
 
     private ReturnEntry findOrThrow(Integer returnId) {
