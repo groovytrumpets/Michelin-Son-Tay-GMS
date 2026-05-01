@@ -344,7 +344,8 @@ public class StockAllocationService {
             }
 
             allocation.setStatus(AllocationStatus.RELEASED);
-            allocationRepo.save(allocation);
+            StockAllocation saved = allocationRepo.save(allocation);
+            estimateInternalApi.releaseEstimate(saved.getAllocationId(), saved.getQuantity(), staffId);
         }
     }
 
@@ -378,7 +379,8 @@ public class StockAllocationService {
                     "stock_allocation_cancel_item", allocation.getAllocationId(), staffId
             );
             allocation.setStatus(AllocationStatus.RELEASED);
-            allocationRepo.save(allocation);
+            StockAllocation saved = allocationRepo.save(allocation);
+            estimateInternalApi.releaseEstimate(saved.getAllocationId(), saved.getQuantity(), staffId);
         }
 
         // Tính tổng RESERVED còn lại cho itemId trong kho sau khi cancel
@@ -481,7 +483,8 @@ public class StockAllocationService {
 
             allocation.setStatus(AllocationStatus.RELEASED);
 
-            allocationRepo.save(allocation);
+            StockAllocation saved = allocationRepo.save(allocation);
+            estimateInternalApi.releaseEstimate(saved.getAllocationId(), saved.getQuantity(), staffId);
         }
 
         // Xóa issue item khỏi phiếu
@@ -526,7 +529,8 @@ public class StockAllocationService {
             }
 
             allocation.setStatus(AllocationStatus.RELEASED);
-            allocationRepo.save(allocation);
+            StockAllocation saved = allocationRepo.save(allocation);
+            estimateInternalApi.releaseEstimate(saved.getAllocationId(), saved.getQuantity(), staffId);
         }
     }
 
