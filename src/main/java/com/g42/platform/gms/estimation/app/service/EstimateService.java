@@ -572,6 +572,7 @@ public class EstimateService {
         giftItem.setFinalPrice(BigDecimal.ZERO);
         giftItem.setPromotionId(promotion.getPromotionId());
         giftItem.setIsGift(Boolean.TRUE);
+        giftItem.setIsChecked(Boolean.TRUE);
         giftItem.setUnit(triggerItem.getUnit());
         //todo: find FREE workCate if Catalog have no W
         if (catalogItem.getWorkCategoryId()==null||catalogItem.getWorkCategoryId()==0){
