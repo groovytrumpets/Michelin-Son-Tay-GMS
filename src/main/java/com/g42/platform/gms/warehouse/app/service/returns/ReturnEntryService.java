@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.g42.platform.gms.auth.entity.StaffProfile;
 import com.g42.platform.gms.auth.repository.StaffProfileRepo;
 import com.g42.platform.gms.common.service.ImageUploadService;
+import com.g42.platform.gms.estimation.api.internal.EstimateInternalApi;
 import com.g42.platform.gms.warehouse.api.dto.request.CreateReturnEntryFormRequest;
 import com.g42.platform.gms.warehouse.api.dto.request.CreateReturnEntryRequest;
 import com.g42.platform.gms.warehouse.api.dto.request.ReturnEntryItemRequest;
@@ -81,6 +82,7 @@ public class ReturnEntryService {
     private final PartCatalogRepo partCatalogRepo;
     private final EstimateItemRepository estimateItemRepository;
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+    private final EstimateInternalApi estimateInternalApi;
 
     @Transactional
     public ReturnEntryResponse create(CreateReturnEntryRequest request, Integer staffId) {
@@ -380,7 +382,8 @@ public class ReturnEntryService {
             }
 
             if (item.getAllocationId() != null) {
-                releaseAllocation(item.getAllocationId(), item.getQuantity(), staffId);
+                Integer savedEstimateItemId = estimateInternalApi.releaseEstimate(item.getAllocationId(), item.getQuantity(), staffId);
+                releaseAllocation(item.getAllocationId(), item.getQuantity(), staffId,savedEstimateItemId);
             }
         }
 
@@ -434,7 +437,7 @@ public class ReturnEntryService {
         transactionRepo.save(tx);
     }
 
-    private void releaseAllocation(Integer allocationId, Integer returnQuantity, Integer staffId) {
+    private void releaseAllocation(Integer allocationId, Integer returnQuantity, Integer staffId, Integer savedEstimateItemId) {
         StockAllocation allocation = stockAllocationRepo.findById(allocationId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Không tìm thấy allocation id=" + allocationId));
@@ -462,7 +465,7 @@ public class ReturnEntryService {
         StockAllocation released = new StockAllocation();
         released.setServiceTicketId(allocation.getServiceTicketId());
 
-        released.setEstimateItemId(allocation.getEstimateItemId());
+        released.setEstimateItemId(savedEstimateItemId);
         Integer estimateId = allocation.getEstimateId();
         if (estimateId == null && allocation.getEstimateItemId() != null) {
             EstimateItem estimateItem = estimateItemRepository.findByEstimateItemId(allocation.getEstimateItemId());
@@ -478,7 +481,8 @@ public class ReturnEntryService {
 
         released.setStatus(AllocationStatus.RELEASED);
         released.setCreatedBy(allocation.getCreatedBy() != null ? allocation.getCreatedBy() : staffId);
-        stockAllocationRepo.save(released);
+        StockAllocation stockAllocation = stockAllocationRepo.save(released);
+        System.out.println("DEBUG: "+stockAllocation.getEstimateItemId());
     }
 
     private ReturnEntry findOrThrow(Integer returnId) {
