@@ -259,7 +259,6 @@ public class StockAllocationService {
             }
 
             alloc.setStatus(AllocationStatus.RELEASED);
-            estimateInternalApi.releaseEstimate(alloc.getAllocationId(), alloc.getQuantity(), staffId);
             allocationRepo.save(alloc);
         }
     }
