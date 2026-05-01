@@ -27,4 +27,6 @@ public interface WarehouseInternalApi {
     Inventory findItemAvailableInOtherWarehouse(Integer itemId, int i);
 
     BigDecimal findItemPricing(Integer itemId, Integer integer, BigDecimal price);
+
+    String getReturnStatusByAlloId(Integer allocationId);
 }
