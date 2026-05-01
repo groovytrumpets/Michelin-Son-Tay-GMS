@@ -38,6 +38,7 @@ import com.g42.platform.gms.warehouse.domain.repository.WarehouseRepo;
 import com.g42.platform.gms.estimation.domain.repository.EstimateItemRepository;
 import com.g42.platform.gms.estimation.domain.entity.EstimateItem;
 import com.g42.platform.gms.warehouse.domain.repository.StockAllocationRepo;
+import com.g42.platform.gms.service_ticket_management.domain.repository.ServiceTicketRepo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -81,6 +82,7 @@ public class ReturnEntryService {
     private final StaffProfileRepo staffProfileRepo;
     private final PartCatalogRepo partCatalogRepo;
     private final EstimateItemRepository estimateItemRepository;
+    private final ServiceTicketRepo serviceTicketRepo;
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
     private final EstimateInternalApi estimateInternalApi;
 
@@ -453,7 +455,6 @@ public class ReturnEntryService {
         }
 
         if (allocation.getQuantity().equals(returnQuantity)) {
-            allocation.setIssueId(null);
             allocation.setStatus(AllocationStatus.RELEASED);
             stockAllocationRepo.save(allocation);
             return;
@@ -507,6 +508,7 @@ public class ReturnEntryService {
         r.setReturnCode(e.getReturnCode());
         r.setWarehouseId(e.getWarehouseId());
         r.setReturnReason(e.getReturnReason());
+        r.setReturnType(e.getReturnType());
         r.setSourceIssueId(e.getSourceIssueId());
         r.setStatus(e.getStatus());
         r.setConfirmedBy(e.getConfirmedBy());
@@ -523,22 +525,28 @@ public class ReturnEntryService {
         }
 
         if (e.getSourceIssueId() != null) {
-            stockIssueRepo.findById(e.getSourceIssueId())
-                    .ifPresent(sourceIssue -> r.setSourceIssueCode(sourceIssue.getIssueCode()));
+            stockIssueRepo.findById(e.getSourceIssueId()).ifPresent(sourceIssue -> {
+                r.setSourceIssueCode(sourceIssue.getIssueCode());
+                // Lấy serviceTicketId/Code từ phiếu xuất nguồn
+                if (sourceIssue.getServiceTicketId() != null) {
+                    r.setServiceTicketId(sourceIssue.getServiceTicketId());
+                    com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicket ticket =
+                            serviceTicketRepo.findByServiceTicketId(sourceIssue.getServiceTicketId());
+                    if (ticket != null) {
+                        r.setServiceTicketCode(ticket.getTicketCode());
+                    }
+                }
+            });
         }
 
         if (e.getCreatedBy() != null) {
             StaffProfile createdBy = staffProfileRepo.findById(e.getCreatedBy()).orElse(null);
-            if (createdBy != null) {
-                r.setCreatedByName(createdBy.getFullName());
-            }
+            if (createdBy != null) r.setCreatedByName(createdBy.getFullName());
         }
 
         if (e.getConfirmedBy() != null) {
             StaffProfile confirmedBy = staffProfileRepo.findById(e.getConfirmedBy()).orElse(null);
-            if (confirmedBy != null) {
-                r.setConfirmedByName(confirmedBy.getFullName());
-            }
+            if (confirmedBy != null) r.setConfirmedByName(confirmedBy.getFullName());
         }
 
         Set<Integer> itemIds = e.getItems().stream()
@@ -546,16 +554,47 @@ public class ReturnEntryService {
                 .collect(Collectors.toSet());
         Map<Integer, String> itemNameById = partCatalogRepo.findNamesByIds(itemIds.stream().toList());
 
+        // Lấy giá từ stock_issue_item để hiển thị unitPrice
+        Map<Integer, java.math.BigDecimal> priceByIssueItemId = new java.util.HashMap<>();
+        Map<Integer, String> issueItemCodeById = new java.util.HashMap<>();
+        if (e.getSourceIssueId() != null) {
+            stockIssueItemRepo.findByIssueId(e.getSourceIssueId()).forEach(si -> {
+                if (si.getIssueItemId() != null) {
+                    priceByIssueItemId.put(si.getIssueItemId(), si.getFinalPrice());
+                }
+            });
+        }
+
         r.setItems(e.getItems().stream().map(i -> {
             ReturnEntryItemResponse ir = new ReturnEntryItemResponse();
             ir.setReturnItemId(i.getReturnItemId());
             ir.setItemId(i.getItemId());
+            ir.setItemName(itemNameById.get(i.getItemId()));
             ir.setAllocationId(i.getAllocationId());
             ir.setSourceIssueItemId(i.getSourceIssueItemId());
             ir.setEntryItemId(i.getEntryItemId());
-            ir.setItemName(itemNameById.get(i.getItemId()));
             ir.setQuantity(i.getQuantity());
             ir.setConditionNote(i.getConditionNote());
+
+            // Enrich giá từ issue item
+            if (i.getSourceIssueItemId() != null) {
+                java.math.BigDecimal unitPrice = priceByIssueItemId.get(i.getSourceIssueItemId());
+                ir.setUnitPrice(unitPrice);
+                if (unitPrice != null && i.getQuantity() != null) {
+                    ir.setTotalPrice(unitPrice.multiply(java.math.BigDecimal.valueOf(i.getQuantity())));
+                }
+            }
+
+            // Enrich thông tin lô nhập
+            if (i.getEntryItemId() != null) {
+                stockEntryRepo.findItemById(i.getEntryItemId()).ifPresent(entryItem -> {
+                    stockEntryRepo.findEntryById(entryItem.getEntryId()).ifPresent(entry -> {
+                        ir.setEntryCode(entry.getEntryCode());
+                        ir.setEntryLotCode(entry.getEntryCode() + "-LOT" + entryItem.getEntryItemId());
+                    });
+                });
+            }
+
             ir.setAttachmentUrls(
                     attachmentRepo.findByRefTypeAndRefId(
                                     WarehouseAttachment.RefType.RETURN_ENTRY_ITEM,

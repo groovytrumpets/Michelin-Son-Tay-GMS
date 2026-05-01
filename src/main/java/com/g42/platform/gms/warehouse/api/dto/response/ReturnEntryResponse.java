@@ -16,6 +16,7 @@ public class ReturnEntryResponse {
     private String returnReason;
     private Integer sourceIssueId;
     private String sourceIssueCode;
+    private com.g42.platform.gms.warehouse.domain.enums.ReturnType returnType;
     private ReturnEntryStatus status;
     private List<ReturnEntryItemResponse> items;
     private Integer confirmedBy;
@@ -24,4 +25,6 @@ public class ReturnEntryResponse {
     private Integer createdBy;
     private String createdByName;
     private LocalDateTime createdAt;
+    private Integer serviceTicketId;
+    private String serviceTicketCode;
 }
