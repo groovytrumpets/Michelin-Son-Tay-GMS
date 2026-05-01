@@ -90,7 +90,11 @@ public class EstimateInternalApiImpl implements EstimateInternalApi {
         if (stockAllocation==null) {
             throw new EstimateException("Allocation:"+allocationId+" 404",EstimateErrorCode.BAD_REQUEST);
         }
-        EstimateItemJpa estimateItemJpa = estimateItemRepositoryJpa.findById(stockAllocation.getEstimateItemId()).orElse(null);
+        EstimateItemJpa estimateItemJpa;
+        estimateItemJpa = estimateItemRepositoryJpa.findByRevisedFromItemId(stockAllocation.getEstimateItemId());
+        if (estimateItemJpa==null) {
+        estimateItemJpa = estimateItemRepositoryJpa.findById(stockAllocation.getEstimateItemId()).orElse(null);
+        }
         if (estimateItemJpa==null || estimateItemJpa.getQuantity()==null) {
             throw new EstimateException("EstimateItem of this Allocation:"+allocationId+" 404",EstimateErrorCode.BAD_REQUEST);
         }
