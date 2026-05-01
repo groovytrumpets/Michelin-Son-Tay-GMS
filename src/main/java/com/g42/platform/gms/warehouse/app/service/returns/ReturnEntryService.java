@@ -453,7 +453,6 @@ public class ReturnEntryService {
         }
 
         if (allocation.getQuantity().equals(returnQuantity)) {
-            allocation.setIssueId(null);
             allocation.setStatus(AllocationStatus.RELEASED);
             stockAllocationRepo.save(allocation);
             return;
