@@ -68,6 +68,15 @@ public interface ReturnEntryJpaRepo extends JpaRepository<ReturnEntryJpa, Intege
             """, nativeQuery = true)
     Long countAnyBySourceIssueItemId(@Param("sourceIssueItemId") Integer sourceIssueItemId);
 
+    @Query(value = """
+            select coalesce(sum(ri.quantity), 0)
+            from return_entry_item ri
+            join return_entry r on r.return_id = ri.return_id
+            where ri.allocation_id = :allocationId
+              and r.status in ('SUBMITTED', 'CONFIRMED')
+            """, nativeQuery = true)
+    Long sumActiveReturnedQuantityByAllocationId(@Param("allocationId") Integer allocationId);
+
         @Query(value = """
             select count(*)
             from return_entry_item ri

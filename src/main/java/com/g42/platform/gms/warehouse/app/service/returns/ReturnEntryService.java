@@ -162,24 +162,36 @@ public class ReturnEntryService {
             }
         }
 
-        MultipartFile[] files = {
-                req.getFile_0(), req.getFile_1(), req.getFile_2(), req.getFile_3(), req.getFile_4()
-        };
-        validateRequiredAttachments(items, files);
+        List<MultipartFile> files = new java.util.ArrayList<>();
+        // Gom từ List<files>
+        if (req.getFiles() != null) {
+            req.getFiles().stream().filter(f -> f != null && !f.isEmpty()).forEach(files::add);
+        }
+        // Gom từ file_0..file_4 (backward compatible)
+        java.util.stream.Stream.of(req.getFile_0(), req.getFile_1(), req.getFile_2(), req.getFile_3(), req.getFile_4())
+                .filter(f -> f != null && !f.isEmpty())
+                .forEach(files::add);
+
+        if (files.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Cần đính kèm ít nhất 1 ảnh chứng minh");
+        }
 
         ReturnEntryResponse created = create(request, staffId);
 
+        // Lấy item đầu tiên (không phải exchange) để gắn tất cả ảnh vào
         ReturnEntry saved = findOrThrow(created.getReturnId());
-        List<ReturnEntryItem> savedItems = saved.getItems().stream()
+        ReturnEntryItem firstItem = saved.getItems().stream()
                 .filter(i -> !i.isExchangeItem())
-                .toList();
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                        "Không tìm thấy item để gắn ảnh"));
 
-        for (int i = 0; i < savedItems.size(); i++) {
-            MultipartFile file = files[i];
+        for (MultipartFile file : files) {
             String url = imageUploadService.uploadImage(file, FOLDER_RETURN_ENTRY);
             WarehouseAttachment attachment = new WarehouseAttachment();
             attachment.setRefType(WarehouseAttachment.RefType.RETURN_ENTRY_ITEM);
-            attachment.setRefId(savedItems.get(i).getReturnItemId());
+            attachment.setRefId(firstItem.getReturnItemId());
             attachment.setFileUrl(url);
             attachment.setUploadedBy(staffId);
             attachmentRepo.save(attachment);
@@ -299,6 +311,27 @@ public class ReturnEntryService {
                 }
             }
         }
+        return toResponse(returnEntryRepo.save(entry));
+    }
+
+    /**
+     * Hủy phiếu hoàn khi chưa confirm (SUBMITTED).
+     * Phiếu hoàn chưa confirm chưa tác động gì đến inventory nên chỉ cần đổi status.
+     */
+    @Transactional
+    public ReturnEntryResponse cancel(Integer returnId, Integer staffId) {
+        ReturnEntry entry = findOrThrow(returnId);
+
+        if (entry.getStatus() == ReturnEntryStatus.CONFIRMED) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Không thể hủy phiếu hoàn đã được xác nhận");
+        }
+
+        if (entry.getStatus() == ReturnEntryStatus.CANCELLED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Phiếu hoàn đã bị hủy");
+        }
+
+        entry.setStatus(ReturnEntryStatus.CANCELLED);
         return toResponse(returnEntryRepo.save(entry));
     }
 
@@ -440,7 +473,9 @@ public class ReturnEntryService {
         released.setEstimateId(estimateId);
         released.setWarehouseId(allocation.getWarehouseId());
         released.setItemId(allocation.getItemId());
+        released.setIssueId(allocation.getIssueId());
         released.setQuantity(returnQuantity);
+
         released.setStatus(AllocationStatus.RELEASED);
         released.setCreatedBy(allocation.getCreatedBy() != null ? allocation.getCreatedBy() : staffId);
         stockAllocationRepo.save(released);
@@ -554,7 +589,7 @@ public class ReturnEntryService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
                         "Không tìm thấy allocation id=" + itemReq.getAllocationId()));
 
-        if (allocation.getIssueId() == null || !allocation.getIssueId().equals(sourceIssueId)) {
+        if (allocation.getIssueId() != null && !allocation.getIssueId().equals(sourceIssueId)) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                     "allocationId không thuộc phiếu xuất nguồn đã chọn");
         }
@@ -572,6 +607,15 @@ public class ReturnEntryService {
         if (itemReq.getQuantity() != null && itemReq.getQuantity() > allocation.getQuantity()) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                     "Số lượng hoàn vượt quá số lượng allocation đã chọn");
+        }
+
+        // Kiểm tra tổng quantity đã hoàn (active) không vượt quá allocation
+        int alreadyReturned = returnEntryRepo.sumActiveReturnedQuantityByAllocationId(itemReq.getAllocationId());
+        int requestedQty = itemReq.getQuantity() != null ? itemReq.getQuantity() : 0;
+        if (alreadyReturned + requestedQty > allocation.getQuantity()) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Tổng số lượng hoàn (" + (alreadyReturned + requestedQty) + ") vượt quá allocation ("
+                            + allocation.getQuantity() + ")");
         }
 
     }
@@ -614,12 +658,19 @@ public class ReturnEntryService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
                         "Không tìm thấy allocation id=" + itemReq.getAllocationId()));
 
-        if (allocation.getIssueId() == null) {
-            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
-                        "allocation chưa gắn issueId nên không thể truy dòng xuất");
+        // Ưu tiên issueId từ allocation; fallback sang sourceIssueId từ request (allocation cũ không có issueId)
+        Integer issueId = allocation.getIssueId();
+        if (issueId == null) {
+            issueId = itemReq.getSourceIssueId();
         }
 
-        List<StockIssueItem> issueItems = stockIssueItemRepo.findByIssueId(allocation.getIssueId());
+        if (issueId == null) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Không xác định được phiếu xuất cho allocation=" + itemReq.getAllocationId()
+                            + ". Vui lòng truyền sourceIssueId");
+        }
+
+        List<StockIssueItem> issueItems = stockIssueItemRepo.findByIssueId(issueId);
         StockIssueItem matchedIssueItem = null;
 
         for (StockIssueItem issueItem : issueItems) {
@@ -638,6 +689,15 @@ public class ReturnEntryService {
                         "allocation này map tới nhiều issueItem/lô, vui lòng truyền entryItemId rõ ràng");
             }
             matchedIssueItem = issueItem;
+        }
+
+        if (matchedIssueItem == null) {
+            // Fallback: allocation cũ có thể không còn issue item (đã bị xóa/thay thế).
+            // Thử tìm bất kỳ issue item nào của itemId trong issueId đó.
+            matchedIssueItem = issueItems.stream()
+                    .filter(i -> itemReq.getItemId().equals(i.getItemId()))
+                    .findFirst()
+                    .orElse(null);
         }
 
         if (matchedIssueItem == null) {
@@ -718,24 +778,12 @@ public class ReturnEntryService {
     }
 
     private void validateDuplicateAllocationOnCreate(Integer allocationId) {
-        if (allocationId == null) {
-            return;
-        }
-
-        if (returnEntryRepo.existsAnyByAllocationId(allocationId)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Allocation này đã có phiếu hoàn, không thể tạo trùng");
-        }
+        // Không block tạo nhiều phiếu hoàn cho cùng allocationId.
+        // Việc kiểm soát số lượng đã được xử lý trong validateAllocation().
     }
 
     private void validateDuplicateAllocationOnUpdate(Integer allocationId, Integer returnId) {
-        if (allocationId == null) {
-            return;
-        }
-
-        if (returnEntryRepo.existsAnyByAllocationIdExcludingReturnId(allocationId, returnId)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Allocation này đã có phiếu hoàn khác, không thể cập nhật trùng");
-        }
+        // Không block update nhiều phiếu hoàn cho cùng allocationId.
+        // Việc kiểm soát số lượng đã được xử lý trong validateAllocation().
     }
 }

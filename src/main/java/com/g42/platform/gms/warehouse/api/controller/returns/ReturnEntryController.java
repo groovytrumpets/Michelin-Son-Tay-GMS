@@ -97,6 +97,15 @@ public class ReturnEntryController {
                 returnEntryService.confirm(id, principal.getStaffId())));
     }
 
+    @PostMapping("/{id}/cancel")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<ReturnEntryResponse>> cancel(
+            @PathVariable Integer id,
+            @AuthenticationPrincipal StaffPrincipal principal) {
+        return ResponseEntity.ok(ApiResponses.success(
+                returnEntryService.cancel(id, principal.getStaffId())));
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<ReturnEntryResponse>> getDetail(@PathVariable Integer id) {

@@ -5,11 +5,14 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
+
 /**
  * Request tạo phiếu hoàn hàng + ảnh lỗi trong 1 form (multipart/form-data).
  * items: JSON string — hàng trả về.
  * exchangeItems: JSON string — hàng đổi mới (chỉ khi returnType = EXCHANGE).
- * file_0..file_4: ảnh lỗi theo index của items.
+ * files: danh sách ảnh lỗi, tất cả gắn vào item đầu tiên (1 item/phiếu hoàn từ UI).
+ *        Nếu nhiều items thì dùng endpoint /items/{id}/attachments để upload thêm.
  */
 @Data
 public class CreateReturnEntryFormRequest {
@@ -34,7 +37,10 @@ public class CreateReturnEntryFormRequest {
      */
     private String exchangeItems;
 
-    // Ảnh lỗi theo index item trả về
+    /** Nhiều ảnh lỗi — tất cả gắn vào item đầu tiên trong phiếu */
+    private List<MultipartFile> files;
+
+    // Backward compatible: vẫn nhận file_0..file_4 từ FE cũ
     private MultipartFile file_0;
     private MultipartFile file_1;
     private MultipartFile file_2;

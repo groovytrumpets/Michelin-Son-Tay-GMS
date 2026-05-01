@@ -21,7 +21,9 @@ import com.g42.platform.gms.warehouse.domain.enums.IssueType;
 import com.g42.platform.gms.warehouse.domain.repository.InventoryRepo;
 import com.g42.platform.gms.warehouse.domain.repository.InventoryTransactionRepo;
 import com.g42.platform.gms.warehouse.domain.repository.StockAllocationRepo;
+import com.g42.platform.gms.warehouse.domain.repository.StockIssueItemRepo;
 import com.g42.platform.gms.warehouse.domain.repository.StockIssueRepo;
+import com.g42.platform.gms.warehouse.domain.entity.StockIssueItem;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -46,6 +48,7 @@ public class StockAllocationService {
     private final EstimateRepository estimateRepository;
     private final StockIssueService stockIssueService;
     private final StockIssueRepo stockIssueRepo;
+    private final StockIssueItemRepo stockIssueItemRepo;
     private final ServiceTicketRepo serviceTicketRepo;
 
     @Transactional
@@ -263,14 +266,27 @@ public class StockAllocationService {
 
     @Transactional
     public void cancelStockAllocation(Integer estimateItemId, Integer issueId, Integer staffId) {
-        if (estimateItemId == null && issueId == null) {
+        cancelStockAllocation(estimateItemId, issueId, null, staffId);
+    }
+
+    @Transactional
+    public void cancelStockAllocation(Integer estimateItemId, Integer issueId, Integer issueItemId, Integer staffId) {
+        if (estimateItemId == null && issueId == null && issueItemId == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Phải cung cấp estimateItemId hoặc issueId");
+                    "Phải cung cấp estimateItemId, issueId hoặc issueItemId");
         }
 
-        if (issueId != null) {
+        if (issueItemId != null) {
+            // Cancel allocation của 1 item cụ thể trong phiếu xuất (truyền issueItemId trực tiếp)
+            cancelReservedByIssueItem(issueItemId, staffId);
+        } else if (issueId != null && estimateItemId != null) {
+            // FE truyền cả hai: tìm issue item của estimateItemId trong phiếu issueId → xóa item đó
+            cancelReservedByEstimateItemInIssue(estimateItemId, issueId, staffId);
+        } else if (issueId != null) {
+            // Chỉ có issueId: cancel tất cả allocation của phiếu (cancel cả phiếu)
             cancelReservedWithIssue(issueId, staffId);
         } else {
+            // Chỉ có estimateItemId và không có issueId
             cancelReservedWithoutIssue(estimateItemId, staffId);
         }
     }
@@ -284,11 +300,6 @@ public class StockAllocationService {
         }
 
         for (StockAllocation allocation : allocations) {
-            if (allocation.getIssueId() != null) {
-                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
-                        "Allocation id=" + allocation.getAllocationId() + " đã gắn phiếu xuất, không thể hủy giữ chỗ");
-            }
-
             if (allocation.getStatus() == AllocationStatus.COMMITTED) {
                 throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                         "Allocation id=" + allocation.getAllocationId() + " đã COMMITTED, không thể hủy giữ chỗ");
@@ -296,6 +307,14 @@ public class StockAllocationService {
 
             if (allocation.getStatus() == AllocationStatus.RELEASED) {
                 continue;
+            }
+
+            // Nếu allocation đã gắn phiếu xuất → FE phải truyền issueId để xử lý đúng luồng
+            if (allocation.getIssueId() != null) {
+                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                        "Allocation id=" + allocation.getAllocationId()
+                                + " đã gắn phiếu xuất issueId=" + allocation.getIssueId()
+                                + ". Vui lòng truyền thêm issueId để cancel item trong phiếu");
             }
 
             Inventory inventory = inventoryRepo
@@ -320,6 +339,121 @@ public class StockAllocationService {
 
             allocation.setStatus(AllocationStatus.RELEASED);
             allocationRepo.save(allocation);
+        }
+    }
+
+    /**
+     * Tìm issue item của estimateItemId trong phiếu issueId, sau đó xóa item đó khỏi phiếu.
+     * Dùng khi FE truyền cả estimateItemId + issueId (cancel 1 item cụ thể trong phiếu).
+     */
+    private void cancelReservedByEstimateItemInIssue(Integer estimateItemId, Integer issueId, Integer staffId) {
+        // Tìm allocation của estimateItemId đang gắn với issueId này
+        List<StockAllocation> allocations = allocationRepo.findByEstimateItemId(estimateItemId)
+                .stream()
+                .filter(a -> issueId.equals(a.getIssueId()) && a.getStatus() == AllocationStatus.RESERVED)
+                .toList();
+
+        if (allocations.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "Không tìm thấy allocation RESERVED cho estimateItemId=" + estimateItemId
+                            + " trong phiếu issueId=" + issueId);
+        }
+
+        // Lấy itemId từ allocation để tìm issue item tương ứng
+        Integer itemId = allocations.get(0).getItemId();
+
+        List<StockIssueItem> issueItems = stockIssueItemRepo.findByIssueId(issueId)
+                .stream()
+                .filter(i -> itemId.equals(i.getItemId()))
+                .toList();
+
+        if (issueItems.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "Không tìm thấy issue item cho itemId=" + itemId + " trong phiếu issueId=" + issueId);
+        }
+
+        // Release tất cả allocation của estimateItemId này
+        for (StockAllocation allocation : allocations) {
+            inventoryRepo.findByWarehouseAndItemWithLock(allocation.getWarehouseId(), allocation.getItemId())
+                    .ifPresent(inv -> {
+                        inv.setReservedQuantity(Math.max(0, inv.getReservedQuantity() - allocation.getQuantity()));
+                        inventoryRepo.save(inv);
+                    });
+            logAdjustmentTransaction(
+                    allocation.getWarehouseId(), allocation.getItemId(),
+                    -allocation.getQuantity(), 0,
+                    "stock_allocation_cancel_item", allocation.getAllocationId(), staffId
+            );
+            allocation.setStatus(AllocationStatus.RELEASED);
+
+            allocationRepo.save(allocation);
+        }
+
+        // Xóa issue item khỏi phiếu (xóa tất cả dòng của itemId này trong phiếu)
+        for (StockIssueItem issueItem : issueItems) {
+            stockIssueItemRepo.deleteById(issueItem.getIssueItemId());
+        }
+
+        // Nếu phiếu hết item → tự cancel phiếu
+        List<StockIssueItem> remaining = stockIssueItemRepo.findByIssueId(issueId);
+        if (remaining.isEmpty()) {
+            stockIssueService.cancel(issueId, staffId);
+        }
+    }
+
+    private void cancelReservedByIssueItem(Integer issueItemId, Integer staffId) {
+        StockIssueItem issueItem = stockIssueItemRepo.findById(issueItemId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Không tìm thấy issue item id=" + issueItemId));
+
+        Integer issueId = issueItem.getIssueId();
+        Integer itemId = issueItem.getItemId();
+
+        // Tìm allocation RESERVED của item này trong phiếu xuất
+        List<StockAllocation> allocations = allocationRepo.findByIssueIdAndStatus(issueId, AllocationStatus.RESERVED)
+                .stream()
+                .filter(a -> itemId.equals(a.getItemId()))
+                .toList();
+
+        if (allocations.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "Không tìm thấy allocation RESERVED cho issueItemId=" + issueItemId);
+        }
+
+        for (StockAllocation allocation : allocations) {
+            Inventory inventory = inventoryRepo
+                    .findByWarehouseAndItemWithLock(allocation.getWarehouseId(), allocation.getItemId())
+                    .orElse(null);
+
+            if (inventory != null) {
+                int updatedReserved = Math.max(0, inventory.getReservedQuantity() - allocation.getQuantity());
+                inventory.setReservedQuantity(updatedReserved);
+                inventoryRepo.save(inventory);
+
+                logAdjustmentTransaction(
+                        allocation.getWarehouseId(),
+                        allocation.getItemId(),
+                        -allocation.getQuantity(),
+                        inventory.getQuantity(),
+                        "stock_allocation_cancel_item",
+                        allocation.getAllocationId(),
+                        staffId
+                );
+            }
+
+            allocation.setStatus(AllocationStatus.RELEASED);
+
+            allocationRepo.save(allocation);
+        }
+
+        // Xóa issue item khỏi phiếu
+        stockIssueItemRepo.deleteById(issueItemId);
+
+        // Nếu phiếu hết item → tự cancel phiếu
+        List<com.g42.platform.gms.warehouse.domain.entity.StockIssueItem> remaining =
+                stockIssueItemRepo.findByIssueId(issueId);
+        if (remaining.isEmpty()) {
+            stockIssueService.cancel(issueId, staffId);
         }
     }
 
@@ -430,8 +564,15 @@ public class StockAllocationService {
     ) {
         Map<Integer, List<CreateStockIssueRequest.IssueItemRequest>> result = new HashMap<>();
         for (StockAllocation allocation : allocations) {
+            // skipAssignedIssue: bỏ qua allocation đã gắn issueId VÀ issue đó vẫn còn DRAFT
+            // (tránh tạo trùng item cho cùng phiếu đang tồn tại)
             if (skipAssignedIssue && allocation.getIssueId() != null) {
-                continue;
+                boolean issueStillActive = stockIssueRepo.findById(allocation.getIssueId())
+                        .map(issue -> issue.getStatus() == com.g42.platform.gms.warehouse.domain.enums.StockIssueStatus.DRAFT)
+                        .orElse(false);
+                if (issueStillActive) {
+                    continue;
+                }
             }
             addIssueItem(result, allocation.getWarehouseId(), allocation.getItemId(), allocation.getQuantity());
         }

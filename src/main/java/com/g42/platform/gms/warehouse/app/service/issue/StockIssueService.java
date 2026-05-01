@@ -261,6 +261,57 @@ public class StockIssueService {
         return toResponse(findOrThrow(issueId));
     }
 
+    /**
+     * Xóa 1 item khỏi phiếu xuất DRAFT.
+     * - Nếu phiếu là SERVICE_TICKET: release allocation tương ứng với item đó.
+     * - Nếu sau khi xóa phiếu không còn item nào → tự cancel phiếu.
+     * - Trả về phiếu sau khi xóa (hoặc phiếu đã CANCELLED nếu hết item).
+     */
+    @Transactional
+    public StockIssueResponse removeItem(Integer issueId, Integer issueItemId, Integer staffId) {
+        StockIssue issue = findOrThrow(issueId);
+        if (issue.getStatus() != StockIssueStatus.DRAFT) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Chỉ có thể xóa item khi phiếu ở trạng thái DRAFT");
+        }
+
+        StockIssueItem item = stockIssueItemRepo.findById(issueItemId)
+                .filter(i -> i.getIssueId().equals(issueId))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Không tìm thấy item id=" + issueItemId + " trong phiếu id=" + issueId));
+
+        // Với phiếu SERVICE_TICKET: release allocation của item này
+        if (issue.getIssueType() == IssueType.SERVICE_TICKET && issue.getServiceTicketId() != null) {
+            List<StockAllocation> allocations = stockAllocationRepo
+                    .findByTicketAndWarehouseAndStatus(issue.getServiceTicketId(), issue.getWarehouseId(), AllocationStatus.RESERVED)
+                    .stream()
+                    .filter(a -> item.getItemId().equals(a.getItemId()) && issueId.equals(a.getIssueId()))
+                    .toList();
+
+            for (StockAllocation alloc : allocations) {
+                inventoryRepo.findByWarehouseAndItemWithLock(alloc.getWarehouseId(), alloc.getItemId())
+                        .ifPresent(inv -> {
+                            inv.setReservedQuantity(Math.max(0, inv.getReservedQuantity() - alloc.getQuantity()));
+                            inventoryRepo.save(inv);
+                        });
+                alloc.setStatus(AllocationStatus.RELEASED);
+                stockAllocationRepo.save(alloc);
+            }
+        }
+
+        // Xóa item
+        stockIssueItemRepo.deleteById(issueItemId);
+
+        // Nếu hết item → cancel phiếu
+        List<StockIssueItem> remaining = stockIssueItemRepo.findByIssueId(issueId);
+        if (remaining.isEmpty()) {
+            issue.setStatus(StockIssueStatus.CANCELLED);
+            stockIssueRepo.save(issue);
+        }
+
+        return toResponse(findOrThrow(issueId));
+    }
+
     @Transactional
     public StockIssueResponse update(Integer issueId, UpdateStockIssueRequest request) {
         StockIssue issue = findOrThrow(issueId);

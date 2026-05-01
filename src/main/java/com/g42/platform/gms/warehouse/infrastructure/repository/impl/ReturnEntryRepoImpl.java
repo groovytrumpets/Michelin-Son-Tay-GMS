@@ -90,6 +90,12 @@ public class ReturnEntryRepoImpl implements ReturnEntryRepo {
     }
 
     @Override
+    public int sumActiveReturnedQuantityByAllocationId(Integer allocationId) {
+        Long sum = jpaRepo.sumActiveReturnedQuantityByAllocationId(allocationId);
+        return sum == null ? 0 : sum.intValue();
+    }
+
+    @Override
     public boolean existsAnyBySourceIssueItemIdExcludingReturnId(Integer sourceIssueItemId, Integer returnId) {
         Long count = jpaRepo.countAnyBySourceIssueItemIdExcludingReturnId(sourceIssueItemId, returnId);
         return count != null && count > 0;

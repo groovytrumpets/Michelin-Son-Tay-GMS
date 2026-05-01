@@ -39,6 +39,8 @@ public interface ReturnEntryRepo {
 
     boolean existsAnyByAllocationId(Integer allocationId);
 
+    int sumActiveReturnedQuantityByAllocationId(Integer allocationId);
+
     boolean existsAnyByAllocationIdExcludingReturnId(Integer allocationId, Integer returnId);
 
     Optional<ReturnEntryItem> findItemById(Integer returnItemId);

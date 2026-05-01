@@ -71,7 +71,11 @@ public class StockAllocationController {
     public ResponseEntity<ApiResponse<Void>> cancel(
             @Valid @RequestBody CancelStockAllocationRequest request,
             @AuthenticationPrincipal StaffPrincipal principal) {
-        stockAllocationService.cancelStockAllocation(request.getEstimateItemId(), request.getIssueId(), principal.getStaffId());
+        stockAllocationService.cancelStockAllocation(
+                request.getEstimateItemId(),
+                request.getIssueId(),
+                request.getIssueItemId(),
+                principal.getStaffId());
         return ResponseEntity.ok(ApiResponses.success(null));
     }
 }
