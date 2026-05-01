@@ -53,11 +53,36 @@ public interface ReturnEntryJpaRepo extends JpaRepository<ReturnEntryJpa, Intege
     Long countActiveBySourceIssueItemId(@Param("sourceIssueItemId") Integer sourceIssueItemId);
 
     @Query(value = """
+                select count(*)
+                from return_entry_item ri
+                join return_entry r on r.return_id = ri.return_id
+                where ri.allocation_id = :allocationId
+                    and r.status in ('SUBMITTED', 'CONFIRMED')
+                """, nativeQuery = true)
+    Long countActiveByAllocationId(@Param("allocationId") Integer allocationId);
+
+    @Query(value = """
             select count(*)
             from return_entry_item ri
             where ri.source_issue_item_id = :sourceIssueItemId
             """, nativeQuery = true)
     Long countAnyBySourceIssueItemId(@Param("sourceIssueItemId") Integer sourceIssueItemId);
+
+    @Query(value = """
+            select coalesce(sum(ri.quantity), 0)
+            from return_entry_item ri
+            join return_entry r on r.return_id = ri.return_id
+            where ri.allocation_id = :allocationId
+              and r.status in ('SUBMITTED', 'CONFIRMED')
+            """, nativeQuery = true)
+    Long sumActiveReturnedQuantityByAllocationId(@Param("allocationId") Integer allocationId);
+
+        @Query(value = """
+            select count(*)
+            from return_entry_item ri
+            where ri.allocation_id = :allocationId
+            """, nativeQuery = true)
+        Long countAnyByAllocationId(@Param("allocationId") Integer allocationId);
 
     @Query(value = """
             select count(*)
@@ -67,4 +92,13 @@ public interface ReturnEntryJpaRepo extends JpaRepository<ReturnEntryJpa, Intege
             """, nativeQuery = true)
     Long countAnyBySourceIssueItemIdExcludingReturnId(@Param("sourceIssueItemId") Integer sourceIssueItemId,
                                                       @Param("returnId") Integer returnId);
+
+        @Query(value = """
+                        select count(*)
+                        from return_entry_item ri
+                        where ri.allocation_id = :allocationId
+                            and ri.return_id <> :returnId
+                        """, nativeQuery = true)
+        Long countAnyByAllocationIdExcludingReturnId(@Param("allocationId") Integer allocationId,
+                                                                                                 @Param("returnId") Integer returnId);
 }

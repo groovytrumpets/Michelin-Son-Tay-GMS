@@ -83,6 +83,17 @@ public class StockIssueController {
         return ResponseEntity.ok(ApiResponses.success(stockIssueService.patchItem(id, itemId, request)));
     }
 
+    /** Xóa 1 item khỏi phiếu xuất DRAFT; nếu hết item thì tự cancel phiếu */
+    @DeleteMapping("/{id}/items/{itemId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<StockIssueResponse>> removeItem(
+            @PathVariable Integer id,
+            @PathVariable Integer itemId,
+            @AuthenticationPrincipal StaffPrincipal principal) {
+        return ResponseEntity.ok(ApiResponses.success(
+                stockIssueService.removeItem(id, itemId, principal.getStaffId())));
+    }
+
     @PutMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<StockIssueResponse>> update(

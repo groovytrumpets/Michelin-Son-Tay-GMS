@@ -14,4 +14,6 @@ public interface EstimateInternalApi {
     void linkEstimateToServiceTicket(Integer estimateId, Integer serviceTicketId);
 
     void updateBookingToRemindById(Integer reminderId, Integer bookingId);
+
+    Integer releaseEstimate(Integer allocationId, Integer quantity, Integer staffId);
 }

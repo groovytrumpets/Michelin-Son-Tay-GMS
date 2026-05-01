@@ -26,4 +26,6 @@ public interface StockIssueRepo {
     boolean existsConfirmedServiceTicketIssue(Integer serviceTicketId);
     boolean existsDraftServiceTicketIssue(Integer serviceTicketId);
     boolean existsDraftServiceTicketIssueInWarehouse(Integer serviceTicketId, Integer warehouseId);
+
+    Optional<StockIssue> findDraftServiceTicketIssueInWarehouse(Integer serviceTicketId, Integer warehouseId);
 }

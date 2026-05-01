@@ -11,6 +11,7 @@ public class StockAllocation {
     private Integer serviceTicketId;
     private Integer issueId;
     private Integer estimateItemId;
+    private Integer estimateId;
     private Integer warehouseId;
     private Integer itemId;
     private String itemName;

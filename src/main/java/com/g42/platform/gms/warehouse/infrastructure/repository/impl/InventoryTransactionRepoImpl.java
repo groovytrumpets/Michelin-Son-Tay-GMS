@@ -24,6 +24,7 @@ public class InventoryTransactionRepoImpl implements InventoryTransactionRepo {
         jpa.setTransactionId(domain.getTransactionId());
         jpa.setWarehouseId(domain.getWarehouseId());
         jpa.setItemId(domain.getItemId());
+        jpa.setEntryItemId(domain.getEntryItemId());
         jpa.setTransactionType(domain.getTransactionType());
         jpa.setQuantity(domain.getQuantity());
         jpa.setBalanceAfter(domain.getBalanceAfter());
@@ -40,6 +41,7 @@ public class InventoryTransactionRepoImpl implements InventoryTransactionRepo {
         domain.setTransactionId(jpa.getTransactionId());
         domain.setWarehouseId(jpa.getWarehouseId());
         domain.setItemId(jpa.getItemId());
+        domain.setEntryItemId(jpa.getEntryItemId());
         domain.setTransactionType(jpa.getTransactionType());
         domain.setQuantity(jpa.getQuantity());
         domain.setBalanceAfter(jpa.getBalanceAfter());

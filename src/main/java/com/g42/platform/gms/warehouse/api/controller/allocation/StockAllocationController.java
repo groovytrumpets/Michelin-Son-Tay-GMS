@@ -3,9 +3,11 @@ package com.g42.platform.gms.warehouse.api.controller.allocation;
 import com.g42.platform.gms.auth.entity.StaffPrincipal;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
+import com.g42.platform.gms.warehouse.api.dto.request.CancelStockAllocationRequest;
 import com.g42.platform.gms.warehouse.api.dto.response.StockIssueResponse;
 import com.g42.platform.gms.warehouse.app.service.allocation.StockAllocationService;
 import com.g42.platform.gms.warehouse.app.service.dto.StockShortageInfo;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -61,6 +63,19 @@ public class StockAllocationController {
             @PathVariable Integer ticketId,
             @AuthenticationPrincipal StaffPrincipal principal) {
         stockAllocationService.release(ticketId, principal.getStaffId());
+        return ResponseEntity.ok(ApiResponses.success(null));
+    }
+
+    @PostMapping("/cancel")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Void>> cancel(
+            @Valid @RequestBody CancelStockAllocationRequest request,
+            @AuthenticationPrincipal StaffPrincipal principal) {
+        stockAllocationService.cancelStockAllocation(
+                request.getEstimateItemId(),
+                request.getIssueId(),
+                request.getIssueItemId(),
+                principal.getStaffId());
         return ResponseEntity.ok(ApiResponses.success(null));
     }
 }

@@ -29,6 +29,11 @@ public class StockIssueItemRepoImpl implements StockIssueItemRepo {
     }
 
     @Override
+    public void deleteById(Integer issueItemId) {
+        jpaRepo.deleteById(issueItemId);
+    }
+
+    @Override
     public Optional<StockIssueItem> findById(Integer issueItemId) {
         return jpaRepo.findById(issueItemId).map(this::toDomain);
     }

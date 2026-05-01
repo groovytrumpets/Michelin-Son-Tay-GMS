@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.g42.platform.gms.auth.entity.StaffProfile;
 import com.g42.platform.gms.auth.repository.StaffProfileRepo;
 import com.g42.platform.gms.common.service.ImageUploadService;
+import com.g42.platform.gms.estimation.api.internal.EstimateInternalApi;
 import com.g42.platform.gms.warehouse.api.dto.request.CreateReturnEntryFormRequest;
 import com.g42.platform.gms.warehouse.api.dto.request.CreateReturnEntryRequest;
 import com.g42.platform.gms.warehouse.api.dto.request.ReturnEntryItemRequest;
@@ -26,9 +27,17 @@ import com.g42.platform.gms.warehouse.domain.entity.InventoryTransaction;
 import com.g42.platform.gms.warehouse.domain.entity.ReturnEntry;
 import com.g42.platform.gms.warehouse.domain.entity.ReturnEntryItem;
 import com.g42.platform.gms.warehouse.domain.entity.StockIssue;
+import com.g42.platform.gms.warehouse.domain.entity.StockIssueItem;
+import com.g42.platform.gms.warehouse.domain.entity.StockAllocation;
+import com.g42.platform.gms.warehouse.domain.entity.StockEntry;
+import com.g42.platform.gms.warehouse.domain.entity.StockEntryItem;
 import com.g42.platform.gms.warehouse.domain.entity.Warehouse;
 import com.g42.platform.gms.warehouse.domain.entity.WarehouseAttachment;
+import com.g42.platform.gms.warehouse.domain.enums.AllocationStatus;
 import com.g42.platform.gms.warehouse.domain.repository.WarehouseRepo;
+import com.g42.platform.gms.estimation.domain.repository.EstimateItemRepository;
+import com.g42.platform.gms.estimation.domain.entity.EstimateItem;
+import com.g42.platform.gms.warehouse.domain.repository.StockAllocationRepo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -66,9 +75,14 @@ public class ReturnEntryService {
     private final ImageUploadService imageUploadService;
     private final WarehouseRepo warehouseRepo;
     private final StockIssueRepo stockIssueRepo;
+    private final com.g42.platform.gms.warehouse.domain.repository.StockIssueItemRepo stockIssueItemRepo;
+    private final StockAllocationRepo stockAllocationRepo;
+    private final com.g42.platform.gms.warehouse.domain.repository.StockEntryRepo stockEntryRepo;
     private final StaffProfileRepo staffProfileRepo;
     private final PartCatalogRepo partCatalogRepo;
+    private final EstimateItemRepository estimateItemRepository;
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+    private final EstimateInternalApi estimateInternalApi;
 
     @Transactional
     public ReturnEntryResponse create(CreateReturnEntryRequest request, Integer staffId) {
@@ -87,13 +101,17 @@ public class ReturnEntryService {
         ReturnEntry saved = returnEntryRepo.save(entry);
 
         for (ReturnEntryItemRequest itemReq : request.getItems()) {
-            validateSourceIssueItem(request.getSourceIssueId(), itemReq);
-            validateDuplicateSourceIssueItemOnCreate(itemReq.getSourceIssueItemId());
+            validateAllocation(request.getSourceIssueId(), itemReq);
+            resolveIssueItemAndEntryFromAllocation(itemReq);
+            validateEntryItem(request.getWarehouseId(), itemReq);
+            validateDuplicateAllocationOnCreate(itemReq.getAllocationId());
 
             ReturnEntryItem item = new ReturnEntryItem();
             item.setReturnId(saved.getReturnId());
             item.setItemId(itemReq.getItemId());
+            item.setAllocationId(itemReq.getAllocationId());
             item.setSourceIssueItemId(itemReq.getSourceIssueItemId());
+            item.setEntryItemId(itemReq.getEntryItemId());
             item.setQuantity(itemReq.getQuantity());
             item.setConditionNote(itemReq.getConditionNote());
             item.setExchangeItem(false);
@@ -102,10 +120,12 @@ public class ReturnEntryService {
 
         if (request.getExchangeItems() != null) {
             for (ReturnEntryItemRequest itemReq : request.getExchangeItems()) {
+                validateEntryItem(request.getWarehouseId(), itemReq);
                 ReturnEntryItem item = new ReturnEntryItem();
                 item.setReturnId(saved.getReturnId());
                 item.setItemId(itemReq.getItemId());
-                item.setSourceIssueItemId(itemReq.getSourceIssueItemId());
+                item.setAllocationId(itemReq.getAllocationId());
+                item.setEntryItemId(itemReq.getEntryItemId());
                 item.setQuantity(itemReq.getQuantity());
                 item.setConditionNote(null);
                 item.setExchangeItem(true);
@@ -144,26 +164,39 @@ public class ReturnEntryService {
             }
         }
 
+        List<MultipartFile> files = new java.util.ArrayList<>();
+        // Gom từ List<files>
+        if (req.getFiles() != null) {
+            req.getFiles().stream().filter(f -> f != null && !f.isEmpty()).forEach(files::add);
+        }
+        // Gom từ file_0..file_4 (backward compatible)
+        java.util.stream.Stream.of(req.getFile_0(), req.getFile_1(), req.getFile_2(), req.getFile_3(), req.getFile_4())
+                .filter(f -> f != null && !f.isEmpty())
+                .forEach(files::add);
+
+        if (files.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Cần đính kèm ít nhất 1 ảnh chứng minh");
+        }
+
         ReturnEntryResponse created = create(request, staffId);
 
-        MultipartFile[] files = {
-                req.getFile_0(), req.getFile_1(), req.getFile_2(), req.getFile_3(), req.getFile_4()
-        };
-
+        // Lấy item đầu tiên (không phải exchange) để gắn tất cả ảnh vào
         ReturnEntry saved = findOrThrow(created.getReturnId());
-        List<ReturnEntryItem> savedItems = saved.getItems();
+        ReturnEntryItem firstItem = saved.getItems().stream()
+                .filter(i -> !i.isExchangeItem())
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                        "Không tìm thấy item để gắn ảnh"));
 
-        for (int i = 0; i < savedItems.size() && i < files.length; i++) {
-            MultipartFile file = files[i];
-            if (file != null && !file.isEmpty()) {
-                String url = imageUploadService.uploadImage(file, FOLDER_RETURN_ENTRY);
-                WarehouseAttachment attachment = new WarehouseAttachment();
-                attachment.setRefType(WarehouseAttachment.RefType.RETURN_ENTRY_ITEM);
-                attachment.setRefId(savedItems.get(i).getReturnItemId());
-                attachment.setFileUrl(url);
-                attachment.setUploadedBy(staffId);
-                attachmentRepo.save(attachment);
-            }
+        for (MultipartFile file : files) {
+            String url = imageUploadService.uploadImage(file, FOLDER_RETURN_ENTRY);
+            WarehouseAttachment attachment = new WarehouseAttachment();
+            attachment.setRefType(WarehouseAttachment.RefType.RETURN_ENTRY_ITEM);
+            attachment.setRefId(firstItem.getReturnItemId());
+            attachment.setFileUrl(url);
+            attachment.setUploadedBy(staffId);
+            attachmentRepo.save(attachment);
         }
 
         return toResponse(findOrThrow(created.getReturnId()));
@@ -248,13 +281,17 @@ public class ReturnEntryService {
             entry.getItems().clear();
             if (request.getItems() != null) {
                 for (ReturnEntryItemRequest itemReq : request.getItems()) {
-                    validateSourceIssueItem(entry.getSourceIssueId(), itemReq);
-                    validateDuplicateSourceIssueItemOnUpdate(itemReq.getSourceIssueItemId(), returnId);
+                    validateAllocation(entry.getSourceIssueId(), itemReq);
+                    resolveIssueItemAndEntryFromAllocation(itemReq);
+                    validateEntryItem(entry.getWarehouseId(), itemReq);
+                    validateDuplicateAllocationOnUpdate(itemReq.getAllocationId(), returnId);
 
                     ReturnEntryItem item = new ReturnEntryItem();
                     item.setReturnId(returnId);
                     item.setItemId(itemReq.getItemId());
+                    item.setAllocationId(itemReq.getAllocationId());
                     item.setSourceIssueItemId(itemReq.getSourceIssueItemId());
+                    item.setEntryItemId(itemReq.getEntryItemId());
                     item.setQuantity(itemReq.getQuantity());
                     item.setConditionNote(itemReq.getConditionNote());
                     item.setExchangeItem(false);
@@ -263,10 +300,12 @@ public class ReturnEntryService {
             }
             if (request.getExchangeItems() != null) {
                 for (ReturnEntryItemRequest itemReq : request.getExchangeItems()) {
+                    validateEntryItem(entry.getWarehouseId(), itemReq);
                     ReturnEntryItem item = new ReturnEntryItem();
                     item.setReturnId(returnId);
                     item.setItemId(itemReq.getItemId());
-                    item.setSourceIssueItemId(itemReq.getSourceIssueItemId());
+                    item.setAllocationId(itemReq.getAllocationId());
+                    item.setEntryItemId(itemReq.getEntryItemId());
                     item.setQuantity(itemReq.getQuantity());
                     item.setConditionNote(null);
                     item.setExchangeItem(true);
@@ -274,6 +313,27 @@ public class ReturnEntryService {
                 }
             }
         }
+        return toResponse(returnEntryRepo.save(entry));
+    }
+
+    /**
+     * Hủy phiếu hoàn khi chưa confirm (SUBMITTED).
+     * Phiếu hoàn chưa confirm chưa tác động gì đến inventory nên chỉ cần đổi status.
+     */
+    @Transactional
+    public ReturnEntryResponse cancel(Integer returnId, Integer staffId) {
+        ReturnEntry entry = findOrThrow(returnId);
+
+        if (entry.getStatus() == ReturnEntryStatus.CONFIRMED) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Không thể hủy phiếu hoàn đã được xác nhận");
+        }
+
+        if (entry.getStatus() == ReturnEntryStatus.CANCELLED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Phiếu hoàn đã bị hủy");
+        }
+
+        entry.setStatus(ReturnEntryStatus.CANCELLED);
         return toResponse(returnEntryRepo.save(entry));
     }
 
@@ -314,8 +374,17 @@ public class ReturnEntryService {
 
             inv.setQuantity(newQty);
             inventoryRepo.save(inv);
-            saveTransaction(entry.getWarehouseId(), item.getItemId(), txType,
+            saveTransaction(entry.getWarehouseId(), item.getItemId(), item.getEntryItemId(), txType,
                     item.getQuantity(), newQty, returnId, staffId);
+
+            if (item.getEntryItemId() != null) {
+                stockEntryRepo.increaseRemainingQuantity(item.getEntryItemId(), item.getQuantity());
+            }
+
+            if (item.getAllocationId() != null) {
+                Integer savedEstimateItemId = estimateInternalApi.releaseEstimate(item.getAllocationId(), item.getQuantity(), staffId);
+                releaseAllocation(item.getAllocationId(), item.getQuantity(), staffId,savedEstimateItemId);
+            }
         }
 
         if (type == ReturnType.EXCHANGE) {
@@ -324,8 +393,11 @@ public class ReturnEntryService {
                 int newQty = Math.max(0, inv.getQuantity() - item.getQuantity());
                 inv.setQuantity(newQty);
                 inventoryRepo.save(inv);
-                saveTransaction(entry.getWarehouseId(), item.getItemId(),
+                saveTransaction(entry.getWarehouseId(), item.getItemId(), item.getEntryItemId(),
                         InventoryTransactionType.OUT, item.getQuantity(), newQty, returnId, staffId);
+                if (item.getEntryItemId() != null) {
+                    stockEntryRepo.increaseRemainingQuantity(item.getEntryItemId(), item.getQuantity());
+                }
             }
         }
 
@@ -348,12 +420,13 @@ public class ReturnEntryService {
                         .build());
     }
 
-    private void saveTransaction(Integer warehouseId, Integer itemId,
+    private void saveTransaction(Integer warehouseId, Integer itemId, Integer entryItemId,
                                  InventoryTransactionType type, int qty, int balance,
                                  Integer returnId, Integer staffId) {
         InventoryTransaction tx = new InventoryTransaction();
         tx.setWarehouseId(warehouseId);
         tx.setItemId(itemId);
+        tx.setEntryItemId(entryItemId);
         tx.setTransactionType(type);
         tx.setQuantity(qty);
         tx.setBalanceAfter(balance);
@@ -362,6 +435,54 @@ public class ReturnEntryService {
         tx.setCreatedById(staffId);
         tx.setCreatedAt(Instant.now());
         transactionRepo.save(tx);
+    }
+
+    private void releaseAllocation(Integer allocationId, Integer returnQuantity, Integer staffId, Integer savedEstimateItemId) {
+        StockAllocation allocation = stockAllocationRepo.findById(allocationId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Không tìm thấy allocation id=" + allocationId));
+
+        if (allocation.getStatus() != AllocationStatus.COMMITTED) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Chỉ được hoàn khi allocation đã COMMITTED");
+        }
+
+        if (allocation.getQuantity() == null || allocation.getQuantity() < returnQuantity) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Số lượng hoàn vượt quá allocation đã chọn");
+        }
+
+        if (allocation.getQuantity().equals(returnQuantity)) {
+            allocation.setIssueId(null);
+            allocation.setStatus(AllocationStatus.RELEASED);
+            stockAllocationRepo.save(allocation);
+            return;
+        }
+
+        allocation.setQuantity(allocation.getQuantity() - returnQuantity);
+        stockAllocationRepo.save(allocation);
+
+        StockAllocation released = new StockAllocation();
+        released.setServiceTicketId(allocation.getServiceTicketId());
+
+        released.setEstimateItemId(savedEstimateItemId);
+        Integer estimateId = allocation.getEstimateId();
+        if (estimateId == null && allocation.getEstimateItemId() != null) {
+            EstimateItem estimateItem = estimateItemRepository.findByEstimateItemId(allocation.getEstimateItemId());
+            if (estimateItem != null) {
+                estimateId = estimateItem.getEstimateId();
+            }
+        }
+        released.setEstimateId(estimateId);
+        released.setWarehouseId(allocation.getWarehouseId());
+        released.setItemId(allocation.getItemId());
+        released.setIssueId(allocation.getIssueId());
+        released.setQuantity(returnQuantity);
+
+        released.setStatus(AllocationStatus.RELEASED);
+        released.setCreatedBy(allocation.getCreatedBy() != null ? allocation.getCreatedBy() : staffId);
+        StockAllocation stockAllocation = stockAllocationRepo.save(released);
+        System.out.println("DEBUG: "+stockAllocation.getEstimateItemId());
     }
 
     private ReturnEntry findOrThrow(Integer returnId) {
@@ -429,43 +550,195 @@ public class ReturnEntryService {
             ReturnEntryItemResponse ir = new ReturnEntryItemResponse();
             ir.setReturnItemId(i.getReturnItemId());
             ir.setItemId(i.getItemId());
+            ir.setAllocationId(i.getAllocationId());
             ir.setSourceIssueItemId(i.getSourceIssueItemId());
+            ir.setEntryItemId(i.getEntryItemId());
             ir.setItemName(itemNameById.get(i.getItemId()));
             ir.setQuantity(i.getQuantity());
             ir.setConditionNote(i.getConditionNote());
+            ir.setAttachmentUrls(
+                    attachmentRepo.findByRefTypeAndRefId(
+                                    WarehouseAttachment.RefType.RETURN_ENTRY_ITEM,
+                                    i.getReturnItemId())
+                            .stream()
+                            .map(WarehouseAttachment::getFileUrl)
+                            .collect(Collectors.toList())
+            );
             return ir;
         }).collect(Collectors.toList()));
 
         return r;
     }
 
-    private void validateSourceIssueItem(Integer sourceIssueId, ReturnEntryItemRequest itemReq) {
-        if (sourceIssueId == null && itemReq.getSourceIssueItemId() == null) {
+    private void validateAllocation(Integer sourceIssueId, ReturnEntryItemRequest itemReq) {
+        if (sourceIssueId == null && itemReq.getAllocationId() == null) {
             return;
         }
 
         if (sourceIssueId == null) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
-                    "sourceIssueId là bắt buộc khi truyền sourceIssueItemId");
+                    "sourceIssueId là bắt buộc khi truyền allocationId");
         }
 
-        if (itemReq.getSourceIssueItemId() == null) {
+        if (itemReq.getAllocationId() == null) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
-                    "sourceIssueItemId là bắt buộc khi có sourceIssueId");
+                    "allocationId là bắt buộc khi có sourceIssueId");
         }
 
         StockIssue sourceIssue = stockIssueRepo.findById(sourceIssueId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
                         "Không tìm thấy phiếu xuất nguồn id=" + sourceIssueId));
 
-        boolean matched = sourceIssue.getItems().stream().anyMatch(issueItem ->
-                issueItem.getIssueItemId() != null
-                        && issueItem.getIssueItemId().equals(itemReq.getSourceIssueItemId())
-                        && issueItem.getItemId().equals(itemReq.getItemId()));
+        StockAllocation allocation = stockAllocationRepo.findById(itemReq.getAllocationId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Không tìm thấy allocation id=" + itemReq.getAllocationId()));
 
-        if (!matched) {
+        if (allocation.getIssueId() != null && !allocation.getIssueId().equals(sourceIssueId)) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
-                    "sourceIssueItemId không khớp với phiếu xuất nguồn hoặc itemId");
+                    "allocationId không thuộc phiếu xuất nguồn đã chọn");
+        }
+
+        if (allocation.getItemId() == null || !allocation.getItemId().equals(itemReq.getItemId())) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "allocationId không khớp với itemId");
+        }
+
+        if (allocation.getStatus() != AllocationStatus.COMMITTED) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "allocationId phải ở trạng thái COMMITTED");
+        }
+
+        // Kiểm tra tổng quantity đã hoàn (active) không vượt quá tổng quantity gốc của allocation
+        // Khi hoàn một phần, allocation bị tách: qty giảm xuống, tạo allocation mới RELEASED.
+        // Tổng gốc = qty hiện tại + tổng đã hoàn active trước đó.
+        int alreadyReturned = returnEntryRepo.sumActiveReturnedQuantityByAllocationId(itemReq.getAllocationId());
+        int requestedQty = itemReq.getQuantity() != null ? itemReq.getQuantity() : 0;
+        int originalQty = allocation.getQuantity() + alreadyReturned; // tổng qty gốc
+        if (alreadyReturned + requestedQty > originalQty) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Tổng số lượng hoàn (" + (alreadyReturned + requestedQty) + ") vượt quá tổng allocation ("
+                            + originalQty + ")");
+        }
+
+    }
+
+    private void validateEntryItem(Integer warehouseId, ReturnEntryItemRequest itemReq) {
+        if (itemReq.getEntryItemId() == null) {
+            return;
+        }
+
+        StockEntryItem lot = stockEntryRepo.findItemById(itemReq.getEntryItemId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Không tìm thấy lô nhập id=" + itemReq.getEntryItemId()));
+
+        if (lot.getItemId() == null || !lot.getItemId().equals(itemReq.getItemId())) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "entryItemId không khớp với itemId");
+        }
+
+        if (lot.getEntryId() == null) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Không xác định được phiếu nhập của lô đã chọn");
+        }
+
+        StockEntry entry = stockEntryRepo.findEntryById(lot.getEntryId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Không tìm thấy phiếu nhập của lô id=" + itemReq.getEntryItemId()));
+
+        if (entry.getWarehouseId() == null || !entry.getWarehouseId().equals(warehouseId)) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "entryItemId không thuộc kho đã chọn");
+        }
+    }
+
+    private void resolveIssueItemAndEntryFromAllocation(ReturnEntryItemRequest itemReq) {
+        if (itemReq.getAllocationId() == null) {
+            return;
+        }
+
+        StockAllocation allocation = stockAllocationRepo.findById(itemReq.getAllocationId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Không tìm thấy allocation id=" + itemReq.getAllocationId()));
+
+        // Ưu tiên issueId từ allocation; fallback sang sourceIssueId từ request (allocation cũ không có issueId)
+        Integer issueId = allocation.getIssueId();
+        if (issueId == null) {
+            issueId = itemReq.getSourceIssueId();
+        }
+
+        if (issueId == null) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Không xác định được phiếu xuất cho allocation=" + itemReq.getAllocationId()
+                            + ". Vui lòng truyền sourceIssueId");
+        }
+
+        List<StockIssueItem> issueItems = stockIssueItemRepo.findByIssueId(issueId);
+        StockIssueItem matchedIssueItem = null;
+
+        for (StockIssueItem issueItem : issueItems) {
+            if (issueItem.getItemId() == null || !issueItem.getItemId().equals(itemReq.getItemId())) {
+                continue;
+            }
+
+            if (itemReq.getEntryItemId() != null) {
+                if (issueItem.getEntryItemId() == null || !issueItem.getEntryItemId().equals(itemReq.getEntryItemId())) {
+                    continue;
+                }
+            }
+
+            if (matchedIssueItem != null) {
+                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                        "allocation này map tới nhiều issueItem/lô, vui lòng truyền entryItemId rõ ràng");
+            }
+            matchedIssueItem = issueItem;
+        }
+
+        if (matchedIssueItem == null) {
+            // Fallback: allocation cũ có thể không còn issue item (đã bị xóa/thay thế).
+            // Thử tìm bất kỳ issue item nào của itemId trong issueId đó.
+            matchedIssueItem = issueItems.stream()
+                    .filter(i -> itemReq.getItemId().equals(i.getItemId()))
+                    .findFirst()
+                    .orElse(null);
+        }
+
+        if (matchedIssueItem == null) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Không tìm thấy dòng xuất phù hợp từ allocation=" + itemReq.getAllocationId());
+        }
+
+        Integer resolvedIssueItemId = matchedIssueItem.getIssueItemId();
+        if (resolvedIssueItemId == null) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Không xác định được issueItemId từ allocation đã chọn");
+        }
+
+        Integer resolvedEntryItemId = matchedIssueItem.getEntryItemId();
+        if (resolvedEntryItemId == null) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Không xác định được entryItemId từ lô đã chọn");
+        }
+
+        itemReq.setSourceIssueItemId(resolvedIssueItemId);
+        itemReq.setEntryItemId(resolvedEntryItemId);
+    }
+
+    private void validateRequiredAttachments(List<ReturnEntryItemRequest> items, MultipartFile[] files) {
+        if (items == null || items.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "items không được rỗng");
+        }
+
+        if (items.size() > files.length) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Hiện chỉ hỗ trợ tối đa 5 ảnh (file_0..file_4) cho 5 dòng hàng trả");
+        }
+
+        for (int i = 0; i < items.size(); i++) {
+            MultipartFile file = files[i];
+            if (file == null || file.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                        "Thiếu ảnh chứng minh cho item index " + i + " (file_" + i + ")");
+            }
         }
     }
 
@@ -489,12 +762,11 @@ public class ReturnEntryService {
             return;
         }
 
-        if (returnEntryRepo.existsActiveBySourceIssueItemId(sourceIssueItemId)) {
+        if (returnEntryRepo.existsAnyBySourceIssueItemId(sourceIssueItemId)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Đã có phiếu hoàn đang xử lý cho dòng xuất này");
+                    "Dòng xuất này đã có phiếu hoàn, không thể tạo trùng");
         }
     }
-
 
     private void validateDuplicateSourceIssueItemOnUpdate(Integer sourceIssueItemId, Integer returnId) {
         if (sourceIssueItemId == null) {
@@ -505,5 +777,15 @@ public class ReturnEntryService {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Dòng xuất này đã có phiếu hoàn khác, không thể cập nhật trùng");
         }
+    }
+
+    private void validateDuplicateAllocationOnCreate(Integer allocationId) {
+        // Không block tạo nhiều phiếu hoàn cho cùng allocationId.
+        // Việc kiểm soát số lượng đã được xử lý trong validateAllocation().
+    }
+
+    private void validateDuplicateAllocationOnUpdate(Integer allocationId, Integer returnId) {
+        // Không block update nhiều phiếu hoàn cho cùng allocationId.
+        // Việc kiểm soát số lượng đã được xử lý trong validateAllocation().
     }
 }

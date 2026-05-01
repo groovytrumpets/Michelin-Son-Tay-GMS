@@ -10,8 +10,20 @@ public class ReturnEntryItemRequest {
     @NotNull
     private Integer itemId;
 
-    /** Dòng issue gốc tương ứng, dùng để trả đúng sản phẩm/lô đã xuất */
+    /** Dòng allocation tương ứng, dùng để trả đúng sản phẩm đang được báo giá/giữ hàng */
+    private Integer allocationId;
+
+    /**
+     * Phiếu xuất nguồn — bắt buộc khi allocation cũ không có issueId gắn sẵn.
+     * Thường FE đã có sourceIssueId từ màn hình chi tiết phiếu xuất.
+     */
+    private Integer sourceIssueId;
+
+    /** (Legacy) Dòng issue gốc tương ứng, không còn dùng cho màn hình mới */
     private Integer sourceIssueItemId;
+
+    /** Tùy chọn: chỉ định lô đích (entryItemId) nếu muốn ghi đích trả vào lô cụ thể */
+    private Integer entryItemId;
 
     @NotNull
     @Min(1)

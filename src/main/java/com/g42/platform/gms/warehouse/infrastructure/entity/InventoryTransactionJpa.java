@@ -29,6 +29,9 @@ public class InventoryTransactionJpa {
     @Column(name = "item_id", nullable = false)
     private Integer itemId;
 
+    @Column(name = "entry_item_id")
+    private Integer entryItemId;
+
     @NotNull
     @Lob
     @Enumerated(EnumType.STRING)

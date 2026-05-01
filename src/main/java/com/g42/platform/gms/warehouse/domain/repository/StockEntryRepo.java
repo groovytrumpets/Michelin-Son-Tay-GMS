@@ -44,6 +44,9 @@ public interface StockEntryRepo {
     /** Trừ remaining_quantity trực tiếp bằng UPDATE query — tránh Hibernate overwrite */
     int decreaseRemainingQuantity(Integer entryItemId, int qty);
 
+    /** Tăng remaining_quantity trực tiếp bằng UPDATE query (khi hoàn hàng vào lô) */
+    int increaseRemainingQuantity(Integer entryItemId, int qty);
+
     /** Giá fallback mới nhất của item trong kho — dùng cho StockEntryServiceImpl */
     BigDecimal findLatesFallBackPrice(Integer itemId, Integer warehouseId);
 
