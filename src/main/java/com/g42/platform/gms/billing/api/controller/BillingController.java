@@ -3,6 +3,7 @@ package com.g42.platform.gms.billing.api.controller;
 import com.g42.platform.gms.auth.entity.StaffPrincipal;
 import com.g42.platform.gms.billing.api.dto.BillEstimateDto;
 import com.g42.platform.gms.billing.api.dto.PaymentTransactionDto;
+import com.g42.platform.gms.billing.api.dto.ServiceBillCreateDto;
 import com.g42.platform.gms.billing.api.dto.ServiceBillDto;
 import com.g42.platform.gms.billing.app.service.BillingService;
 import com.g42.platform.gms.common.dto.ApiResponse;
@@ -18,7 +19,7 @@ public class BillingController {
     @Autowired
     private BillingService billingService;
     @PostMapping("/create")
-    public ResponseEntity<ApiResponse<ServiceBillDto>> createBilling(@RequestBody ServiceBillDto serviceBillDto) {
+    public ResponseEntity<ApiResponse<ServiceBillDto>> createBilling(@RequestBody ServiceBillCreateDto serviceBillDto) {
         ServiceBillDto promotion = billingService.createNewBilling(serviceBillDto);
         return ResponseEntity.ok(ApiResponses.success(promotion));
     }
