@@ -1,5 +1,6 @@
 package com.g42.platform.gms.warehouse.infrastructure.specification;
 
+import org.apache.commons.lang3.tuple.Pair;
 import com.g42.platform.gms.warehouse.api.dto.CatalogItemDto;
 import com.g42.platform.gms.warehouse.api.internal.WarehouseInternalApi;
 import com.g42.platform.gms.warehouse.app.service.inventory.InventoryService;
@@ -18,7 +19,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class WarehouseInternalApiImpl implements WarehouseInternalApi {
@@ -107,16 +110,19 @@ public class WarehouseInternalApiImpl implements WarehouseInternalApi {
     }
 
     @Override
-    public String getReturnStatusByAlloId(Integer allocationId) {
-        ReturnEntryItemJpa returnEntryItemJpa = returnEntryItemJpaRepo.findTopByAllocationId(allocationId);
-        if (returnEntryItemJpa == null) {
+    public Pair<Integer,String> getReturnStatusByAlloId(Integer allocationId) {
+        ReturnEntryItemJpa item = returnEntryItemJpaRepo.findTopByAllocationId(allocationId);
+        if (item == null || item.getReturnId() == null) {
             return null;
         }
-        ReturnEntryJpa returnEntryJpa = returnEntryJpaRepo.findById(returnEntryItemJpa.getReturnId()).orElse(null);
-        assert returnEntryJpa != null;
-        if (returnEntryJpa.getStatus() != null) {
-        return returnEntryJpa.getStatus().name();
+
+        ReturnEntryJpa returnEntry = returnEntryJpaRepo.findById(item.getReturnId()).orElse(null);
+
+        if (returnEntry != null && returnEntry.getStatus() != null) {
+            // Khởi tạo cặp dữ liệu ID và Status Name
+            return Pair.of(allocationId, returnEntry.getStatus().name());
         }
+
         return null;
     }
 }
