@@ -12,4 +12,6 @@ public interface ReturnEntryItemJpaRepo extends JpaRepository<ReturnEntryItemJpa
     ReturnEntryItemJpa findByAllocationId(Integer allocationId);
 
     ReturnEntryItemJpa findTopByAllocationId(Integer allocationId);
+
+    ReturnEntryItemJpa findTopByAllocationIdOrderByReturnItemIdDesc(Integer allocationId);
 }

@@ -111,7 +111,7 @@ public class WarehouseInternalApiImpl implements WarehouseInternalApi {
 
     @Override
     public Pair<Integer,String> getReturnStatusByAlloId(Integer allocationId) {
-        ReturnEntryItemJpa item = returnEntryItemJpaRepo.findTopByAllocationId(allocationId);
+        ReturnEntryItemJpa item = returnEntryItemJpaRepo.findTopByAllocationIdOrderByReturnItemIdDesc(allocationId);
         if (item == null || item.getReturnId() == null) {
             return null;
         }
@@ -120,7 +120,7 @@ public class WarehouseInternalApiImpl implements WarehouseInternalApi {
 
         if (returnEntry != null && returnEntry.getStatus() != null) {
             // Khởi tạo cặp dữ liệu ID và Status Name
-            return Pair.of(allocationId, returnEntry.getStatus().name());
+            return Pair.of(returnEntry.getReturnId(), returnEntry.getStatus().name());
         }
 
         return null;
