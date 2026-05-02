@@ -40,6 +40,7 @@ public class StockAllocationService {
 
         Estimate newEstimate = estimateService.findById(estimateId);
         List<StockAllocation> stockAllocations = new ArrayList<>();
+        Map<Integer, Integer> itemAncestryMap = new HashMap<>();
         Integer currentRevIdToCheck = newEstimate.getRevisedFromId();
 
         // =========================================================================
@@ -50,6 +51,10 @@ public class StockAllocationService {
             while (currentRevIdToCheck !=null){
                 List<StockAllocation> oldAllocations2 = stockAllocationRepository.findByEstimateId(currentRevIdToCheck);
                 oldAllocations.addAll(oldAllocations2);
+                List<EstimateItem> oldItems = estimateItemRepository.findByEstimateId(currentRevIdToCheck);
+                for (EstimateItem oldItem : oldItems) {
+                    itemAncestryMap.put(oldItem.getId(),oldItem.getRevisedFromItemId());
+                }
                 Estimate prevEstimate = estimateService.findById(currentRevIdToCheck);
                 currentRevIdToCheck = prevEstimate.getRevisedFromId();
             }
@@ -66,12 +71,22 @@ public class StockAllocationService {
                     .map(StockAllocation::getEstimateItemId)
                     .collect(Collectors.toSet());
             List<EstimateItem> brandNewItems = newEstimateItems.stream()
-                    .filter(newItem -> newItem.getRevisedFromItemId() == null
-                            && newItem.getIsRemoved()==false)
+                    .filter(newItem -> newItem.getIsRemoved()==false)
                     .toList();
 
             for (EstimateItem newItem : brandNewItems) {
-                if (newItem.getRevisedFromItemId()==null || !existingItemIds.contains(newItem.getRevisedFromItemId())) {
+                boolean hasAllocationInChain = false;
+                Integer ancestorId = newItem.getRevisedFromItemId();
+
+                while (ancestorId!=null){
+                    if (existingItemIds.contains(ancestorId)){
+                        hasAllocationInChain = true;
+                        break;
+                    }
+                    ancestorId = itemAncestryMap.get(ancestorId);
+                }
+
+                if (!hasAllocationInChain) {
                 System.out.println("Đây là món đồ mới tinh: " + newItem.getItemName());
                 StockAllocation stockAllocation = new StockAllocation();
                 stockAllocation.setServiceTicketId(newEstimate.getServiceTicketId());
@@ -135,6 +150,9 @@ public class StockAllocationService {
                         StockAllocation::getAllocationId,
                         allocation -> allocation
                 ));
+        if (oldMap.isEmpty()){
+            return createStockAllocation(estimateId, staffId);
+        }
         //handle add new and update:
         for (StockAllocationDto dto : stockAllocationDtos) {
             System.out.println("DEBUG allo:"+dto.getAllocationId()+", "+dto.getStatus());
