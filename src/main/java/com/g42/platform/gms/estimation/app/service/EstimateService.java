@@ -1,5 +1,6 @@
 package com.g42.platform.gms.estimation.app.service;
 
+import org.apache.commons.lang3.tuple.Pair;
 import com.g42.platform.gms.common.enums.EstimateEnum;
 import com.g42.platform.gms.estimation.api.dto.*;
 import com.g42.platform.gms.estimation.api.dto.request.EstimateItemReqDto;
@@ -141,9 +142,15 @@ public class EstimateService {
                 if (item.getId() != null) {
                     StockAllocation allocation = allocationMap.get(item.getId());
                     if (allocation != null) {
-                        String returnStatus = warehouseInternalApi.getReturnStatusByAlloId(allocation.getAllocationId());
+                        Pair<Integer, String> returnPair = warehouseInternalApi.getReturnStatusByAlloId(allocation.getAllocationId());
+
                         StockAllocationDto allocationDto = stockAllocationDtoMapper.toDto(allocation);
-                        allocationDto.setReturnStatus(returnStatus);
+                        if (returnPair!=null){
+
+                        allocationDto.setReturnStatus(returnPair.getRight());
+                        allocationDto.setReturnId(returnPair.getLeft());
+                        }
+
                         itemDto.setStockAllocation(allocationDto);
                     }
                 }

@@ -1,5 +1,6 @@
 package com.g42.platform.gms.warehouse.api.internal;
 
+import org.apache.commons.lang3.tuple.Pair;
 import com.g42.platform.gms.marketing.service_catalog.domain.entity.Service;
 import com.g42.platform.gms.warehouse.api.dto.CatalogItemDto;
 import com.g42.platform.gms.warehouse.domain.entity.CatalogItem;
@@ -8,6 +9,7 @@ import com.g42.platform.gms.warehouse.domain.entity.Warehouse;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 public interface WarehouseInternalApi {
     CatalogItemDto getItemInfo(Integer itemId);
@@ -28,5 +30,5 @@ public interface WarehouseInternalApi {
 
     BigDecimal findItemPricing(Integer itemId, Integer integer, BigDecimal price);
 
-    String getReturnStatusByAlloId(Integer allocationId);
+    Pair<Integer,String> getReturnStatusByAlloId(Integer allocationId);
 }
