@@ -55,6 +55,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -104,20 +105,12 @@ public class ReturnEntryService {
 
         for (ReturnEntryItemRequest itemReq : request.getItems()) {
             validateAllocation(request.getSourceIssueId(), itemReq);
-            resolveIssueItemAndEntryFromAllocation(itemReq);
-            validateEntryItem(request.getWarehouseId(), itemReq);
             validateDuplicateAllocationOnCreate(itemReq.getAllocationId());
 
-            ReturnEntryItem item = new ReturnEntryItem();
-            item.setReturnId(saved.getReturnId());
-            item.setItemId(itemReq.getItemId());
-            item.setAllocationId(itemReq.getAllocationId());
-            item.setSourceIssueItemId(itemReq.getSourceIssueItemId());
-            item.setEntryItemId(itemReq.getEntryItemId());
-            item.setQuantity(itemReq.getQuantity());
-            item.setConditionNote(itemReq.getConditionNote());
-            item.setExchangeItem(false);
-            saved.getItems().add(item);
+            // Tự động tách thành nhiều dòng theo lô nếu cần
+            List<ReturnEntryItem> expandedItems = expandReturnItemsByLot(
+                    itemReq, saved.getReturnId(), request.getSourceIssueId());
+            saved.getItems().addAll(expandedItems);
         }
 
         if (request.getExchangeItems() != null) {
@@ -486,6 +479,94 @@ public class ReturnEntryService {
         System.out.println("DEBUG: "+stockAllocation.getEstimateItemId());
     }
 
+    private List<ReturnEntryItem> expandReturnItemsByLot(
+            ReturnEntryItemRequest itemReq, Integer returnId, Integer sourceIssueId) {
+
+        List<ReturnEntryItem> result = new ArrayList<>();
+
+        if (itemReq.getAllocationId() == null) {
+            ReturnEntryItem item = new ReturnEntryItem();
+            item.setReturnId(returnId);
+            item.setItemId(itemReq.getItemId());
+            item.setQuantity(itemReq.getQuantity());
+            item.setConditionNote(itemReq.getConditionNote());
+            item.setExchangeItem(false);
+            result.add(item);
+            return result;
+        }
+
+        StockAllocation allocation = stockAllocationRepo.findById(itemReq.getAllocationId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Không tìm thấy allocation id=" + itemReq.getAllocationId()));
+
+        Integer issueId = allocation.getIssueId();
+        if (issueId == null) {
+            issueId = sourceIssueId;
+        }
+        if (issueId == null) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Không xác định được phiếu xuất cho allocation=" + itemReq.getAllocationId());
+        }
+
+        // Lấy tất cả issue items cùng itemId có entryItemId hợp lệ
+        List<StockIssueItem> issueItems = new ArrayList<>();
+        for (StockIssueItem si : stockIssueItemRepo.findByIssueId(issueId)) {
+            if (itemReq.getItemId().equals(si.getItemId())
+                    && si.getEntryItemId() != null && si.getEntryItemId() > 0) {
+                issueItems.add(si);
+            }
+        }
+
+        if (issueItems.isEmpty()) {
+            ReturnEntryItem item = new ReturnEntryItem();
+            item.setReturnId(returnId);
+            item.setItemId(itemReq.getItemId());
+            item.setAllocationId(itemReq.getAllocationId());
+            item.setQuantity(itemReq.getQuantity());
+            item.setConditionNote(itemReq.getConditionNote());
+            item.setExchangeItem(false);
+            result.add(item);
+            return result;
+        }
+
+        // Phân bổ quantity theo thứ tự lô (FIFO)
+        int remaining = itemReq.getQuantity() != null ? itemReq.getQuantity() : 0;
+
+        for (StockIssueItem si : issueItems) {
+            if (remaining <= 0) break;
+            int lotQty = si.getQuantity() != null ? si.getQuantity() : 0;
+            int consume = Math.min(remaining, lotQty);
+            if (consume <= 0) continue;
+
+            ReturnEntryItem item = new ReturnEntryItem();
+            item.setReturnId(returnId);
+            item.setItemId(itemReq.getItemId());
+            item.setAllocationId(itemReq.getAllocationId());
+            item.setSourceIssueItemId(si.getIssueItemId());
+            item.setEntryItemId(si.getEntryItemId());
+            item.setQuantity(consume);
+            item.setConditionNote(itemReq.getConditionNote());
+            item.setExchangeItem(false);
+            result.add(item);
+
+            remaining -= consume;
+        }
+
+        // Nếu còn dư (quantity > tổng lô) → thêm dòng không có lô
+        if (remaining > 0) {
+            ReturnEntryItem item = new ReturnEntryItem();
+            item.setReturnId(returnId);
+            item.setItemId(itemReq.getItemId());
+            item.setAllocationId(itemReq.getAllocationId());
+            item.setQuantity(remaining);
+            item.setConditionNote(itemReq.getConditionNote());
+            item.setExchangeItem(false);
+            result.add(item);
+        }
+
+        return result;
+    }
+
     private ReturnEntry findOrThrow(Integer returnId) {
         return returnEntryRepo.findById(returnId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
@@ -712,24 +793,24 @@ public class ReturnEntryService {
         }
 
         List<StockIssueItem> issueItems = stockIssueItemRepo.findByIssueId(issueId);
+        List<StockIssueItem> candidates = issueItems.stream()
+                .filter(i -> i.getItemId() != null && i.getItemId().equals(itemReq.getItemId()))
+                .filter(i -> itemReq.getEntryItemId() == null
+                        || (i.getEntryItemId() != null && i.getEntryItemId().equals(itemReq.getEntryItemId())))
+                .collect(java.util.stream.Collectors.toList());
+
         StockIssueItem matchedIssueItem = null;
 
-        for (StockIssueItem issueItem : issueItems) {
-            if (issueItem.getItemId() == null || !issueItem.getItemId().equals(itemReq.getItemId())) {
-                continue;
-            }
-
-            if (itemReq.getEntryItemId() != null) {
-                if (issueItem.getEntryItemId() == null || !issueItem.getEntryItemId().equals(itemReq.getEntryItemId())) {
-                    continue;
-                }
-            }
-
-            if (matchedIssueItem != null) {
-                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
-                        "allocation này map tới nhiều issueItem/lô, vui lòng truyền entryItemId rõ ràng");
-            }
-            matchedIssueItem = issueItem;
+        if (candidates.size() == 1) {
+            matchedIssueItem = candidates.get(0);
+        } else if (candidates.size() > 1) {
+            // Nhiều dòng cùng itemId: ưu tiên dòng có entryItemId hợp lệ (> 0)
+            // Mỗi dòng đại diện cho 1 lô — lấy dòng đầu tiên có lô hợp lệ
+            // entryItemId sẽ được set từ issue item, không cần FE truyền
+            matchedIssueItem = candidates.stream()
+                    .filter(i -> i.getEntryItemId() != null && i.getEntryItemId() > 0)
+                    .findFirst()
+                    .orElse(candidates.get(0));
         }
 
         if (matchedIssueItem == null) {
