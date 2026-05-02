@@ -32,10 +32,10 @@ public class StockAllocationService {
 
     @Transactional
     public List<StockAllocationDto> createStockAllocation(Integer estimateId, Integer staffId) {
-        List<StockAllocation> oldStockAllocations = stockAllocationRepository.findByEstimateId(estimateId);
-        if (oldStockAllocations!=null) {
+        List<StockAllocation> existingAllocations = stockAllocationRepository.findByEstimateId(estimateId);
+        if (existingAllocations!=null && !existingAllocations.isEmpty()) {
             System.err.println("Estimate ID " + estimateId + " đã có allocation, bỏ qua tạo mới.");
-            return oldStockAllocations.stream().map(stockAllocationDtoMapper::toDto).toList();
+            return existingAllocations.stream().map(stockAllocationDtoMapper::toDto).toList();
         }
 
         Estimate newEstimate = estimateService.findById(estimateId);
