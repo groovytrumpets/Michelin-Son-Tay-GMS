@@ -2,6 +2,7 @@ package com.g42.platform.gms.billing.api.mapper;
 
 import com.g42.platform.gms.billing.api.dto.BillEstimateDto;
 import com.g42.platform.gms.billing.api.dto.PaymentTransactionDto;
+import com.g42.platform.gms.billing.api.dto.ServiceBillCreateDto;
 import com.g42.platform.gms.billing.api.dto.ServiceBillDto;
 import com.g42.platform.gms.billing.domain.entity.PaymentTransaction;
 import com.g42.platform.gms.billing.domain.entity.ServiceBill;
@@ -15,4 +16,6 @@ public interface ServiceBillDtoMapper {
     PaymentTransaction mapPaymentToEntity(PaymentTransactionDto paymentTransactionDto);
 
     BillEstimateDto toBillEstimateDto(ServiceBill serviceBill);
+
+    ServiceBill mapToCreateEntity(ServiceBillCreateDto serviceBillDto);
 }

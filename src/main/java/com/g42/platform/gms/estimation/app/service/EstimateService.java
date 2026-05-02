@@ -111,6 +111,7 @@ public class EstimateService {
         // 6. Map dữ liệu sang DTO
         return estimateList.stream().map(estimate -> {
             EstimateRespondDto dto = estimateDtoMapper.toEstimateDto(estimate);
+            BigDecimal oldPrice = dto.getTotalPrice();
             List<EstimateItem> items = itemsByEstimateId.getOrDefault(estimate.getId(), List.of());
 
             BigDecimal totalTax = BigDecimal.ZERO;
@@ -172,6 +173,11 @@ public class EstimateService {
             dto.setTotalTaxAmount(totalTax);
             dto.setItems(itemDtos);
             dto.setPromotions(new ArrayList<>(prmotionIds));
+            if (!oldPrice.equals(dto.getTotalPrice())) {
+                Estimate newEstimate = estimateRepository.findEstimateById(dto.getEstimateId());
+                newEstimate.setTotalPrice(dto.getTotalPrice());
+                estimateRepository.save(newEstimate);
+            }
 
             return dto;
         }).toList();

@@ -3,6 +3,7 @@ package com.g42.platform.gms.billing.app.service;
 import com.g42.platform.gms.auth.api.internal.CustomerInternalApi;
 import com.g42.platform.gms.billing.api.dto.BillEstimateDto;
 import com.g42.platform.gms.billing.api.dto.PaymentTransactionDto;
+import com.g42.platform.gms.billing.api.dto.ServiceBillCreateDto;
 import com.g42.platform.gms.billing.api.dto.ServiceBillDto;
 import com.g42.platform.gms.billing.api.mapper.ServiceBillDtoMapper;
 import com.g42.platform.gms.billing.domain.entity.PaymentTransaction;
@@ -76,8 +77,8 @@ public class BillingService {
 
     //todo: get available promotion
     @Transactional
-    public ServiceBillDto createNewBilling(ServiceBillDto serviceBillDto) {
-        ServiceBill serviceBill = serviceBillDtoMapper.mapToEntity(serviceBillDto);
+    public ServiceBillDto createNewBilling(ServiceBillCreateDto serviceBillDto) {
+        ServiceBill serviceBill = serviceBillDtoMapper.mapToCreateEntity(serviceBillDto);
         //todo: check estimate match serviceTicket
         Estimate estimate = estimateRepository.findEstimateByServiceIdAndLatestVerson(serviceBillDto.getServiceTicketId());
         System.out.println("DEBUG: Estimate: " + estimate.getId());
@@ -86,23 +87,23 @@ public class BillingService {
         serviceBill.setSubTotal(estimate.getTotalPrice());
         serviceBill.setEstimateId(estimate.getId());
         //todo: check promotion available for billing
-        Promotion promotion = resolvePromotion(serviceBillDto);
-        if (promotion != null) {
-        System.out.println("DEBUG: Promotion: " + promotion.getPromotionId());
-            System.out.println("DEBUG: Promotion: " + promotion.getDiscountPercent());
-            BigDecimal baseAmount = estimate.getTotalPrice();
-            BigDecimal discountAmount = baseAmount
-                    .multiply(promotion.getDiscountPercent())
-                    .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-            serviceBill.setDiscountAmount(discountAmount);
-            System.out.println("DEBUG: Promotion: " + discountAmount);
-            promotionRepo.countUsed(promotion.getPromotionId());
-            serviceBill.setFinalAmount(estimate.getTotalPrice().subtract(discountAmount));
-        }else {
+//        Promotion promotion = resolvePromotion(serviceBillDto);
+//        if (promotion != null) {
+//        System.out.println("DEBUG: Promotion: " + promotion.getPromotionId());
+//            System.out.println("DEBUG: Promotion: " + promotion.getDiscountPercent());
+//            BigDecimal baseAmount = estimate.getTotalPrice();
+//            BigDecimal discountAmount = baseAmount
+//                    .multiply(promotion.getDiscountPercent())
+//                    .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+//            serviceBill.setDiscountAmount(discountAmount);
+//            System.out.println("DEBUG: Promotion: " + discountAmount);
+//            promotionRepo.countUsed(promotion.getPromotionId());
+//            serviceBill.setFinalAmount(estimate.getTotalPrice().subtract(discountAmount));
+//        }else {
             serviceBill.setDiscountAmount(BigDecimal.ZERO);
             serviceBill.setFinalAmount(estimate.getTotalPrice());
 //            throw new BillingException("Đơn hàng chưa đủ điều kiện áp dụng Promotion",BillingErrorCode.PROMOTION404);
-        }
+//        }
         //todo: change status of estimate and service ticket
         serviceTicket.setTicketStatus(TicketStatus.COMPLETED);
         serviceTicketRepository.save(serviceTicket);
@@ -137,10 +138,11 @@ public class BillingService {
     }
     @Transactional
     public PaymentTransactionDto createNewPayment(PaymentTransactionDto dto, Integer staffId) {
+        ServiceBill serviceBill = billingRepository.getBillingByBillingId(dto.getBillId());
         PaymentTransaction paymentTransactionDto = serviceBillDtoMapper.mapPaymentToEntity(dto);
         paymentTransactionDto.setPaidAt(Instant.now());
+        paymentTransactionDto.setAmount(serviceBill.getFinalAmount());
         PaymentTransaction paymentTransaction = paymentTransationRepo.createNewPayment(paymentTransactionDto);
-        ServiceBill serviceBill = billingRepository.getBillingByBillingId(dto.getBillId());
         ServiceTicketJpa serviceTicketJpa = serviceTicketRepository.findByServiceTicketId(serviceBill.getServiceTicketId());
         serviceTicketJpa.setTicketStatus(TicketStatus.PAID);
         serviceTicketJpa.setDeliveredAt(LocalDateTime.now());
