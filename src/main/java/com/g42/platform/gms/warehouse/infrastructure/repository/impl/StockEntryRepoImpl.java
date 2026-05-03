@@ -19,6 +19,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Repository adapter cho StockEntry / StockEntryItem.
+ *
+ * Luồng Issue dùng repo này chủ yếu ở 2 chỗ:
+ * - findFifoLots(): lấy các lô còn hàng theo thứ tự FIFO để tạo item draft / confirm
+ * - decreaseRemainingQuantity(): trừ remaining_quantity khi phiếu xuất được confirm
+ */
 @Repository
 @RequiredArgsConstructor
 public class StockEntryRepoImpl implements StockEntryRepo {
@@ -150,12 +157,14 @@ public class StockEntryRepoImpl implements StockEntryRepo {
 
     @Override
     public List<StockEntryItem> findFifoLots(Integer warehouseId, Integer itemId) {
+        // Repo JPA đã sắp xếp sẵn theo entryItemId ASC để đảm bảo FIFO.
         return itemJpaRepo.findFifoLots(warehouseId, itemId)
                 .stream().map(this::toDomainItem).toList();
     }
 
     @Override
     public Optional<StockEntryItem> findLatestLot(Integer warehouseId, Integer itemId) {
+        // Lấy lô mới nhất để tham khảo giá nhập gần nhất khi cần preview giá.
         return itemJpaRepo.findLatestLot(warehouseId, itemId)
                 .stream().findFirst().map(this::toDomainItem);
     }
@@ -172,6 +181,7 @@ public class StockEntryRepoImpl implements StockEntryRepo {
 
     @Override
     public int decreaseRemainingQuantity(Integer entryItemId, int qty) {
+        // Trừ trực tiếp bằng UPDATE query để tránh Hibernate ghi đè state cũ của entity.
         return itemJpaRepo.decreaseRemainingQuantity(entryItemId, qty);
     }
 
@@ -192,6 +202,7 @@ public class StockEntryRepoImpl implements StockEntryRepo {
 
     @Override
     public List<StockEntryItem> findActiveLotsByWarehouse(Integer warehouseId) {
+        // Dùng cho màn tổng quan / sync export: chỉ lấy các lô còn hàng và là PART.
         return itemJpaRepo.findActiveLotsByWarehouse(warehouseId)
                 .stream().map(this::toDomainItem).toList();
     }

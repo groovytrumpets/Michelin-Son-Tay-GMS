@@ -106,6 +106,14 @@ public class StockIssueService {
 
     @Transactional
     public StockIssueResponse create(CreateStockIssueRequest request, Integer staffId) {
+        // ======= CREATE: Tạo phiếu DRAFT =======
+        // 1. Nếu SERVICE_TICKET: lấy allocated reserves đã giữ chỗ để validate khả dụng
+        // 2. Validate tồn kho: available (qty - reserved) + allocated reserves >= requested
+        // 3. Tạo StockIssue với status DRAFT
+        // 4. Gắn allocations vào issue này (chỉ SERVICE_TICKET)
+        // 5. Lưu placeholder items (chưa chốt lô FIFO, chưa tính giá thực)
+        // Lưu ý: BỚC NÀY KHÔNG TRỪTỒN KHO, chỉ tạo placeholder
+        
         Map<Integer, Integer> reservedByItem = new HashMap<>();
         if (request.getIssueType() == IssueType.SERVICE_TICKET && request.getServiceTicketId() != null) {
             List<StockAllocation> reservedAllocations = stockAllocationRepo
@@ -292,8 +300,17 @@ public class StockIssueService {
         attachmentRepo.save(attachment);
     }
 
+    /**
+     * PATCH 1 ITEM trong phiếu DRAFT.
+     *
+     * REPOSITORY LAYER:
+     * 1. stockIssueRepo.findById(issueId) -> kiểm tra phiếu có tồn tại và đang DRAFT
+     * 2. stockIssueItemRepo.findById(issueItemId) -> lấy item cần sửa
+     * 3. stockIssueItemRepo.save(item) -> lưu quantity/discountRate mới
+     */
     @Transactional
     public StockIssueResponse patchItem(Integer issueId, Integer issueItemId, PatchIssueItemRequest request) {
+        // Bước 1: Lấy phiếu và validate trạng thái
         StockIssue issue = findOrThrow(issueId);
         if (issue.getStatus() != StockIssueStatus.DRAFT) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
@@ -305,15 +322,14 @@ public class StockIssueService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                     "Phiếu xuất từ Service Ticket không được điều chỉnh. Vui lòng yêu cầu tạo đơn mới từ cửa hàng");
         }
-        
-        StockIssueItem item = stockIssueItemRepo.findById(issueItemId)
-                .filter(i -> i.getIssueId().equals(issueId))
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "Không tìm thấy item id=" + issueItemId + " trong phiếu id=" + issueId));
+
+        // Bước 2: Lấy item cần sửa (bắt buộc thuộc đúng issue)
+        StockIssueItem item = findIssueItemOrThrow(issueId, issueItemId);
 
         if (request.getQuantity() != null) item.setQuantity(request.getQuantity());
         if (request.getDiscountRate() != null) item.setDiscountRate(request.getDiscountRate());
 
+        // Bước 3: Lưu item và trả response mới nhất
         stockIssueItemRepo.save(item);
         return toResponse(findOrThrow(issueId));
     }
@@ -326,16 +342,15 @@ public class StockIssueService {
      */
     @Transactional
     public StockIssueResponse removeItem(Integer issueId, Integer issueItemId, Integer staffId) {
+        // Bước 1: Chỉ thao tác được khi phiếu còn DRAFT
         StockIssue issue = findOrThrow(issueId);
         if (issue.getStatus() != StockIssueStatus.DRAFT) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                     "Chỉ có thể xóa item khi phiếu ở trạng thái DRAFT");
         }
 
-        StockIssueItem item = stockIssueItemRepo.findById(issueItemId)
-                .filter(i -> i.getIssueId().equals(issueId))
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "Không tìm thấy item id=" + issueItemId + " trong phiếu id=" + issueId));
+        // Bước 2: Lấy item cần xóa
+        StockIssueItem item = findIssueItemOrThrow(issueId, issueItemId);
 
         // Với phiếu SERVICE_TICKET: release allocation của item này
         if (issue.getIssueType() == IssueType.SERVICE_TICKET && issue.getServiceTicketId() != null) {
@@ -346,13 +361,7 @@ public class StockIssueService {
                     .toList();
 
             for (StockAllocation alloc : allocations) {
-                inventoryRepo.findByWarehouseAndItemWithLock(alloc.getWarehouseId(), alloc.getItemId())
-                        .ifPresent(inv -> {
-                            inv.setReservedQuantity(Math.max(0, inv.getReservedQuantity() - alloc.getQuantity()));
-                            inventoryRepo.save(inv);
-                        });
-                alloc.setStatus(AllocationStatus.RELEASED);
-                stockAllocationRepo.save(alloc);
+                releaseReservedAllocation(alloc, "stock_allocation_cancel_item", staffId);
             }
         }
 
@@ -369,8 +378,20 @@ public class StockIssueService {
         return toResponse(findOrThrow(issueId));
     }
 
+    /**
+     * UPDATE toàn bộ phiếu DRAFT (header + items).
+     *
+     * REPOSITORY LAYER:
+     * 1. stockIssueRepo.findById(issueId) -> validate phiếu
+     * 2. inventoryRepo.findByWarehouseAndItem(...) -> check đủ tồn trước khi update
+     * 3. stockIssueItemRepo.deleteByIssueId(issueId) -> xóa item cũ
+     * 4. stockEntryRepo.findFifoLots(...) + pricingRepo.findActiveByWarehouseAndItem(...)
+     *    -> tính item mới theo lot FIFO và giá
+     * 5. stockIssueItemRepo.saveAll(newItems) + stockIssueRepo.save(issue)
+     */
     @Transactional
     public StockIssueResponse update(Integer issueId, UpdateStockIssueRequest request) {
+        // Bước 1: Validate phiếu có thể sửa
         StockIssue issue = findOrThrow(issueId);
         if (issue.getStatus() != StockIssueStatus.DRAFT) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
@@ -382,10 +403,11 @@ public class StockIssueService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                     "Phiếu xuất từ Service Ticket không được điều chỉnh. Vui lòng yêu cầu tạo đơn mới từ cửa hàng");
         }
-        
+
         if (request.getIssueReason() != null) issue.setIssueReason(request.getIssueReason());
 
         if (request.getItems() != null) {
+            // Bước 2: Validate tồn kho khả dụng trước khi xóa item cũ
             // Validate inventory availability trước khi update
             for (CreateStockIssueRequest.IssueItemRequest item : request.getItems()) {
                 int available = inventoryRepo
@@ -398,8 +420,11 @@ public class StockIssueService {
                                     + " (yêu cầu=" + item.getQuantity() + ", khả dụng=" + available + ")");
                 }
             }
-            
+
+            // Bước 3: Xóa toàn bộ item cũ để build lại theo danh sách mới
             stockIssueItemRepo.deleteByIssueId(issueId);
+
+            // Bước 4: Build lại items theo FIFO lots + pricing rules
             List<StockIssueItem> newItems = new ArrayList<>();
             for (CreateStockIssueRequest.IssueItemRequest req : request.getItems()) {
                 Integer itemId = req.getItemId();
@@ -432,12 +457,25 @@ public class StockIssueService {
                             .importPrice(BigDecimal.ZERO).discountRate(discountRate).finalPrice(BigDecimal.ZERO).build());
                 }
             }
+
+            // Bước 5: Lưu toàn bộ item mới
             stockIssueItemRepo.saveAll(newItems);
         }
         stockIssueRepo.save(issue);
         return toResponse(findOrThrow(issueId));
     }
 
+    /**
+     * CONFIRM: Chốt phiếu xuất kho từ DRAFT -> CONFIRMED
+     * 
+     * Quy trình:
+     * 1. Bắt buộc có ảnh chứng từ
+     * 2. Chốt lô FIFO: tính giá bán, áp discount, WHOLESALE (-15%)
+     * 3. Trừ quantity trong inventory + log OUT transaction
+     * 4. Giảm remaining_quantity của từng lô nhập
+     * 5. Commit allocation: RESERVED -> COMMITTED (SERVICE_TICKET only)
+     * 6. Chuyển status -> CONFIRMED
+     */
     @Transactional
     public StockIssueResponse confirm(Integer issueId, Integer staffId) {
         StockIssue issue = findOrThrow(issueId);
@@ -548,6 +586,14 @@ public class StockIssueService {
         return toResponse(findOrThrow(issueId));
     }
 
+    /**
+     * CANCEL: Hủy phiếu xuất kho (chỉ khi còn ở DRAFT)
+     * 
+     * Quy trình:
+     * 1. Kiểm tra trạng thái: chỉ hủy được phiếu DRAFT
+     * 2. Nếu là SERVICE_TICKET: release allocation (RESERVED -> RELEASED, giảm reserved_quantity)
+     * 3. Chuyển status -> CANCELLED
+     */
     @Transactional
     public StockIssueResponse cancel(Integer issueId, Integer staffId) {
         StockIssue issue = findOrThrow(issueId);
@@ -565,19 +611,7 @@ public class StockIssueService {
                     .findByIssueIdAndStatus(issueId, AllocationStatus.RESERVED);
 
             for (StockAllocation allocation : allocations) {
-                Inventory inventory = inventoryRepo
-                        .findByWarehouseAndItemWithLock(allocation.getWarehouseId(), allocation.getItemId())
-                        .orElse(null);
-
-                if (inventory != null) {
-                    int updatedReserved = Math.max(0, inventory.getReservedQuantity() - allocation.getQuantity());
-                    inventory.setReservedQuantity(updatedReserved);
-                    inventoryRepo.save(inventory);
-                }
-
-
-                allocation.setStatus(AllocationStatus.RELEASED);
-                stockAllocationRepo.save(allocation);
+                releaseReservedAllocation(allocation, "stock_allocation_cancel_with_issue", staffId);
             }
         }
 
@@ -710,10 +744,77 @@ public class StockIssueService {
 
     // ── helpers ──────────────────────────────────────────────────────────────
 
+    /**
+     * DEBUG CHECKLIST NHANH CHO ISSUE
+     * 1. Issue có đúng status chưa? DRAFT / CONFIRMED / CANCELLED.
+     * 2. Có attachment chưa nếu đang confirm?
+     * 3. Item đã gắn đúng issueId chưa?
+     * 4. Allocation đang RESERVED hay COMMITTED?
+     * 5. Inventory reserved_quantity có khớp với allocation quantity không?
+     * 6. FIFO lot còn remaining_quantity không?
+     * 7. Transaction log đã ghi đúng refType chưa?
+     */
+
     private StockIssue findOrThrow(Integer issueId) {
         return stockIssueRepo.findById(issueId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Không tìm thấy phiếu xuất kho id=" + issueId));
+    }
+
+    private StockIssueItem findIssueItemOrThrow(Integer issueId, Integer issueItemId) {
+        return stockIssueItemRepo.findById(issueItemId)
+                .filter(i -> i.getIssueId().equals(issueId))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Không tìm thấy item id=" + issueItemId + " trong phiếu id=" + issueId));
+    }
+
+    private void releaseReservedAllocation(StockAllocation allocation, String refType, Integer staffId) {
+        Inventory inventory = inventoryRepo
+                .findByWarehouseAndItemWithLock(allocation.getWarehouseId(), allocation.getItemId())
+                .orElse(null);
+
+        if (inventory != null) {
+            int updatedReserved = Math.max(0, inventory.getReservedQuantity() - allocation.getQuantity());
+            inventory.setReservedQuantity(updatedReserved);
+            inventoryRepo.save(inventory);
+
+            logTransaction(
+                    allocation.getWarehouseId(),
+                    allocation.getItemId(),
+                    InventoryTransactionType.ADJUSTMENT,
+                    -allocation.getQuantity(),
+                    inventory.getQuantity(),
+                    refType,
+                    allocation.getAllocationId(),
+                    staffId
+            );
+        }
+
+        allocation.setStatus(AllocationStatus.RELEASED);
+        stockAllocationRepo.save(allocation);
+    }
+
+    private void logTransaction(
+            Integer warehouseId,
+            Integer itemId,
+            InventoryTransactionType type,
+            int qty,
+            int balanceAfter,
+            String refType,
+            Integer refId,
+            Integer staffId
+    ) {
+        InventoryTransaction tx = new InventoryTransaction();
+        tx.setWarehouseId(warehouseId);
+        tx.setItemId(itemId);
+        tx.setTransactionType(type);
+        tx.setQuantity(qty);
+        tx.setBalanceAfter(balanceAfter);
+        tx.setReferenceType(refType);
+        tx.setReferenceId(refId);
+        tx.setCreatedById(staffId);
+        tx.setCreatedAt(Instant.now());
+        transactionRepo.save(tx);
     }
 
     private String generateIssueCode() {

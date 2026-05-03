@@ -10,8 +10,14 @@ import java.util.List;
 
 public interface StockEntryItemJpaRepo extends JpaRepository<StockEntryItemJpa, Integer> {
 
+       /** Lấy toàn bộ item theo phiếu nhập. */
     List<StockEntryItemJpa> findByEntryId(Integer entryId);
 
+       /**
+        * FIFO lot selection.
+        * Chỉ lấy lô còn remainingQuantity > 0, phiếu nhập phải CONFIRMED,
+        * rồi sắp xếp theo entryItemId tăng dần để xuất lô cũ trước.
+        */
     @Query("SELECT sei FROM StockEntryItemJpa sei " +
            "JOIN StockEntryJpa se ON se.entryId = sei.entryId " +
            "WHERE se.warehouseId = :warehouseId " +
@@ -38,11 +44,12 @@ public interface StockEntryItemJpaRepo extends JpaRepository<StockEntryItemJpa, 
     @Query("UPDATE StockEntryItemJpa sei SET sei.remainingQuantity = sei.remainingQuantity - :qty WHERE sei.entryItemId = :id AND sei.remainingQuantity >= :qty")
     int decreaseRemainingQuantity(@Param("id") Integer entryItemId, @Param("qty") int qty);
 
-       @Modifying
-       @Query("UPDATE StockEntryItemJpa sei SET sei.remainingQuantity = sei.remainingQuantity + :qty WHERE sei.entryItemId = :id")
-       int increaseRemainingQuantity(@Param("id") Integer entryItemId, @Param("qty") int qty);
+        /** Tăng remainingQuantity khi hoàn hàng vào lô. */
+        @Modifying
+        @Query("UPDATE StockEntryItemJpa sei SET sei.remainingQuantity = sei.remainingQuantity + :qty WHERE sei.entryItemId = :id")
+        int increaseRemainingQuantity(@Param("id") Integer entryItemId, @Param("qty") int qty);
 
-    /** Tất cả lô còn hàng trong kho — dùng để kiểm tra tổng quan FIFO */
+        /** Tất cả lô còn hàng trong kho — dùng để kiểm tra tổng quan FIFO. */
     @Query("SELECT sei FROM StockEntryItemJpa sei " +
            "JOIN StockEntryJpa se ON se.entryId = sei.entryId " +
            "JOIN WarehouseCatalogItem ci ON ci.itemId = sei.itemId " +
