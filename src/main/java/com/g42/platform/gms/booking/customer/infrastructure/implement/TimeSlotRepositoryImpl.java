@@ -26,6 +26,12 @@ public class TimeSlotRepositoryImpl implements TimeSlotRepository {
     }
 
     @Override
+    public Optional<TimeSlot> findByStartTimeWithLock(LocalTime startTime) {
+        return jpaRepository.findByStartTimeWithLock(startTime)
+                .map(mapper::toDomain);
+    }
+
+    @Override
     public List<TimeSlot> findActiveOrderByStartTime() {
         return jpaRepository.findByIsActiveTrueOrderByStartTimeAsc()
                 .stream()
