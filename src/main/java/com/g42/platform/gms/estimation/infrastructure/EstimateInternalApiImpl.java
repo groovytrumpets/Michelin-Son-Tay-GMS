@@ -107,6 +107,8 @@ public class EstimateInternalApiImpl implements EstimateInternalApi {
             EstimateItemJpa saved = estimateItemRepositoryJpa.save(estimateItemJpa);
             return saved.getId();
         }
+        //todo: validate buy x get y
+        
         EstimateItemJpa returnEstimate = new EstimateItemJpa();
         BeanUtils.copyProperties(estimateItemJpa,returnEstimate,"id");
 
