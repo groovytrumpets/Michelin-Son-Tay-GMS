@@ -665,25 +665,25 @@ public class EstimateService {
 
     private void validatePromotion(Promotion promotion, Estimate estimate, List<EstimateItem> items) {
         if (promotion == null) {
-            throw new EstimateException("PROMOTION_404", EstimateErrorCode.PROMOTION_404);
+            throw new EstimateException("Mã giảm giá không khả dụng", EstimateErrorCode.PROMOTION_404);
         }
         if (promotion.getIsActive().equals(Boolean.FALSE)) {
-            throw new EstimateException("PROMOTION_INACTIVE", EstimateErrorCode.PROMOTION_404);
+            throw new EstimateException("Mã giảm giá không khả dụng", EstimateErrorCode.PROMOTION_404);
         }
         if (promotion.getEndDate().isBefore(LocalDate.now())){
-            throw new EstimateException("PROMOTION_EXPIRED", EstimateErrorCode.PROMOTION_404);
+            throw new EstimateException("Mã giảm giá hết hạn", EstimateErrorCode.PROMOTION_404);
         }
         if (promotion.getUsageLimit() != null && promotion.getUsedCount()>=promotion.getUsageLimit()){
-            throw new EstimateException("PROMOTION_USED_ALL", EstimateErrorCode.PROMOTION_404);
+            throw new EstimateException("Mã giảm giá đã dùng hết", EstimateErrorCode.PROMOTION_404);
         }
         if (promotion.getMinOrderValue() != null && promotion.getMinOrderValue().compareTo(estimate.getTotalPrice()) > 0){
-            throw new EstimateException("PROMOTION_MinOrderValue_Bigger", EstimateErrorCode.PROMOTION_404);
+            throw new EstimateException("Giá trị đơn hàng không đủ", EstimateErrorCode.PROMOTION_404);
         }
         if (promotion.getType().equals("PERCENT")&&promotion.getApplyTo().equals("SPECIFIC")){
             List<Integer> promotionItems = promotionInternalApi.findItemIdsByPromotionId(promotion);
             boolean hasMatchItems = items.stream().anyMatch(item -> promotionItems.contains(item.getItemId()));
             if (!hasMatchItems) {
-                throw new EstimateException("PROMOTION_NOT_MATCH_ITEMS", EstimateErrorCode.PROMOTION_404);
+                throw new EstimateException("Không tìm thấy sản phẩm đủ điều kiện giảm giá", EstimateErrorCode.PROMOTION_404);
             }
         }
         if (promotion.getType().equals("BUY_X_GET_Y")){
@@ -691,7 +691,7 @@ public class EstimateService {
                     estimateItem.getItemId().equals(promotion.getBuyItemId())
                             &&estimateItem.getQuantity().equals(promotion.getBuyQuantity()));
             if (!hasMatchItems) {
-                throw new EstimateException("PROMOTION_TRIGGER_ITEM_NOT_MET", EstimateErrorCode.PROMOTION_404);
+                throw new EstimateException("Sản phẩm không đủ điều kiện khuyến mãi", EstimateErrorCode.PROMOTION_404);
             }
         }
 
