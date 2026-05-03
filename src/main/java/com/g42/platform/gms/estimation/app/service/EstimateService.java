@@ -751,10 +751,6 @@ public class EstimateService {
                         .multiply(estimateItem.getAppliedTaxRate())
                         .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
                 estimateItem.setTaxAmount(tax);
-            estimateItem.setFinalPrice(estimateItem.getTotalPrice().add(tax));
-            }else {
-                estimateItem.setTaxAmount(BigDecimal.ZERO);
-                estimateItem.setFinalPrice(estimateItem.getTotalPrice());
             }
 
         });
