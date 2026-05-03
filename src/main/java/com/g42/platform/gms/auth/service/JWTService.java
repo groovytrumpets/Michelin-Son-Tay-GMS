@@ -65,7 +65,8 @@ public class JWTService {
 
     }
     public Long extractAuthId(String token) {
-        return extractClaim(token, claims -> claims.get("authId", Long.class));
+        String subject = extractClaim(token, Claims::getSubject);
+        return Long.valueOf(subject);
     }
 
     private boolean isTokenExpired(String token) {

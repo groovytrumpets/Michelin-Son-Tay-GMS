@@ -62,6 +62,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                             if (jwtService.validateToken(token)) {
                                 // QUAN TRỌNG: Lấy staffId ra (ví dụ: "1", "2")
                                 StaffAuth staffAuth = staffAuthRepo.searchByStaffAuthId(jwtService.extractAuthId(token));
+                                if (staffAuth!=null && staffAuth.getStaffProfile() != null) {
+
                                 String staffId = String.valueOf(staffAuth.getStaffProfile().getStaffId());
 
 
@@ -72,6 +74,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                                 // Principal userPrincipal = new UsernamePasswordAuthenticationToken(staffId, null, authorities);
 
                                 accessor.setUser(userPrincipal);
+                                }
                             }
                         }
                     }
