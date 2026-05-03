@@ -19,4 +19,6 @@ public interface EstimateItemRepositoryJpa extends JpaRepository<EstimateItemJpa
     EstimateItemJpa getEstimateItemJpaById(Integer id);
 
     EstimateItemJpa findByRevisedFromItemId(Integer revisedFromItemId);
+
+    List<EstimateItemJpa> findByEstimateIdAndTriggeredByItemId(Integer estimateId, Integer triggeredByItemId);
 }

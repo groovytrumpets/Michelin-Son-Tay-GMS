@@ -1,8 +1,11 @@
 package com.g42.platform.gms.estimation.api.internal;
 
 import com.g42.platform.gms.estimation.domain.entity.Estimate;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 
 import java.util.List;
+import java.util.Map;
 
 public interface EstimateInternalApi {
     List<Estimate> findAllByServiceTicketId(List<Integer> ticketIds);
@@ -16,4 +19,6 @@ public interface EstimateInternalApi {
     void updateBookingToRemindById(Integer reminderId, Integer bookingId);
 
     Integer releaseEstimate(Integer allocationId, Integer quantity, Integer staffId);
+//
+//    void validatePromotion(Map<Integer, Integer> returnAllocationMap);
 }
