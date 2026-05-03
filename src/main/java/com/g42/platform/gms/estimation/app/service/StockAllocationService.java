@@ -73,8 +73,10 @@ public class StockAllocationService {
             List<EstimateItem> brandNewItems = newEstimateItems.stream()
                     .filter(newItem -> newItem.getIsRemoved()==false)
                     .toList();
-
-            for (EstimateItem newItem : brandNewItems) {
+            List<EstimateItem> sortedItems = brandNewItems.stream()
+                    .sorted(Comparator.comparing(EstimateItem::getItemId))
+                    .toList();
+            for (EstimateItem newItem : sortedItems) {
                 boolean hasAllocationInChain = false;
                 Integer ancestorId = newItem.getRevisedFromItemId();
 
