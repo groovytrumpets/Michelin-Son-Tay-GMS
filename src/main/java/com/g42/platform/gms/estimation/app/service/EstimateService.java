@@ -597,7 +597,7 @@ public class EstimateService {
         giftItem.setTriggeredByItemId(triggerItem.getItemId());
         //todo: find FREE workCate if Catalog have no W
         if (catalogItem.getWorkCategoryId()==null||catalogItem.getWorkCategoryId()==0){
-            throw new EstimateException("CATALOG HAVE NO CATEGORY!", EstimateErrorCode.BAD_DATA);
+            throw new EstimateException("Danh mục không được tạo với phân loại phù hợp (workCategory_404)", EstimateErrorCode.BAD_DATA);
         }
         giftItem.setWorkCategoryId(catalogItem.getWorkCategoryId());
         //todo: check warehouse quantity available
