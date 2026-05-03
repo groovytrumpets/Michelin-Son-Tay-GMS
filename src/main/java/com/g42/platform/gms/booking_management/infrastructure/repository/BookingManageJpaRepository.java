@@ -23,17 +23,10 @@ public interface BookingManageJpaRepository extends JpaRepository<BookingJpa, In
 
     BookingJpa getBookingJpaByBookingCode(String bookingCode);
     @Query("""
-    SELECT b FROM BookingJpa b 
-    JOIN BookingSlotReservationJpa bs ON b.bookingId = bs.booking.bookingId 
-    WHERE bs.reservedDate = :date 
-      AND bs.startTime = :slot 
-      AND bs.startTime = (
-          SELECT MIN(bs2.startTime) 
-          FROM BookingSlotReservationJpa bs2 
-          WHERE bs2.booking.bookingId = b.bookingId 
-            AND bs2.reservedDate = :date
-      )
-""")
+    select b from BookingJpa b join BookingSlotReservationJpa bs on b.bookingId = bs.booking.bookingId where
+        bs.reservedDate=:date
+        and bs.startTime=:slot
+    """)
     List<BookingJpa> findAllBookingBySlotDate(LocalDate date, LocalTime slot);
     @Query("""
     select max(b.queueOrder)from BookingJpa b where b.scheduledDate=:scheduledDate and b.scheduledTime=:scheduledTime
