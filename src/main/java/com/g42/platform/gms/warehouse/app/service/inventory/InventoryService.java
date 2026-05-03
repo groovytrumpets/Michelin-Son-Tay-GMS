@@ -1,5 +1,7 @@
 package com.g42.platform.gms.warehouse.app.service.inventory;
 
+import com.g42.platform.gms.estimation.domain.exception.EstimateErrorCode;
+import com.g42.platform.gms.estimation.domain.exception.EstimateException;
 import com.g42.platform.gms.warehouse.api.dto.response.InventoryResponse;
 import com.g42.platform.gms.warehouse.app.service.dto.StockRequest;
 import com.g42.platform.gms.warehouse.app.service.dto.StockShortageInfo;
@@ -39,11 +41,25 @@ public class InventoryService {
     /** Tăng reserved_quantity — dùng khi tạo stock allocation */
     @Transactional
     public void increaseReservedQuantity(Integer itemId, Integer warehouseId, Integer quantity) {
-        inventoryRepo.findByWarehouseAndItemWithLock(warehouseId, itemId).ifPresent(inv -> {
-            int newReserved = (inv.getReservedQuantity() != null ? inv.getReservedQuantity() : 0) + quantity;
-            inv.setReservedQuantity(Math.max(0, newReserved));
-            inventoryRepo.save(inv);
-        });
+
+        Inventory inv = inventoryRepo.findByWarehouseAndItemWithLock(warehouseId, itemId)
+                .orElseThrow(() -> new EstimateException("Không tìm thấy thông tin tồn kho cho sản phẩm này!", EstimateErrorCode.BAD_REQUEST));
+        if (inv.getAvailableQuantity() < quantity) {
+            throw new EstimateException(
+                    "Sản phẩm không đủ tồn kho để giữ chỗ! Khả dụng: " + inv.getAvailableQuantity() + ", Yêu cầu: " + quantity,
+                    EstimateErrorCode.OUT_OF_STOCK
+            );
+        }
+        int newReserved = (inv.getReservedQuantity() != null ? inv.getReservedQuantity() : 0) + quantity;
+        inv.setReservedQuantity(newReserved);
+
+        inventoryRepo.save(inv);
+
+//        inventoryRepo.findByWarehouseAndItemWithLock(warehouseId, itemId).ifPresent(inv -> {
+//            int newReserved = (inv.getReservedQuantity() != null ? inv.getReservedQuantity() : 0) + quantity;
+//            inv.setReservedQuantity(Math.max(0, newReserved));
+//            inventoryRepo.save(inv);
+//        });
     }
 
     /** Giảm reserved_quantity — dùng khi release stock allocation */
