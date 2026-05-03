@@ -21,7 +21,7 @@ public class StaffNotifyRepoImpl implements StaffNotifyRepo {
     public StaffNotification save(StaffNotification staffNotification) {
         StaffNotificationJpa staffNotificationJpa = staffNotifyJpaMapper.toJpa(staffNotification);
         staffNotifyJpaRepo.save(staffNotificationJpa);
-        return staffNotification;
+        return staffNotifyJpaMapper.toDomain(staffNotificationJpa);
     }
 
     @Override
