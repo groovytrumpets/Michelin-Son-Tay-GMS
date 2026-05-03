@@ -153,36 +153,10 @@ public class StockAllocationService {
         if (oldMap.isEmpty()){
             return createStockAllocation(estimateId, staffId);
         }
-        Map<Integer,StockAllocation> activeMapByItemId = oldList.stream()
-                .filter(s -> s.getStatus().equals("RESERVED")||s.getStatus().equals("COMMITTED"))
-                .collect(Collectors.toMap(StockAllocation::getItemId,allocation -> allocation,
-                        (existing, replacement) -> existing));
         //handle add new and update:
         for (StockAllocationDto dto : stockAllocationDtos) {
             System.out.println("DEBUG allo:"+dto.getAllocationId()+", "+dto.getStatus());
         if (dto.getAllocationId()==null) {
-            //todo: check frontend duplicate
-            if (activeMapByItemId.containsKey(dto.getItemId())) {
-                System.err.println("CẢNH BÁO: Frontend gửi đúp item " + dto.getItemId() + " (do lỗi UI hiện lại nút Xác nhận). Tự động map về Allocation cũ.");
-                StockAllocation existingAlloc = activeMapByItemId.get(dto.getItemId());
-
-                // 1. Gỡ nó khỏi oldMap để vòng lặp cuối hàm KHÔNG XÓA NHẦM nó
-                oldMap.remove(existingAlloc.getAllocationId());
-
-                // 2. Xử lý Update Delta (nếu UI có thay đổi số lượng lúc bấm xác nhận lại)
-                if ("COMMITTED".equals(existingAlloc.getStatus())) {
-                    continue; // Đã chốt thì không cho sửa kho nữa
-                }
-
-                int difference = dto.getQuantity() - existingAlloc.getQuantity();
-                if (difference != 0) {
-                    existingAlloc.setQuantity(dto.getQuantity());
-                    stockAllocationRepository.save(existingAlloc);
-                    inventoryService.updateReservedQuantityByDelta(dto.getItemId(), dto.getWarehouseId(), difference);
-                }
-
-                continue; // Xử lý xong, BỎ QUA lệnh add new bên dưới
-            }
             //add new
             StockAllocation stockAllocationNew = stockAllocationDtoMapper.toDomain(dto);
             stockAllocationNew.setCreatedBy(staffId);
