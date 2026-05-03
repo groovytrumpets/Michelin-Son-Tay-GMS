@@ -64,6 +64,9 @@ public class JWTService {
         }
 
     }
+    public Long extractAuthId(String token) {
+        return extractClaim(token, claims -> claims.get("authId", Long.class));
+    }
 
     private boolean isTokenExpired(String token) {
         return extractExpiration(token).before(new Date());
