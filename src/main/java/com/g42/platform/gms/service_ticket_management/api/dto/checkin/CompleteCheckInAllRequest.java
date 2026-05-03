@@ -73,10 +73,10 @@ public class CompleteCheckInAllRequest {
 
     // Staff ID who performs check-in (receptionist/staff)
     // This will be used for both uploadedBy (photos) and recordedBy (odometer)
-    @NotNull(message = "Staff ID là bắt buộc")
+    @NotNull(message = "Không tìm thấy nhân viên")
     private Integer staffId;
 
     /** Advisor được phân công cho phiếu dịch vụ này (bắt buộc) */
-    @NotNull(message = "Advisor ID là bắt buộc")
+    @NotNull(message = "Bạn chưa chọn Tư vấn viên, vui lòng thử lại")
     private Integer advisorId;
 }
