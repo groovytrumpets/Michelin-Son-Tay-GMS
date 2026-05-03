@@ -4,6 +4,7 @@ import com.g42.platform.gms.dashboard.api.dto.NotificationCreateDto;
 import com.g42.platform.gms.dashboard.api.dto.NotificationRespondDto;
 import com.g42.platform.gms.dashboard.api.mapper.StaffNotifyDtoMapper;
 import com.g42.platform.gms.dashboard.domain.entity.StaffNotification;
+import com.g42.platform.gms.dashboard.domain.enums.NotificationType;
 import com.g42.platform.gms.dashboard.domain.repository.StaffNotifyRepo;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -38,6 +39,11 @@ public class StaffNotifyService {
 
         StaffNotification saved = staffNotifyRepo.save(staffNotification);
         sendNotification(saved);
+    }
+    @Transactional
+    public void createNotificationAssignAuto(Integer staffId, String title, String message, Integer sendBy,String url) {
+        NotificationCreateDto dto = new NotificationCreateDto(staffId,title,message, NotificationType.INFO,false,sendBy,url);
+        createAndSendManual(dto);
     }
 
     public List<NotificationRespondDto> getMyNotifications(Integer staffId) {

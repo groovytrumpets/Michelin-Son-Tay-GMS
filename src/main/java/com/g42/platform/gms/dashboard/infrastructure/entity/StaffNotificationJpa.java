@@ -2,6 +2,7 @@ package com.g42.platform.gms.dashboard.infrastructure.entity;
 
 import com.g42.platform.gms.dashboard.domain.enums.NotificationType;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -36,4 +37,7 @@ public class StaffNotificationJpa {
 
     @Column(name = "sent_at")
     private LocalDateTime sentAt;
+    @Size(max = 255)
+    @Column(name = "url")
+    private String url;
 }
