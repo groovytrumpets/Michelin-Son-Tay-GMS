@@ -1,5 +1,6 @@
 package com.g42.platform.gms.dashboard.config;
-
+import com.g42.platform.gms.auth.entity.StaffAuth;
+import com.g42.platform.gms.auth.repository.StaffAuthRepo;
 import com.g42.platform.gms.auth.service.JWTService;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,6 +28,9 @@ import java.util.List;
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Autowired
     private JWTService jwtService;
+    @Autowired
+    private StaffAuthRepo staffAuthRepo;
+
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
         registry.enableSimpleBroker("/topic","/queue");
@@ -57,7 +61,9 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                             // Giải mã token (Dùng logic hiện có của dự án)
                             if (jwtService.validateToken(token)) {
                                 // QUAN TRỌNG: Lấy staffId ra (ví dụ: "1", "2")
-                                String staffId = String.valueOf(jwtService.extractUserName(token));
+                                StaffAuth staffAuth = staffAuthRepo.searchByStaffAuthId(jwtService.extractAuthId(token));
+                                String staffId = String.valueOf(staffAuth.getStaffProfile().getStaffId());
+
 
                                 // Gán Principal có name CHÍNH LÀ staffId
                                 Principal userPrincipal = () -> staffId;
