@@ -325,9 +325,10 @@ public class EstimateService {
             item.setUnit(req.getUnit());
             item.setIsChecked(req.getIsChecked() != null ? req.getIsChecked() : false);
             item.setRevisedFromItemId(req.getRevisedFromItemId());
+            item.setTriggeredByItemId(req.getTriggeredByItemId());
 
             item.setIsGift(req.getIsGift() != null ? req.getIsGift() : false);
-
+//            System.out.println("DEBUG RESOLVING ITEM: "+req.getIsGift()+", Tiggerd by: "+req.getRevisedFromItemId());
             TaxRule taxRule = null;
             Integer ruleId = null;
             //todo: check item taxt
@@ -529,6 +530,11 @@ public class EstimateService {
         }
         Estimate estimate = estimateRepository.findEstimateById(estimateId);
         List<EstimateItem> items = estimateItemRepository.findByEstimateId(estimateId);
+        if (promotion.getUsedCount()==null){
+            System.err.println("USED COUNT NULL!");
+            promotion.setUsedCount(0);
+            promotionInternalApi.savePromotion(promotion);
+        }
         validatePromotion(promotion,estimate,items);
         //todo: update estimateItems and estimate
         if (promotion.getType().equals("PERCENT")){
@@ -587,6 +593,7 @@ public class EstimateService {
         giftItem.setIsGift(Boolean.TRUE);
         giftItem.setIsChecked(Boolean.TRUE);
         giftItem.setUnit(triggerItem.getUnit());
+        giftItem.setTriggeredByItemId(triggerItem.getItemId());
         //todo: find FREE workCate if Catalog have no W
         if (catalogItem.getWorkCategoryId()==null||catalogItem.getWorkCategoryId()==0){
             throw new EstimateException("CATALOG HAVE NO CATEGORY!", EstimateErrorCode.BAD_DATA);
