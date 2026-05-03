@@ -60,5 +60,6 @@ public class BookingJpa {
 //    private Vehicle vehicle;
     @Column(name = "estimate_time")
     private Integer estimateTime;
-
+    @Column(name = "estimate_id")
+    private Integer estimateId;
 }

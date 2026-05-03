@@ -1,5 +1,5 @@
 package com.g42.platform.gms.estimation.domain.exception;
 
 public enum EstimateErrorCode {
-    REMIND_404, PROMOTION_404, BAD_DATA, PROMOTION_OUT, BAD_REQUEST
+    REMIND_404, PROMOTION_404, BAD_DATA, PROMOTION_OUT, OUT_OF_STOCK, BAD_REQUEST
 }

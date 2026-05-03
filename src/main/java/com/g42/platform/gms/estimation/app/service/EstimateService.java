@@ -1,5 +1,6 @@
 package com.g42.platform.gms.estimation.app.service;
 
+import com.g42.platform.gms.booking_management.api.internal.BookingManageInternalApi;
 import org.apache.commons.lang3.tuple.Pair;
 import com.g42.platform.gms.common.enums.EstimateEnum;
 import com.g42.platform.gms.estimation.api.dto.*;
@@ -46,6 +47,7 @@ public class EstimateService {
     private final PromotionInternalApi promotionInternalApi;
     private final StockAllocationRepository stockAllocationRepository;
     private final StockAllocationDtoMapper stockAllocationDtoMapper;
+    private final BookingManageInternalApi bookingManageInternalApi;
 
 
     public List<EstimateRespondDto> getEstimateByCode(Integer serviceTicketId) {
@@ -753,5 +755,133 @@ public class EstimateService {
 
         });
         estimateItemRepository.saveAll(affectedItems);
+    }
+
+    public EstimateRespondDto getEstimateByBookingId(Integer bookingId) {
+        Integer estimateId = bookingManageInternalApi.findEstimateId(bookingId);
+        if (estimateId == null) {
+            System.err.println("EstimateId is null");
+            return null;
+        }
+
+        // 1. Tìm estimate
+        Estimate estimate = estimateRepository.findEstimateById(estimateId);
+
+        // EARLY RETURN
+        if (estimate == null) {
+            return null;
+        }
+
+        // 2. Lấy estimate items của estimate này và lọc bỏ đồ bị xóa
+        List<EstimateItem> estimateItems = estimateItemRepository.findByEstimateIds(List.of(estimateId))
+                .stream()
+                .filter(item -> Boolean.FALSE.equals(item.getIsRemoved()))
+                .toList();
+
+        // 3. Chuẩn bị các ID cần thiết để query
+        List<Integer> warehouseIds = estimateItems.stream()
+                .map(EstimateItem::getWarehouseId)
+                .filter(Objects::nonNull) // Đã mở lại để tránh lỗi null
+                .distinct()
+                .toList();
+
+        List<Integer> workCategoryIds = estimateItems.stream()
+                .map(EstimateItem::getWorkCategoryId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        // 4. Lấy dữ liệu Map (Dùng toán tử 3 ngôi cho gọn)
+        Map<Integer, WorkCategory> categoryMap = workCategoryIds.isEmpty() ? new HashMap<>() :
+                workCategoryRepo.findAllById(workCategoryIds).stream()
+                        .collect(Collectors.toMap(WorkCategory::getId, wc -> wc));
+
+        Map<Integer, Warehouse> warehouseMap = warehouseIds.isEmpty() ? new HashMap<>() :
+                warehouseInternalApi.findAllById(warehouseIds).stream()
+                        .collect(Collectors.toMap(Warehouse::getWarehouseId, w -> w));
+
+        Map<Integer, StockAllocation> allocationMap = estimateItems.isEmpty() ? new HashMap<>() :
+                stockAllocationRepository.findAllByEstimateId(estimateItems).stream()
+                        .collect(Collectors.toMap(StockAllocation::getEstimateItemId, a -> a));
+
+        // 5. Map dữ liệu sang DTO (Chỉ xử lý 1 Estimate, không cần vòng lặp stream() bọc ngoài)
+        EstimateRespondDto dto = estimateDtoMapper.toEstimateDto(estimate);
+        BigDecimal oldPrice = dto.getTotalPrice() != null ? dto.getTotalPrice() : BigDecimal.ZERO;
+
+        BigDecimal totalTax = BigDecimal.ZERO;
+        BigDecimal subTotal = BigDecimal.ZERO;
+        BigDecimal finalPrice = BigDecimal.ZERO;
+        List<EstimateItemDto> itemDtos = new ArrayList<>();
+        Set<Integer> promotionIds = new HashSet<>();
+
+        for (EstimateItem item : estimateItems) {
+            EstimateItemDto itemDto = estimateDtoMapper.toEstimateItemDto(item);
+
+            // Inject work category
+            if (item.getWorkCategoryId() != null) {
+                WorkCategory wc = categoryMap.get(item.getWorkCategoryId());
+                if (wc != null) {
+                    itemDto.setWorkCategory(estimateDtoMapper.toWorkCateDto(wc));
+                }
+            }
+
+            // Inject warehouse
+            if (item.getWarehouseId() != null) {
+                Warehouse wh = warehouseMap.get(item.getWarehouseId());
+                if (wh != null) {
+                    itemDto.setWarehouse(warehouseDtoMapper.toDtoInternal(wh));
+                }
+            }
+
+            // Inject stock allocation & return status
+            if (item.getId() != null) {
+                StockAllocation allocation = allocationMap.get(item.getId());
+                if (allocation != null) {
+                    Pair<Integer, String> returnPair = warehouseInternalApi.getReturnStatusByAlloId(allocation.getAllocationId());
+                    StockAllocationDto allocationDto = stockAllocationDtoMapper.toDto(allocation);
+
+                    if (returnPair != null) {
+                        allocationDto.setReturnId(returnPair.getLeft());
+                        allocationDto.setReturnStatus(returnPair.getRight());
+                    }
+                    itemDto.setStockAllocation(allocationDto);
+                }
+            }
+
+            // Tính toán giá tiền cho các item được checked
+            if (Boolean.TRUE.equals(item.getIsChecked())) {
+                if (item.getTaxAmount() != null) {
+                    totalTax = totalTax.add(item.getTaxAmount());
+                }
+
+                BigDecimal itemQty = BigDecimal.valueOf(item.getQuantity() != null ? item.getQuantity() : 0);
+                BigDecimal itemPrice = item.getUnitPrice() != null ? item.getUnitPrice() : BigDecimal.ZERO;
+                subTotal = subTotal.add(itemPrice.multiply(itemQty));
+
+                BigDecimal itemFinalPrice = item.getFinalPrice() != null ? item.getFinalPrice() : BigDecimal.ZERO;
+                finalPrice = finalPrice.add(itemFinalPrice);
+
+                if (item.getPromotionId() != null) {
+                    promotionIds.add(item.getPromotionId());
+                }
+            }
+            itemDtos.add(itemDto);
+        }
+
+        // Set lại thông tin cho DTO
+        dto.setTotalPrice(finalPrice);
+        dto.setSubTotal(subTotal);
+        dto.setTotalTaxAmount(totalTax);
+        dto.setItems(itemDtos);
+        dto.setPromotions(new ArrayList<>(promotionIds));
+
+        // Cập nhật giá mới nếu có thay đổi
+        if (oldPrice.compareTo(finalPrice) != 0) {
+            // Tận dụng luôn object `estimate` đã lấy từ đầu, không cần query lại findEstimateById
+            estimate.setTotalPrice(finalPrice);
+            estimateRepository.save(estimate);
+        }
+
+        return dto;
     }
 }

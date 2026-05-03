@@ -33,6 +33,11 @@ public class EstimateController {
         List<EstimateRespondDto> estimate = estimateService.getEstimateByCode(serviceTicketId);
         return ResponseEntity.ok(ApiResponses.success(estimate));
     }
+    @GetMapping("/{bookingId}/bookingId")
+    public ResponseEntity<ApiResponse<EstimateRespondDto>> getEstimateTicketByBooking(@PathVariable Integer bookingId){
+        EstimateRespondDto estimate = estimateService.getEstimateByBookingId(bookingId);
+        return ResponseEntity.ok(ApiResponses.success(estimate));
+    }
 
     @PostMapping()
     public ResponseEntity<ApiResponse<EstimateRespondDto>> createEstimate(@RequestBody EstimateRequestDto request){
