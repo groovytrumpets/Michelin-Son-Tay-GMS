@@ -3,6 +3,7 @@ package com.g42.platform.gms.booking_management.application.service;
 
 
 import com.g42.platform.gms.booking.customer.api.dto.BookingResponse;
+import com.g42.platform.gms.booking.customer.application.service.SlotService;
 import com.g42.platform.gms.booking.customer.domain.enums.BookingRequestStatus;
 import com.g42.platform.gms.booking.customer.domain.exception.BookingException;
 import com.g42.platform.gms.booking_management.api.dto.CustomerDto;
@@ -43,6 +44,7 @@ public class BookingManageService {
     private final BookingMDetailDtoMapper  bookingMDetailDtoMapper;
     private final BookingMRequestDtoMapper  bookingMRequestDtoMapper;
     private final ZaloNotificationSender zaloNotificationSender;
+    private final SlotService slotService;
 
     public Page<BookedRespond> getListBooked(int page, int size, LocalDate date, Boolean isGuest, BookingEnum status, String search) {
         Page<BookedRespond> bookingPage = bookingRepository.getBookedList(page,size,date,isGuest,status,search);
@@ -76,35 +78,51 @@ public class BookingManageService {
     @Transactional
     public Boolean confirmBookingRequest(String requestId) {
         BookingRequest request = bookingRepository.getBookingRequestById(requestId);
-        if (!request.isPending()){
-            //todo: wrong status handle
+        if (request == null) {
+            throw new BookingStaffException("Không tìm thấy booking request", BookingStaffErrorCode.INVALID_ID);
         }
-        //todo: check slot capacity
-        System.out.println("request slot: " + request.getScheduledTime());
-            //todo: search for reservedCount
-        int reservedCount = bookingRepository.countReserverdBasedOnTime(request.getScheduledTime());
-        System.out.println("reserved count: " + reservedCount);
-            //todo: compare reservedCount to available slot
-        TimeSlot timeSlot = bookingRepository.getTimeSlotByTime(request.getScheduledTime());
-        System.out.println("time slot: " + timeSlot);
-        //todo: check acc available else create customer acc
+        if (!request.isPending()) {
+            throw new BookingStaffException("Booking request không ở trạng thái PENDING", BookingStaffErrorCode.BOOKING_CANT_EDIT);
+        }
+
+        // Tạo hoặc lấy customer account
         int customerId = customerGateway.getOrCreateCustomer(
-                new CreateCustomerCommand(request.getFullName(),request.getPhone(),request.getCreatedAt())
+                new CreateCustomerCommand(request.getFullName(), request.getPhone(), request.getCreatedAt())
         );
-        System.out.println("customer id: " + customerId);
-        //todo: check if create account success
-        //todo: create booking
+
+        // Tạo booking record
         BookingJpa booking = bookingRepository.createBookingByRequest(request, customerId);
-        System.out.println("booking: " + booking.getBookingId());
-        //todo: create Reservation
-        BookingSlotReservation bookingSlotReservation = bookingRepository.createBookingSlotReservation(request, booking);
-        System.out.println("booking slot reservation: " + bookingSlotReservation);
-        //todo: update booking request status
+
+        // Check capacity + reserve slot atomic (tránh race condition / overbooking)
+        int estimatedDuration = request.getServices() == null ? 60 :
+                request.getServices().stream()
+                        .filter(item -> item.getServiceService() != null && item.getServiceService().getEstimateTime() != null)
+                        .mapToInt(item -> item.getServiceService().getEstimateTime())
+                        .sum();
+        if (estimatedDuration <= 0) estimatedDuration = 60;
+
+        slotService.checkAndReserve(
+                booking.getBookingId(),
+                request.getScheduledDate(),
+                request.getScheduledTime(),
+                estimatedDuration,
+                null
+        );
+
+        // Cập nhật trạng thái request
         boolean confirmed = request.confirm();
         bookingRepository.setConfirmStatus(request);
-        //todo: Zalo notify
-        zaloNotificationSender.sendBookingConfirm(request.getPhone(),request.getFullName(),request.getServices().stream().map(CatalogItem::getItemName).toList(),request.getRequestCode(),request.getLocalDateTime(),"Michelin Sơn Tây");
-return confirmed;
+
+        // Gửi thông báo Zalo
+        zaloNotificationSender.sendBookingConfirm(
+                request.getPhone(),
+                request.getFullName(),
+                request.getServices().stream().map(CatalogItem::getItemName).toList(),
+                request.getRequestCode(),
+                request.getLocalDateTime(),
+                "Michelin Sơn Tây"
+        );
+        return confirmed;
     }
     private final TimeSlotMMapper  timeSlotMMapper;
     public List<TimeSlot> getListTimeSlotByBookingId(Integer bookingId) {

@@ -178,7 +178,7 @@ public class CheckInService {
         log.info("Starting single-page check-in for booking: {}", request.getBookingId());
 
         if (request.getStaffId() == null) {
-            throw new CheckInException("Thiếu thông tin nhân viên thực hiện check-in (staffId)");
+            throw new CheckInException("Thiếu thông tin nhân viên thực hiện check-in");
         }
 
         // 1. Validate and get vehicle
@@ -195,6 +195,9 @@ public class CheckInService {
             .orElseThrow(() -> new CheckInException("Không tìm thấy service ticket vừa tạo"));
         final Integer createdTicketId = ticketDomain.getServiceTicketId();
 
+        if (request.getAdvisorId() == null) {
+            throw new CheckInException("Thiếu phân công tư vấn viên.");
+        }
         // 3. Upload license plate photo (optional)
         if (request.getLicensePlatePhoto() != null && !request.getLicensePlatePhoto().isEmpty()) {
             try {
