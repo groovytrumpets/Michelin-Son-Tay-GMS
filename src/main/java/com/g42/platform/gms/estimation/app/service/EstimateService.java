@@ -326,6 +326,7 @@ public class EstimateService {
             item.setIsChecked(req.getIsChecked() != null ? req.getIsChecked() : false);
             item.setRevisedFromItemId(req.getRevisedFromItemId());
             item.setTriggeredByItemId(req.getTriggeredByItemId());
+            item.setPromotionId(req.getPromotionId());
 
             item.setIsGift(req.getIsGift() != null ? req.getIsGift() : false);
 //            System.out.println("DEBUG RESOLVING ITEM: "+req.getIsGift()+", Tiggerd by: "+req.getRevisedFromItemId());
