@@ -66,6 +66,48 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+/**
+ * Service xử lý toàn bộ luồng "Return Entry" (phiếu hoàn) trong module Warehouse.
+ *
+ * Mục đích chính:
+ * - Tạo phiếu hoàn (khách trả / trả nhà cung cấp / đổi hàng) từ phiếu xuất gốc (StockIssue)
+ * - Xác nhận phiếu hoàn: cập nhật `Inventory`, `StockEntryItem.remainingQuantity`,
+ *   ghi `InventoryTransaction`, và release/adjust `StockAllocation` khi cần
+ * - Hủy/patch/update phiếu hoàn trước khi confirm
+ *
+ * Các dependency chính (injected repos/services):
+ * - `returnEntryRepo`: lưu/đọc `ReturnEntry` và `ReturnEntryItem` (domain port)
+ * - `inventoryRepo`: đọc và cập nhật tồn kho; khi thay đổi quantity nên dùng
+ *     `findByWarehouseAndItemWithLock(...)` ở service layer để đảm bảo SELECT FOR UPDATE
+ * - `transactionRepo`: ghi log audit `InventoryTransaction` sau mọi thay đổi tồn kho
+ * - `stockEntryRepo`: truy vấn lô (lots) và gọi `increaseRemainingQuantity(...)` khi hoàn
+ * - `stockIssueRepo` / `stockIssueItemRepo`: tra cứu phiếu xuất nguồn và dòng xuất để map lô
+ * - `stockAllocationRepo`: kiểm tra/điều chỉnh allocation (COMMITTED → RELEASED hoặc tách allocation)
+ * - `estimateInternalApi`: gọi API nội bộ để cập nhật trạng thái estimate khi release allocation
+ *
+ * Luồng chính (tóm tắt):
+ * 1) Tạo phiếu hoàn (Create): kiểm tra phiếu xuất nguồn (nếu có) đã CONFIRMED,
+ *    validate allocation/entryItem, và nếu cần mở rộng dòng trả theo lô (FIFO).
+ * 2) Xác nhận phiếu (Confirm):
+ *    - `CUSTOMER_RETURN`: tăng tồn kho (IN); nếu có `entryItemId` thì tăng
+ *      `StockEntryItem.remainingQuantity` của lô tương ứng; release/adjust allocation
+ *      (COMMITTED → RELEASED hoặc giảm qty và tạo allocation RELEASED mới).
+ *    - `SUPPLIER_RETURN`: giảm tồn kho (OUT) vì trả hàng cho nhà cung cấp.
+ *    - `EXCHANGE`: vừa giảm hàng cấp (OUT) vừa có thể tăng lô mới (tùy trường hợp).
+ *    - Ghi `InventoryTransaction` cho từng thay đổi để audit.
+ * 3) Hủy phiếu (Cancel): chỉ cho phép khi phiếu đang ở trạng thái SUBMITTED (không tác
+ *    động lên inventory).
+ *
+ * Ghi chú về đồng thời (concurrency) và nguyên tắc bất biến:
+ * - Khi thay đổi `inventory.quantity` hoặc `inventory.reservedQuantity`, phải đọc
+ *   bằng `findByWarehouseAndItemWithLock(...)` (SELECT FOR UPDATE) trong cùng một
+ *   transaction để tránh race condition.
+ * - Khi cập nhật `StockEntryItem.remainingQuantity` (thuật toán FIFO), repo dùng
+ *   `@Modifying` UPDATE (cập nhật nguyên tử) để tránh ghi đè khi có nhiều request
+ *   thao tác cùng lô đồng thời.
+ * - Allocation chỉ được release khi ở trạng thái `COMMITTED`; khi hoàn một phần,
+ *   allocation gốc sẽ giảm qty và tạo allocation mới ở trạng thái `RELEASED`.
+ */
 public class ReturnEntryService {
 
     private static final String FOLDER_RETURN_ENTRY = "garage/warehouse/return-entry";
@@ -91,33 +133,51 @@ public class ReturnEntryService {
 
     @Transactional
     public ReturnEntryResponse create(CreateReturnEntryRequest request, Integer staffId) {
+        // Kiểm tra phiếu xuất nguồn (nếu có) phải ở trạng thái CONFIRMED trước khi tạo phiếu hoàn
         validateSourceIssueConfirmed(request.getSourceIssueId());
 
+        // Khởi tạo đối tượng ReturnEntry và gán metadata cơ bản
         ReturnEntry entry = new ReturnEntry();
+        // Tạo mã phiếu hoàn duy nhất (TH-yyyyMMdd-seq)
         entry.setReturnCode(generateCode());
+        // Gán kho và lý do trả từ request
         entry.setWarehouseId(request.getWarehouseId());
         entry.setReturnReason(request.getReturnReason());
+        // Liên kết tới phiếu xuất nguồn nếu có (dùng để map lô/allocation)
         entry.setSourceIssueId(request.getSourceIssueId());
+        // Mặc định loại hoàn là CUSTOMER_RETURN nếu không có
         entry.setReturnType(request.getReturnType() != null
                 ? request.getReturnType() : ReturnType.CUSTOMER_RETURN);
+        // Phiếu mới bắt đầu ở trạng thái SUBMITTED (chưa ảnh hưởng tồn kho)
         entry.setStatus(ReturnEntryStatus.SUBMITTED);
         entry.setCreatedBy(staffId);
 
+        // Lưu phiếu tạm để có id gắn các dòng item con (tránh foreign key null khi lưu items)
         ReturnEntry saved = returnEntryRepo.save(entry);
 
+        // Xử lý từng dòng item yêu cầu hoàn
         for (ReturnEntryItemRequest itemReq : request.getItems()) {
+            // Kiểm tra allocation thuộc source issue và không vượt quá qty gốc
             validateAllocation(request.getSourceIssueId(), itemReq);
+            // (Kiểm tra trùng allocation khi tạo) - hiện là no-op, validateAllocation xử lý qty
             validateDuplicateAllocationOnCreate(itemReq.getAllocationId());
 
-            // Tự động tách thành nhiều dòng theo lô nếu cần
+                // Mở rộng 1 dòng request thành nhiều ReturnEntryItem theo lô nếu cần
+                // - Nếu có allocationId thì cố gắng map về các issueItem/entryItem (lô) theo FIFO
+                // - Nếu không tìm lô phù hợp thì fallback tạo 1 dòng tổng
             List<ReturnEntryItem> expandedItems = expandReturnItemsByLot(
                     itemReq, saved.getReturnId(), request.getSourceIssueId());
+            // Gắn các dòng đã mở rộng vào return đã lưu
             saved.getItems().addAll(expandedItems);
         }
 
+        // Xử lý item đổi (hàng cấp lại cho khách)
+        // - Exchange items không ảnh hưởng allocation của dòng trả; là hàng mới được cấp cho khách
         if (request.getExchangeItems() != null) {
             for (ReturnEntryItemRequest itemReq : request.getExchangeItems()) {
+                // Kiểm tra entryItemId nếu có (phải khớp item & kho)
                 validateEntryItem(request.getWarehouseId(), itemReq);
+                // Map request thành domain item và đánh dấu là exchange
                 ReturnEntryItem item = new ReturnEntryItem();
                 item.setReturnId(saved.getReturnId());
                 item.setItemId(itemReq.getItemId());
@@ -130,11 +190,17 @@ public class ReturnEntryService {
             }
         }
 
+        // Lưu và trả về ReturnEntry đã được bổ sung dữ liệu
         return toResponse(returnEntryRepo.save(saved));
     }
 
     @Transactional
     public ReturnEntryResponse createWithAttachments(CreateReturnEntryFormRequest req, Integer staffId) throws IOException {
+        // Bắt đầu: parse và validate input multipart form
+        // - `items` là JSON string, cần parse thành List<ReturnEntryItemRequest>
+        // - `exchangeItems` tương tự nếu có
+        // - gom các MultipartFile từ các trường files và file_0..file_4
+        // Mọi lỗi parse/thiếu file sẽ ném ResponseStatusException (BAD_REQUEST / UNPROCESSABLE_ENTITY)
         List<ReturnEntryItemRequest> items;
         try {
             items = objectMapper.readValue(req.getItems(),
@@ -148,6 +214,8 @@ public class ReturnEntryService {
 //                .collect(Collectors.toMap(ReturnEntryItemRequest::getAllocationId, ReturnEntryItemRequest::getQuantity));
 //            estimateInternalApi.validatePromotion(returnAllocationMap);
 
+        // Tạo DTO nội bộ `CreateReturnEntryRequest` từ form đã parse
+        // (sử dụng cùng cấu trúc như endpoint JSON để tái sử dụng `create(...)`)
         CreateReturnEntryRequest request = new CreateReturnEntryRequest();
         request.setWarehouseId(req.getWarehouseId());
         request.setReturnReason(req.getReturnReason());
@@ -165,24 +233,28 @@ public class ReturnEntryService {
             }
         }
 
+        // Gom tất cả multipart files vào 1 list để gắn vào return entry
         List<MultipartFile> files = new java.util.ArrayList<>();
         // Gom từ List<files>
         if (req.getFiles() != null) {
             req.getFiles().stream().filter(f -> f != null && !f.isEmpty()).forEach(files::add);
         }
-        // Gom từ file_0..file_4 (backward compatible)
+        // Gom từ file_0..file_4 (tương thích ngược)
         java.util.stream.Stream.of(req.getFile_0(), req.getFile_1(), req.getFile_2(), req.getFile_3(), req.getFile_4())
                 .filter(f -> f != null && !f.isEmpty())
                 .forEach(files::add);
 
+        // Bắt buộc phải có ít nhất 1 ảnh kèm theo (business rule UI expects it)
         if (files.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
-                    "Cần đính kèm ít nhất 1 ảnh chứng minh");
+                "Cần đính kèm ít nhất 1 ảnh chứng minh");
         }
 
+        // Gọi lại service `create(...)` để tái sử dụng luồng tạo phiếu (logic đã test)
         ReturnEntryResponse created = create(request, staffId);
 
-        // Lấy item đầu tiên (không phải exchange) để gắn tất cả ảnh vào
+        // Gắn các file ảnh lên item đầu tiên (không phải exchange)
+        // Lưu ý: hiện thiết kế backend gán tất cả ảnh cho 1 dòng item, FE cần tương ứng
         ReturnEntry saved = findOrThrow(created.getReturnId());
         ReturnEntryItem firstItem = saved.getItems().stream()
                 .filter(i -> !i.isExchangeItem())
@@ -318,40 +390,91 @@ public class ReturnEntryService {
     }
 
     /**
-     * Hủy phiếu hoàn khi chưa confirm (SUBMITTED).
-     * Phiếu hoàn chưa confirm chưa tác động gì đến inventory nên chỉ cần đổi status.
+     * Hủy phiếu hoàn (Cancel).
+     *
+     * Quy tắc:
+     * - Chỉ cho phép hủy khi phiếu ở trạng thái SUBMITTED (chưa confirm). Phiếu đã
+     *   CONFIRMED không thể hủy vì đã tác động lên inventory.
+     * - Hủy chỉ thay đổi trạng thái sang CANCELLED và lưu; không tác động inventory
+     *   hay allocation (vì confirm mới thay đổi allocation/inventory).
+     *
+     * @param returnId id phiếu cần hủy
+     * @param staffId id nhân viên thực hiện
      */
     @Transactional
     public ReturnEntryResponse cancel(Integer returnId, Integer staffId) {
+        // Tải phiếu hoàn từ DB; ném NOT_FOUND nếu không tồn tại
         ReturnEntry entry = findOrThrow(returnId);
 
+        // Không cho phép hủy phiếu đã xác nhận vì đã tác động tới tồn kho
         if (entry.getStatus() == ReturnEntryStatus.CONFIRMED) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                     "Không thể hủy phiếu hoàn đã được xác nhận");
         }
 
+        // Nếu đã bị hủy, trả lỗi CONFLICT
         if (entry.getStatus() == ReturnEntryStatus.CANCELLED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Phiếu hoàn đã bị hủy");
         }
-
+        // Đánh dấu là CANCELLED và lưu; không tác động inventory hay allocation
         entry.setStatus(ReturnEntryStatus.CANCELLED);
         return toResponse(returnEntryRepo.save(entry));
     }
 
+    /**
+     * Xác nhận (confirm) phiếu hoàn.
+     *
+     * Mục tiêu: khi confirm, phiếu hoàn sẽ thực sự ảnh hưởng tới tồn kho và allocation:
+     * - CUSTOMER_RETURN: tăng `inventory.quantity` (IN), nếu dòng có `entryItemId` thì
+     *   gọi `stockEntryRepo.increaseRemainingQuantity(...)` để cộng lại remainingQuantity của lô;
+     *   release/adjust allocation tương ứng (CALL `estimateInternalApi.releaseEstimate` và
+     *   `releaseAllocation(...)` để chuyển COMMITTED → RELEASED hoặc tách allocation).
+     * - SUPPLIER_RETURN: giảm `inventory.quantity` (OUT) vì hàng được trả về nhà cung cấp.
+     * - EXCHANGE: kết hợp cả giảm hàng cấp (OUT) và có thể tăng lại lô tương ứng.
+     *
+     * Quy trình thực hiện (chi tiết):
+     * 1. Kiểm tra trạng thái phiếu là SUBMITTED
+     * 2. Phân tách items thành returnItems (thực tế trả) và exchangeItems (hàng cấp đổi)
+     * 3. Với mỗi returnItem:
+     *    - Lấy hoặc tạo Inventory bằng `getOrCreateInventory(...)` (sử dụng lock khi đọc)
+     *    - Tính `newQty` theo ReturnType (IN/OUT)
+     *    - Ghi `inventoryRepo.save(inv)` (trong cùng transaction)
+     *    - Ghi audit `InventoryTransaction` bằng `saveTransaction(...)`
+     *    - Nếu item liên kết `entryItemId` (lô cụ thể): gọi
+     *      `stockEntryRepo.increaseRemainingQuantity(entryItemId, qty)` để làm cho lô
+     *      có thêm remainingQuantity (lô trở lại khả dụng)
+     *    - Nếu item liên kết `allocationId`: gọi `estimateInternalApi.releaseEstimate(...)`
+     *      để cập nhật estimate, sau đó `releaseAllocation(...)` để điều chỉnh allocation
+     * 4. Xử lý exchangeItems: giảm inventory và (nếu có) tăng remainingQuantity tương ứng
+     * 5. Set trạng thái phiếu = CONFIRMED, ghi confirmedBy/At
+     *
+     * Concurrency notes:
+     * - `getOrCreateInventory` dùng `inventoryRepo.findByWarehouseAndItemWithLock(...)`
+     *   để đảm bảo SELECT FOR UPDATE trước khi cập nhật quantity.
+     * - `stockEntryRepo.increaseRemainingQuantity(...)` là @Modifying UPDATE (atomic) nên
+     *   an toàn khi nhiều request thao tác lô cùng lúc.
+     *
+     * @param returnId id phiếu cần confirm
+     * @param staffId id nhân viên thực hiện
+     */
     @Transactional
     public ReturnEntryResponse confirm(Integer returnId, Integer staffId) {
+        // Tải phiếu hoàn từ DB (nếu không tồn tại sẽ ném NOT_FOUND)
         ReturnEntry entry = findOrThrow(returnId);
 
+        // Chỉ cho phép confirm khi đang ở trạng thái SUBMITTED
         if (entry.getStatus() != ReturnEntryStatus.SUBMITTED) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                     "Chỉ có thể confirm phiếu ở trạng thái SUBMITTED");
         }
 
+        // Tách các item: những cái thực sự 'trả' và những cái là 'exchange' (đổi hàng)
         List<ReturnEntryItem> returnItems = entry.getItems().stream()
                 .filter(i -> !i.isExchangeItem()).collect(Collectors.toList());
         List<ReturnEntryItem> exchangeItems = entry.getItems().stream()
                 .filter(ReturnEntryItem::isExchangeItem).collect(Collectors.toList());
 
+        // Bảo đảm có ít nhất một item để xử lý
         if (returnItems.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                     "Phiếu hoàn không có sản phẩm nào");
@@ -359,67 +482,100 @@ public class ReturnEntryService {
 
         ReturnType type = entry.getReturnType();
 
+        // Xử lý từng item thực tế được trả (không phải exchange)
         for (ReturnEntryItem item : returnItems) {
+            // Lấy inventory với lock nếu đã tồn tại, hoặc một đối tượng mới chưa lưu
             Inventory inv = getOrCreateInventory(entry.getWarehouseId(), item.getItemId());
 
             int newQty;
             InventoryTransactionType txType;
 
+            // Với trả cho nhà cung cấp (supplier return) ta giảm tồn kho (OUT)
             if (type == ReturnType.SUPPLIER_RETURN) {
                 newQty = Math.max(0, inv.getQuantity() - item.getQuantity());
                 txType = InventoryTransactionType.OUT;
             } else {
+                // Với customer return (hoặc default) ta tăng tồn kho (IN)
                 newQty = inv.getQuantity() + item.getQuantity();
                 txType = InventoryTransactionType.IN;
             }
 
+            // Cập nhật giá trị tồn kho trong object, sau đó persist
             inv.setQuantity(newQty);
             inventoryRepo.save(inv);
+
+            // Ghi lại transaction audit để truy vết: kiểu, qty, số dư sau khi thay đổi
             saveTransaction(entry.getWarehouseId(), item.getItemId(), item.getEntryItemId(), txType,
                     item.getQuantity(), newQty, returnId, staffId);
 
+            // Nếu item liên kết tới một lô nhập cụ thể thì tăng remainingQuantity của lô đó
             if (item.getEntryItemId() != null) {
+                // phương thức này thực hiện @Modifying UPDATE, an toàn cho concurrent
                 stockEntryRepo.increaseRemainingQuantity(item.getEntryItemId(), item.getQuantity());
             }
 
+            // Nếu item được gắn allocation (đã từng reserve), ta gọi releaseEstimate + releaseAllocation
             if (item.getAllocationId() != null) {
+                // Gọi API nội bộ để cập nhật estimate (ví dụ cơ chế billing/estimate liên quan allocation)
                 Integer savedEstimateItemId = estimateInternalApi.releaseEstimate(item.getAllocationId(), item.getQuantity(), staffId);
-                releaseAllocation(item.getAllocationId(), item.getQuantity(), staffId,savedEstimateItemId);
+                // Thực hiện release/adjust allocation tại DB
+                releaseAllocation(item.getAllocationId(), item.getQuantity(), staffId, savedEstimateItemId);
             }
         }
 
+        // Xử lý các item đổi trả: đây là những item mà cửa hàng cấp lại cho khách (out)
         if (type == ReturnType.EXCHANGE) {
             for (ReturnEntryItem item : exchangeItems) {
+                // Lấy inventory đã khóa/khởi tạo
                 Inventory inv = getOrCreateInventory(entry.getWarehouseId(), item.getItemId());
+                // Khi cấp hàng đổi, tồn kho giảm
                 int newQty = Math.max(0, inv.getQuantity() - item.getQuantity());
                 inv.setQuantity(newQty);
                 inventoryRepo.save(inv);
+                // Ghi transaction dạng OUT
                 saveTransaction(entry.getWarehouseId(), item.getItemId(), item.getEntryItemId(),
                         InventoryTransactionType.OUT, item.getQuantity(), newQty, returnId, staffId);
+                // Nếu liên quan lô nhập, trả lô đó về remainingQuantity
                 if (item.getEntryItemId() != null) {
                     stockEntryRepo.increaseRemainingQuantity(item.getEntryItemId(), item.getQuantity());
                 }
             }
         }
 
+        // Cập nhật trạng thái phiếu là CONFIRMED và lưu metadata xác nhận
         entry.setStatus(ReturnEntryStatus.CONFIRMED);
         entry.setConfirmedBy(staffId);
         entry.setConfirmedAt(LocalDateTime.now());
 
+        // Lưu thay đổi trạng thái và trả về response
         return toResponse(returnEntryRepo.save(entry));
     }
 
-    // ── helpers ──────────────────────────────────────────────────────────────
+    // ── Hàm trợ giúp (helpers) ─────────────────────────────────────────────────
 
-    private Inventory getOrCreateInventory(Integer warehouseId, Integer itemId) {
-        return inventoryRepo.findByWarehouseAndItemWithLock(warehouseId, itemId)
+        /**
+         * Lấy inventory có lock (SELECT FOR UPDATE) hoặc tạo mới (not persisted) nếu không tồn tại.
+         *
+         * - Dùng `findByWarehouseAndItemWithLock(...)` để đảm bảo row được khóa trong transaction
+         *   trước khi service thay đổi `quantity`/`reservedQuantity`.
+         * - Trường hợp không tìm thấy sẽ trả về một domain `Inventory` mới chưa được persist;
+         *   caller phải gọi `inventoryRepo.save(...)` khi muốn lưu (ví dụ khi confirm return / entry).
+         *
+         * @param warehouseId kho
+         * @param itemId mã sản phẩm
+         * @return Inventory domain (locked if existing)
+         */
+        private Inventory getOrCreateInventory(Integer warehouseId, Integer itemId) {
+            // Thử đọc Inventory với SELECT FOR UPDATE để khóa hàng trong transaction
+            return inventoryRepo.findByWarehouseAndItemWithLock(warehouseId, itemId)
                 .orElseGet(() -> Inventory.builder()
-                        .warehouseId(warehouseId)
-                        .itemId(itemId)
-                        .quantity(0)
-                        .reservedQuantity(0)
-                        .build());
-    }
+                    // Nếu không tồn tại, trả về một object mới (chưa persist). Caller sẽ save khi cần.
+                    .warehouseId(warehouseId)
+                    .itemId(itemId)
+                    .quantity(0)
+                    .reservedQuantity(0)
+                    .build());
+        }
 
     private void saveTransaction(Integer warehouseId, Integer itemId, Integer entryItemId,
                                  InventoryTransactionType type, int qty, int balance,
@@ -438,6 +594,25 @@ public class ReturnEntryService {
         transactionRepo.save(tx);
     }
 
+    /**
+     * Release / adjust an allocation when items are returned.
+     *
+     * Behaviour:
+     * - Only allow releasing if the allocation is currently COMMITTED.
+     * - If the returned quantity equals allocation.quantity -> set allocation.status = RELEASED
+     * - If partial return: subtract returnQuantity from allocation.quantity and
+     *   create a new allocation record in RELEASED state representing the returned qty.
+     *
+     * Integration note:
+     * - Calls to `estimateInternalApi.releaseEstimate(...)` (performed before calling
+     *   this method) provide updated estimate item id to link the new released allocation.
+     * - Persisting the new released allocation happens via `stockAllocationRepo.save(...)`.
+     *
+     * @param allocationId id allocation gốc (COMMITTED)
+     * @param returnQuantity số lượng đang hoàn
+     * @param staffId id nhân viên thực hiện
+     * @param savedEstimateItemId estimate item id trả về từ estimateInternalApi (có thể null)
+     */
     private void releaseAllocation(Integer allocationId, Integer returnQuantity, Integer staffId, Integer savedEstimateItemId) {
         StockAllocation allocation = stockAllocationRepo.findById(allocationId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
@@ -453,19 +628,25 @@ public class ReturnEntryService {
                     "Số lượng hoàn vượt quá allocation đã chọn");
         }
 
+        // Nếu hoàn đúng bằng tổng allocation thì chuyển trạng thái thành RELEASED
         if (allocation.getQuantity().equals(returnQuantity)) {
             allocation.setStatus(AllocationStatus.RELEASED);
             stockAllocationRepo.save(allocation);
             return;
         }
 
+        // Nếu hoàn một phần: giảm quantity của allocation gốc
         allocation.setQuantity(allocation.getQuantity() - returnQuantity);
         stockAllocationRepo.save(allocation);
 
+        // Tạo một allocation mới biểu diễn phần đã được release (trạng thái RELEASED)
         StockAllocation released = new StockAllocation();
+        // giữ liên kết service ticket nếu có
         released.setServiceTicketId(allocation.getServiceTicketId());
 
+        // Gắn estimateItemId trả về từ estimateInternalApi (nếu có)
         released.setEstimateItemId(savedEstimateItemId);
+        // Thử resolve estimateId nếu không có nhưng có estimateItemId trong allocation gốc
         Integer estimateId = allocation.getEstimateId();
         if (estimateId == null && allocation.getEstimateItemId() != null) {
             EstimateItem estimateItem = estimateItemRepository.findByEstimateItemId(allocation.getEstimateItemId());
@@ -474,103 +655,136 @@ public class ReturnEntryService {
             }
         }
         released.setEstimateId(estimateId);
+        // copy các thuộc tính liên quan: kho, item, issue
         released.setWarehouseId(allocation.getWarehouseId());
         released.setItemId(allocation.getItemId());
         released.setIssueId(allocation.getIssueId());
+        // số lượng của allocation mới = phần được trả về
         released.setQuantity(returnQuantity);
 
         released.setStatus(AllocationStatus.RELEASED);
+        // preserved createdBy từ allocation gốc nếu có, fallback staffId
         released.setCreatedBy(allocation.getCreatedBy() != null ? allocation.getCreatedBy() : staffId);
         StockAllocation stockAllocation = stockAllocationRepo.save(released);
-        System.out.println("DEBUG: "+stockAllocation.getEstimateItemId());
+        // debug log nhỏ để dễ trace estimateItemId liên kết
+        System.out.println("DEBUG: " + stockAllocation.getEstimateItemId());
     }
 
-    private List<ReturnEntryItem> expandReturnItemsByLot(
+        /**
+         * Expand a return request line into one or more domain `ReturnEntryItem` by
+         * mapping to the actual issue items / lots (FIFO) from the source issue.
+         *
+         * Use case:
+         * - When FE passes an `allocationId`, we prefer to return items against the
+         *   exact lots that were used by the original StockIssue lines (entryItemId).
+         * - This method finds matching StockIssueItem rows and splits the requested
+         *   quantity across them in FIFO order (issue item list order).
+         *
+         * Behavior:
+         * - If allocation is not provided or no matching issue items found, produce
+         *   a single ReturnEntryItem without entryItemId (fallback).
+         * - If matched issue items exist, create one ReturnEntryItem per lot consumed.
+         *
+         * @param itemReq request DTO containing itemId, allocationId, quantity, etc.
+         * @param returnId parent return id for new items
+         * @param sourceIssueId optional fallback issue id
+         */
+        private List<ReturnEntryItem> expandReturnItemsByLot(
             ReturnEntryItemRequest itemReq, Integer returnId, Integer sourceIssueId) {
+            List<ReturnEntryItem> result = new ArrayList<>();
 
-        List<ReturnEntryItem> result = new ArrayList<>();
-
-        if (itemReq.getAllocationId() == null) {
-            ReturnEntryItem item = new ReturnEntryItem();
-            item.setReturnId(returnId);
-            item.setItemId(itemReq.getItemId());
-            item.setQuantity(itemReq.getQuantity());
-            item.setConditionNote(itemReq.getConditionNote());
-            item.setExchangeItem(false);
-            result.add(item);
-            return result;
-        }
-
-        StockAllocation allocation = stockAllocationRepo.findById(itemReq.getAllocationId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                        "Không tìm thấy allocation id=" + itemReq.getAllocationId()));
-
-        Integer issueId = allocation.getIssueId();
-        if (issueId == null) {
-            issueId = sourceIssueId;
-        }
-        if (issueId == null) {
-            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
-                    "Không xác định được phiếu xuất cho allocation=" + itemReq.getAllocationId());
-        }
-
-        // Lấy tất cả issue items cùng itemId có entryItemId hợp lệ
-        List<StockIssueItem> issueItems = new ArrayList<>();
-        for (StockIssueItem si : stockIssueItemRepo.findByIssueId(issueId)) {
-            if (itemReq.getItemId().equals(si.getItemId())
-                    && si.getEntryItemId() != null && si.getEntryItemId() > 0) {
-                issueItems.add(si);
+            // Nếu không có allocationId thì không cần phân lô — trả 1 dòng tổng
+            if (itemReq.getAllocationId() == null) {
+                ReturnEntryItem item = new ReturnEntryItem();
+                item.setReturnId(returnId);
+                item.setItemId(itemReq.getItemId());
+                item.setQuantity(itemReq.getQuantity());
+                item.setConditionNote(itemReq.getConditionNote());
+                item.setExchangeItem(false);
+                result.add(item);
+                return result;
             }
-        }
 
-        if (issueItems.isEmpty()) {
-            ReturnEntryItem item = new ReturnEntryItem();
-            item.setReturnId(returnId);
-            item.setItemId(itemReq.getItemId());
-            item.setAllocationId(itemReq.getAllocationId());
-            item.setQuantity(itemReq.getQuantity());
-            item.setConditionNote(itemReq.getConditionNote());
-            item.setExchangeItem(false);
-            result.add(item);
+            // Lấy allocation gốc để xác định issueId/lô liên quan
+            StockAllocation allocation = stockAllocationRepo.findById(itemReq.getAllocationId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                            "Không tìm thấy allocation id=" + itemReq.getAllocationId()));
+
+            // Ưu tiên issueId từ allocation, fallback sang sourceIssueId nếu allocation cũ
+            Integer issueId = allocation.getIssueId();
+            if (issueId == null) {
+                issueId = sourceIssueId;
+            }
+            if (issueId == null) {
+                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                        "Không xác định được phiếu xuất cho allocation=" + itemReq.getAllocationId());
+            }
+
+            // Lấy tất cả stock issue items của issue và lọc ra những dòng có entryItemId
+            List<StockIssueItem> issueItems = new ArrayList<>();
+            for (StockIssueItem si : stockIssueItemRepo.findByIssueId(issueId)) {
+                if (itemReq.getItemId().equals(si.getItemId())
+                        && si.getEntryItemId() != null && si.getEntryItemId() > 0) {
+                    issueItems.add(si);
+                }
+            }
+
+            // Nếu không có lô tương ứng thì fallback: trả 1 dòng chung gắn allocationId
+            if (issueItems.isEmpty()) {
+                ReturnEntryItem item = new ReturnEntryItem();
+                item.setReturnId(returnId);
+                item.setItemId(itemReq.getItemId());
+                item.setAllocationId(itemReq.getAllocationId());
+                item.setQuantity(itemReq.getQuantity());
+                item.setConditionNote(itemReq.getConditionNote());
+                item.setExchangeItem(false);
+                result.add(item);
+                return result;
+            }
+
+                // PHÂN LÔ (FIFO): duyệt các issueItems theo thứ tự trả về từ repo
+                // Mỗi issueItem tương ứng 1 lô (entryItemId). Ta phân phần trả (consume)
+                // từ lô đầu tiên tới khi đủ hoặc hết lô.
+            // Phân bổ số lượng trả theo thứ tự lô (đơn giản theo thứ tự trả về từ repo - FIFO)
+            int remaining = itemReq.getQuantity() != null ? itemReq.getQuantity() : 0;
+
+            for (StockIssueItem si : issueItems) {
+                if (remaining <= 0) break; // hết cần phân bổ
+                int lotQty = si.getQuantity() != null ? si.getQuantity() : 0;
+                // Lấy lượng tiêu thụ từ lô = min(remaining, lotQty)
+                int consume = Math.min(remaining, lotQty);
+                    // Nếu lô đã tiêu hết (consume=0) thì bỏ qua — tiếp lô kế
+                if (consume <= 0) continue;
+
+                // Tạo 1 ReturnEntryItem ánh xạ tới lô nhập (entryItemId) và issueItemId
+                ReturnEntryItem item = new ReturnEntryItem();
+                item.setReturnId(returnId);
+                item.setItemId(itemReq.getItemId());
+                item.setAllocationId(itemReq.getAllocationId());
+                item.setSourceIssueItemId(si.getIssueItemId());
+                item.setEntryItemId(si.getEntryItemId());
+                item.setQuantity(consume);
+                item.setConditionNote(itemReq.getConditionNote());
+                item.setExchangeItem(false);
+                result.add(item);
+
+                // Giảm remaining bởi lượng đã phân bổ cho lô này
+                remaining -= consume;
+            }
+
+            // Nếu vẫn còn lượng chưa phân bổ (không đủ lô), thêm 1 dòng không gắn lô
+            if (remaining > 0) {
+                ReturnEntryItem item = new ReturnEntryItem();
+                item.setReturnId(returnId);
+                item.setItemId(itemReq.getItemId());
+                item.setAllocationId(itemReq.getAllocationId());
+                item.setQuantity(remaining);
+                item.setConditionNote(itemReq.getConditionNote());
+                item.setExchangeItem(false);
+                result.add(item);
+            }
+
             return result;
-        }
-
-        // Phân bổ quantity theo thứ tự lô (FIFO)
-        int remaining = itemReq.getQuantity() != null ? itemReq.getQuantity() : 0;
-
-        for (StockIssueItem si : issueItems) {
-            if (remaining <= 0) break;
-            int lotQty = si.getQuantity() != null ? si.getQuantity() : 0;
-            int consume = Math.min(remaining, lotQty);
-            if (consume <= 0) continue;
-
-            ReturnEntryItem item = new ReturnEntryItem();
-            item.setReturnId(returnId);
-            item.setItemId(itemReq.getItemId());
-            item.setAllocationId(itemReq.getAllocationId());
-            item.setSourceIssueItemId(si.getIssueItemId());
-            item.setEntryItemId(si.getEntryItemId());
-            item.setQuantity(consume);
-            item.setConditionNote(itemReq.getConditionNote());
-            item.setExchangeItem(false);
-            result.add(item);
-
-            remaining -= consume;
-        }
-
-        // Nếu còn dư (quantity > tổng lô) → thêm dòng không có lô
-        if (remaining > 0) {
-            ReturnEntryItem item = new ReturnEntryItem();
-            item.setReturnId(returnId);
-            item.setItemId(itemReq.getItemId());
-            item.setAllocationId(itemReq.getAllocationId());
-            item.setQuantity(remaining);
-            item.setConditionNote(itemReq.getConditionNote());
-            item.setExchangeItem(false);
-            result.add(item);
-        }
-
-        return result;
     }
 
     private ReturnEntry findOrThrow(Integer returnId) {
@@ -663,7 +877,7 @@ public class ReturnEntryService {
             ir.setQuantity(i.getQuantity());
             ir.setConditionNote(i.getConditionNote());
 
-            // Enrich giá từ issue item
+            // Bổ sung giá từ issue item
             if (i.getSourceIssueItemId() != null) {
                 java.math.BigDecimal unitPrice = priceByIssueItemId.get(i.getSourceIssueItemId());
                 ir.setUnitPrice(unitPrice);
@@ -672,7 +886,7 @@ public class ReturnEntryService {
                 }
             }
 
-            // Enrich thông tin lô nhập
+            // Bổ sung thông tin lô nhập
             if (i.getEntryItemId() != null) {
                 stockEntryRepo.findItemById(i.getEntryItemId()).ifPresent(entryItem -> {
                     stockEntryRepo.findEntryById(entryItem.getEntryId()).ifPresent(entry -> {
@@ -697,6 +911,11 @@ public class ReturnEntryService {
     }
 
     private void validateAllocation(Integer sourceIssueId, ReturnEntryItemRequest itemReq) {
+        // Mục tiêu validateAllocation:
+        // - đảm bảo allocation tồn tại và thuộc sourceIssue nếu sourceIssueId được cung cấp
+        // - đảm bảo itemId khớp
+        // - allocation phải ở trạng thái COMMITTED
+        // - tổng số lượng đã hoàn (đã active) + requested <= tổng qty gốc của allocation
         if (sourceIssueId == null && itemReq.getAllocationId() == null) {
             return;
         }
@@ -711,14 +930,17 @@ public class ReturnEntryService {
                     "allocationId là bắt buộc khi có sourceIssueId");
         }
 
+        // Lấy phiếu xuất nguồn để xác thực allocation.issueId nếu cần
         StockIssue sourceIssue = stockIssueRepo.findById(sourceIssueId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
                         "Không tìm thấy phiếu xuất nguồn id=" + sourceIssueId));
 
+        // Lấy allocation gốc
         StockAllocation allocation = stockAllocationRepo.findById(itemReq.getAllocationId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
                         "Không tìm thấy allocation id=" + itemReq.getAllocationId()));
 
+        // Nếu allocation chứa issueId, phải khớp với sourceIssueId
         if (allocation.getIssueId() != null && !allocation.getIssueId().equals(sourceIssueId)) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                     "allocationId không thuộc phiếu xuất nguồn đã chọn");
@@ -729,6 +951,7 @@ public class ReturnEntryService {
                     "allocationId không khớp với itemId");
         }
 
+        // Allocation phải ở trạng thái COMMITTED để có thể release khi trả
         if (allocation.getStatus() != AllocationStatus.COMMITTED) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                     "allocationId phải ở trạng thái COMMITTED");
@@ -737,9 +960,11 @@ public class ReturnEntryService {
         // Kiểm tra tổng quantity đã hoàn (active) không vượt quá tổng quantity gốc của allocation
         // Khi hoàn một phần, allocation bị tách: qty giảm xuống, tạo allocation mới RELEASED.
         // Tổng gốc = qty hiện tại + tổng đã hoàn active trước đó.
+        // Tính tổng đã hoàn trước đó (active) để đảm bảo không vượt quá tổng gốc
         int alreadyReturned = returnEntryRepo.sumActiveReturnedQuantityByAllocationId(itemReq.getAllocationId());
         int requestedQty = itemReq.getQuantity() != null ? itemReq.getQuantity() : 0;
         int originalQty = allocation.getQuantity() + alreadyReturned; // tổng qty gốc
+        // Nếu tổng (đã hoàn + lần này) vượt quá tổng gốc -> lỗi
         if (alreadyReturned + requestedQty > originalQty) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                     "Tổng số lượng hoàn (" + (alreadyReturned + requestedQty) + ") vượt quá tổng allocation ("
@@ -749,31 +974,36 @@ public class ReturnEntryService {
     }
 
     private void validateEntryItem(Integer warehouseId, ReturnEntryItemRequest itemReq) {
+        // Nếu FE không truyền entryItemId thì không cần kiểm tra thêm
         if (itemReq.getEntryItemId() == null) {
             return;
         }
 
+        // Lấy thông tin lô nhập (StockEntryItem) theo id
         StockEntryItem lot = stockEntryRepo.findItemById(itemReq.getEntryItemId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                        "Không tìm thấy lô nhập id=" + itemReq.getEntryItemId()));
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Không tìm thấy lô nhập id=" + itemReq.getEntryItemId()));
 
+        // Kiểm tra itemId của lô phải khớp với itemId được yêu cầu
         if (lot.getItemId() == null || !lot.getItemId().equals(itemReq.getItemId())) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
-                    "entryItemId không khớp với itemId");
+                "entryItemId không khớp với itemId");
         }
 
+        // Lô phải gắn với một phiếu nhập (entryId): nếu thiếu, đó là dữ liệu bất thường
         if (lot.getEntryId() == null) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
-                    "Không xác định được phiếu nhập của lô đã chọn");
+                "Không xác định được phiếu nhập của lô đã chọn");
         }
 
+        // Kiểm tra phiếu nhập phải thuộc cùng kho với return request
         StockEntry entry = stockEntryRepo.findEntryById(lot.getEntryId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                        "Không tìm thấy phiếu nhập của lô id=" + itemReq.getEntryItemId()));
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Không tìm thấy phiếu nhập của lô id=" + itemReq.getEntryItemId()));
 
         if (entry.getWarehouseId() == null || !entry.getWarehouseId().equals(warehouseId)) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
-                    "entryItemId không thuộc kho đã chọn");
+                "entryItemId không thuộc kho đã chọn");
         }
     }
 
@@ -873,10 +1103,12 @@ public class ReturnEntryService {
             return;
         }
 
+        // Kiểm tra tồn tại và trạng thái của phiếu xuất nguồn
         StockIssue sourceIssue = stockIssueRepo.findById(sourceIssueId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
                         "Không tìm thấy phiếu xuất nguồn id=" + sourceIssueId));
 
+        // Chỉ cho phép tạo phiếu hoàn nếu phiếu xuất nguồn đã được CONFIRMED
         if (sourceIssue.getStatus() != com.g42.platform.gms.warehouse.domain.enums.StockIssueStatus.CONFIRMED) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                     "Chỉ được hoàn khi phiếu xuất nguồn đã CONFIRMED");
@@ -906,8 +1138,10 @@ public class ReturnEntryService {
     }
 
     private void validateDuplicateAllocationOnCreate(Integer allocationId) {
-        // Không block tạo nhiều phiếu hoàn cho cùng allocationId.
-        // Việc kiểm soát số lượng đã được xử lý trong validateAllocation().
+        // NO-OP hiện tại: không chặn tạo nhiều phiếu hoàn cùng `allocationId` ở layer này.
+        // Lý do: ràng buộc số lượng/over-return được kiểm tra trong `validateAllocation()`.
+        // Nếu trong tương lai muốn nghiêm ngặt hơn (chặn duplicate hoàn song song),
+        // có thể thêm kiểm tra ở đây dựa trên business rule.
     }
 
     private void validateDuplicateAllocationOnUpdate(Integer allocationId, Integer returnId) {

@@ -52,9 +52,9 @@ public class StaffService {
         StaffProfileDto result = staffProfileDtoMapper.toStaffProfileDto(staffProfile);
 
         // Sau khi tạo nhân viên trong GMS, tạo luôn trên Hikvision (employeeNo = staffId, auto-generated)
-        if (result.getEmployeeNo() != null && !result.getEmployeeNo().isBlank()) {
-            hikvisionUserClient.createPerson(result.getEmployeeNo(), result.getFullName());
-        }
+//        if (result.getEmployeeNo() != null && !result.getEmployeeNo().isBlank()) {
+//            hikvisionUserClient.createPerson(result.getEmployeeNo(), result.getFullName());
+//        }
 
         return result;
     }
@@ -64,10 +64,10 @@ public class StaffService {
         StaffProfileDto result = staffProfileDtoMapper.toStaffProfileDto(staffProfile);
 
         // Sync tên mới lên Hikvision — employeeNo = staffId (auto-generated)
-        if (staffProfileDto.getFullName() != null) {
-            String employeeNo = String.valueOf(staffId);
-            hikvisionUserClient.updatePerson(employeeNo, staffProfileDto.getFullName());
-        }
+//        if (staffProfileDto.getFullName() != null) {
+//            String employeeNo = String.valueOf(staffId);
+//            hikvisionUserClient.updatePerson(employeeNo, staffProfileDto.getFullName());
+//        }
 
         return result;
     }
@@ -77,7 +77,7 @@ public class StaffService {
         StaffProfileDto result = staffProfileDtoMapper.toStaffProfileDto(staffProfile);
 
         // Xóa person trên Hikvision — employeeNo = staffId
-        hikvisionUserClient.deletePerson(String.valueOf(staffId));
+//        hikvisionUserClient.deletePerson(String.valueOf(staffId));
 
         return result;
     }

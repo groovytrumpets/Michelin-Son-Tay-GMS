@@ -10,6 +10,25 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Adapter: InventoryRepoImpl - Repository Implementation Pattern.
+ *
+ * Chuyển đổi giữa JPA layer (InventoryJpaRepo + InventoryJpa entity)
+ * và Domain layer (InventoryRepo interface + Inventory domain entity).
+ *
+ * Luồng dữ liệu (example):
+ * 1. Service gọi: inventoryRepo.findByWarehouseAndItemWithLock(wId, iId)
+ * 2. InventoryRepoImpl gọi: jpaRepo.findByWarehouseIdAndItemIdWithLock(...)
+ *    → SQL: SELECT FOR UPDATE (lock row)
+ * 3. Adapter map: InventoryJpa → Inventory domain
+ * 4. Service thay đổi: inv.setReservedQuantity(...)
+ * 5. Service gọi: save(inventory)
+ * 6. Adapter map ngược: Inventory → InventoryJpa
+ * 7. jpaRepo.save(...) → SQL: UPDATE
+ * 8. Commit transaction → release lock
+ *
+ * Mapper toDomain / toJpa: chuyển đổi dữ liệu giữa 2 layers.
+ */
 @Repository
 @RequiredArgsConstructor
 public class InventoryRepoImpl implements InventoryRepo {
