@@ -8,6 +8,8 @@ import java.util.Optional;
 
 public interface TimeSlotRepository {
     Optional<TimeSlot> findByStartTime(LocalTime startTime);
+    /** Pessimistic write lock — dùng khi check + reserve slot để tránh race condition */
+    Optional<TimeSlot> findByStartTimeWithLock(LocalTime startTime);
     List<TimeSlot> findActiveOrderByStartTime();
     List<TimeSlot> findAllOrderByStartTime();
 }

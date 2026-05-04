@@ -13,4 +13,5 @@ public interface NotificationSender {
     void sendOtpVerify(String number,String otp);
 
     void sendFeedback(String number, String name, String code);
+    void sendEstimate(String number, String customerName,List<String> productName, String orderCode, LocalDateTime createAt, String garageLocation,String totalPrice);
 }

@@ -59,8 +59,8 @@ public class SlotService {
      *    - Số reservation hiện tại < capacity không
      * 3. Nếu tất cả blocks đều OK => available
      * 
-     * Sử dụng Pessimistic Locking (findByStartTimeWithLock) để tránh race condition
-     * khi 2 người cùng đặt slot cuối cùng
+     * NOTE: Method này chỉ dùng để query hiển thị (getAvailableSlots).
+     * Khi tạo booking, dùng checkAndReserve() để đảm bảo atomic.
      * 
      * @param date Ngày đặt
      * @param startTime Giờ bắt đầu
@@ -68,7 +68,7 @@ public class SlotService {
      * @param excludeBookingId ID của booking cần exclude (dùng khi modify booking)
      * @return true nếu available, false nếu đã đầy
      */
-
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public boolean isSlotAvailable(LocalDate date,
                                    LocalTime startTime,
                                    int estimatedDurationMinutes,
@@ -106,6 +106,61 @@ public class SlotService {
     }
 
     /**
+     * Kiểm tra slot và reserve ngay trong cùng 1 transaction có pessimistic lock.
+     * Dùng method này thay vì gọi isSlotAvailable() + reserveForBooking() riêng lẻ
+     * để tránh race condition (overbooking).
+     *
+     * @param bookingId            ID booking vừa được save
+     * @param date                 Ngày đặt
+     * @param startTime            Giờ bắt đầu
+     * @param durationMinutes      Thời lượng ước tính
+     * @param excludeBookingId     Booking cần exclude khi check (dùng khi modify)
+     * @throws com.g42.platform.gms.booking.customer.domain.exception.BookingException nếu slot đã đầy
+     */
+    @Transactional
+    public void checkAndReserve(Integer bookingId, LocalDate date, LocalTime startTime,
+                                int durationMinutes, Integer excludeBookingId) {
+        int requiredBlocks = calculateRequiredBlocks(durationMinutes);
+
+        for (int i = 0; i < requiredBlocks; i++) {
+            LocalTime blockTime = startTime.plusMinutes((long) i * BASE_SLOT_MINUTES);
+
+            // Pessimistic lock trên time_slot row — chặn concurrent check cùng slot
+            TimeSlot slotConfig = timeSlotRepository.findByStartTimeWithLock(blockTime)
+                    .orElseThrow(() -> new com.g42.platform.gms.booking.customer.domain.exception.BookingException(
+                            "Khung giờ không tồn tại: " + blockTime));
+
+            if (Boolean.FALSE.equals(slotConfig.getIsActive())) {
+                throw new com.g42.platform.gms.booking.customer.domain.exception.BookingException(
+                        "Khung giờ không hoạt động: " + blockTime);
+            }
+
+            List<SlotReservation> reservations = reservationRepository.findByDateAndTime(date, blockTime);
+            int count = 0;
+            for (SlotReservation r : reservations) {
+                if (excludeBookingId != null && excludeBookingId.equals(r.getBookingId())) {
+                    continue;
+                }
+                count++;
+            }
+
+            if (count >= slotConfig.getCapacity()) {
+                throw new com.g42.platform.gms.booking.customer.domain.exception.BookingException(
+                        "Khung giờ này đã đầy, vui lòng chọn giờ khác.");
+            }
+
+            // Reserve ngay trong cùng transaction đang giữ lock
+            SlotReservation reservation = new SlotReservation();
+            reservation.setBookingId(bookingId);
+            reservation.setReservedDate(date);
+            reservation.setStartTime(blockTime);
+            reservationRepository.save(reservation);
+        }
+
+        log.debug("checkAndReserve: reserved {} blocks for booking {}", requiredBlocks, bookingId);
+    }
+
+    /**
      * Reserve (đặt chỗ) slots cho một booking
      * 
      * Tạo SlotReservation records cho tất cả blocks cần thiết
@@ -113,6 +168,7 @@ public class SlotService {
      * @param bookingId ID của booking
      * @param estimatedDurationMinutes Thời lượng ước tính
      */
+    @Transactional
     public void reserveForBooking(Integer bookingId, int estimatedDurationMinutes) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new RuntimeException("Booking not found: " + bookingId));
@@ -141,6 +197,7 @@ public class SlotService {
      * 
      * @param bookingId ID của booking
      */
+    @Transactional
     public void releaseForBooking(Integer bookingId) {
         reservationRepository.deleteByBookingId(bookingId);
         log.debug("Released slots for booking {}", bookingId);

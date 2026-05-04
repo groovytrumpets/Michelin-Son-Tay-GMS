@@ -67,7 +67,6 @@ public class ZaloNotificationSender implements NotificationSender {
     @Transactional
     public void sendBookingConfirm(String phone, String customerName, List<String> productName, String orderCode, LocalDateTime bookingTime, String garageLocation) {
         System.out.println("Sending confirmation...");
-        String template_id = "546916";
         String url = "https://business.openapi.zalo.me/message/template";
         ZaloToken zaloToken = zaloTokenRepo.getZaloTokensByState("active");
         if (zaloToken == null||zaloToken.getAccessToken()==null||zaloToken.getAccessToken().isEmpty()) {
@@ -76,7 +75,7 @@ public class ZaloNotificationSender implements NotificationSender {
         }
 //        String accessToken = zaloToken.getAccessToken();
 
-        String templateId = "546916";
+        String templateId = "562453";
 
         RestTemplate restTemplate = new RestTemplate();
 
@@ -203,5 +202,48 @@ public class ZaloNotificationSender implements NotificationSender {
             return "84" + phone.substring(1);
         }
         return phone;
+    }
+    @Override
+    public void sendEstimate(String number, String customerName,List<String> productName, String orderCode, LocalDateTime createAt, String garageLocation,String totalPrice) {
+        String url = "https://business.openapi.zalo.me/message/template";
+        ZaloToken zaloToken = zaloTokenRepo.getZaloTokenByState("active");
+        if (zaloToken == null||zaloToken.getAccessToken()==null||zaloToken.getAccessToken().isEmpty()) {
+            System.err.println("ZaloToken is null, tried send to Booking: "+orderCode);
+            return;
+        }
+//        String accessToken = zaloToken.getAccessToken();
+
+        String templateId = "574006";
+
+        RestTemplate restTemplate = new RestTemplate();
+
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("access_token", zaloToken.getAccessToken());
+
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("phone", convertPhone(number));
+        body.put("template_id", templateId);
+
+        Map<String, Object> templateData = new HashMap<>();
+        templateData.put("customer_name", customerName);
+        templateData.put("order_code", orderCode);
+        templateData.put("time", createAt);
+        templateData.put("service_price", productName);
+        templateData.put("price", totalPrice);
+        templateData.put("location", garageLocation);
+        body.put("template_data", templateData);
+
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+
+        ResponseEntity<String> response = restTemplate.postForEntity(
+                url,
+                request,
+                String.class
+        );
+
+        System.out.println(response.getBody());
     }
 }

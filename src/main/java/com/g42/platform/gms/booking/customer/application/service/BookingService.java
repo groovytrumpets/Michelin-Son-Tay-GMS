@@ -176,18 +176,8 @@ public class BookingService {
             throw new BookingException("Vui lòng đặt lịch trước ít nhất 2 giờ.");
         }
 
-        // === 6. CHECK SLOT AVAILABILITY ===
+        // === 6. TÍNH DURATION ===
         int estimatedDuration = calculateEstimatedDuration(booking.getCatalogItemIds());
-
-        boolean slotAvailable = slotService.isSlotAvailable(
-                booking.getScheduledDate(),
-                booking.getScheduledTime(),
-                estimatedDuration,
-                null
-        );
-        if (!slotAvailable) {
-            throw new BookingException("Khung giờ này đã đầy, vui lòng chọn giờ khác.");
-        }
 
         // === 7. GENERATE BOOKING CODE (MST_XXXXXX) ===
         try {
@@ -205,8 +195,15 @@ public class BookingService {
         booking.setQueueOrder(maxQueueOrder!=null?maxQueueOrder+1:1);
         Booking savedBooking = bookingRepository.save(booking);
 
-        // === 9. RESERVE SLOT CHO BOOKING NÀY ===
-        slotService.reserveForBooking(savedBooking.getBookingId(), estimatedDuration);
+        // === 9. CHECK SLOT VÀ RESERVE ATOMIC (tránh race condition) ===
+        // checkAndReserve dùng pessimistic lock, check + reserve trong cùng 1 transaction
+        slotService.checkAndReserve(
+                savedBooking.getBookingId(),
+                savedBooking.getScheduledDate(),
+                savedBooking.getScheduledTime(),
+                estimatedDuration,
+                null
+        );
 
         // === 10. GỬI THÔNG BÁO XÁC NHẬN BOOKING QUA ZALO ===
         // Lưu booking thành công trước, sau đó mới gửi thông báo để lỗi Zalo không rollback booking.
@@ -502,13 +499,7 @@ public class BookingService {
         int estimatedDuration = calculateEstimatedDuration(finalCatalogItemIds);
 
         if (timeChanged) {
-            boolean slotAvailable = slotService.isSlotAvailable(
-                    newDate, newTime, estimatedDuration, booking.getBookingId()
-            );
-            if (!slotAvailable) {
-                throw new BookingException("Khung giờ mới đã đầy, vui lòng chọn giờ khác.");
-            }
-
+            // Release slot cũ trước
             slotService.releaseForBooking(booking.getBookingId());
         }
 
@@ -536,7 +527,8 @@ public class BookingService {
         Booking saved = bookingRepository.save(booking);
 
         if (timeChanged) {
-            slotService.reserveForBooking(saved.getBookingId(), estimatedDuration);
+            // Check + reserve slot mới atomic (tránh race condition)
+            slotService.checkAndReserve(saved.getBookingId(), newDate, newTime, estimatedDuration, null);
         }
 
         log.info("Customer booking modified: bookingId={}, customerId={}", saved.getBookingId(), customerId);

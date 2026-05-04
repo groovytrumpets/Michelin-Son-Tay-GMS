@@ -9,6 +9,7 @@ import com.g42.platform.gms.booking.customer.domain.repository.BookingRepository
 import com.g42.platform.gms.catalog.infrastructure.repository.CatalogItemRepository;
 import com.g42.platform.gms.common.constant.FileUploadConstants;
 import com.g42.platform.gms.common.service.ImageUploadService;
+import com.g42.platform.gms.dashboard.application.service.StaffNotifyService;
 import com.g42.platform.gms.estimation.api.internal.EstimateInternalApi;
 import com.g42.platform.gms.estimation.domain.entity.Estimate;
 import com.g42.platform.gms.service_ticket_management.api.dto.assign.AssignStaffDto;
@@ -68,6 +69,7 @@ public class CheckInService {
     private final SafetyInspectionService safetyInspectionService;
     private final TicketAssignmentService ticketAssignmentService;
     private final EstimateInternalApi estimateInternalApi;
+    private final StaffNotifyService staffNotifyService;
 
     @Transactional(readOnly = true)
     public BookingLookupResponse lookupBooking(BookingLookupRequest request) {
@@ -178,7 +180,7 @@ public class CheckInService {
         log.info("Starting single-page check-in for booking: {}", request.getBookingId());
 
         if (request.getStaffId() == null) {
-            throw new CheckInException("Thiếu thông tin nhân viên thực hiện check-in (staffId)");
+            throw new CheckInException("Thiếu thông tin nhân viên thực hiện check-in");
         }
 
         // 1. Validate and get vehicle
@@ -195,6 +197,9 @@ public class CheckInService {
             .orElseThrow(() -> new CheckInException("Không tìm thấy service ticket vừa tạo"));
         final Integer createdTicketId = ticketDomain.getServiceTicketId();
 
+        if (request.getAdvisorId() == null) {
+            throw new CheckInException("Thiếu phân công tư vấn viên.");
+        }
         // 3. Upload license plate photo (optional)
         if (request.getLicensePlatePhoto() != null && !request.getLicensePlatePhoto().isEmpty()) {
             try {
@@ -337,7 +342,8 @@ public class CheckInService {
 
         log.info("Single-page check-in completed successfully: ticketCode={}, photoCount={}, warnings={}",
             savedTicketAll.getTicketCode(), photoCount, warnings.size());
-
+        //
+        staffNotifyService.createNotificationAssignAuto(response.getAdvisorId(),"Đã được giao phiếu: "+savedTicketAll.getTicketCode(),"Vui lòng mở trang Điều phối dịch vụ để xác nhận!",savedTicketAll.getCreatedBy(),"http://localhost:5173/advisor/inspection");
         return response;
     }
 

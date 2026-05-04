@@ -29,8 +29,16 @@ public class PricingService {
                 .findByItemIdAndWarehouseId(itemId, warehouseId).orElse(null);
         if (warehousePricing != null && warehousePricing.getSellingPrice().compareTo(BigDecimal.ZERO) > 0) {
             pricingResolve.setFinalPrice(warehousePricing.getSellingPrice());
-            pricingResolve.setNotify("Đang dùng giá warehousePricing");
+            pricingResolve.setNotify("Đang dùng giá cài đặt sẵn");
             return  pricingResolve;
+        }
+
+        // 2. Fallback: giá nhập mới nhất từ lô
+        BigDecimal finalPrice = stockEntryService.findLatesFallBackPrice(itemId, warehouseId);
+        if (finalPrice != null && finalPrice.compareTo(BigDecimal.ZERO) > 0) {
+            pricingResolve.setFinalPrice(finalPrice);
+            pricingResolve.setNotify("Đang dùng giá nhập kho cũ nhất (FIFO)");
+            return pricingResolve;
         }
 
         // 3. Giá từ catalog
@@ -47,13 +55,6 @@ public class PricingService {
             return pricingResolve;
         }
 
-        // 2. Fallback: giá nhập mới nhất từ lô
-        BigDecimal finalPrice = stockEntryService.findLatesFallBackPrice(itemId, warehouseId);
-        if (finalPrice != null && finalPrice.compareTo(BigDecimal.ZERO) > 0) {
-            pricingResolve.setFinalPrice(finalPrice);
-            pricingResolve.setNotify("Đang dùng giá nhập kho mới nhất");
-            return pricingResolve;
-        }
         pricingResolve.setFinalPrice(BigDecimal.ZERO);
         pricingResolve.setNotify("Không tìm thấy giá phù hợp trong cơ sở dữ liệu");
         return pricingResolve;

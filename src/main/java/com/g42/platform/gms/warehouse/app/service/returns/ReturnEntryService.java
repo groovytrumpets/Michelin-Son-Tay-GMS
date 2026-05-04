@@ -39,6 +39,8 @@ import com.g42.platform.gms.estimation.domain.repository.EstimateItemRepository;
 import com.g42.platform.gms.estimation.domain.entity.EstimateItem;
 import com.g42.platform.gms.warehouse.domain.repository.StockAllocationRepo;
 import com.g42.platform.gms.service_ticket_management.domain.repository.ServiceTicketRepo;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -207,6 +209,10 @@ public class ReturnEntryService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "items không hợp lệ: " + e.getMessage());
         }
+        //buy x get y
+//        Map<Integer, Integer> returnAllocationMap = items.stream()
+//                .collect(Collectors.toMap(ReturnEntryItemRequest::getAllocationId, ReturnEntryItemRequest::getQuantity));
+//            estimateInternalApi.validatePromotion(returnAllocationMap);
 
         // Tạo DTO nội bộ `CreateReturnEntryRequest` từ form đã parse
         // (sử dụng cùng cấu trúc như endpoint JSON để tái sử dụng `create(...)`)

@@ -18,4 +18,5 @@ public class NotificationCreateDto {
     private NotificationType notificationType;
     private Boolean isRead;
     private Integer sentBy;
+    private String url;
 }

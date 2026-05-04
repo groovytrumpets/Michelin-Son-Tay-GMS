@@ -1,11 +1,17 @@
 package com.g42.platform.gms.notification.api.controller;
 
+import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.feedback.api.internal.FeedbackInternalApi;
+import com.g42.platform.gms.notification.api.dto.EstimateRequest;
 import com.g42.platform.gms.notification.api.dto.ZaloWebhookPayloadDto;
+import com.g42.platform.gms.notification.application.service.NotificationService;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDateTime;
+import java.util.List;
 
 @RestController
 @AllArgsConstructor
@@ -13,6 +19,9 @@ import org.springframework.web.bind.annotation.*;
 public class ZaloWebhookController {
     @Autowired
     private FeedbackInternalApi feedbackInternalApi;
+    @Autowired
+    private NotificationService notificationService;
+
     @PostMapping("/events")
     public ResponseEntity<String> receiveZaloEvents(
             @RequestBody ZaloWebhookPayloadDto payload,
@@ -45,5 +54,22 @@ public class ZaloWebhookController {
 
         // 2. BẮT BUỘC TRẢ VỀ 200 OK
         return ResponseEntity.ok("Received");
+    }
+    @PostMapping("/estimate/sent")
+    public ResponseEntity<String> estimate(@RequestBody EstimateRequest request){
+        if (request.getNumber() == null || request.getOrderCode() == null) {
+            return ResponseEntity.badRequest().body("Thiếu thông tin số điện thoại hoặc mã đơn!");
+        }
+        LocalDateTime createAt = LocalDateTime.now();
+        notificationService.sendEstimateViaZalo(
+                request.getNumber(),
+                request.getCustomerName(),
+                request.getProductName(),
+                request.getOrderCode(),
+                createAt,
+                request.getGarageLocation(),
+                request.getTotalPrice()
+        );
+        return ResponseEntity.ok("Yêu cầu gửi báo giá Zalo ZNS đã được xử lý");
     }
 }
