@@ -5,19 +5,19 @@ import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.warehouse.api.dto.entry.CreateStockEntryRequest;
 import com.g42.platform.gms.warehouse.api.dto.entry.CreateStockEntryWithAttachmentRequest;
-import com.g42.platform.gms.warehouse.api.dto.response.StockEntryResponse;
-import com.g42.platform.gms.warehouse.app.service.entry.StockEntryService;
 import com.g42.platform.gms.warehouse.api.dto.request.PatchEntryItemRequest;
 import com.g42.platform.gms.warehouse.api.dto.request.UpdateStockEntryRequest;
 import com.g42.platform.gms.warehouse.api.dto.response.StockEntryImportResponse;
+import com.g42.platform.gms.warehouse.api.dto.response.StockEntryResponse;
 import com.g42.platform.gms.warehouse.app.service.entry.StockEntryExcelService;
+import com.g42.platform.gms.warehouse.app.service.entry.StockEntryService;
 import com.g42.platform.gms.warehouse.domain.enums.StockEntryStatus;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -36,50 +36,49 @@ public class StockEntryController {
     private final StockEntryService stockEntryService;
     private final StockEntryExcelService excelService;
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // QUERY
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /** Danh sách phiếu nhập có filter + phân trang. */
     @GetMapping
     @PreAuthorize("isAuthenticated()")
-        public ResponseEntity<ApiResponse<Page<StockEntryResponse>>> list(
+    public ResponseEntity<ApiResponse<Page<StockEntryResponse>>> list(
             @RequestParam Integer warehouseId,
-                        @RequestParam(required = false) StockEntryStatus status,
-                        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
-                        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
-                        @RequestParam(required = false) String search,
-                        @RequestParam(defaultValue = "0") int page,
-                        @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(required = false) StockEntryStatus status,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
         return ResponseEntity.ok(ApiResponses.success(
-                                stockEntryService.searchByWarehouse(warehouseId, status, fromDate, toDate, search, page, size)));
+                stockEntryService.searchByWarehouse(warehouseId, status, fromDate, toDate, search, page, size)));
     }
 
+    /** Chi tiết 1 phiếu nhập. */
     @GetMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<StockEntryResponse>> getById(@PathVariable Integer id) {
         return ResponseEntity.ok(ApiResponses.success(stockEntryService.getById(id)));
     }
 
-    /** Sửa từng item trong phiếu nhập — chỉ khi DRAFT */
-    @PatchMapping("/{id}/items/{itemId}")
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<StockEntryResponse>> patchItem(
-            @PathVariable Integer id,
-            @PathVariable Integer itemId,
-            @RequestBody PatchEntryItemRequest request) {
-        return ResponseEntity.ok(ApiResponses.success(stockEntryService.patchItem(id, itemId, request)));
-    }
+    // ─────────────────────────────────────────────────────────────────────────
+    // CREATE
+    // ─────────────────────────────────────────────────────────────────────────
 
-    /** Cập nhật phiếu nhập kho — chỉ khi DRAFT */
-    @PutMapping("/{id}")
+    /** Tạo phiếu nhập DRAFT (JSON only, không kèm ảnh). */
+    @PostMapping
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<StockEntryResponse>> update(
-            @PathVariable Integer id,
-            @RequestBody UpdateStockEntryRequest request) {
-        return ResponseEntity.ok(ApiResponses.success(stockEntryService.update(id, request)));
+    public ResponseEntity<ApiResponse<StockEntryResponse>> create(
+            @Valid @RequestBody CreateStockEntryRequest request,
+            @AuthenticationPrincipal StaffPrincipal principal) {
+        return ResponseEntity.ok(ApiResponses.success(
+                stockEntryService.create(request, principal.getStaffId())));
     }
 
     /**
-     * Tạo phiếu nhập kho + ảnh chứng từ trong 1 form (multipart/form-data).
-     * Dùng @ModelAttribute — tương tự CheckIn complete-all.
-     * items truyền dưới dạng JSON string.
-     * POST /api/warehouse/stock-entries/with-attachment
+     * Tạo phiếu nhập + ảnh chứng từ trong 1 request (multipart/form-data).
+     * items truyền dưới dạng JSON string trong field "items".
      */
     @PostMapping(value = "/with-attachment", consumes = "multipart/form-data")
     @PreAuthorize("isAuthenticated()")
@@ -90,17 +89,34 @@ public class StockEntryController {
                 stockEntryService.createWithAttachmentForm(request, principal.getStaffId())));
     }
 
-    /** Tạo phiếu DRAFT (JSON only, không kèm ảnh) */
-    @PostMapping
+    // ─────────────────────────────────────────────────────────────────────────
+    // UPDATE
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /** Cập nhật thông tin phiếu nhập — chỉ khi DRAFT. */
+    @PutMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<StockEntryResponse>> create(
-            @Valid @RequestBody CreateStockEntryRequest request,
-            @AuthenticationPrincipal StaffPrincipal principal) {
-        return ResponseEntity.ok(ApiResponses.success(
-                stockEntryService.create(request, principal.getStaffId())));
+    public ResponseEntity<ApiResponse<StockEntryResponse>> update(
+            @PathVariable Integer id,
+            @RequestBody UpdateStockEntryRequest request) {
+        return ResponseEntity.ok(ApiResponses.success(stockEntryService.update(id, request)));
     }
 
-    /** Upload ảnh riêng cho phiếu đã tạo */
+    /** Sửa từng dòng item trong phiếu nhập — chỉ khi DRAFT. */
+    @PatchMapping("/{id}/items/{itemId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<StockEntryResponse>> patchItem(
+            @PathVariable Integer id,
+            @PathVariable Integer itemId,
+            @RequestBody PatchEntryItemRequest request) {
+        return ResponseEntity.ok(ApiResponses.success(stockEntryService.patchItem(id, itemId, request)));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // ATTACHMENT
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /** Upload ảnh chứng từ riêng cho phiếu đã tạo — chỉ khi DRAFT. */
     @PostMapping("/{id}/attachments")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> addAttachment(
@@ -111,7 +127,11 @@ public class StockEntryController {
         return ResponseEntity.ok(ApiResponses.success(null));
     }
 
-    /** Xác nhận phiếu nhập → cộng inventory */
+    // ─────────────────────────────────────────────────────────────────────────
+    // CONFIRM
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /** Xác nhận phiếu nhập → cộng tồn kho. */
     @PostMapping("/{id}/confirm")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<StockEntryResponse>> confirm(
@@ -121,12 +141,11 @@ public class StockEntryController {
                 stockEntryService.confirm(id, principal.getStaffId())));
     }
 
-    // ── Excel ──────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
+    // EXCEL
+    // ─────────────────────────────────────────────────────────────────────────
 
-    /**
-     * Xuất danh sách phiếu nhập kho ra Excel.
-     * GET /api/warehouse/stock-entries/excel/export?warehouseId=1
-     */
+    /** Xuất danh sách phiếu nhập ra Excel. */
     @GetMapping("/excel/export")
     @PreAuthorize("hasAnyRole('WAREHOUSE_KEEPER','MANAGER','ADMIN','ACCOUNTANT')")
     public ResponseEntity<byte[]> exportStockEntries(
@@ -150,17 +169,12 @@ public class StockEntryController {
         });
 
         return ResponseEntity.ok()
-                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\"stock-entries.xlsx\"")
-                .contentType(org.springframework.http.MediaType.parseMediaType(
-                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"stock-entries.xlsx\"")
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                 .body(bytes);
     }
 
-    /**
-     * Tải về file Excel mẫu để nhập kho.
-     * GET /api/warehouse/stock-entries/excel/template
-     */
+    /** Tải về file Excel mẫu để nhập kho. */
     @GetMapping("/excel/template")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<byte[]> downloadTemplate() {
@@ -171,10 +185,7 @@ public class StockEntryController {
                 .body(bytes);
     }
 
-    /**
-     * Tải về danh sách tất cả PART trong catalog (để tham khảo SKU khi điền phiếu nhập).
-     * GET /api/warehouse/stock-entries/excel/catalog
-     */
+    /** Tải về danh sách tất cả PART trong catalog (tham khảo SKU khi điền phiếu nhập). */
     @GetMapping("/excel/catalog")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<byte[]> downloadCatalog() {
@@ -187,7 +198,6 @@ public class StockEntryController {
 
     /**
      * Import phiếu nhập kho từ file Excel.
-     * POST /api/warehouse/stock-entries/excel/import
      * Content-Type: multipart/form-data
      * Params: file, warehouseId, supplierName
      */
