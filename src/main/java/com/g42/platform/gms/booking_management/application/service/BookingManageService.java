@@ -101,7 +101,7 @@ public class BookingManageService {
                         .sum();
         if (estimatedDuration <= 0) estimatedDuration = 60;
 
-        slotService.checkAndReserve(
+        slotService.checkAndReserveForStaff(
                 booking.getBookingId(),
                 request.getScheduledDate(),
                 request.getScheduledTime(),
