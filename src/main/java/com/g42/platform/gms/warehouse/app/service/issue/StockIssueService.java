@@ -123,51 +123,17 @@ public class StockIssueService {
 
     private static final String FOLDER_STOCK_ISSUE = "stock-issues";
 
-    /**
-     * Tạo phiếu xuất kho (DRAFT).
-     * 
-     * Quy trình:
-     * 1. Kiểm tra tồn kho khả dụng (quantity - reserved_quantity)
-     * 2. Tạo phiếu với status=DRAFT
-     * 3. Nếu là SERVICE_TICKET: gắn allocation RESERVED vào phiếu (setIssueId)
-     * 4. Tính FIFO + giá (dùng lot cũ nhất trước)
-     *    - Nếu đủ lô: tạo item với giá thực (entryItemId > 0)
-     *    - Nếu thiếu: tạo placeholder item với giá=0 (entryItemId=0, là tín hiệu chưa có hàng)
-     * 5. Lưu draft items vào database
-     *
-     * Lưu ý quan trọng:
-     * - Draft chỉ là dự tính (calculation), không thay đổi inventory/allocation
-     * - Khi confirm(), mới thực sự trừ inventory.quantity + giảm stockEntry.remainingQuantity
-     * - Placeholder rows (giá=0, entryItemId=0) báo hiệu demand chưa có lô hàng từ supplier
-     *
-     * @param request - Yêu cầu tạo phiếu (warehouseId, items, issueType, serviceTicketId, v.v.)
-     * @param staffId - ID nhân viên tạo
-     * @return Phiếu xuất đã tạo (DRAFT status)
-     */
     @Transactional
     public StockIssueResponse create(CreateStockIssueRequest request, Integer staffId) {
-        // Bước 1: Tính tổng reserved_quantity cho từng item từ allocation
-        Map<Integer, Integer> reservedByItem = new HashMap<>();
-        if (request.getIssueType() == IssueType.SERVICE_TICKET && request.getServiceTicketId() != null) {
-            List<StockAllocation> reservedAllocations = stockAllocationRepo
-                    .findByTicketAndWarehouseAndStatus(
-                            request.getServiceTicketId(),
-                            request.getWarehouseId(),
-                            AllocationStatus.RESERVED);
-            for (StockAllocation alloc : reservedAllocations) {
-                // Bỏ qua allocation đã gắn issueId (tránh tính trùng)
-                if (alloc.getIssueId() != null) continue;
-                reservedByItem.merge(alloc.getItemId(), alloc.getQuantity(), Integer::sum);
-            }
-        }
+        // Tính reserved quantity từ allocation (chỉ SERVICE_TICKET)
+        Map<Integer, Integer> reservedByItem = buildReservedByItemMap(request);
 
-        // Bước 2: Kiểm tra tồn kho khả dụng cho từng item trong request
+        // Kiểm tra tồn kho khả dụng = (quantity - reserved) + reserved đang muốn xuất
         for (CreateStockIssueRequest.IssueItemRequest item : request.getItems()) {
             int available = inventoryRepo
                     .findByWarehouseAndItem(request.getWarehouseId(), item.getItemId())
                     .map(inv -> Math.max(0, inv.getQuantity() - inv.getReservedQuantity()))
                     .orElse(0);
-            // Tồn kho khả dụng = available + reserved (allocation mà đang muốn xuất này)
             int effectiveAvailable = available + reservedByItem.getOrDefault(item.getItemId(), 0);
             if (effectiveAvailable < item.getQuantity()) {
                 throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
@@ -176,9 +142,9 @@ public class StockIssueService {
             }
         }
 
-        // Bước 3: Tạo phiếu với status=DRAFT
-        StockIssue issue = StockIssue.builder()
-                .issueCode(generateIssueCode())  // Tự động sinh mã phiếu
+        // Tạo phiếu DRAFT
+        StockIssue saved = stockIssueRepo.save(StockIssue.builder()
+                .issueCode(generateIssueCode())
                 .warehouseId(request.getWarehouseId())
                 .issueType(request.getIssueType())
                 .issueReason(request.getIssueReason())
@@ -186,120 +152,27 @@ public class StockIssueService {
                 .discountRate(BigDecimal.ZERO)
                 .status(StockIssueStatus.DRAFT)
                 .createdBy(staffId)
-                .build();
+                .build());
 
-        StockIssue saved = stockIssueRepo.save(issue);
-
-        // Bước 4: Nếu là SERVICE_TICKET → gắn allocation vào phiếu
+        // Gắn allocation RESERVED vào phiếu (chỉ SERVICE_TICKET)
         if (saved.getIssueType() == IssueType.SERVICE_TICKET && saved.getServiceTicketId() != null) {
-            List<StockAllocation> reservedAllocations = stockAllocationRepo
-                    .findByTicketAndWarehouseAndStatus(saved.getServiceTicketId(), saved.getWarehouseId(), AllocationStatus.RESERVED);
-            for (StockAllocation allocation : reservedAllocations) {
-                if (allocation.getIssueId() != null) continue;
-                allocation.setIssueId(saved.getIssueId());  // Gắn phiếu vào allocation
-                stockAllocationRepo.save(allocation);
-            }
+            stockAllocationRepo
+                    .findByTicketAndWarehouseAndStatus(saved.getServiceTicketId(), saved.getWarehouseId(), AllocationStatus.RESERVED)
+                    .stream()
+                    .filter(a -> a.getIssueId() == null)
+                    .forEach(a -> {
+                        a.setIssueId(saved.getIssueId());
+                        stockAllocationRepo.save(a);
+                    });
         }
 
-        // Bước 5: Tính FIFO + giá từ entry items
+        // Tính FIFO + giá cho từng item và lưu
         List<StockIssueItem> draftItems = new ArrayList<>();
         for (CreateStockIssueRequest.IssueItemRequest req : request.getItems()) {
-            Integer itemId = req.getItemId();
-            int needed = req.getQuantity();
-
-            // Lấy estimate unit price (nếu là SERVICE_TICKET)
-            BigDecimal estimateUnitPrice = resolveEstimateUnitPrice(
-                    saved.getServiceTicketId(), saved.getWarehouseId(), itemId);
-
-            // Lấy hoặc tính discount rate
-            BigDecimal discountRate = req.getDiscountRate() != null && req.getDiscountRate().compareTo(BigDecimal.ZERO) != 0
-                    ? req.getDiscountRate()
-                    : discountService.resolveDiscountRate(itemId, saved.getIssueType(), needed);
-
-            // Lấy market selling price
-            BigDecimal marketSellingPrice = pricingRepo
-                    .findActiveByWarehouseAndItem(saved.getWarehouseId(), itemId)
-                    .map(WarehousePricing::getSellingPrice)
-                    .orElse(null);
-
-            // Lấy danh sách lô hàng theo FIFO (cũ nhất trước)
-            List<StockEntryItem> lots = stockEntryRepo.findFifoLots(saved.getWarehouseId(), itemId);
-            int remaining = needed;
-
-            /*
-             * FIFO allocation details:
-             * - We iterate lots oldest-first and consume remaining quantities from
-             *   each lot up to its remainingQuantity. This ensures correct costing
-             *   and tracking per lot (for warranties / traceability).
-             * - We do NOT change inventory quantities here; draft creation only
-             *   records which lot(s) would be used. Actual remainingQuantity is
-             *   decreased when the issue is CONFIRMED.
-             */
-            // Tính toán từng lô
-            for (StockEntryItem lot : lots) {
-                if (remaining <= 0) break;
-                int consume = Math.min(remaining, lot.getRemainingQuantity());  // Lấy cái nhỏ hơn
-                if (consume <= 0) continue;
-
-                // Tính selling price
-                BigDecimal sellingPrice = marketSellingPrice != null
-                        ? marketSellingPrice
-                        : lot.getImportPrice().multiply(lot.getMarkupMultiplier()).setScale(2, RoundingMode.HALF_UP);
-
-                // Nếu là WHOLESALE → giảm giá 15% (0.85)
-                if (saved.getIssueType() == IssueType.WHOLESALE) {
-                    sellingPrice = sellingPrice.multiply(WHOLESALE_FACTOR).setScale(2, RoundingMode.HALF_UP);
-                }
-
-                // Tính final price base
-                BigDecimal finalPriceBase = resolveFinalPriceBase(saved.getIssueType(), estimateUnitPrice, sellingPrice);
-                // Áp dụng discount
-                BigDecimal finalPrice = finalPriceBase
-                        .multiply(BigDecimal.ONE.subtract(
-                                discountRate.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP)))
-                        .setScale(2, RoundingMode.HALF_UP);
-
-                // Tạo issue item
-                draftItems.add(StockIssueItem.builder()
-                        .issueId(saved.getIssueId())
-                        .itemId(itemId)
-                        .entryItemId(lot.getEntryItemId())  // Lô hàng này
-                        .quantity(consume)
-                        .exportPrice(sellingPrice)
-                        .estimateUnitPrice(estimateUnitPrice)
-                        .importPrice(lot.getImportPrice())
-                        .discountRate(discountRate)
-                        .finalPrice(finalPrice)
-                        .build());
-
-                remaining -= consume;
-            }
-
-            // Nếu thiếu hàng (chưa nhập kho): tạo placeholder item với giá=0
-            if (remaining > 0) {
-                /*
-                 * Placeholder rows represent demand that cannot be fulfilled from
-                 * existing lots (stock not yet received). We set entryItemId=0
-                 * and zero prices as a signal to frontend/operators that this
-                 * quantity is pending. When stock arrives, the draft may be
-                 * re-calculated or a new draft created to cover the shortage.
-                 */
-                draftItems.add(StockIssueItem.builder()
-                        .issueId(saved.getIssueId())
-                        .itemId(itemId)
-                        .entryItemId(0)  // Không có lô (placeholder)
-                        .quantity(remaining)
-                        .exportPrice(BigDecimal.ZERO)
-                        .estimateUnitPrice(estimateUnitPrice)
-                        .importPrice(BigDecimal.ZERO)
-                        .discountRate(discountRate)
-                        .finalPrice(BigDecimal.ZERO)
-                        .build());
-            }
+            draftItems.addAll(buildFifoItems(saved, req.getItemId(), req.getQuantity(), req.getDiscountRate()));
         }
-
-        // Lưu tất cả draft items
         stockIssueItemRepo.saveAll(draftItems);
+
         return toResponse(findOrThrow(saved.getIssueId()));
     }
 
@@ -522,41 +395,7 @@ public class StockIssueService {
             // Bước 5: Tính lại FIFO + giá cho items mới
             List<StockIssueItem> newItems = new ArrayList<>();
             for (CreateStockIssueRequest.IssueItemRequest req : request.getItems()) {
-                Integer itemId = req.getItemId();
-                int needed = req.getQuantity();
-
-                // Lấy pricing info
-                BigDecimal estimateUnitPrice = resolveEstimateUnitPrice(issue.getServiceTicketId(), issue.getWarehouseId(), itemId);
-                BigDecimal discountRate = req.getDiscountRate() != null && req.getDiscountRate().compareTo(BigDecimal.ZERO) != 0
-                        ? req.getDiscountRate()
-                        : discountService.resolveDiscountRate(itemId, issue.getIssueType(), needed);
-                BigDecimal marketSellingPrice = pricingRepo.findActiveByWarehouseAndItem(issue.getWarehouseId(), itemId)
-                        .map(WarehousePricing::getSellingPrice).orElse(null);
-
-                // FIFO calculation
-                List<StockEntryItem> lots = stockEntryRepo.findFifoLots(issue.getWarehouseId(), itemId);
-                int remaining = needed;
-                for (StockEntryItem lot : lots) {
-                    if (remaining <= 0) break;
-                    int consume = Math.min(remaining, lot.getRemainingQuantity());
-                    if (consume <= 0) continue;
-                    BigDecimal sellingPrice = marketSellingPrice != null ? marketSellingPrice
-                            : lot.getImportPrice().multiply(lot.getMarkupMultiplier()).setScale(2, RoundingMode.HALF_UP);
-                    BigDecimal finalPriceBase = resolveFinalPriceBase(issue.getIssueType(), estimateUnitPrice, sellingPrice);
-                    BigDecimal finalPrice = finalPriceBase.multiply(BigDecimal.ONE.subtract(
-                            discountRate.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP))).setScale(2, RoundingMode.HALF_UP);
-                    newItems.add(StockIssueItem.builder().issueId(issueId).itemId(itemId).entryItemId(lot.getEntryItemId())
-                            .quantity(consume).exportPrice(sellingPrice).estimateUnitPrice(estimateUnitPrice)
-                            .importPrice(lot.getImportPrice()).discountRate(discountRate).finalPrice(finalPrice).build());
-                    remaining -= consume;
-                }
-
-                // Nếu thiếu hàng → placeholder item
-                if (remaining > 0) {
-                    newItems.add(StockIssueItem.builder().issueId(issueId).itemId(itemId).entryItemId(0)
-                            .quantity(remaining).exportPrice(BigDecimal.ZERO).estimateUnitPrice(estimateUnitPrice)
-                            .importPrice(BigDecimal.ZERO).discountRate(discountRate).finalPrice(BigDecimal.ZERO).build());
-                }
+                newItems.addAll(buildFifoItems(issue, req.getItemId(), req.getQuantity(), req.getDiscountRate()));
             }
             // Bước 6: Lưu items mới
             stockIssueItemRepo.saveAll(newItems);
@@ -888,6 +727,113 @@ public class StockIssueService {
 
     // ── helpers ──────────────────────────────────────────────────────────────
 
+    /** Tổng hợp reserved quantity theo itemId từ allocation RESERVED chưa gắn phiếu. */
+    private Map<Integer, Integer> buildReservedByItemMap(CreateStockIssueRequest request) {
+        if (request.getIssueType() != IssueType.SERVICE_TICKET || request.getServiceTicketId() == null) {
+            return Map.of();
+        }
+        Map<Integer, Integer> result = new HashMap<>();
+        stockAllocationRepo
+                .findByTicketAndWarehouseAndStatus(request.getServiceTicketId(), request.getWarehouseId(), AllocationStatus.RESERVED)
+                .stream()
+                .filter(a -> a.getIssueId() == null)
+                .forEach(a -> result.merge(a.getItemId(), a.getQuantity(), Integer::sum));
+        return result;
+    }
+
+    /**
+     * Tính FIFO và tạo danh sách StockIssueItem cho một itemId.
+     * - importPrice: theo từng lô consume (FIFO chuẩn)
+     * - sellingPrice: ưu tiên market price, fallback dùng lô mới nhất * markup
+     * - Nếu thiếu hàng: thêm placeholder row (entryItemId=0, giá=0)
+     */
+    private List<StockIssueItem> buildFifoItems(StockIssue issue, Integer itemId, int needed, BigDecimal requestedDiscount) {
+        BigDecimal estimateUnitPrice = resolveEstimateUnitPrice(issue.getServiceTicketId(), issue.getWarehouseId(), itemId);
+        BigDecimal discountRate = (requestedDiscount != null && requestedDiscount.compareTo(BigDecimal.ZERO) != 0)
+                ? requestedDiscount
+                : discountService.resolveDiscountRate(itemId, issue.getIssueType(), needed);
+        BigDecimal marketSellingPrice = pricingRepo
+                .findActiveByWarehouseAndItem(issue.getWarehouseId(), itemId)
+                .map(WarehousePricing::getSellingPrice)
+                .orElse(null);
+
+        List<StockEntryItem> lots = stockEntryRepo.findFifoLots(issue.getWarehouseId(), itemId);
+        StockEntryItem latestLot = stockEntryRepo.findLatestLot(issue.getWarehouseId(), itemId).orElse(null);
+
+        List<StockIssueItem> items = new ArrayList<>();
+        int remaining = needed;
+
+        for (StockEntryItem lot : lots) {
+            if (remaining <= 0) break;
+            int consume = Math.min(remaining, lot.getRemainingQuantity());
+            if (consume <= 0) continue;
+
+            BigDecimal sellingPrice = resolveSellingPrice(marketSellingPrice, latestLot, lot, issue.getIssueType());
+            BigDecimal finalPrice = applyDiscount(resolveFinalPriceBase(issue.getIssueType(), estimateUnitPrice, sellingPrice), discountRate);
+
+            items.add(StockIssueItem.builder()
+                    .issueId(issue.getIssueId())
+                    .itemId(itemId)
+                    .entryItemId(lot.getEntryItemId())
+                    .quantity(consume)
+                    .exportPrice(sellingPrice)
+                    .estimateUnitPrice(estimateUnitPrice)
+                    .importPrice(lot.getImportPrice())
+                    .discountRate(discountRate)
+                    .finalPrice(finalPrice)
+                    .build());
+
+            remaining -= consume;
+        }
+
+        // Placeholder row khi không đủ lô hàng trong kho
+        if (remaining > 0) {
+            items.add(StockIssueItem.builder()
+                    .issueId(issue.getIssueId())
+                    .itemId(itemId)
+                    .entryItemId(0)
+                    .quantity(remaining)
+                    .exportPrice(BigDecimal.ZERO)
+                    .estimateUnitPrice(estimateUnitPrice)
+                    .importPrice(BigDecimal.ZERO)
+                    .discountRate(discountRate)
+                    .finalPrice(BigDecimal.ZERO)
+                    .build());
+        }
+
+        return items;
+    }
+
+    /**
+     * Tính giá bán:
+     * 1. Market price (từ WarehousePricing) nếu có
+     * 2. Lô mới nhất * markup nếu không có market price
+     * 3. Lô hiện tại * markup làm fallback cuối
+     * Áp dụng WHOLESALE_FACTOR (0.85) nếu là phiếu buôn.
+     */
+    private BigDecimal resolveSellingPrice(BigDecimal marketPrice, StockEntryItem latestLot,
+                                           StockEntryItem currentLot, IssueType issueType) {
+        BigDecimal price;
+        if (marketPrice != null) {
+            price = marketPrice;
+        } else if (latestLot != null) {
+            price = latestLot.getImportPrice().multiply(latestLot.getMarkupMultiplier()).setScale(2, RoundingMode.HALF_UP);
+        } else {
+            price = currentLot.getImportPrice().multiply(currentLot.getMarkupMultiplier()).setScale(2, RoundingMode.HALF_UP);
+        }
+        if (issueType == IssueType.WHOLESALE) {
+            price = price.multiply(WHOLESALE_FACTOR).setScale(2, RoundingMode.HALF_UP);
+        }
+        return price;
+    }
+
+    /** Áp dụng discount rate (%) vào giá. */
+    private BigDecimal applyDiscount(BigDecimal price, BigDecimal discountRate) {
+        return price
+                .multiply(BigDecimal.ONE.subtract(discountRate.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP)))
+                .setScale(2, RoundingMode.HALF_UP);
+    }
+
     private StockIssue findOrThrow(Integer issueId) {
         return stockIssueRepo.findById(issueId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
@@ -904,47 +850,30 @@ public class StockIssueService {
         return candidate;
     }
 
-    private BigDecimal resolveDiscount(Integer itemId, IssueType issueType, int quantity) {
-        return discountService.resolveDiscountRate(itemId, issueType, quantity);
-    }
-
     private PricingPreview buildDraftPricingPreview(StockIssue issue, StockIssueItem item) {
         int quantity = item.getQuantity() != null ? item.getQuantity() : 0;
         BigDecimal discountRate = item.getDiscountRate() != null
                 ? item.getDiscountRate()
-            : discountService.resolveDiscountRate(item.getItemId(), issue.getIssueType(), quantity);
+                : discountService.resolveDiscountRate(item.getItemId(), issue.getIssueType(), quantity);
 
         List<StockEntryItem> lots = stockEntryRepo.findFifoLots(issue.getWarehouseId(), item.getItemId());
         BigDecimal importPrice = computeAverageImportPrice(lots, quantity);
 
-        BigDecimal sellingPrice = pricingRepo
-                .findActiveByWarehouseAndItem(issue.getWarehouseId(), item.getItemId())
-            .map(WarehousePricing::getSellingPrice)
-                .orElseGet(() -> {
-                    if (!lots.isEmpty()) {
-                        StockEntryItem first = lots.get(0);
-                        return first.getImportPrice()
-                                .multiply(first.getMarkupMultiplier())
-                                .setScale(2, RoundingMode.HALF_UP);
-                    }
-                    return BigDecimal.ZERO;
-                });
+        StockEntryItem latestLot = stockEntryRepo.findLatestLot(issue.getWarehouseId(), item.getItemId()).orElse(null);
+        BigDecimal marketPrice = pricingRepo.findActiveByWarehouseAndItem(issue.getWarehouseId(), item.getItemId())
+                .map(WarehousePricing::getSellingPrice).orElse(null);
 
-        if (issue.getIssueType() == IssueType.WHOLESALE) {
-            sellingPrice = sellingPrice.multiply(WHOLESALE_FACTOR).setScale(2, RoundingMode.HALF_UP);
-        }
+        // Dùng lô đầu tiên làm currentLot fallback khi tính sellingPrice
+        StockEntryItem firstLot = lots.isEmpty() ? null : lots.get(0);
+        BigDecimal sellingPrice = (marketPrice != null || firstLot != null)
+                ? resolveSellingPrice(marketPrice, latestLot, firstLot != null ? firstLot : latestLot, issue.getIssueType())
+                : BigDecimal.ZERO;
 
         BigDecimal estimateUnitPrice = item.getEstimateUnitPrice() != null
-            ? item.getEstimateUnitPrice()
-            : resolveEstimateUnitPrice(issue.getServiceTicketId(), issue.getWarehouseId(), item.getItemId());
+                ? item.getEstimateUnitPrice()
+                : resolveEstimateUnitPrice(issue.getServiceTicketId(), issue.getWarehouseId(), item.getItemId());
 
-        BigDecimal finalPriceBase = resolveFinalPriceBase(issue.getIssueType(), estimateUnitPrice, sellingPrice);
-
-        BigDecimal finalPrice = finalPriceBase
-                .multiply(BigDecimal.ONE.subtract(
-                        discountRate.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP)))
-                .setScale(2, RoundingMode.HALF_UP);
-
+        BigDecimal finalPrice = applyDiscount(resolveFinalPriceBase(issue.getIssueType(), estimateUnitPrice, sellingPrice), discountRate);
         BigDecimal grossProfit = finalPrice.subtract(importPrice).setScale(2, RoundingMode.HALF_UP);
 
         return new PricingPreview(sellingPrice, importPrice, discountRate, finalPrice, grossProfit);

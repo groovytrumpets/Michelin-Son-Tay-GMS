@@ -502,13 +502,24 @@ public class StockAllocationService {
             List<StockEntryItem> lots = stockEntryRepo.findFifoLots(warehouseId, itemId);
             int remaining = remainingReservedQty;
             List<StockIssueItem> newLotItems = new ArrayList<>();
+
+            // Lấy lô mới nhất để tính giá bán fallback
+            StockEntryItem latestLot = stockEntryRepo.findLatestLot(warehouseId, itemId).orElse(null);
+
             for (StockEntryItem lot : lots) {
                 if (remaining <= 0) break;
                 int consume = Math.min(remaining, lot.getRemainingQuantity());
                 if (consume <= 0) continue;
-                BigDecimal sellingPrice = marketSellingPrice != null ? marketSellingPrice
-                        : lot.getImportPrice().multiply(lot.getMarkupMultiplier())
-                                .setScale(2, java.math.RoundingMode.HALF_UP);
+                BigDecimal sellingPrice;
+                if (marketSellingPrice != null) {
+                    sellingPrice = marketSellingPrice;
+                } else if (latestLot != null) {
+                    sellingPrice = latestLot.getImportPrice().multiply(latestLot.getMarkupMultiplier())
+                            .setScale(2, java.math.RoundingMode.HALF_UP);
+                } else {
+                    sellingPrice = lot.getImportPrice().multiply(lot.getMarkupMultiplier())
+                            .setScale(2, java.math.RoundingMode.HALF_UP);
+                }
                 BigDecimal finalPriceBase = stockIssueService.resolveFinalPriceBasePublic(
                         IssueType.SERVICE_TICKET, estimateUnitPrice, sellingPrice);
                 BigDecimal finalPrice = finalPriceBase.multiply(BigDecimal.ONE.subtract(
@@ -867,13 +878,24 @@ public class StockAllocationService {
                         List<StockEntryItem> lots = stockEntryRepo.findFifoLots(warehouseId, itemId);
                         int remaining = totalNeeded;
                         List<StockIssueItem> lotItems = new ArrayList<>();
+
+                        // Lấy lô mới nhất để tính giá bán fallback
+                        StockEntryItem latestLot = stockEntryRepo.findLatestLot(warehouseId, itemId).orElse(null);
+
                         for (StockEntryItem lot : lots) {
                             if (remaining <= 0) break;
                             int consume = Math.min(remaining, lot.getRemainingQuantity());
                             if (consume <= 0) continue;
-                            BigDecimal sellingPrice = marketSellingPrice != null ? marketSellingPrice
-                                    : lot.getImportPrice().multiply(lot.getMarkupMultiplier())
-                                            .setScale(2, java.math.RoundingMode.HALF_UP);
+                            BigDecimal sellingPrice;
+                            if (marketSellingPrice != null) {
+                                sellingPrice = marketSellingPrice;
+                            } else if (latestLot != null) {
+                                sellingPrice = latestLot.getImportPrice().multiply(latestLot.getMarkupMultiplier())
+                                        .setScale(2, java.math.RoundingMode.HALF_UP);
+                            } else {
+                                sellingPrice = lot.getImportPrice().multiply(lot.getMarkupMultiplier())
+                                        .setScale(2, java.math.RoundingMode.HALF_UP);
+                            }
                             BigDecimal finalPriceBase = stockIssueService.resolveFinalPriceBasePublic(
                                     IssueType.SERVICE_TICKET, estimateUnitPrice, sellingPrice);
                             BigDecimal finalPrice = finalPriceBase.multiply(BigDecimal.ONE.subtract(

@@ -17,6 +17,7 @@ import com.g42.platform.gms.service_ticket_management.domain.repository.ServiceT
 import com.g42.platform.gms.service_ticket_management.domain.repository.TicketAssignmentRepo;
 import com.g42.platform.gms.staff.profile.infrastructure.entity.StaffProfileJpa;
 import com.g42.platform.gms.staff.profile.infrastructure.repository.StaffProileJpaRepo;
+import com.g42.platform.gms.dashboard.application.service.StaffNotifyService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,6 +45,7 @@ public class TicketAssignmentService {
     private final TicketAssignmentDtoMapper dtoMapper;
     private final StaffProileJpaRepo staffProfileRepo;
     private final ServiceTicketRepo serviceTicketRepo;
+    private final StaffNotifyService staffNotifyService;
 
 
     @Transactional(readOnly = true)
@@ -113,6 +115,20 @@ public class TicketAssignmentService {
         // Nếu assign technician thành công, chuyển advisor từ PENDING sang ACTIVE
         if ("TECHNICIAN".equals(dto.getRoleInTicket())) {
             activateAdvisorAssignment(ticketId);
+
+            // Thông báo cho kỹ thuật viên vừa được phân công
+            ServiceTicket ticket = serviceTicketRepo.findByServiceTicketId(ticketId);
+            String ticketCode = String.valueOf(ticketId);
+            if (ticket != null) {
+                ticketCode = ticket.getTicketCode();
+            }
+            staffNotifyService.createNotificationAssignAuto(
+                dto.getStaffId(),
+                "Đã được phân công vào phiếu: " + ticketCode,
+                "Bạn đã được phân công vào phiếu dịch vụ " + ticketCode + "; Vui lòng kiểm tra và xác nhận!",
+                dto.getStaffId(),
+                "http://localhost:5173/advisor/inspection"
+            );
         }
 
         return enrichDtoWithStaffName(dtoMapper.toDto(saved));
