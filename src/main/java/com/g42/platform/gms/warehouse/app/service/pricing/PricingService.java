@@ -37,7 +37,7 @@ public class PricingService {
         BigDecimal finalPrice = stockEntryService.findLatesFallBackPrice(itemId, warehouseId);
         if (finalPrice != null && finalPrice.compareTo(BigDecimal.ZERO) > 0) {
             pricingResolve.setFinalPrice(finalPrice);
-            pricingResolve.setNotify("Đang dùng giá nhập kho cũ nhất (FIFO)");
+            pricingResolve.setNotify("Đang dùng giá nhập kho nhập mới nhất");
             return pricingResolve;
         }
 
