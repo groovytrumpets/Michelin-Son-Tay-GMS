@@ -1,5 +1,6 @@
 package com.g42.platform.gms.warehouse.infrastructure.specification;
 
+import com.g42.platform.gms.warehouse.app.service.dto.PricingResolve;
 import org.apache.commons.lang3.tuple.Pair;
 import com.g42.platform.gms.warehouse.api.dto.CatalogItemDto;
 import com.g42.platform.gms.warehouse.api.internal.WarehouseInternalApi;
@@ -124,5 +125,17 @@ public class WarehouseInternalApiImpl implements WarehouseInternalApi {
         }
 
         return null;
+    }
+
+    @Override
+    public BigDecimal findLatesFallBackPrice(Integer itemId, Integer warehouseId) {
+        PricingResolve pricingResolve = pricingService.getEffectivePrice(itemId,warehouseId,null);
+        if (pricingResolve == null) {
+            return BigDecimal.ZERO;
+        }
+        if (pricingResolve.getFinalPrice() != null) {
+        return  pricingResolve.getFinalPrice();
+        }
+            return BigDecimal.ZERO;
     }
 }

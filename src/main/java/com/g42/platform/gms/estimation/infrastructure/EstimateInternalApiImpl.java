@@ -2,8 +2,11 @@ package com.g42.platform.gms.estimation.infrastructure;
 
 import com.g42.platform.gms.estimation.api.internal.EstimateInternalApi;
 import com.g42.platform.gms.estimation.domain.entity.Estimate;
+import com.g42.platform.gms.estimation.domain.entity.EstimateItem;
 import com.g42.platform.gms.estimation.domain.exception.EstimateErrorCode;
 import com.g42.platform.gms.estimation.domain.exception.EstimateException;
+import com.g42.platform.gms.estimation.domain.repository.EstimateItemRepository;
+import com.g42.platform.gms.estimation.domain.repository.EstimateRepository;
 import com.g42.platform.gms.estimation.infrastructure.entity.EstimateItemJpa;
 import com.g42.platform.gms.estimation.infrastructure.entity.EstimateJpa;
 import com.g42.platform.gms.estimation.infrastructure.entity.ServiceReminderJpa;
@@ -15,6 +18,10 @@ import com.g42.platform.gms.estimation.infrastructure.repository.ServiceRemindJp
 import com.g42.platform.gms.estimation.infrastructure.repository.StockAllocationRepositoryJpa;
 import com.g42.platform.gms.promotion.api.internal.PromotionInternalApi;
 import com.g42.platform.gms.promotion.domain.entity.Promotion;
+import com.g42.platform.gms.warehouse.api.internal.WarehouseInternalApi;
+import com.g42.platform.gms.warehouse.domain.entity.StockIssue;
+import com.g42.platform.gms.warehouse.infrastructure.entity.StockIssueJpa;
+import com.g42.platform.gms.warehouse.infrastructure.repository.StockIssueJpaRepo;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -39,6 +46,14 @@ public class EstimateInternalApiImpl implements EstimateInternalApi {
     private EstimateItemRepositoryJpa estimateItemRepositoryJpa;
     @Autowired
     private PromotionInternalApi promotionInternalApi;
+    @Autowired
+    private EstimateRepository estimateRepository;
+    @Autowired
+    private EstimateItemRepository estimateItemRepository;
+    @Autowired
+    private WarehouseInternalApi warehouseInternalApi;
+    @Autowired
+    private StockIssueJpaRepo stockIssueJpaRepo;
 
     @Override
     public List<Estimate> findAllByServiceTicketId(List<Integer> ticketIds) {
@@ -143,6 +158,55 @@ public class EstimateInternalApiImpl implements EstimateInternalApi {
         recalculateItemPrices(returnEstimate,oldQty);
         EstimateItemJpa saved = estimateItemRepositoryJpa.save(returnEstimate);
         return saved.getId();
+    }
+
+    @Override
+    public void calculateAndLockGrossProfit(Integer serviceTicketId) {
+        Estimate estimate = estimateRepository.findEstimateByServiceIdAndLatestVerson(serviceTicketId);
+        if (estimate == null) {
+            return;
+        }
+        List<EstimateItem> items = estimateItemRepository.findByEstimateId(estimate.getId());
+
+        BigDecimal totalEstimateCost = BigDecimal.ZERO;
+        BigDecimal totalEstimateGrossProfit = BigDecimal.ZERO;
+
+        for (EstimateItem item : items) {
+            if (item.getIsRemoved()) continue;
+
+            BigDecimal unitCost = BigDecimal.ZERO;
+
+            // 2. Chỉ tính giá vốn cho phụ tùng/vật tư (bỏ qua công thợ nếu công thợ không có kho)
+            if (item.getItemId() != null && item.getWarehouseId() != null) {
+                // Lấy giá vốn (sử dụng hàm Fallback FIFO cũ của bạn hoặc API từ kho)
+                StockAllocationJpa stockAllocation = stockAllocationJpaRepo.findByEstimateItemId(item.getId());
+                StockIssueJpa stockIssueJpa = stockIssueJpaRepo.findById(stockAllocation.getIssueId()).orElse(null);
+                if (stockIssueJpa==null) {
+                    continue;
+                }
+                BigDecimal cost = warehouseInternalApi.findLatesFallBackPrice(item.getItemId(), item.getWarehouseId());
+                if (cost != null) {
+                    unitCost = cost;
+                }
+            }
+
+            // 3. Tính toán tiền nong cho dòng này
+            BigDecimal quantity = BigDecimal.valueOf(item.getQuantity());
+            BigDecimal totalCost = unitCost.multiply(quantity);
+
+            // Lợi nhuận = Giá bán cuối cùng (đã trừ discount) - Tổng giá vốn
+            BigDecimal itemGrossProfit = item.getFinalPrice().subtract(totalCost);
+
+            // 4. Lưu vào Estimate Item
+            item.setGrossProfit(itemGrossProfit); // Thêm field gross_profit
+            estimateItemRepository.save(item);
+
+            // 5. Cộng dồn lên biến tổng
+            totalEstimateCost = totalEstimateCost.add(totalCost);
+            totalEstimateGrossProfit = totalEstimateGrossProfit.add(itemGrossProfit);
+        }
+        estimate.setGrossProfit(totalEstimateGrossProfit);
+        estimateRepository.save(estimate);
     }
 //
 //    @Override

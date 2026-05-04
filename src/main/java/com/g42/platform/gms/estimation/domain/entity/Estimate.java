@@ -30,6 +30,7 @@ public class Estimate {
     private Integer version;
     private Integer revisedFromId;
     private BigDecimal totalPrice;
+    private BigDecimal grossProfit;
     private List<EstimateItem> items;
 
 //    public BigDecimal getTotalPrices() {
