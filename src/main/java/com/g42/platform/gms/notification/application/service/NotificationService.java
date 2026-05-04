@@ -25,4 +25,7 @@ public class NotificationService {
     public void sendFeedbackViaZalo(String number, String name, String code) {
         notificationSender.sendFeedback(number,name,code);
     }
+    public void sendEstimateViaZalo(String number, String customerName,List<String> productName, String orderCode, LocalDateTime createAt, String garageLocation,String totalPrice) {
+        notificationSender.sendEstimate(number,customerName,productName,orderCode,createAt,garageLocation,totalPrice);
+    }
 }
