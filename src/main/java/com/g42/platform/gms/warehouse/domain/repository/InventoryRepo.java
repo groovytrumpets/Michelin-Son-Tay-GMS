@@ -6,8 +6,17 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Domain port — persistence contract cho Inventory.
- * Service chỉ phụ thuộc vào interface này và domain entity Inventory.
+ * Domain port cho Inventory.
+ *
+ * Service lớp trên chỉ làm việc với interface này để:
+ * - đọc tồn kho theo kho + item
+ * - khóa row khi cần cập nhật reservedQuantity an toàn
+ * - cập nhật quantity / reservedQuantity trong cùng transaction
+ *
+ * Ghi chú concurrency:
+ * - `findByWarehouseAndItemWithLock(...)` được dùng khi service sẽ tính lại
+ *   reserved/available và save ngay sau đó.
+ * - Khi không cần ghi, ưu tiên `findByWarehouseAndItem(...)` để tránh lock thừa.
  */
 public interface InventoryRepo {
 

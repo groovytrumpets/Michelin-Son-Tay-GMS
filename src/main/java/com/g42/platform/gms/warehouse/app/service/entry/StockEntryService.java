@@ -58,6 +58,23 @@ public class StockEntryService {
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyyMMdd");
     private static final AtomicInteger SEQ = new AtomicInteger(0);
 
+    /*
+     * Mô tả các dependency (repo/service) chính và vai trò của chúng trong service này:
+     * - stockEntryRepo: quản lý entity StockEntry (tạo, cập nhật, tìm kiếm) và StockEntryItem (lô hàng).
+     * - inventoryRepo: đọc và cập nhật entity Inventory; khi confirm entry cần gọi
+     *   findByWarehouseAndItemWithLock(...) để khóa hàng trước khi tăng số lượng tồn kho.
+     * - transactionRepo: ghi InventoryTransaction để audit mọi thay đổi tồn kho (IN = nhập).
+     * - attachmentRepo / imageUploadService: quản lý ảnh chứng từ nhập hàng (bắt buộc trước confirm).
+     * - warehouseRepo / staffProfileRepo / partCatalogRepo: dữ liệu reference (kho, nhân viên, sản phẩm).
+     *
+     * Ghi chú quan trọng (concurrency / invariants):
+     * - Mọi thao tác thay đổi inventory.quantity (nhập hàng) cần gọi findByWarehouseAndItemWithLock(...)
+     *   để khóa hàng/row trước khi thay đổi, tránh race condition.
+     * - Entry có 2 trạng thái chính: DRAFT (soạn thảo) và CONFIRMED (đã nhập kho).
+     * - Khi confirm: phải kiểm tra ảnh chứng từ bắt buộc, sau đó tăng quantity và ghi audit log.
+     * - remainingQuantity của từng lô (entry item) dùng để track phần chưa xuất kho (FIFO allocation).
+     */
+
     private final StockEntryRepo stockEntryRepo;
     private final InventoryRepo inventoryRepo;
     private final InventoryTransactionRepo transactionRepo;
@@ -216,24 +233,50 @@ public class StockEntryService {
         attachmentRepo.save(attachment);
     }
 
+    /**
+     * Xác nhận (confirm) phiếu nhập hàng vào kho.
+     *
+     * Quy trình:
+     * 1. Kiểm tra phiếu chưa CONFIRMED
+     * 2. Kiểm tra có ảnh chứng từ đính kèm (bắt buộc)
+     * 3. Kiểm tra phiếu có ít nhất 1 item
+     * 4. Tăng inventory.quantity cho từng item (dùng lock để tránh race condition)
+     * 5. Ghi log InventoryTransaction để audit
+     * 6. Cập nhật trạng thái phiếu → CONFIRMED, ghi confirmed_by và confirmed_at
+     *
+     * Lưu ý:
+     * - Khi confirm, remainingQuantity của từng lô sẽ được dùng để track FIFO
+     *   khi các phiếu xuất kho (StockIssue) tính toán lô nào xuất trước.
+     * - Ảnh chứng từ là bắt buộc (scan hóa đơn, biên bản nhập).
+     *
+     * @param entryId - ID phiếu nhập cần xác nhận
+     * @param staffId - ID nhân viên xác nhận
+     * @return Phiếu đã xác nhận
+     */
     @Transactional
     public StockEntryResponse confirm(Integer entryId, Integer staffId) {
         StockEntry entry = findOrThrow(entryId);
 
+        // Kiểm tra phiếu chưa CONFIRMED
         if (entry.getStatus() == StockEntryStatus.CONFIRMED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Phiếu đã được xác nhận");
         }
+
+        // Kiểm tra ảnh chứng từ bắt buộc
         boolean hasAttachment = attachmentRepo.existsByRefTypeAndRefId(
             WarehouseAttachment.RefType.STOCK_ENTRY, entryId);
         if (!hasAttachment) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                     "Cần đính kèm ảnh chứng từ trước khi xác nhận");
         }
+
+        // Kiểm tra có sản phẩm
         if (entry.getItems().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                     "Phiếu nhập không có sản phẩm nào");
         }
 
+        // Bước 4-5: Tăng inventory quantity + ghi audit log cho từng item
         // Dùng lock theo warehouse/item để tránh lệch tồn khi nhiều request confirm đồng thời.
         for (StockEntryItem item : entry.getItems()) {
             Inventory inventory = inventoryRepo
@@ -245,10 +288,12 @@ public class StockEntryService {
                             .reservedQuantity(0)
                             .build());
 
+            // Tăng tồn kho hiện tại
             int balanceAfter = inventory.getQuantity() + item.getQuantity();
             inventory.setQuantity(balanceAfter);
             inventoryRepo.save(inventory);
 
+            // Ghi audit log transaction
             saveInventoryInTransaction(
                 entry.getWarehouseId(),
                 item.getItemId(),
@@ -259,6 +304,7 @@ public class StockEntryService {
             );
         }
 
+        // Bước 6: Cập nhật trạng thái phiếu
         entry.setStatus(StockEntryStatus.CONFIRMED);
         entry.setConfirmedBy(staffId);
         entry.setConfirmedAt(LocalDateTime.now());

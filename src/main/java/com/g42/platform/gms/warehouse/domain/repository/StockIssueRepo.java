@@ -11,6 +11,21 @@ import java.util.List;
 import java.util.Optional;
 
 public interface StockIssueRepo {
+    /**
+     * Repository port cho `StockIssue`.
+     *
+     * Mô tả:
+     * - Chứa các truy vấn để tìm phiếu theo warehouse / service ticket, kiểm tra
+     *   tồn tại phiếu DRAFT/CONFIRMED và tìm draft hiện tại để merge items.
+     * - `StockIssueService` sẽ sử dụng các method ở đây để: tạo DRAFT, cập nhật
+     *   trạng thái (DRAFT → CONFIRMED), và kiểm tra xem đã có phiếu CONFIRMED
+     *   cho một service ticket hay chưa (để tránh tạo 2 phiếu xác nhận).
+     *
+     * Ghi chú:
+     * - Các phương thức `exists*` giúp service ngăn chặn duplicate confirms.
+     * - `findDraftServiceTicketIssueInWarehouse` thường được dùng khi muốn
+     *   merge allocations vào một draft hiện có của cùng warehouse.
+     */
     Optional<StockIssue> findById(Integer issueId);
     List<StockIssue> findByWarehouseId(Integer warehouseId);
     List<StockIssue> findByServiceTicketId(Integer serviceTicketId);

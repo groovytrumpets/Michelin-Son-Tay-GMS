@@ -23,6 +23,23 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class StockEntryRepoImpl implements StockEntryRepo {
 
+    /*
+     * Infrastructure adapter: chuyển đổi giữa JPA entities (StockEntryJpa,
+     * StockEntryItemJpa) và domain entities (StockEntry, StockEntryItem).
+     *
+     * Ghi chú quan trọng:
+     * - `save(...)` sử dụng CascadeType để persist items cùng với StockEntryJpa.
+     * - Các thao tác decrease/increase remainingQuantity được delegate tới
+     *   `StockEntryItemJpaRepo` và thực hiện bằng `@Modifying` UPDATE SQL để
+     *   tránh Hibernate overwrite khi có cập nhật cạnh tranh (giảm risk của
+     *   optimistic lock trong các thao tác confirm xuất kho).
+     * - `findFifoLots(...)` trả về các lô còn hàng theo thứ tự cũ nhất trước
+     *   (entryItemId ASC) — đảm bảo tính nhất quán khi service tính FIFO.
+     *
+     * Các service sử dụng lớp này: `StockIssueService` (tạo draft + confirm),
+     * `StockEntryService` (quản lý nhập kho), và các tool export/import.
+     */
+
     private final StockEntryJpaRepo jpaRepo;
     private final StockEntryItemJpaRepo itemJpaRepo;
 
@@ -128,7 +145,8 @@ public class StockEntryRepoImpl implements StockEntryRepo {
     public StockEntry save(StockEntry entry) {
         StockEntryJpa jpa = toJpa(entry);
 
-        // Sync items into the JPA entity so CascadeType.ALL persists them
+        // Đồng bộ items vào JPA entity trước khi save để CascadeType.ALL persist
+        // cả header lẫn chi tiết trong cùng một lần ghi.
         if (entry.getItems() != null) {
             jpa.getItems().clear();
             for (StockEntryItem item : entry.getItems()) {
@@ -150,6 +168,7 @@ public class StockEntryRepoImpl implements StockEntryRepo {
 
     @Override
     public List<StockEntryItem> findFifoLots(Integer warehouseId, Integer itemId) {
+        // FIFO: lô cũ nhất trước để service confirm xuất kho theo thứ tự nhập.
         return itemJpaRepo.findFifoLots(warehouseId, itemId)
                 .stream().map(this::toDomainItem).toList();
     }
@@ -172,11 +191,13 @@ public class StockEntryRepoImpl implements StockEntryRepo {
 
     @Override
     public int decreaseRemainingQuantity(Integer entryItemId, int qty) {
+        // Delegate về UPDATE query để giảm remainingQuantity an toàn khi confirm.
         return itemJpaRepo.decreaseRemainingQuantity(entryItemId, qty);
     }
 
     @Override
     public int increaseRemainingQuantity(Integer entryItemId, int qty) {
+        // Delegate về UPDATE query cho luồng hoàn trả / cộng lại số lượng lô.
         return itemJpaRepo.increaseRemainingQuantity(entryItemId, qty);
     }
 
