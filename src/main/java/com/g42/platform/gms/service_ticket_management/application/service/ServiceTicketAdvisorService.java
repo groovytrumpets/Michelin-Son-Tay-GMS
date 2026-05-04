@@ -3,6 +3,7 @@ package com.g42.platform.gms.service_ticket_management.application.service;
 
 import com.g42.platform.gms.booking.customer.domain.entity.Booking;
 import com.g42.platform.gms.booking.customer.domain.repository.BookingRepository;
+import com.g42.platform.gms.dashboard.application.service.StaffNotifyService;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceTicketDetailResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.UpdateServiceTicketRequest;
 import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicket;
@@ -32,6 +33,7 @@ public class ServiceTicketAdvisorService {
     private final BookingRepository bookingRepository;
     private final ServiceTicketManageService manageService; // delegate getDetail/getList
     private final TicketAssignmentService ticketAssignmentService;
+    private final StaffNotifyService staffNotifyService;
 
 
     /** Advisor duyệt báo giá, bắt đầu sửa — ESTIMATED/PENDING → REPAIRING.
