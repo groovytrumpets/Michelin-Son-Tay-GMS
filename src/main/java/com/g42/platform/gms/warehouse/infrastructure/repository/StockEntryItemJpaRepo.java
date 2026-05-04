@@ -8,10 +8,41 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
+/**
+ * Spring Data JPA Repository cho StockEntryItem (chi tiết lô hàng nhập).
+ *
+ * FIFO Logic (findFifoLots):
+ * - Trả về danh sách lô còn hàng theo thứ tự FIFO (First-In-First-Out).
+ * - ORDER BY sei.entryItemId ASC = lô cũ nhất trước (vì entryItemId tăng dần theo thời gian).
+ * - Service StockIssueService.create() dùng FIFO này để:
+ *   1. Tính giá nhập (importPrice) từ lô cũ nhất
+ *   2. Xác định lô nào sẽ xuất trước
+ *   3. Khi confirm(), giảm remainingQuantity từ lô cũ nhất
+ *
+ * @Modifying Updates:
+ * - decreaseRemainingQuantity / increaseRemainingQuantity dùng UPDATE SQL trực tiếp
+ *   (không load entity, không Hibernate overwrite), đảm bảo:
+ *   - Khi confirm xuất kho: remainingQuantity chỉ bị trừ, không bị overwrite
+ *   - Khi hoàn trả: remainingQuantity được cộng lại
+ *
+ * Ghi chú về Concurrency:
+ * - remainingQuantity là thuộc tính CRITICAL (dùng cho FIFO allocation)
+ * - Phải dùng @Modifying UPDATE, không được load+save (tránh race condition)
+ */
 public interface StockEntryItemJpaRepo extends JpaRepository<StockEntryItemJpa, Integer> {
 
     List<StockEntryItemJpa> findByEntryId(Integer entryId);
 
+    /**
+     * FIFO Lots: lấy các lô còn hàng, cũ nhất trước.
+     * Điều kiện:
+     * - remainingQuantity > 0 (lô còn hàng)
+     * - status = CONFIRMED (entry đã nhập kho)
+     * - warehouse + itemId trùng
+     * ORDER BY entryItemId ASC = cũ nhất trước (FIFO)
+     *
+     * Service sẽ duyệt lô này từ đầu, consume từng lô cho đến hết demand.
+     */
     @Query("SELECT sei FROM StockEntryItemJpa sei " +
            "JOIN StockEntryJpa se ON se.entryId = sei.entryId " +
            "WHERE se.warehouseId = :warehouseId " +
@@ -34,12 +65,34 @@ public interface StockEntryItemJpaRepo extends JpaRepository<StockEntryItemJpa, 
             @Param("warehouseId") Integer warehouseId,
             @Param("itemId") Integer itemId);
 
+    /**
+     * Giảm remainingQuantity bằng UPDATE SQL (không load entity).
+     *
+     * Luồng confirm xuất kho:
+     * 1. StockIssueService.confirm() lấy issue items
+     * 2. Với mỗi item có entryItemId: gọi repo.decreaseRemainingQuantity(entryItemId, qty)
+     * 3. Query: UPDATE lô SET remainingQuantity -= qty
+     * 4. Return 1 (success) hoặc 0 (không đủ hàng)
+     *
+     * Tại sao @Modifying UPDATE? Tránh race condition:
+     * - Cách load+save: Request A load=100, Request B load=100 →
+     *   A save(50) overwrite, B save(70) overwrite → kết quả sai
+     * - Cách @Modifying: UPDATE atomic → database handle → kết quả đúng
+     */
     @Modifying
     @Query("UPDATE StockEntryItemJpa sei SET sei.remainingQuantity = sei.remainingQuantity - :qty WHERE sei.entryItemId = :id AND sei.remainingQuantity >= :qty")
     int decreaseRemainingQuantity(@Param("id") Integer entryItemId, @Param("qty") int qty);
 
-       @Modifying
-       @Query("UPDATE StockEntryItemJpa sei SET sei.remainingQuantity = sei.remainingQuantity + :qty WHERE sei.entryItemId = :id")
+    /**
+     * Tăng remainingQuantity bằng UPDATE SQL (không load entity).
+     *
+     * Luồng hoàn trả hàng:
+     * 1. ReturnEntryService.confirm() lấy return items
+     * 2. Cộng remainingQuantity lại cho lô (khi hoàn trả customer return)
+     * 3. Lô lại khả dụng cho FIFO allocation tiếp theo
+     */
+    @Modifying
+    @Query("UPDATE StockEntryItemJpa sei SET sei.remainingQuantity = sei.remainingQuantity + :qty WHERE sei.entryItemId = :id")
        int increaseRemainingQuantity(@Param("id") Integer entryItemId, @Param("qty") int qty);
 
     /** Tất cả lô còn hàng trong kho — dùng để kiểm tra tổng quan FIFO */
