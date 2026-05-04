@@ -19,6 +19,7 @@ import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.common.enums.EstimateEnum;
 import com.g42.platform.gms.customer.domain.entity.CustomerProfile;
 import com.g42.platform.gms.estimation.api.dto.EstimateRespondDto;
+import com.g42.platform.gms.estimation.api.internal.EstimateInternalApi;
 import com.g42.platform.gms.estimation.app.service.EstimateService;
 import com.g42.platform.gms.estimation.domain.entity.Estimate;
 import com.g42.platform.gms.estimation.domain.repository.EstimateRepository;
@@ -74,6 +75,8 @@ public class BillingService {
     @Autowired
     @Qualifier("warehouseStockAllocationService")
     private com.g42.platform.gms.warehouse.app.service.allocation.StockAllocationService warehouseStockAllocationService;
+    @Autowired
+    private EstimateInternalApi estimateInternalApi;
 
     //todo: get available promotion
     @Transactional
@@ -165,6 +168,9 @@ public class BillingService {
         //todo: change status of assignment
 
         ticketAssignmentService.markAssignmentDone(serviceBill.getServiceTicketId());
+
+        //todo: calculate gross-profit
+//        estimateInternalApi.calculateAndLockGrossProfit(serviceBill.getServiceTicketId());
         return serviceBillDtoMapper.mapPaymentToDto(paymentTransaction);
     }
 
