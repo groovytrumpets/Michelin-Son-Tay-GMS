@@ -45,10 +45,7 @@ public interface StockEntryJpaRepo extends JpaRepository<StockEntryJpa, Integer>
 
     @Query("""
     select se.importPrice*se.markupMultiplier from StockEntryItemJpa se join StockEntryJpa s on se.entryId = s.entryId
-        where s.warehouseId=:warehouseId and se.itemId=:itemId 
-            and se.remainingQuantity> 0
-                and s.status = 'CONFIRMED'
-                order by s.createdAt asc limit 1
+        where s.warehouseId=:warehouseId and se.itemId=:itemId order by s.createdAt desc limit 1
     """)
     Optional<BigDecimal> findLatesFallBackPrice(Integer itemId, Integer warehouseId);
 }
