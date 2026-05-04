@@ -7,7 +7,7 @@ import com.g42.platform.gms.booking.customer.domain.entity.TimeSlot;
 import com.g42.platform.gms.booking.customer.domain.repository.BookingRepository;
 import com.g42.platform.gms.booking.customer.domain.repository.SlotReservationRepository;
 import com.g42.platform.gms.booking.customer.domain.repository.TimeSlotRepository;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -68,7 +68,7 @@ public class SlotService {
      * @param excludeBookingId ID của booking cần exclude (dùng khi modify booking)
      * @return true nếu available, false nếu đã đầy
      */
-    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    @Transactional(readOnly = true)
     public boolean isSlotAvailable(LocalDate date,
                                    LocalTime startTime,
                                    int estimatedDurationMinutes,
