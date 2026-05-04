@@ -19,6 +19,8 @@ public interface EstimateInternalApi {
     void updateBookingToRemindById(Integer reminderId, Integer bookingId);
 
     Integer releaseEstimate(Integer allocationId, Integer quantity, Integer staffId);
+
+    void calculateAndLockGrossProfit(Integer serviceTicketId);
 //
 //    void validatePromotion(Map<Integer, Integer> returnAllocationMap);
 }
