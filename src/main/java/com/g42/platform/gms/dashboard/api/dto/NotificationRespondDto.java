@@ -17,4 +17,5 @@ public class NotificationRespondDto {
     private Boolean isRead;
     private Integer sentBy;
     private LocalDateTime sentAt;
+    private String url;
 }
