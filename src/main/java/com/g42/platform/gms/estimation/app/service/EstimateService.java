@@ -752,14 +752,23 @@ public class EstimateService {
         List<EstimateItem> affectedItems = items.stream().filter(estimateItem -> promotion.getPromotionId().equals(estimateItem.getPromotionId())).toList();
         affectedItems.forEach(estimateItem -> {
             estimateItem.setDiscountAmount(null);
-            estimateItem.setFinalPrice(estimateItem.getTotalPrice());
             estimateItem.setPromotionId(null);
+
+            BigDecimal quantity = BigDecimal.valueOf(estimateItem.getQuantity() != null ? estimateItem.getQuantity() : 0);
+            BigDecimal unitPrice = estimateItem.getUnitPrice() != null ? estimateItem.getUnitPrice() : BigDecimal.ZERO;
+            BigDecimal basePrice = unitPrice.multiply(quantity);
+
+            estimateItem.setTotalPrice(basePrice);
+
             if (estimateItem.getAppliedTaxRate()!=null){
-                BigDecimal tax = estimateItem.getFinalPrice()
+                BigDecimal tax = basePrice
                         .multiply(estimateItem.getAppliedTaxRate())
                         .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
                 estimateItem.setTaxAmount(tax);
-                estimateItem.setFinalPrice(estimateItem.getFinalPrice().add(tax));
+                estimateItem.setFinalPrice(basePrice.add(tax));
+            }else {
+                estimateItem.setTaxAmount(BigDecimal.ZERO);
+                estimateItem.setFinalPrice(basePrice);
             }
 
         });
