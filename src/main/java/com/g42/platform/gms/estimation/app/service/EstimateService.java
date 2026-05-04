@@ -561,7 +561,7 @@ public class EstimateService {
 
         //todo:update used race condition
         int rowsUpdated = promotionInternalApi.incrementUsedCountIfAvailable(promotionId);
-        if (rowsUpdated==0) throw new EstimateException("UNFORTUNATE, LAST PROMOTION IS USED", EstimateErrorCode.PROMOTION_OUT);
+        if (rowsUpdated==0) throw new EstimateException("Rất tiếc, giảm giá đã dùng hết rồi!", EstimateErrorCode.PROMOTION_OUT);
         return getEstimateRespondDto(estimateId);
     }
 
@@ -729,6 +729,14 @@ public class EstimateService {
             promotion.setUsedCount(0);
         }else promotion.setUsedCount(promotion.getUsedCount()-1);
         promotionInternalApi.savePromotion(promotion);
+        BigDecimal newTotalPrice = items.stream()
+                .filter(item -> Boolean.TRUE.equals(item.getIsChecked()))
+                .filter(item -> Boolean.FALSE.equals(item.getIsRemoved()))
+                .map(item -> item.getFinalPrice() != null ? item.getFinalPrice() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        estimate.setTotalPrice(newTotalPrice);
+        estimateRepository.save(estimate);
         return getEstimateRespondDto(estimateId);
     }
 
@@ -751,6 +759,7 @@ public class EstimateService {
                         .multiply(estimateItem.getAppliedTaxRate())
                         .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
                 estimateItem.setTaxAmount(tax);
+                estimateItem.setFinalPrice(estimateItem.getFinalPrice().add(tax));
             }
 
         });
