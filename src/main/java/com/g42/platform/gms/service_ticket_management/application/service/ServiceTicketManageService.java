@@ -12,6 +12,7 @@ import com.g42.platform.gms.catalog.infrastructure.repository.CatalogItemReposit
 import com.g42.platform.gms.common.service.ExcelService;
 import com.g42.platform.gms.billing.domain.entity.ServiceBill;
 import com.g42.platform.gms.billing.domain.repository.BillingRepository;
+import com.g42.platform.gms.dashboard.application.service.StaffNotifyService;
 import com.g42.platform.gms.estimation.api.internal.EstimateInternalApi;
 import com.g42.platform.gms.estimation.domain.entity.Estimate;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceQueueResponse;
@@ -86,6 +87,7 @@ public class ServiceTicketManageService {
     private final SafetyInspectionService safetyInspectionService;
     private final StockIssueJpaRepo stockIssueJpaRepo;
     private final StockAllocationJpaRepo stockAllocationJpaRepo;
+    private final StaffNotifyService staffNotifyService;
 
     /**
      * Get paginated list of service tickets with filters.
@@ -369,6 +371,7 @@ public class ServiceTicketManageService {
         ticketAssignmentService.changeAdvisor(ticket.getServiceTicketId(), newAdvisorId, note);
 
         log.info("Advisor changed successfully for ticket: {}", ticketCode);
+        staffNotifyService.createNotificationAssignAuto(newAdvisorId,"Đã được giao phiếu: "+ticketCode, "Đã được giao phiếu: "+ticketCode+"; Vui lòng mở trang Điều phối dịch vụ để xác nhận!",newAdvisorId,null);
         return getServiceTicketDetail(ticketCode);
     }
 

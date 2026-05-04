@@ -343,7 +343,7 @@ public class CheckInService {
         log.info("Single-page check-in completed successfully: ticketCode={}, photoCount={}, warnings={}",
             savedTicketAll.getTicketCode(), photoCount, warnings.size());
         //
-        staffNotifyService.createNotificationAssignAuto(response.getAdvisorId(),"Đã được giao phiếu: "+savedTicketAll.getTicketCode(),"Vui lòng mở trang Điều phối dịch vụ để xác nhận!",savedTicketAll.getCreatedBy(),"http://localhost:5173/advisor/inspection");
+        staffNotifyService.createNotificationAssignAuto(response.getAdvisorId(),"Đã được giao phiếu: "+savedTicketAll.getTicketCode(),"Đã được giao phiếu: "+savedTicketAll.getTicketCode()+"; Vui lòng mở trang Điều phối dịch vụ để xác nhận!",savedTicketAll.getCreatedBy(),"http://localhost:5173/advisor/inspection");
         return response;
     }
 
