@@ -125,7 +125,19 @@ public class ServiceTicketAdvisorService {
         ticket.setUpdatedAt(LocalDateTime.now());
         serviceTicketRepo.save(ticket);
         log.info("Ticket {} → CANCELLED", ticketCode);
-        return manageService.getServiceTicketDetail(ticketCode);
+
+        // Thông báo cho advisor hiện tại biết phiếu đã bị hủy
+        ServiceTicketDetailResponse detail = manageService.getServiceTicketDetail(ticketCode);
+        if (detail.getAdvisorId() != null) {
+            staffNotifyService.createNotificationAssignAuto(
+                detail.getAdvisorId(),
+                "Phiếu dịch vụ đã bị hủy: " + ticketCode,
+                "Phiếu dịch vụ " + ticketCode + " đã bị hủy. Vui lòng kiểm tra lại!",
+                detail.getAdvisorId(),
+                "http://localhost:5173/advisor/inspection"
+            );
+        }
+        return detail;
     }
 
 
@@ -167,6 +179,15 @@ public class ServiceTicketAdvisorService {
         ticketAssignmentService.changeAdvisorByAdvisor(ticket.getServiceTicketId(), newAdvisorId, note);
 
         log.info("Advisor changed successfully for ticket: {}", ticketCode);
+
+        // Thông báo cho advisor mới được giao phiếu
+        staffNotifyService.createNotificationAssignAuto(
+            newAdvisorId,
+            "Đã được giao phiếu: " + ticketCode,
+            "Đã được giao phiếu: " + ticketCode + "; Vui lòng mở trang Điều phối dịch vụ để xác nhận!",
+            newAdvisorId,
+            "http://localhost:5173/advisor/inspection"
+        );
         return manageService.getServiceTicketDetail(ticketCode);
     }
 
@@ -179,14 +200,21 @@ public class ServiceTicketAdvisorService {
     public ServiceTicketDetailResponse removeTechnician(String ticketCode, Integer technicianId) {
         log.info("Advisor removing technician {} from ticket: {}", technicianId, ticketCode);
 
-
         ServiceTicket ticket = findTicket(ticketCode);
 
         // Delegate to TicketAssignmentService for the actual logic
         ticketAssignmentService.removeTechnician(ticket.getServiceTicketId(), technicianId);
 
-
         log.info("Technician {} removed from ticket: {}", technicianId, ticketCode);
+
+        // Thông báo cho kỹ thuật viên bị hủy phân công
+        staffNotifyService.createNotificationAssignAuto(
+            technicianId,
+            "Đã bị hủy phân công khỏi phiếu: " + ticketCode,
+            "Bạn đã bị hủy phân công khỏi phiếu dịch vụ " + ticketCode + ". Vui lòng kiểm tra lại!",
+            technicianId,
+            "http://localhost:5173/advisor/inspection"
+        );
         return manageService.getServiceTicketDetail(ticketCode);
     }
 
@@ -199,14 +227,29 @@ public class ServiceTicketAdvisorService {
     public ServiceTicketDetailResponse changeTechnician(String ticketCode, Integer oldTechnicianId, Integer newTechnicianId, String note) {
         log.info("Advisor changing technician from {} to {} for ticket: {}", oldTechnicianId, newTechnicianId, ticketCode);
 
-
         ServiceTicket ticket = findTicket(ticketCode);
 
         // Delegate to TicketAssignmentService for the actual logic
         ticketAssignmentService.changeTechnician(ticket.getServiceTicketId(), oldTechnicianId, newTechnicianId, note);
 
-
         log.info("Technician changed successfully for ticket: {}", ticketCode);
+
+        // Thông báo cho kỹ thuật viên mới được phân công
+        staffNotifyService.createNotificationAssignAuto(
+            newTechnicianId,
+            "Đã được phân công vào phiếu: " + ticketCode,
+            "Bạn đã được phân công vào phiếu dịch vụ " + ticketCode + "; Vui lòng kiểm tra và xác nhận!",
+            newTechnicianId,
+            "http://localhost:5173/advisor/inspection"
+        );
+        // Thông báo cho kỹ thuật viên cũ bị thay thế
+        staffNotifyService.createNotificationAssignAuto(
+            oldTechnicianId,
+            "Đã bị thay thế khỏi phiếu: " + ticketCode,
+            "Bạn đã bị thay thế bởi kỹ thuật viên khác trong phiếu dịch vụ " + ticketCode + ".",
+            newTechnicianId,
+            "http://localhost:5173/advisor/inspection"
+        );
         return manageService.getServiceTicketDetail(ticketCode);
     }
 

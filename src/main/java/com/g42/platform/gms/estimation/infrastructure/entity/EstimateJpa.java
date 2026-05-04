@@ -53,6 +53,8 @@
         private Integer revisedFromId;
         @Column(name = "total_price", precision = 12, scale = 2)
         private BigDecimal totalPrice;
+        @Column(name = "gross_profit", precision = 12, scale = 2)
+        private BigDecimal grossProfit;
 
 
     }

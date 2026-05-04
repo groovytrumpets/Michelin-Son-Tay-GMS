@@ -12,12 +12,45 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * Infrastructure Adapter: implements PartCatalogRepo (domain port).
+ *
+ * Bảng catalog_item chứa tất cả loại item: PART (phụ tùng), SERVICE (dịch vụ), COMBO...
+ * PartCatalogRepo chỉ quan tâm đến PART — tất cả query đều filter itemType = PART.
+ *
+ * Method quan trọng nhất với StockEntryService là findNamesByIds():
+ *
+ * Luồng trong toResponse() của StockEntryService:
+ *   1. Collect tất cả itemId từ entry.getItems() → Set<Integer> itemIds
+ *   2. partCatalogRepo.findNamesByIds(itemIds.stream().toList())
+ *        → PartCatalogRepoImpl.findNamesByIds(ids)
+ *        → jpaRepo.findByItemTypeAndItemIdIn(PART, ids)
+ *        → SQL: SELECT * FROM catalog_item
+ *                WHERE item_type = 'PART' AND item_id IN (?, ?, ?, ...)
+ *        → stream().collect(toMap(itemId → itemName))
+ *        → trả về Map<Integer, String> {itemId → itemName}
+ *   3. Với mỗi item trong response: itemName = map.get(item.getItemId())
+ *
+ * Tại sao dùng batch lookup (findNamesByIds) thay vì query từng cái?
+ *   Phiếu nhập có 10 items → nếu query từng cái = 10 queries (N+1 problem)
+ *   Dùng IN clause = 1 query cho tất cả → hiệu năng tốt hơn nhiều
+ *
+ * searchParts() dùng in-memory filter (không dùng SQL LIKE):
+ *   - Load tất cả PART → filter trong Java
+ *   - Phù hợp khi catalog không quá lớn (vài nghìn items)
+ *   - Nếu catalog lớn hơn, nên chuyển sang SQL LIKE hoặc full-text search
+ */
 @Repository
 @RequiredArgsConstructor
 public class PartCatalogRepoImpl implements PartCatalogRepo {
 
     private final CatalogItemJpaRepo jpaRepo;
 
+    /**
+     * Lấy tất cả PART trong catalog.
+     * SQL: SELECT * FROM catalog_item WHERE item_type = 'PART'
+     * Dùng cho: Excel export catalog, dropdown chọn sản phẩm khi tạo phiếu nhập.
+     */
     @Override
     public List<CatalogItem> findAllParts() {
         return jpaRepo.findByItemType(CatalogItemType.PART).stream()
@@ -25,6 +58,13 @@ public class PartCatalogRepoImpl implements PartCatalogRepo {
                 .toList();
     }
 
+    /**
+     * Tìm kiếm PART theo keyword — in-memory filter.
+     * SQL: SELECT * FROM catalog_item WHERE item_type = 'PART'
+     * Sau đó filter trong Java theo: itemName, sku, partNumber, barcode
+     *
+     * Lưu ý: load toàn bộ PART rồi filter → không scale tốt nếu catalog lớn.
+     */
     @Override
     public List<CatalogItem> searchParts(String keyword) {
         String normalized = keyword == null ? "" : keyword.trim().toLowerCase();
@@ -38,6 +78,11 @@ public class PartCatalogRepoImpl implements PartCatalogRepo {
                 .toList();
     }
 
+    /**
+     * Lấy danh sách PART theo list ID.
+     * SQL: SELECT * FROM catalog_item WHERE item_type = 'PART' AND item_id IN (?, ?, ...)
+     * Trả về: empty list nếu ids null/empty (tránh SQL IN với list rỗng)
+     */
     @Override
     public List<CatalogItem> findAllPartsByIds(List<Integer> ids) {
         if (ids == null || ids.isEmpty()) {
@@ -48,17 +93,28 @@ public class PartCatalogRepoImpl implements PartCatalogRepo {
                 .toList();
     }
 
+    /** SQL: SELECT COUNT(*) > 0 FROM catalog_item WHERE sku = ? */
     @Override
     public boolean existsBySku(String sku) {
         return jpaRepo.existsBySku(sku);
     }
 
+    /** SQL: INSERT hoặc UPDATE catalog_item */
     @Override
     public CatalogItem save(CatalogItem item) {
         CatalogItemJpa saved = jpaRepo.save(toJpa(item));
         return toDomain(saved);
     }
 
+    /**
+     * Batch lookup: lấy tên sản phẩm theo list ID — dùng cho enrichment response.
+     *
+     * SQL: SELECT * FROM catalog_item WHERE item_type = 'PART' AND item_id IN (?, ?, ...)
+     * Sau đó collect thành Map<itemId, itemName> trong Java.
+     *
+     * Trả về: empty Map nếu ids null/empty
+     * Dùng bởi: StockEntryService.toResponse() để hiển thị tên sản phẩm trong response
+     */
     @Override
     public Map<Integer, String> findNamesByIds(List<Integer> ids) {
         if (ids == null || ids.isEmpty()) {
@@ -68,10 +124,15 @@ public class PartCatalogRepoImpl implements PartCatalogRepo {
                 .collect(Collectors.toMap(CatalogItemJpa::getItemId, CatalogItemJpa::getItemName));
     }
 
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
     private boolean containsIgnoreCase(String value, String keywordLower) {
         return value != null && value.toLowerCase().contains(keywordLower);
     }
 
+    // ── Mappers ───────────────────────────────────────────────────────────────
+
+    /** CatalogItemJpa → CatalogItem domain (map toàn bộ fields) */
     private CatalogItem toDomain(CatalogItemJpa jpa) {
         CatalogItem domain = new CatalogItem();
         domain.setItemId(jpa.getItemId());
@@ -100,6 +161,7 @@ public class PartCatalogRepoImpl implements PartCatalogRepo {
         return domain;
     }
 
+    /** CatalogItem domain → CatalogItemJpa */
     private CatalogItemJpa toJpa(CatalogItem domain) {
         CatalogItemJpa jpa = new CatalogItemJpa();
         jpa.setItemId(domain.getItemId());
