@@ -83,6 +83,8 @@ public class EstimateItemJpa {
     private BigDecimal discountAmount;
     @Column(name = "final_price", precision = 12, scale = 2)
     private BigDecimal finalPrice;
+    @Column(name = "gross_profit", precision = 12, scale = 2)
+    private BigDecimal grossProfit;
 
 
 }
