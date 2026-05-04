@@ -749,9 +749,15 @@ public class StockIssueService {
      */
     private List<StockIssueItem> buildFifoItems(StockIssue issue, Integer itemId, int needed, BigDecimal requestedDiscount) {
         BigDecimal estimateUnitPrice = resolveEstimateUnitPrice(issue.getServiceTicketId(), issue.getWarehouseId(), itemId);
-        BigDecimal discountRate = (requestedDiscount != null && requestedDiscount.compareTo(BigDecimal.ZERO) != 0)
-                ? requestedDiscount
-                : discountService.resolveDiscountRate(itemId, issue.getIssueType(), needed);
+
+        // SERVICE_TICKET: discount kho không áp dụng, giá báo giá đã là giá chốt
+        // NORMAL/WHOLESALE: áp discount kho
+        BigDecimal discountRate = (issue.getIssueType() == IssueType.SERVICE_TICKET)
+                ? BigDecimal.ZERO
+                : (requestedDiscount != null && requestedDiscount.compareTo(BigDecimal.ZERO) != 0)
+                        ? requestedDiscount
+                        : discountService.resolveDiscountRate(itemId, issue.getIssueType(), needed);
+
         BigDecimal marketSellingPrice = pricingRepo
                 .findActiveByWarehouseAndItem(issue.getWarehouseId(), itemId)
                 .map(WarehousePricing::getSellingPrice)
@@ -769,7 +775,13 @@ public class StockIssueService {
             if (consume <= 0) continue;
 
             BigDecimal sellingPrice = resolveSellingPrice(marketSellingPrice, latestLot, lot, issue.getIssueType());
-            BigDecimal finalPrice = applyDiscount(resolveFinalPriceBase(issue.getIssueType(), estimateUnitPrice, sellingPrice), discountRate);
+
+            // final_price = giá kho thu được per unit (trước thuế, sau discount kho)
+            // SERVICE_TICKET: dùng estimateUnitPrice (giá báo giá trước thuế)
+            // NORMAL/WHOLESALE: export_price sau discount kho
+            BigDecimal finalPrice = applyDiscount(
+                    resolveFinalPriceBase(issue.getIssueType(), estimateUnitPrice, sellingPrice),
+                    discountRate);
 
             items.add(StockIssueItem.builder()
                     .issueId(issue.getIssueId())
@@ -925,15 +937,14 @@ public class StockIssueService {
         if (latestEstimate == null) {
             return null;
         }
-        Integer estimateId = latestEstimate.getId();
-        return estimateItemRepository.findByEstimateId(estimateId).stream()
+        // Lấy row mới nhất (max id) khi cùng itemId có nhiều dòng trong 1 estimate
+        return estimateItemRepository.findByEstimateId(latestEstimate.getId()).stream()
                 .filter(i -> itemId.equals(i.getItemId()))
                 .filter(i -> warehouseId == null || warehouseId.equals(i.getWarehouseId()))
                 .filter(i -> !Boolean.TRUE.equals(i.getIsRemoved()))
                 .filter(i -> Boolean.TRUE.equals(i.getIsChecked()))
+                .max(java.util.Comparator.comparingInt(i -> i.getId() != null ? i.getId() : 0))
                 .map(EstimateItem::getUnitPrice)
-                .filter(p -> p != null)
-                .findFirst()
                 .orElse(null);
     }
 
