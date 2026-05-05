@@ -25,7 +25,9 @@ public class FeedbackIntenalApiImpl implements FeedbackInternalApi {
         feedbackJpa.setCreatedAt(Instant.now());
         Integer serviceId = serviceTicketInternalApi.getServiceIdByCode(trackingId);
         feedbackJpa.setServiceTicketId(serviceId);
-        String joinedFeedbacks = String.join(", ", feedbacks);
+        String joinedFeedbacks = (feedbacks != null && !feedbacks.isEmpty())
+                ? String.join(", ", feedbacks)
+                : null;
         feedbackJpa.setDetailFeedback(joinedFeedbacks);
         FeedbackJpa savedFeedbackJpa = feedbackJpaRepo.save(feedbackJpa);
 
