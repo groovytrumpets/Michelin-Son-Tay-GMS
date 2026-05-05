@@ -667,7 +667,7 @@ public class StockIssueService {
                 stockEntryRepo.findItemById(it.getEntryItemId()).ifPresent(entryItem -> {
                     stockEntryRepo.findEntryById(entryItem.getEntryId()).ifPresent(entry -> {
                         d.setEntryCode(entry.getEntryCode());
-                        d.setEntryLotCode(entry.getEntryCode() + "-LOT" + entryItem.getEntryItemId());
+                        d.setEntryLotCode(entry.getEntryCode());
                     });
                 });
             }
