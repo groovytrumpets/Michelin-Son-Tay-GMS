@@ -96,7 +96,9 @@ public class ZaloNotificationSender implements NotificationSender {
 
         Map<String, Object> templateData = new HashMap<>();
         templateData.put("customer_name", customerName);
-        templateData.put("service", String.join(", ", productName));
+        templateData.put("service", (productName != null && !productName.isEmpty())
+                ? String.join(", ", productName)
+                : null);
         templateData.put("booking_code", orderCode);
         templateData.put("booking_time", formattedTime);
         templateData.put("location", garageLocation);
