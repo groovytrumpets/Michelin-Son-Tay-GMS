@@ -93,12 +93,15 @@ public class ZaloNotificationSender implements NotificationSender {
                 DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy");
 
         String formattedTime = bookingTime.format(formatter);
-
+        String serviceNames;
+        if (productName == null || productName.isEmpty()) {
+            serviceNames = "Không có dịch vụ cụ thể"; // Đổi text này tùy theo nghiệp vụ của bạn, nhưng KHÔNG ĐƯỢC ĐỂ TRỐNG
+        } else {
+            serviceNames = String.join(", ", productName);
+        }
         Map<String, Object> templateData = new HashMap<>();
         templateData.put("customer_name", customerName);
-        templateData.put("service", (productName != null && !productName.isEmpty())
-                ? String.join(", ", productName)
-                : null);
+        templateData.put("service", serviceNames);
         templateData.put("booking_code", orderCode);
         templateData.put("booking_time", formattedTime);
         templateData.put("location", garageLocation);
