@@ -69,10 +69,23 @@ Watch the full demonstration of the MST-GMS platform in action, covering both cu
 
 The following resources and links are available:
 - 🌐 **Live Website**: [https://sontaygarage.vn/](https://sontaygarage.vn/)
-- 📁 **Documentation Folder**: Check the `/docs` folder for:
+- 📁 **Documentation Folder**: Check the `/docs` folder or [Google Drive](https://drive.google.com/drive/folders/13LBJXMy4XoLQMktEPq-fzLSuzgLIIruJ) for:
   - Database Schema (SQL)sdchfiowef  ioewefbiorqeir 
   - Architectural sequence diagrams (numbered sequentially with whole integers).
-or [Google Drive](https://drive.google.com/drive/folders/13LBJXMy4XoLQMktEPq-fzLSuzgLIIruJ)    
+    
+---
+## 👨‍💻 Development Team
+
+This graduation project was built with dedication by **Group 3 (Software Engineering)** from **FPT University**, under the valuable supervision and guidance of **Ms. Tran Thu Thuy**.
+
+| Avatar | Member | Role | Core Responsibilities | GitHub |
+| :---: | :--- | :--- | :--- | :---: |
+| <img src="https://github.com/github.png" width="45" height="45" style="border-radius:50%;"/> | **Nguyễn Nam Khánh** | **Team Leader**<br>Backend Engineer | Architecture design (Clean Architecture, DDD), core API developments, dynamic pricing & tax recalculation logic. | [![GitHub](https://img.shields.io/badge/-Profile-181717?style=flat&logo=github)](https://github.com/YOUR_GITHUB_USERNAME) |
+| <img src="https://github.com/github.png" width="45" height="45" style="border-radius:50%;"/> | **Do Dang Hiep** | Fullstack Engineer | Frontend integration, React.js module implementation, service ticket and booking management workflows. | [![GitHub](https://img.shields.io/badge/-Profile-181717?style=flat&logo=github)](https://github.com/YOUR_GITHUB_USERNAME) |
+| <img src="https://github.com/github.png" width="45" height="45" style="border-radius:50%;"/> | **Ho Duong Tuan Vu** | Backend Engineer | Warehouse management module, inventory import/export optimization, database schema scaling (70+ tables). | [![GitHub](https://img.shields.io/badge/-Profile-181717?style=flat&logo=github)](https://github.com/YOUR_GITHUB_USERNAME) |
+| <img src="https://github.com/github.png" width="45" height="45" style="border-radius:50%;"/> | **Vu Cong Dat** | Frontend Engineer | UI/UX design implementation, customer dashboard development, real-time notification views via WebSocket. | [![GitHub](https://img.shields.io/badge/-Profile-181717?style=flat&logo=github)](https://github.com/YOUR_GITHUB_USERNAME) |
+| <img src="https://github.com/github.png" width="45" height="45" style="border-radius:50%;"/> | **Le Trong Tan** | DevOps & System | Dockerization, Linux environment setup, deployment, Hikvision camera hardware integration, system security. | [![GitHub](https://img.shields.io/badge/-Profile-181717?style=flat&logo=github)](https://github.com/YOUR_GITHUB_USERNAME) |
+
 ---
 
 ## 🚀 Getting Started
