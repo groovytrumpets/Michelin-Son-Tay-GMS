@@ -70,9 +70,9 @@ Watch the full demonstration of the MST-GMS platform in action, covering both cu
 The following resources and links are available:
 - 🌐 **Live Website**: [https://sontaygarage.vn/](https://sontaygarage.vn/)
 - 📁 **Documentation Folder**: Check the `/docs` folder for:
-  - Database Schema (SQL)
+  - Database Schema (SQL)sdchfiowef  ioewefbiorqeir 
   - Architectural sequence diagrams (numbered sequentially with whole integers).
-
+or [Google Drive](https://drive.google.com/drive/folders/13LBJXMy4XoLQMktEPq-fzLSuzgLIIruJ)    
 ---
 
 ## 🚀 Getting Started
