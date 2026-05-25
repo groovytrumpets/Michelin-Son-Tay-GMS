@@ -16,12 +16,12 @@ The purpose of this system is to provide a comprehensive and integrated software
 
 ## 📑 Table of Contents
 - [Technologies](#️-technologies)
+- [Video Demo](#-video-demo)
 - [Actors & Roles](#-actors--roles)
 - [Documentation](#-documentation)
 - [Getting Started](#-getting-started)
-  - [Requirements](#1-requirements)
-  - [Setup Guide](#2-setup-guide)
 - [Deployment](#-deployment)
+- [Development Team](#-development-team)
 
 ---
 
@@ -44,13 +44,24 @@ The purpose of this system is to provide a comprehensive and integrated software
 
 ---
 
+## 🎥 Video Demo
+
+Watch the full demonstration of the MST-GMS platform in action, covering both customer booking workflows and internal garage management:
+
+[![MST-GMS Video Demo](https://img.youtube.com/vi/PLhQPTBqhWuI3h1bP_WRcivySEzC3-EOyI/maxresdefault.jpg)](https://www.youtube.com/playlist?list=PLhQPTBqhWuI3h1bP_WRcivySEzC3-EOyI "Click to Watch Video Demo")
+
+---
+
 ## 👥 Actors & Roles
 
-- **Admin/Manager**: Manage employee accounts, oversee warehouse inventory, configure promotions and tax logic, view reports, and manage garage operations.
-- **Service Advisor/Staff**: Create and manage service tickets, assign tasks to mechanics, check stock availability, and process payments.
-- **Mechanic**: View assigned service tickets, update task statuses, and request parts from the warehouse.
-- **Customer**: Book service appointments online, authenticate via Google OAuth2, and receive real-time updates and notifications.
-- **System**: Calculate dynamic pricing and taxes (e.g., re-applying tax upon promotion removal), trigger Zalo OA notifications via WebSocket, manage media uploads to Cloudinary, and interface with Hikvision cameras.
+- **Customer**: Use services: book appointments, track progress, and give feedback.
+- **Receptionist**: Manage bookings, check-in, service tickets, and handle customer care.
+- **Technician**: Perform assigned tasks and update service progress.
+- **Advisor**: Review requests, create estimates, assign technicians, and ensure service quality.
+- **Accountant**: Manage billing, payments.
+- **Warehouse Keeper**: Manage warehouse operations, inventory, import, export items.
+- **Manager**: Oversee operations, staff, pricing, and reports.
+- **Admin**: Manage users, roles, permissions, and system security.
 
 ---
 
