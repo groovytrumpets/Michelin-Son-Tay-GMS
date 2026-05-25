@@ -15,13 +15,13 @@ The purpose of this system is to provide a comprehensive and integrated software
 ---
 
 ## 📑 Table of Contents
-- [Technologies](#technologies)
-- [Video Demo](#video-demo)
-- [Actors & Roles](#actors--roles)
-- [Documentation](#documentation)
-- [Getting Started](#getting-started)
-- [Deployment](#deployment)
-- [Development Team](#development-team)
+- [Technologies](#️-technologies)
+- [Video Demo](#-video-demo)
+- [Actors & Roles](#-actors--roles)
+- [Documentation](#-documentation)
+- [Getting Started](#-getting-started)
+- [Deployment](#-deployment)
+- [Development Team](#-development-team)
 
 ---
 
