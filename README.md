@@ -1,100 +1,95 @@
-Michelin Son Tay Garage Management System (MST-GMS)
-📌 Introduction
+# Michelin Son Tay Garage Management System (MST-GMS)
+
+![Java](https://img.shields.io/badge/Java-17-orange.svg)
+![Spring Boot](https://img.shields.io/badge/Spring_Boot-Clean_Architecture-brightgreen.svg)
+![React](https://img.shields.io/badge/React.js-Frontend-blue.svg)
+![MySQL](https://img.shields.io/badge/MySQL-70%2B_Tables-blue.svg)
+![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg)
+
+## 📌 Introduction
+
 The purpose of this system is to provide a comprehensive and integrated software platform for an authorized Michelin dealer in Son Tay. It supports the operational management of the garage in an efficient, secure, and transparent manner, handling end-to-end workflows including booking, service ticket processing, and warehouse management.
 
-🛠️ Technologies
-Backend: Java 17, Spring Boot (Clean Architecture, Domain-Driven Design)
+**Live System:** [sontaygarage.vn](https://sontaygarage.vn/)
 
-Frontend: React.js
+---
 
-Database: MySQL (Scalable schema with 70+ tables)
+## 📑 Table of Contents
+- [Technologies](#️-technologies)
+- [Actors & Roles](#-actors--roles)
+- [Documentation](#-documentation)
+- [Getting Started](#-getting-started)
+  - [Requirements](#1-requirements)
+  - [Setup Guide](#2-setup-guide)
+- [Deployment](#-deployment)
 
-Deployment: Docker, Linux Server
+---
 
-Storage: Cloudinary
+## 🛠️ Technologies
 
-Real-time & Notifications: WebSocket/STOMP, Zalo OA API
+### Backend
+- **Core**: Java 17, Spring Boot
+- **Architecture**: Clean Architecture, Domain-Driven Design
+- **Real-time & Notifications**: WebSocket/STOMP, Zalo OA API
+- **Authentication**: Google OAuth2
+- **Hardware Integration**: Hikvision ISAPI
 
-Authentication: Google OAuth2
+### Frontend & Storage
+- **Frontend**: React.js
+- **Storage**: Cloudinary
 
-Hardware Integration: Hikvision ISAPI
+### Database & DevOps
+- **Database**: MySQL (Scalable schema with 70+ tables)
+- **Deployment**: Docker, Linux Server
 
-Live System: sontaygarage.vn
+---
 
-🚀 Installation & Run
-1. Requirements
-JDK: Java JDK 17
+## 👥 Actors & Roles
 
-Environment: Node.js (for React frontend)
+- **Admin/Manager**: Manage employee accounts, oversee warehouse inventory, configure promotions and tax logic, view reports, and manage garage operations.
+- **Service Advisor/Staff**: Create and manage service tickets, assign tasks to mechanics, check stock availability, and process payments.
+- **Mechanic**: View assigned service tickets, update task statuses, and request parts from the warehouse.
+- **Customer**: Book service appointments online, authenticate via Google OAuth2, and receive real-time updates and notifications.
+- **System**: Calculate dynamic pricing and taxes (e.g., re-applying tax upon promotion removal), trigger Zalo OA notifications via WebSocket, manage media uploads to Cloudinary, and interface with Hikvision cameras.
 
-Database: MySQL Server
+---
 
-DevOps: Docker & Docker Compose
+## 📚 Documentation
 
-IDE: IntelliJ IDEA / Eclipse (Backend) & Visual Studio Code (Frontend)
-
-👥 Actors & Roles
-Admin/Manager: Manage employee accounts, oversee warehouse inventory, configure promotions and tax logic, view reports, and manage garage operations.
-
-Service Advisor/Staff: Create and manage service tickets, assign tasks to mechanics, check stock availability, and process payments.
-
-Mechanic: View assigned service tickets, update task statuses, and request parts from the warehouse.
-
-Customer: Book service appointments online, authenticate via Google OAuth2, and receive real-time updates and notifications.
-
-System: Calculate dynamic pricing and taxes (e.g., re-applying tax upon promotion removal), trigger Zalo OA notifications via WebSocket, manage media uploads to Cloudinary, and interface with Hikvision cameras.
-
-📑 Documentation
 The following resources and links are available:
+- 🌐 **Live Website**: [https://sontaygarage.vn/](https://sontaygarage.vn/)
+- 📁 **Documentation Folder**: Check the `/docs` folder for:
+  - Database Schema (SQL)
+  - Architectural sequence diagrams (numbered sequentially with whole integers).
 
-Live Website: https://sontaygarage.vn/
+---
 
-GitHub Repository: MST-GMS Repository
+## 🚀 Getting Started
 
-Documentation Folder: Check the /docs folder for Database Schema (SQL) and architectural sequence diagrams (numbered sequentially with whole integers).
+### 1. Requirements
 
-🛠️ Setup Guide
-(A) Install Prerequisites
-Download and install Java JDK 17. Set the JAVA_HOME environment variable.
+Before running the project, ensure you have the following installed:
+- **Java**: JDK 17 (`JAVA_HOME` configured)
+- **Node.js**: Environment for React frontend
+- **Database**: MySQL Server & MySQL Workbench (or similar client)
+- **DevOps**: Docker & Docker Compose
+- **IDE**: IntelliJ IDEA / Eclipse (Backend) & Visual Studio Code (Frontend)
 
-Download and install Node.js for frontend package management.
+### 2. Setup Guide
 
-Download and install MySQL Server and a client like MySQL Workbench.
+#### (A) Database Setup
+1. Open MySQL Workbench.
+2. Execute the provided initialization script in `docs/schema.sql` to create the 70+ tables.
+3. Verify the database has been created and populated with initial setup data.
 
-(B) Database Setup
-Open MySQL Workbench or your preferred database tool.
-
-Execute the provided initialization script in docs/schema.sql to create the 70+ tables.
-
-Verify the database has been created and populated with initial setup data.
-
-(C) Backend Setup (Spring Boot)
-Open the backend project folder in IntelliJ IDEA.
-
-Navigate to src/main/resources/application.properties (or .yml) and configure the environment variables:
-
-MySQL Database credentials.
-
-Cloudinary API keys.
-
-Google OAuth2 Client ID and Secret.
-
-Zalo OA API credentials.
-
-Run the application using Maven or your IDE's run configuration. The server will typically start on port 8080.
-
-(D) Frontend Setup (React.js)
-Open the frontend folder in Visual Studio Code.
-
-Open the terminal and run npm install to fetch all dependencies.
-
-Configure your .env file with the correct backend API endpoint URL.
-
-Run npm start to launch the development server.
-
-(E) Docker Deployment (Production)
-Ensure Docker and Docker Compose are installed on your Linux machine.
-
-Navigate to the root directory containing the docker-compose.yml file.
-
-Run docker-compose up -d --build to build the images and start the containers in the background.
+#### (B) Backend Setup (Spring Boot)
+1. Open the backend project folder in IntelliJ IDEA.
+2. Navigate to `src/main/resources/application.properties` (or `.yml`) and configure the environment variables:
+```properties
+   # Example Configurations
+   spring.datasource.url=jdbc:mysql://localhost:3306/mst_gms
+   spring.datasource.username=your_db_username
+   spring.datasource.password=your_db_password
+   cloudinary.api_key=your_api_key
+   google.oauth2.client_id=your_client_id
+   zalo.oa.api_key=your_zalo_api_key
