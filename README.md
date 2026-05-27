@@ -10,8 +10,7 @@
 
 The purpose of this system is to provide a comprehensive and integrated software platform for an authorized Michelin dealer in Son Tay. It supports the operational management of the garage in an efficient, secure, and transparent manner, handling end-to-end workflows including booking, service ticket processing, and warehouse management.
 
-**Live System:** [sontaygarage.vn](https://sontaygarage.vn/)
-**Frontend Repo:** [Click Here](https://github.com/HDTVux/Michelin-Son-Tay-GMS-FrontEnd.git)
+**Live System:** [sontaygarage.vn](https://sontaygarage.vn/)  | **Frontend Repo:** [Click Here](https://github.com/HDTVux/Michelin-Son-Tay-GMS-FrontEnd.git)
 
 ---
 
