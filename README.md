@@ -21,7 +21,7 @@ The purpose of this system is to provide a comprehensive and integrated software
 - [Documentation](#-documentation)
 - [Getting Started](#getting-started)
 - [Deployment](#-deployment)
-- [Development Team](development-team)
+- [Development Team](#development-team)
 
 ---
 
