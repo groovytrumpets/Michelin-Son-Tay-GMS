@@ -19,9 +19,9 @@ The purpose of this system is to provide a comprehensive and integrated software
 - [Video Demo](#-video-demo)
 - [Actors & Roles](#-actors--roles)
 - [Documentation](#-documentation)
-- [Getting Started](#-getting-started)
+- [Getting Started](#getting-started)
 - [Deployment](#-deployment)
-- [Development Team](#-development-team)
+- [Development Team](development-team)
 
 ---
 
@@ -69,10 +69,11 @@ Watch the full demonstration of the MST-GMS platform in action, covering both cu
 The following resources and links are available:
 - 🌐 **Live Website**: [https://sontaygarage.vn/](https://sontaygarage.vn/)
 - 📁 **Documentation Folder**: Check the `/docs` folder or [Google Drive](https://drive.google.com/drive/folders/13LBJXMy4XoLQMktEPq-fzLSuzgLIIruJ) for:
-  - Database Schema (SQL)sdchfiowef  ioewefbiorqeir 
+  - Database Schema (SQL)
   - Architectural sequence diagrams (numbered sequentially with whole integers).
     
 ---
+<a id="development-team"></a>
 ## 👨‍💻 Development Team
 
 This graduation project was built with dedication by **Group 3 (Software Engineering)** from **FPT University**, under the valuable supervision and guidance of **Ms. Tran Thu Thuy**.
@@ -86,7 +87,7 @@ This graduation project was built with dedication by **Group 3 (Software Enginee
 | <img src="https://avatars.githubusercontent.com/u/211706548?v=4" width="45" height="45" style="border-radius:50%;"/> | **Le Trong Tan** | Backend Engineer | RESTful API development, database integration, and feature implementations, Hikvision camera hardware integration, system security. | [![GitHub](https://img.shields.io/badge/-Profile-181717?style=flat&logo=github)](https://github.com/tanle04) |
 
 ---
-
+<a id="getting-started"></a>
 ## 🚀 Getting Started
 
 ### 1. Requirements
