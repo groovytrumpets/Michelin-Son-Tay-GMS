@@ -76,15 +76,23 @@ The following resources and links are available:
 <a id="development-team"></a>
 ## 👨‍💻 Development Team
 
-This graduation project was built with dedication by **Group 3 (Software Engineering)** from **FPT University**, under the valuable supervision and guidance of **Ms. Tran Thu Thuy**.
+### Phase 2: Active Maintainers & Core Team
+Following the successful graduation phase, the system is actively maintained, refactored, and scaled by the core engineering team:
+- **Nguyễn Nam Khánh** (Leader / System Architect)
+- **Lê Trọng Tấn** (Backend Engineer)
+- **Đỗ Đăng Hiệp** (Business Analyst)
 
+### Phase 1: Graduation Project Phase (Original Team)
+This project was initially established and successfully defended as a university graduation project from January to May 2026 by **Group 42 (Software Engineering)** from **FPT University**, under the valuable supervision and guidance of **Ms. Tran Thu Thuy**. 
+
+*We acknowledge and appreciate the foundational contributions of the original 5-member team:*
 | Avatar | Member | Role | Core Responsibilities | GitHub |
 | :---: | :--- | :--- | :--- | :---: |
 | <img src="https://avatars.githubusercontent.com/u/166611562?v=4" width="45" height="45" style="border-radius:50%;"/> | **Nguyễn Nam Khánh** | **Team Leader**<br>Backend Engineer | Overall project management, Backend architecture, core services design, and system deployment. | [![GitHub](https://img.shields.io/badge/-Profile-181717?style=flat&logo=github)](https://github.com/groovytrumpets) |
-| <img src="https://github.com/github.png" width="45" height="45" style="border-radius:50%;"/> | **Do Dang Hiep** | QA/Tester/BA | Test case creation, bug tracking, ensuring software quality, and clarifying business requirements. | [![GitHub](https://img.shields.io/badge/-Profile-181717?style=flat&logo=github)](https://github.com/YOUR_GITHUB_USERNAME) |
-| <img src="https://github.com/github.png" width="45" height="45" style="border-radius:50%;"/> | **Ho Duong Tuan Vu** | Frontend Engineer | Leading frontend development, main operational service flows, and state management in React. | [![GitHub](https://img.shields.io/badge/-Profile-181717?style=flat&logo=github)](https://github.com/HDTVux) |
-| <img src="https://github.com/github.png" width="45" height="45" style="border-radius:50%;"/> | **Vu Cong Dat** | Frontend Engineer | UI/UX design implementation, customer dashboard development, real-time notification views via WebSocket. | [![GitHub](https://img.shields.io/badge/-Profile-181717?style=flat&logo=github)](https://github.com/CongDat2003) |
-| <img src="https://avatars.githubusercontent.com/u/211706548?v=4" width="45" height="45" style="border-radius:50%;"/> | **Le Trong Tan** | Backend Engineer | RESTful API development, database integration, and feature implementations, Hikvision camera hardware integration, system security. | [![GitHub](https://img.shields.io/badge/-Profile-181717?style=flat&logo=github)](https://github.com/tanle04) |
+| <img src="https://github.com/github.png" width="45" height="45" style="border-radius:50%;"/> | **Đỗ Đăng Hiệp** | QA/Tester/BA | Test case creation, bug tracking, ensuring software quality, and clarifying business requirements. | [![GitHub](https://img.shields.io/badge/-Profile-181717?style=flat&logo=github)](https://github.com/YOUR_GITHUB_USERNAME) |
+| <img src="https://github.com/github.png" width="45" height="45" style="border-radius:50%;"/> | **Hồ Dương Tuấn Vũ** | Frontend Engineer | Leading frontend development, main operational service flows, and state management in React. | [![GitHub](https://img.shields.io/badge/-Profile-181717?style=flat&logo=github)](https://github.com/HDTVux) |
+| <img src="https://github.com/github.png" width="45" height="45" style="border-radius:50%;"/> | **Vũ Công Đạt** | Frontend Engineer | UI/UX design implementation, customer dashboard development, real-time notification views via WebSocket. | [![GitHub](https://img.shields.io/badge/-Profile-181717?style=flat&logo=github)](https://github.com/CongDat2003) |
+| <img src="https://avatars.githubusercontent.com/u/211706548?v=4" width="45" height="45" style="border-radius:50%;"/> | **Lê Trọng Tấn** | Backend Engineer | RESTful API development, database integration, and feature implementations, Hikvision camera hardware integration, system security. | [![GitHub](https://img.shields.io/badge/-Profile-181717?style=flat&logo=github)](https://github.com/tanle04) |
 
 ---
 <a id="getting-started"></a>
