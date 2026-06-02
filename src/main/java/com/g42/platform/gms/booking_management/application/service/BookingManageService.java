@@ -81,9 +81,6 @@ public class BookingManageService {
         if (request == null) {
             throw new BookingStaffException("Không tìm thấy booking request", BookingStaffErrorCode.INVALID_ID);
         }
-        if (!request.isPending()) {
-            throw new BookingStaffException("Booking request không ở trạng thái PENDING", BookingStaffErrorCode.BOOKING_CANT_EDIT);
-        }
 
         // Tạo hoặc lấy customer account
         int customerId = customerGateway.getOrCreateCustomer(
@@ -101,7 +98,7 @@ public class BookingManageService {
                         .sum();
         if (estimatedDuration <= 0) estimatedDuration = 60;
 
-        slotService.checkAndReserve(
+        slotService.checkAndReserveForStaff(
                 booking.getBookingId(),
                 request.getScheduledDate(),
                 request.getScheduledTime(),

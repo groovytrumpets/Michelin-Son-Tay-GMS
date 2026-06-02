@@ -159,6 +159,43 @@ public class SlotService {
 
         log.debug("checkAndReserve: reserved {} blocks for booking {}", requiredBlocks, bookingId);
     }
+    @Transactional
+    public void checkAndReserveForStaff(Integer bookingId, LocalDate date, LocalTime startTime,
+                                int durationMinutes, Integer excludeBookingId) {
+        int requiredBlocks = calculateRequiredBlocks(durationMinutes);
+
+        for (int i = 0; i < requiredBlocks; i++) {
+            LocalTime blockTime = startTime.plusMinutes((long) i * BASE_SLOT_MINUTES);
+
+            // Pessimistic lock trên time_slot row — chặn concurrent check cùng slot
+            TimeSlot slotConfig = timeSlotRepository.findByStartTimeWithLock(blockTime)
+                    .orElseThrow(() -> new com.g42.platform.gms.booking.customer.domain.exception.BookingException(
+                            "Khung giờ không tồn tại: " + blockTime));
+
+            if (Boolean.FALSE.equals(slotConfig.getIsActive())) {
+                throw new com.g42.platform.gms.booking.customer.domain.exception.BookingException(
+                        "Khung giờ không hoạt động: " + blockTime);
+            }
+
+            List<SlotReservation> reservations = reservationRepository.findByDateAndTime(date, blockTime);
+            int count = 0;
+            for (SlotReservation r : reservations) {
+                if (excludeBookingId != null && excludeBookingId.equals(r.getBookingId())) {
+                    continue;
+                }
+                count++;
+            }
+
+            // Reserve ngay trong cùng transaction đang giữ lock
+            SlotReservation reservation = new SlotReservation();
+            reservation.setBookingId(bookingId);
+            reservation.setReservedDate(date);
+            reservation.setStartTime(blockTime);
+            reservationRepository.save(reservation);
+        }
+
+        log.debug("checkAndReserve: reserved {} blocks for booking {}", requiredBlocks, bookingId);
+    }
 
     /**
      * Reserve (đặt chỗ) slots cho một booking
