@@ -38,5 +38,6 @@ public class CatalogCreateDto {
     private String partNumber;
     private String barcode;
     private String color;
+    private Boolean isActive;
 
 }

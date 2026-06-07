@@ -249,4 +249,53 @@ public class CatalogItemService {
         List<Warehouse> warehouses = warehouseRepo.getAllWarehouse();
         return warehouses.stream().map(warehouseDtoMapper::toDto).toList();
     }
+
+    @Transactional
+    public CatalogItemDto updateCatalog(CatalogCreateDto updateDto, Integer itemId) {
+        CatalogItem catalogItem = catalogItemRepo.getCatalogItemById(itemId);
+        if (catalogItem == null) {
+            throw new WarehouseException("Catalog item not found", WarehouseErrorCode.CATALOG_404);
+        }
+
+        // Validate SKU only if it changed
+        if (updateDto.getSku() != null && !updateDto.getSku().equals(catalogItem.getSku())) {
+            if (catalogItemRepo.exitBySku(updateDto.getSku())){
+                throw new WarehouseException("Sku is duplicated! please create new sku",
+                        WarehouseErrorCode.DUPLICATE_SKU);
+            }
+        }
+
+        catalogItem.setSku(updateDto.getSku());
+        catalogItem.setPrice(updateDto.getPrice());
+        catalogItem.setShowPrice(updateDto.getShowPrice());
+        catalogItem.setUnit(updateDto.getUnit());
+        catalogItem.setWarrantyDurationMonths(updateDto.getWarrantyDurationMonths());
+        catalogItem.setBrandId(updateDto.getBrandId());
+        catalogItem.setProductLineId(updateDto.getProductLineId());
+        catalogItem.setWorkCategoryId(updateDto.getWorkCategoryId());
+        if (updateDto.getIsActive() != null) {
+            catalogItem.setIsActive(updateDto.getIsActive());
+        }
+
+        Brand brand = updateDto.getBrandId() != null ? catalogItemRepo.getBrandById(updateDto.getBrandId()) : null;
+        ProductLine productLine = updateDto.getProductLineId() != null ? catalogItemRepo.getProductLineById(updateDto.getProductLineId()) : null;
+        WorkCategory itemCategory = updateDto.getWorkCategoryId() != null ? catalogItemRepo.getItemCategoryById(updateDto.getWorkCategoryId()) : null;
+        if (itemCategory == null) {
+            itemCategory = new WorkCategory();
+        }
+
+        List<Specification> specifications = catalogItemRepo.getListOfSpecsByItem(itemId);
+        String displayName = builDisplayName(catalogItem, brand, productLine, specifications, itemCategory);
+        catalogItem.setItemName(displayName);
+
+        Integer finalTaxId = updateDto.getTaxRuleId();
+        if (finalTaxId == null) {
+            finalTaxId = taxRuleInternalApi.getTaxCodeFreeId("FREE");
+            if (finalTaxId == null || finalTaxId == -1) finalTaxId = taxRuleInternalApi.createNewFreeTax();
+        }
+        catalogItem.setTaxRuleId(finalTaxId);
+
+        CatalogItem saved = catalogItemRepo.saveCatalogItem(catalogItem);
+        return catalogDtoMapper.toDto(saved);
+    }
 }
