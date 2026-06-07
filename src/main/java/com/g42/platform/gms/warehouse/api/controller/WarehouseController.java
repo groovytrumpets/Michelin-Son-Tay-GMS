@@ -62,6 +62,10 @@ public class WarehouseController {
     public ResponseEntity<ApiResponse<CatalogItemDto>> createCatalog(@RequestBody CatalogCreateDto createDto) {
         return ResponseEntity.ok(ApiResponses.success(catalogItemService.createNewCatalog(createDto)));
     }
+    @PutMapping("/catalog-item/update/{itemId}")
+    public ResponseEntity<ApiResponse<CatalogItemDto>> updateCatalog(@RequestBody CatalogCreateDto updateDto, @PathVariable Integer itemId) {
+        return ResponseEntity.ok(ApiResponses.success(catalogItemService.updateCatalog(updateDto, itemId)));
+    }
     @PostMapping("/product-line/create")
     public ResponseEntity<ApiResponse<ProductLine>> createProductLine(@RequestBody ProductLine productLine) {
         return ResponseEntity.ok(ApiResponses.success(catalogItemService.saveProductLine(productLine)));

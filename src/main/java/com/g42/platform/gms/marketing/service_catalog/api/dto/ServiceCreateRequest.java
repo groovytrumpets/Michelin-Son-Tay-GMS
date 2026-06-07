@@ -19,4 +19,6 @@ public class ServiceCreateRequest {
     private Integer estimateTime;
     private MultipartFile thumbnailFile;
     private List<MultipartFile> mediaFiles;
+    private String thumbnailUrl;
+    private List<String> existingMediaUrls;
 }

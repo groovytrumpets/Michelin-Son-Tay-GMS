@@ -95,38 +95,77 @@ public class ServiceCatalogService {
         return serviceDtoMapper.toDetailDto(serviceSaved);
     }
 
+    @Transactional
     public ServiceDetailRespond updateService(ServiceCreateRequest request, Long serviceId) throws IOException {
-
-        com.g42.platform.gms.marketing.service_catalog.domain.entity.Service
-                service = serviceDtoMapper.toEntity(request);
-        service.setServiceId(serviceId);
-        if (request.getThumbnailFile() != null && !request.getThumbnailFile().isEmpty()) {
-            String thumnailUrl = imageUploadService.uploadImage(request.getThumbnailFile(),"garage/services/thumbnails");
-            service.setMediaThumbnail(thumnailUrl);
+        com.g42.platform.gms.marketing.service_catalog.domain.entity.Service service = serviceRepository.findServiceDetailById(serviceId);
+        if (service == null) {
+            throw new ServiceException("Service not found", ServiceErrorCode.SERVICE_NOT_FOUND);
         }
+
+        service.setTitle(request.getTitle());
+        service.setShortDescription(request.getShortDescription());
+        service.setFullDescription(request.getFullDescription());
+        service.setShowPrice(request.isShowPrice());
+        service.setDisplayPrice(request.getDisplayPrice());
+        service.setStatus(request.getStatus());
+//        service.setEstimateTime(request.getEstimateTime());
+
+        // Cập nhật ảnh đại diện (Thumbnail)
+        if (request.getThumbnailFile() != null && !request.getThumbnailFile().isEmpty()) {
+            String thumnailUrl = imageUploadService.uploadImage(request.getThumbnailFile(), "garage/services/thumbnails");
+            service.setMediaThumbnail(thumnailUrl);
+        } else {
+            // Giữ lại URL cũ hoặc xóa (nếu gửi lên rỗng/null)
+            String thumbUrl = request.getThumbnailUrl();
+            service.setMediaThumbnail(thumbUrl != null && !thumbUrl.trim().isEmpty() ? thumbUrl.trim() : null);
+        }
+
+        // Cập nhật thư viện ảnh/video (Media)
+        List<ServiceMedia> currentMedia = service.getMedia();
+        if (currentMedia == null) {
+            currentMedia = new ArrayList<>();
+            service.setMedia(currentMedia);
+        }
+
+        // Lọc bỏ những media cũ không nằm trong danh sách request.existingMediaUrls
+        List<String> existingUrls = request.getExistingMediaUrls() != null ? request.getExistingMediaUrls() : new ArrayList<>();
+        List<ServiceMedia> toRemove = new ArrayList<>();
+        for (ServiceMedia m : currentMedia) {
+            if (m.getMediaUrl() == null || !existingUrls.contains(m.getMediaUrl().trim())) {
+                toRemove.add(m);
+            }
+        }
+        currentMedia.removeAll(toRemove);
+
+        // Cập nhật displayOrder cho những media giữ lại dựa theo thứ tự mới gửi lên
+        for (int i = 0; i < existingUrls.size(); i++) {
+            final String url = existingUrls.get(i).trim();
+            final int displayOrderVal = i + 1;
+            currentMedia.stream()
+                    .filter(m -> url.equals(m.getMediaUrl()))
+                    .findFirst()
+                    .ifPresent(m -> m.setDisplayOrder(displayOrderVal));
+        }
+
+        // Upload thêm các ảnh/video mới
         if (request.getMediaFiles() != null && !request.getMediaFiles().isEmpty()) {
-            List<ServiceMedia> mediaList = new ArrayList<>();
-            int displayOrder=1;
             for (MultipartFile file : request.getMediaFiles()) {
                 if (!file.isEmpty()) {
-
-
                     String contentType = file.getContentType();
                     ServiceMedia mediaEntity = new ServiceMedia();
-                    mediaEntity.setDisplayOrder(displayOrder++);
+                    mediaEntity.setDisplayOrder(currentMedia.size() + 1);
                     if (contentType != null && contentType.startsWith("video")) {
                         String mediaUrl = imageUploadService.uploadVideo(file, "garage/services/video");
                         mediaEntity.setMediaUrl(mediaUrl);
                         mediaEntity.setMediaType(MediaType.VIDEO);
-                    } else {String mediaUrl = imageUploadService.uploadImage(file, "garage/services/gallery");
-
+                    } else {
+                        String mediaUrl = imageUploadService.uploadImage(file, "garage/services/gallery");
                         mediaEntity.setMediaUrl(mediaUrl);
                         mediaEntity.setMediaType(MediaType.IMAGE);
                     }
-                    mediaList.add(mediaEntity);
+                    currentMedia.add(mediaEntity);
                 }
             }
-            service.setMedia(mediaList);
         }
 
         return serviceDtoMapper.toDetailDto(serviceRepository.save(service));
