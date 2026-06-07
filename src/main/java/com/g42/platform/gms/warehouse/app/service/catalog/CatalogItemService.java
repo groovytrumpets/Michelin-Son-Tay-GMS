@@ -211,11 +211,11 @@ public class CatalogItemService {
         CatalogItem catalogItem = catalogItemRepo.getCatalogItemById(catalogItemId);
         CatalogDetailDto catalogDetailDto = catalogDtoMapper.toDetailDto(catalogItem);
         catalogDetailDto.setSpecifications(catalogItemRepo.getAllSpecsByItemId(catalogItemId));
-        if (catalogItem.getBrandId() != 0) {
+        if (catalogItem.getBrandId() != null && catalogItem.getBrandId() != 0) {
             System.out.println(catalogItem.getBrandId()+" DEBUG");
         catalogDetailDto.setBrandId(catalogItemRepo.getBrandById(catalogItem.getBrandId()).getBrandName());
         }
-        if (catalogItem.getProductLineId() != 0) {
+        if (catalogItem.getProductLineId() != null && catalogItem.getProductLineId() != 0) {
         catalogDetailDto.setProductLine(catalogItemRepo.getProductLineById(catalogItem.getProductLineId()).getLineName());
         }
         if (catalogItem.getTaxRuleId() !=null){
