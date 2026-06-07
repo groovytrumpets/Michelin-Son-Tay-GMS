@@ -38,12 +38,10 @@ public class CatalogItem {
     private String color;
 
     public Integer getBrandId() {
-        if (brandId == null) return 0;
         return brandId;
     }
 
     public Integer getProductLineId() {
-        if (productLineId == null) return 0;
         return productLineId;
     }
 
