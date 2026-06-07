@@ -276,6 +276,12 @@ public class CatalogItemService {
         if (updateDto.getIsActive() != null) {
             catalogItem.setIsActive(updateDto.getIsActive());
         }
+        if (updateDto.getServiceServiceId() != null) {
+            catalogItem.setServiceServiceId(updateDto.getServiceServiceId());
+        }
+        if (updateDto.getDescription() != null) {
+            catalogItem.setDescription(updateDto.getDescription());
+        }
 
         Brand brand = updateDto.getBrandId() != null ? catalogItemRepo.getBrandById(updateDto.getBrandId()) : null;
         ProductLine productLine = updateDto.getProductLineId() != null ? catalogItemRepo.getProductLineById(updateDto.getProductLineId()) : null;
