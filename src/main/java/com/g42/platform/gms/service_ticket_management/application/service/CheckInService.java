@@ -233,9 +233,9 @@ public class CheckInService {
             throw new CheckInException("Không thể upload ảnh xe: " + e.getMessage());
         }
 
-        if (photoCount == 0) {
-            throw new CheckInException("Phải upload ít nhất 1 ảnh tình trạng xe");
-        }
+//        if (photoCount == 0) {
+//            throw new CheckInException("Phải upload ít nhất 1 ảnh tình trạng xe");
+//        }
         log.info("Uploaded {} vehicle condition photos", photoCount);
 
         // 5. Save odometer reading (optional)
