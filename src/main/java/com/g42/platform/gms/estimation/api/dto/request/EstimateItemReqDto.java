@@ -11,6 +11,7 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @AllArgsConstructor
 public class EstimateItemReqDto {
+    private Integer estimateItemId;
     private Integer workCategoryId;
     private String newCategoryName;
     private Integer itemId;
@@ -28,4 +29,5 @@ public class EstimateItemReqDto {
     private Integer triggeredByItemId;
     private BigDecimal discountAmount;
 //    private BigDecimal finalPrice;
+    private Integer entryItemId;
 }

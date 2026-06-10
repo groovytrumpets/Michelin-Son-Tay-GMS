@@ -39,5 +39,7 @@ public class CreateStockIssueRequest {
 
         /** Discount rate % (0-100), optional */
         private BigDecimal discountRate = BigDecimal.ZERO;
+
+        private Integer entryItemId;
     }
 }

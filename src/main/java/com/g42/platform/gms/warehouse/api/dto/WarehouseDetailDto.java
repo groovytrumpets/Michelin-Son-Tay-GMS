@@ -33,6 +33,7 @@ public class WarehouseDetailDto {
     private Integer maxStockLevel;
     private Integer availableStockLevel;
     private String notify;
+    private java.util.List<WarehouseLotDto> lots;
 
     public Integer getAvailableStockLevel() {
         this.setAvailableStockLevel(this.quantity-this.reservedQuantity);
@@ -49,5 +50,20 @@ public class WarehouseDetailDto {
         this.reservedQuantity = reservedQuantity;
         this.minStockLevel = minStockLevel;
         this.maxStockLevel = maxStockLevel;
+    }
+
+    public WarehouseDetailDto(Integer warehouseId, String warehouseCode, String warehouseName, String warehouseAddress, Integer itemId, BigDecimal sellingPrice, Integer quantity, Integer reservedQuantity, Integer minStockLevel, Integer maxStockLevel, Integer availableStockLevel, String notify) {
+        this.warehouseId = warehouseId;
+        this.warehouseCode = warehouseCode;
+        this.warehouseName = warehouseName;
+        this.warehouseAddress = warehouseAddress;
+        this.itemId = itemId;
+        this.sellingPrice = sellingPrice;
+        this.quantity = quantity;
+        this.reservedQuantity = reservedQuantity;
+        this.minStockLevel = minStockLevel;
+        this.maxStockLevel = maxStockLevel;
+        this.availableStockLevel = availableStockLevel;
+        this.notify = notify;
     }
 }

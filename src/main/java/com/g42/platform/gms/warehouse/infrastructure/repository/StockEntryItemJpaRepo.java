@@ -144,4 +144,27 @@ public interface StockEntryItemJpaRepo extends JpaRepository<StockEntryItemJpa, 
            "      AND se2.status = com.g42.platform.gms.warehouse.domain.enums.StockEntryStatus.CONFIRMED" +
            "  )")
     List<Object[]> findLatestMarkupByWarehouse(@Param("warehouseId") Integer warehouseId);
+
+    @Query("""
+    SELECT new com.g42.platform.gms.warehouse.api.dto.WarehouseLotDto(
+        sei.entryItemId,
+        sei.entryId,
+        se.entryCode,
+        sei.quantity,
+        sei.remainingQuantity,
+        sei.importPrice,
+        sei.markupMultiplier,
+        null
+    )
+    FROM StockEntryItemJpa sei
+    JOIN StockEntryJpa se ON se.entryId = sei.entryId
+    WHERE se.warehouseId = :warehouseId
+      AND sei.itemId = :itemId
+      AND sei.remainingQuantity > 0
+      AND se.status = com.g42.platform.gms.warehouse.domain.enums.StockEntryStatus.CONFIRMED
+    ORDER BY sei.entryItemId ASC
+    """)
+    List<com.g42.platform.gms.warehouse.api.dto.WarehouseLotDto> findWarehouseLots(
+            @Param("warehouseId") Integer warehouseId,
+            @Param("itemId") Integer itemId);
 }

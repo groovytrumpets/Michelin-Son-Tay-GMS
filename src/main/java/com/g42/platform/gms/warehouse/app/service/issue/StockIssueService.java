@@ -169,7 +169,7 @@ public class StockIssueService {
         // Tính FIFO + giá cho từng item và lưu
         List<StockIssueItem> draftItems = new ArrayList<>();
         for (CreateStockIssueRequest.IssueItemRequest req : request.getItems()) {
-            draftItems.addAll(buildFifoItems(saved, req.getItemId(), req.getQuantity(), req.getDiscountRate()));
+            draftItems.addAll(buildFifoItems(saved, req.getItemId(), req.getQuantity(), req.getDiscountRate(), req.getEntryItemId()));
         }
         stockIssueItemRepo.saveAll(draftItems);
 
@@ -395,7 +395,7 @@ public class StockIssueService {
             // Bước 5: Tính lại FIFO + giá cho items mới
             List<StockIssueItem> newItems = new ArrayList<>();
             for (CreateStockIssueRequest.IssueItemRequest req : request.getItems()) {
-                newItems.addAll(buildFifoItems(issue, req.getItemId(), req.getQuantity(), req.getDiscountRate()));
+                newItems.addAll(buildFifoItems(issue, req.getItemId(), req.getQuantity(), req.getDiscountRate(), req.getEntryItemId()));
             }
             // Bước 6: Lưu items mới
             stockIssueItemRepo.saveAll(newItems);
@@ -747,7 +747,7 @@ public class StockIssueService {
      * - sellingPrice: ưu tiên market price, fallback dùng lô mới nhất * markup
      * - Nếu thiếu hàng: thêm placeholder row (entryItemId=0, giá=0)
      */
-    private List<StockIssueItem> buildFifoItems(StockIssue issue, Integer itemId, int needed, BigDecimal requestedDiscount) {
+    private List<StockIssueItem> buildFifoItems(StockIssue issue, Integer itemId, int needed, BigDecimal requestedDiscount, Integer selectedEntryItemId) {
         BigDecimal estimateUnitPrice = resolveEstimateUnitPrice(issue.getServiceTicketId(), issue.getWarehouseId(), itemId);
 
         // SERVICE_TICKET: discount kho không áp dụng, giá báo giá đã là giá chốt
@@ -763,7 +763,12 @@ public class StockIssueService {
                 .map(WarehousePricing::getSellingPrice)
                 .orElse(null);
 
-        List<StockEntryItem> lots = stockEntryRepo.findFifoLots(issue.getWarehouseId(), itemId);
+        List<StockEntryItem> lots = new ArrayList<>();
+        if (selectedEntryItemId != null && selectedEntryItemId > 0) {
+            stockEntryRepo.findItemById(selectedEntryItemId).ifPresent(lots::add);
+        } else {
+            lots = stockEntryRepo.findFifoLots(issue.getWarehouseId(), itemId);
+        }
         StockEntryItem latestLot = stockEntryRepo.findLatestLot(issue.getWarehouseId(), itemId).orElse(null);
 
         List<StockIssueItem> items = new ArrayList<>();
@@ -868,7 +873,13 @@ public class StockIssueService {
                 ? item.getDiscountRate()
                 : discountService.resolveDiscountRate(item.getItemId(), issue.getIssueType(), quantity);
 
-        List<StockEntryItem> lots = stockEntryRepo.findFifoLots(issue.getWarehouseId(), item.getItemId());
+        List<StockEntryItem> lots;
+        if (item.getEntryItemId() != null && item.getEntryItemId() > 0) {
+            lots = new ArrayList<>();
+            stockEntryRepo.findItemById(item.getEntryItemId()).ifPresent(lots::add);
+        } else {
+            lots = stockEntryRepo.findFifoLots(issue.getWarehouseId(), item.getItemId());
+        }
         BigDecimal importPrice = computeAverageImportPrice(lots, quantity);
 
         StockEntryItem latestLot = stockEntryRepo.findLatestLot(issue.getWarehouseId(), item.getItemId()).orElse(null);

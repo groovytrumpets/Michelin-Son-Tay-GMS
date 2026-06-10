@@ -238,13 +238,16 @@ public class EstimateService {
         List<EstimateItem> toSave = new ArrayList<>();
         Set<Integer> incomingIds = new HashSet<>();
         for (EstimateItemReqDto req : request.getItems()) {
-            if (req.getItemId() != null && existingMap.containsKey(req.getItemId())) {
+            if (req.getEstimateItemId() != null && existingMap.containsKey(req.getEstimateItemId())) {
                 // update old items
-                EstimateItem existing = existingMap.get(req.getItemId());
+                EstimateItem existing = existingMap.get(req.getEstimateItemId());
                 existing.setItemName(req.getItemName());
+                existing.setItemId(req.getItemId());
                 existing.setQuantity(req.getQuantity());
                 existing.setUnitPrice(req.getUnitPrice());
                 existing.setWorkCategoryId(req.getWorkCategoryId());
+                existing.setWarehouseId(req.getWarehouseId());
+                existing.setEntryItemId(req.getEntryItemId());
                 existing.setIsChecked(req.getIsChecked());
                 existing.setIsRemoved(req.getIsRemoved());
                 existing.setIsGift(req.getIsGift());
@@ -260,7 +263,7 @@ public class EstimateService {
                 }
                 existing.setFinalPrice(existing.getFinalPrice());
                 toSave.add(existing);
-                incomingIds.add(req.getItemId());
+                incomingIds.add(req.getEstimateItemId());
             } else {
                 toSave.addAll(resolveItems(List.of(req), estimateId));
             }
@@ -329,6 +332,7 @@ public class EstimateService {
             item.setRevisedFromItemId(req.getRevisedFromItemId());
             item.setTriggeredByItemId(req.getTriggeredByItemId());
             item.setPromotionId(req.getPromotionId());
+            item.setEntryItemId(req.getEntryItemId());
 
             item.setIsGift(req.getIsGift() != null ? req.getIsGift() : false);
 //            System.out.println("DEBUG RESOLVING ITEM: "+req.getIsGift()+", Tiggerd by: "+req.getRevisedFromItemId());
@@ -455,6 +459,8 @@ public class EstimateService {
         if (request.getUnitPrice() != null)estimateItem.setUnitPrice(request.getUnitPrice());
         if (request.getIsChecked() != null)estimateItem.setIsChecked(request.getIsChecked());
         if (request.getIsRemoved() != null)estimateItem.setIsRemoved(request.getIsRemoved());
+        if (request.getWarehouseId() != null) estimateItem.setWarehouseId(request.getWarehouseId());
+        estimateItem.setEntryItemId(request.getEntryItemId());
         applyTax(estimateItem,currentTaxRuleId);
         EstimateItem saved = estimateItemRepository.save(estimateItem);
         //todo: recalculate
