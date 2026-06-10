@@ -95,6 +95,7 @@ public class StockAllocationService {
                 stockAllocation.setEstimateItemId(newItem.getId());
                 stockAllocation.setWarehouseId(newItem.getWarehouseId());
                 stockAllocation.setItemId(newItem.getItemId());
+                stockAllocation.setEntryItemId(newItem.getEntryItemId());
                 stockAllocation.setQuantity(newItem.getQuantity());
                 stockAllocation.setEstimateId(estimateId);
                 stockAllocation.setStatus("RESERVED");
@@ -123,6 +124,7 @@ public class StockAllocationService {
                     stockAllocation.setEstimateItemId(estimateItem.getId());
                     stockAllocation.setWarehouseId(estimateItem.getWarehouseId());
                     stockAllocation.setItemId(estimateItem.getItemId());
+                    stockAllocation.setEntryItemId(estimateItem.getEntryItemId());
                     stockAllocation.setQuantity(estimateItem.getQuantity());
                     stockAllocation.setEstimateId(estimateId);
                     stockAllocation.setStatus("RESERVED");
@@ -177,10 +179,14 @@ public class StockAllocationService {
                 }
 
                 int difference = dto.getQuantity() - existingAlloc.getQuantity();
-                if (difference != 0) {
+                boolean entryItemIdChanged = !Objects.equals(dto.getEntryItemId(), existingAlloc.getEntryItemId());
+                if (difference != 0 || entryItemIdChanged) {
                     existingAlloc.setQuantity(dto.getQuantity());
+                    existingAlloc.setEntryItemId(dto.getEntryItemId());
                     stockAllocationRepository.save(existingAlloc);
-                    inventoryService.updateReservedQuantityByDelta(dto.getItemId(), dto.getWarehouseId(), difference);
+                    if (difference != 0) {
+                        inventoryService.updateReservedQuantityByDelta(dto.getItemId(), dto.getWarehouseId(), difference);
+                    }
                 }
 
                 continue; // Xử lý xong, BỎ QUA lệnh add new bên dưới
@@ -205,11 +211,15 @@ public class StockAllocationService {
                 continue; // Bỏ qua mọi xử lý update bên dưới, nhảy sang dto tiếp theo
             }
             int difference = dto.getQuantity() - oldAllocation.getQuantity();
-            if (difference != 0) {
+            boolean entryItemIdChanged = !Objects.equals(dto.getEntryItemId(), oldAllocation.getEntryItemId());
+            if (difference != 0 || entryItemIdChanged) {
                 oldAllocation.setQuantity(dto.getQuantity());
+                oldAllocation.setEntryItemId(dto.getEntryItemId());
                 stockAllocationRepository.save(oldAllocation);
 
-                inventoryService.updateReservedQuantityByDelta(dto.getItemId(),dto.getWarehouseId(),difference);
+                if (difference != 0) {
+                    inventoryService.updateReservedQuantityByDelta(dto.getItemId(),dto.getWarehouseId(),difference);
+                }
             }
             oldMap.remove(dto.getAllocationId());
         }

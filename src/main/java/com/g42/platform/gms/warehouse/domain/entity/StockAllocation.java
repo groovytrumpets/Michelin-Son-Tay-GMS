@@ -14,6 +14,7 @@ public class StockAllocation {
     private Integer estimateId;
     private Integer warehouseId;
     private Integer itemId;
+    private Integer entryItemId;
     private String itemName;
     private Integer quantity;
     private AllocationStatus status;

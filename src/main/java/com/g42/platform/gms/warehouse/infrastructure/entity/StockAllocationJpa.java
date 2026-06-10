@@ -39,6 +39,9 @@ public class StockAllocationJpa {
     @Column(name = "item_id", nullable = false)
     private Integer itemId;
 
+    @Column(name = "entry_item_id")
+    private Integer entryItemId;
+
     @Column(name = "quantity", nullable = false)
     private Integer quantity;
 

@@ -35,11 +35,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 @Service("warehouseStockAllocationService")
 @RequiredArgsConstructor
@@ -131,10 +127,12 @@ public class StockAllocationService {
 
             // Cập nhật allocation cũ hoặc tạo mới
             if (existingAlloc != null) {
-                if (delta == 0) continue;  // Không thay đổi → skip
+                boolean entryItemIdChanged = !Objects.equals(estimateItem.getEntryItemId(), existingAlloc.getEntryItemId());
+                if (delta == 0 && !entryItemIdChanged) continue;  // Không thay đổi → skip
 
                 // Cập nhật quantity
                 existingAlloc.setQuantity(requiredQty);
+                existingAlloc.setEntryItemId(estimateItem.getEntryItemId());
                 allocationRepo.save(existingAlloc);
 
                 // Cập nhật reserved quantity trong inventory
@@ -153,6 +151,7 @@ public class StockAllocationService {
                 newAlloc.setEstimateId(estimateId);
                 newAlloc.setWarehouseId(estimateItem.getWarehouseId());
                 newAlloc.setItemId(estimateItem.getItemId());
+                newAlloc.setEntryItemId(estimateItem.getEntryItemId());
                 newAlloc.setQuantity(requiredQty);
                 newAlloc.setStatus(AllocationStatus.RESERVED);
                 newAlloc.setCreatedBy(staffId);
@@ -782,7 +781,7 @@ public class StockAllocationService {
                     continue;
                 }
             }
-            addIssueItem(result, allocation.getWarehouseId(), allocation.getItemId(), allocation.getQuantity());
+            addIssueItem(result, allocation.getWarehouseId(), allocation.getItemId(), allocation.getQuantity(), allocation.getEntryItemId());
         }
         return result;
     }
@@ -792,7 +791,7 @@ public class StockAllocationService {
     ) {
         Map<Integer, List<CreateStockIssueRequest.IssueItemRequest>> result = new HashMap<>();
         for (EstimateItem estimateItem : estimateItems) {
-            addIssueItem(result, estimateItem.getWarehouseId(), estimateItem.getItemId(), estimateItem.getQuantity());
+            addIssueItem(result, estimateItem.getWarehouseId(), estimateItem.getItemId(), estimateItem.getQuantity(), estimateItem.getEntryItemId());
         }
         return result;
     }
@@ -801,12 +800,14 @@ public class StockAllocationService {
             Map<Integer, List<CreateStockIssueRequest.IssueItemRequest>> issueItemsByWarehouse,
             Integer warehouseId,
             Integer itemId,
-            Integer quantity
+            Integer quantity,
+            Integer entryItemId
     ) {
         CreateStockIssueRequest.IssueItemRequest item = new CreateStockIssueRequest.IssueItemRequest();
         item.setItemId(itemId);
         item.setQuantity(quantity);
         item.setDiscountRate(BigDecimal.ZERO);
+        item.setEntryItemId(entryItemId);
         issueItemsByWarehouse.computeIfAbsent(warehouseId, key -> new ArrayList<>()).add(item);
     }
 
@@ -891,40 +892,72 @@ public class StockAllocationService {
                         lastItemId = itemId;
                     }
 
-                    // Phân bổ qty của allocation này vào các lô theo FIFO
+                    // Phân bổ qty của allocation này vào các lô (theo lô được chọn hoặc FIFO)
                     // Mỗi lô có thể đã bị dùng một phần bởi dòng cũ → chỉ lấy phần còn lại
                     int remaining = needed;
-                    for (StockEntryItem lot : lots_cache) {
-                        if (remaining <= 0) break;
-                        // Tính qty còn khả dụng của lô này (trừ đi phần đã dùng bởi dòng cũ)
-                        int alreadyConsumed = consumedByLot.getOrDefault(lot.getEntryItemId(), 0);
-                        int available = Math.max(0, lot.getRemainingQuantity() - alreadyConsumed);
-                        if (available <= 0) continue;
+                    if (alloc.getEntryItemId() != null && alloc.getEntryItemId() > 0) {
+                        StockEntryItem lot = stockEntryRepo.findItemById(alloc.getEntryItemId()).orElse(null);
+                        if (lot != null && lot.getItemId().equals(itemId)) {
+                            int alreadyConsumed = consumedByLot.getOrDefault(lot.getEntryItemId(), 0);
+                            int available = Math.max(0, lot.getRemainingQuantity() - alreadyConsumed);
+                            int consume = Math.min(remaining, available);
+                            if (consume > 0) {
+                                BigDecimal sellingPrice;
+                                if (marketSellingPrice_cache != null) {
+                                    sellingPrice = marketSellingPrice_cache;
+                                } else if (latestLot_cache != null) {
+                                    sellingPrice = latestLot_cache.getImportPrice().multiply(latestLot_cache.getMarkupMultiplier())
+                                            .setScale(2, java.math.RoundingMode.HALF_UP);
+                                } else {
+                                    sellingPrice = lot.getImportPrice().multiply(lot.getMarkupMultiplier())
+                                            .setScale(2, java.math.RoundingMode.HALF_UP);
+                                }
+                                BigDecimal finalPrice = stockIssueService.resolveFinalPriceBasePublic(
+                                        IssueType.SERVICE_TICKET, estimateUnitPrice, sellingPrice);
 
-                        int consume = Math.min(remaining, available);
+                                newLotItems.add(StockIssueItem.builder()
+                                        .issueId(existingIssueId).itemId(itemId)
+                                        .entryItemId(lot.getEntryItemId()).quantity(consume)
+                                        .exportPrice(sellingPrice).estimateUnitPrice(estimateUnitPrice)
+                                        .importPrice(lot.getImportPrice()).discountRate(BigDecimal.ZERO)
+                                        .finalPrice(finalPrice).build());
 
-                        BigDecimal sellingPrice;
-                        if (marketSellingPrice_cache != null) {
-                            sellingPrice = marketSellingPrice_cache;
-                        } else if (latestLot_cache != null) {
-                            sellingPrice = latestLot_cache.getImportPrice().multiply(latestLot_cache.getMarkupMultiplier())
-                                    .setScale(2, java.math.RoundingMode.HALF_UP);
-                        } else {
-                            sellingPrice = lot.getImportPrice().multiply(lot.getMarkupMultiplier())
-                                    .setScale(2, java.math.RoundingMode.HALF_UP);
+                                consumedByLot.merge(lot.getEntryItemId(), consume, Integer::sum);
+                                remaining -= consume;
+                            }
                         }
-                        BigDecimal finalPrice = stockIssueService.resolveFinalPriceBasePublic(
-                                IssueType.SERVICE_TICKET, estimateUnitPrice, sellingPrice);
+                    } else {
+                        for (StockEntryItem lot : lots_cache) {
+                            if (remaining <= 0) break;
+                            int alreadyConsumed = consumedByLot.getOrDefault(lot.getEntryItemId(), 0);
+                            int available = Math.max(0, lot.getRemainingQuantity() - alreadyConsumed);
+                            if (available <= 0) continue;
 
-                        newLotItems.add(StockIssueItem.builder()
-                                .issueId(existingIssueId).itemId(itemId)
-                                .entryItemId(lot.getEntryItemId()).quantity(consume)
-                                .exportPrice(sellingPrice).estimateUnitPrice(estimateUnitPrice)
-                                .importPrice(lot.getImportPrice()).discountRate(BigDecimal.ZERO)
-                                .finalPrice(finalPrice).build());
-                        // Cập nhật consumed để các allocation sau trong cùng vòng lặp không dùng lại
-                        consumedByLot.merge(lot.getEntryItemId(), consume, Integer::sum);
-                        remaining -= consume;
+                            int consume = Math.min(remaining, available);
+
+                            BigDecimal sellingPrice;
+                            if (marketSellingPrice_cache != null) {
+                                    sellingPrice = marketSellingPrice_cache;
+                            } else if (latestLot_cache != null) {
+                                    sellingPrice = latestLot_cache.getImportPrice().multiply(latestLot_cache.getMarkupMultiplier())
+                                            .setScale(2, java.math.RoundingMode.HALF_UP);
+                            } else {
+                                    sellingPrice = lot.getImportPrice().multiply(lot.getMarkupMultiplier())
+                                            .setScale(2, java.math.RoundingMode.HALF_UP);
+                            }
+                            BigDecimal finalPrice = stockIssueService.resolveFinalPriceBasePublic(
+                                    IssueType.SERVICE_TICKET, estimateUnitPrice, sellingPrice);
+
+                            newLotItems.add(StockIssueItem.builder()
+                                    .issueId(existingIssueId).itemId(itemId)
+                                    .entryItemId(lot.getEntryItemId()).quantity(consume)
+                                    .exportPrice(sellingPrice).estimateUnitPrice(estimateUnitPrice)
+                                    .importPrice(lot.getImportPrice()).discountRate(BigDecimal.ZERO)
+                                    .finalPrice(finalPrice).build());
+
+                            consumedByLot.merge(lot.getEntryItemId(), consume, Integer::sum);
+                            remaining -= consume;
+                        }
                     }
                     // Placeholder nếu không đủ lô
                     if (remaining > 0) {

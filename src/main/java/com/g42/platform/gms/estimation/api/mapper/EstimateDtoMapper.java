@@ -25,6 +25,7 @@ public interface EstimateDtoMapper {
     EstimateRespondDto toEstimateDto(Estimate estimate);
     @Mapping(target = "workCateId", source = "id")
     WorkCataDto toWorkCateDto(WorkCategory workCataDto);
+    @Mapping(target = "estimateItemId", source = "id")
     EstimateItemReqDto toEstimateItemReqDto(EstimateItem estimateItem);
     @Mapping(target = "estimateItemId", source = "id")
     EstimateItemDto toEstimateItemDtoJpa(EstimateItemJpa estimateItem);

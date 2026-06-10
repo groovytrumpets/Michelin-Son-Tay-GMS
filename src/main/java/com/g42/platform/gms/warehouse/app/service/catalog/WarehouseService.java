@@ -4,18 +4,22 @@ import com.g42.platform.gms.warehouse.api.dto.CatalogDetailDto;
 import com.g42.platform.gms.warehouse.api.dto.CatalogSummaryDto;
 import com.g42.platform.gms.warehouse.api.dto.CatalogWarehouseDto;
 import com.g42.platform.gms.warehouse.api.dto.WarehouseDetailDto;
+import com.g42.platform.gms.warehouse.api.dto.WarehouseLotDto;
 import com.g42.platform.gms.warehouse.api.mapper.CatalogDtoMapper;
 import com.g42.platform.gms.warehouse.app.service.dto.PricingResolve;
 import com.g42.platform.gms.warehouse.app.service.pricing.PricingService;
 import com.g42.platform.gms.warehouse.domain.entity.Brand;
 import com.g42.platform.gms.warehouse.domain.entity.CatalogItem;
 import com.g42.platform.gms.warehouse.domain.entity.ProductLine;
+import com.g42.platform.gms.warehouse.domain.entity.WarehousePricing;
 import com.g42.platform.gms.warehouse.domain.enums.CatalogItemType;
 import com.g42.platform.gms.warehouse.domain.exception.WarehouseErrorCode;
 import com.g42.platform.gms.warehouse.domain.exception.WarehouseException;
 import com.g42.platform.gms.warehouse.domain.repository.CatalogItemRepo;
 import com.g42.platform.gms.warehouse.domain.repository.WarehouseDetailProjection;
+import com.g42.platform.gms.warehouse.domain.repository.WarehousePricingRepo;
 import com.g42.platform.gms.warehouse.domain.repository.WarehouseRepo;
+import com.g42.platform.gms.warehouse.infrastructure.repository.StockEntryItemJpaRepo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -37,6 +41,10 @@ public class WarehouseService {
     private CatalogDtoMapper catalogDtoMapper;
     @Autowired
     private PricingService  pricingService;
+    @Autowired
+    private StockEntryItemJpaRepo stockEntryItemJpaRepo;
+    @Autowired
+    private WarehousePricingRepo warehousePricingRepo;
 
 
     public Page<CatalogSummaryDto> getListItems(int page, int size, CatalogItemType itemType, Boolean isActive, String search, Integer brand, Integer productLine, String categoryCode, BigDecimal minPrice, BigDecimal maxPrice, String sortBy) {
@@ -145,6 +153,29 @@ public class WarehouseService {
                 // Set giá trị cuối cùng vào DTO (Bạn nhớ thêm thuộc tính effectivePrice vào WarehouseDetailDto nhé)
                 detail.setSellingPrice(pricingResolve.getFinalPrice());
                 detail.setNotify(pricingResolve.getNotify());
+
+                // Query các lô hàng cho kho và vật tư này
+                List<WarehouseLotDto> lots = stockEntryItemJpaRepo.findWarehouseLots(detail.getWarehouseId(), catalogItem.getItemId());
+                
+                // Lấy cấu hình giá bán cố định nếu có
+                BigDecimal warehouseSellingPrice = warehousePricingRepo.findActiveByWarehouseAndItem(detail.getWarehouseId(), catalogItem.getItemId())
+                        .map(WarehousePricing::getSellingPrice)
+                        .orElse(null);
+
+                for (WarehouseLotDto lot : lots) {
+                    BigDecimal lotSellingPrice;
+                    if (warehouseSellingPrice != null && warehouseSellingPrice.compareTo(BigDecimal.ZERO) > 0) {
+                        lotSellingPrice = warehouseSellingPrice;
+                    } else if (lot.getImportPrice() != null && lot.getImportPrice().compareTo(BigDecimal.ZERO) > 0) {
+                        lotSellingPrice = lot.getImportPrice()
+                                .multiply(lot.getMarkupMultiplier() != null ? lot.getMarkupMultiplier() : BigDecimal.ONE)
+                                .setScale(2, java.math.RoundingMode.HALF_UP);
+                    } else {
+                        lotSellingPrice = catalogItem.getPrice() != null ? catalogItem.getPrice() : BigDecimal.ZERO;
+                    }
+                    lot.setSellingPrice(lotSellingPrice);
+                }
+                detail.setLots(lots);
             }
             return dto;
         });
