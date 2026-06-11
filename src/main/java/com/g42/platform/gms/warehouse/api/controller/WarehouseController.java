@@ -88,4 +88,20 @@ public class WarehouseController {
         return ResponseEntity.ok(ApiResponses.success(promotionCreateDtoList));
     }
 
+    /**
+     * Tạo kho hàng lỗi (DEFECTIVE) cho một chi nhánh.
+     * 
+     * @param branchWarehouseId - ID kho chi nhánh chính (parent warehouse)
+     * @return Thông tin kho DEFECTIVE vừa tạo
+     */
+    @PostMapping("/warehouse/defective/create/{branchWarehouseId}")
+    public ResponseEntity<ApiResponse<String>> createDefectiveWarehouse(@PathVariable Integer branchWarehouseId) {
+        try {
+            warehouseService.createDefectiveWarehouse(branchWarehouseId);
+            return ResponseEntity.ok(ApiResponses.success("Tạo kho hàng lỗi thành công cho warehouse ID: " + branchWarehouseId));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponses.error("ERROR", e.getMessage()));
+        }
+    }
+
 }

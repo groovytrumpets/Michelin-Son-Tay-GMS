@@ -1,12 +1,18 @@
 package com.g42.platform.gms.warehouse.infrastructure.entity;
 
+import com.g42.platform.gms.warehouse.domain.enums.DefectCause;
+import com.g42.platform.gms.warehouse.domain.enums.ReturnReason;
 import jakarta.persistence.*;
 import lombok.Data;
 
 /**
  * Chi tiết từng sản phẩm trong phiếu hoàn hàng.
- * Mỗi item có condition_note riêng và có thể upload ảnh lỗi riêng
- * qua warehouse_attachment (ref_type = RETURN_ENTRY_ITEM, ref_id = return_item_id).
+ *
+ * - condition_note   : mô tả tình trạng sản phẩm khi trả
+ * - return_reason    : WRONG_TYPE (nhầm kiểu/mẫu) hoặc DEFECTIVE (hàng lỗi)
+ * - defect_cause     : nguyên nhân lỗi (TECHNICIAN / WAREHOUSE / SUPPLIER), chỉ khi DEFECTIVE
+ * - responsible_staff_id : nhân viên chịu trách nhiệm, bắt buộc khi cause là TECHNICIAN/WAREHOUSE
+ * - defective_warehouse_id : kho hàng lỗi đích, được tự động điền khi confirm
  */
 @Entity
 @Table(name = "return_entry_item")
@@ -24,29 +30,50 @@ public class ReturnEntryItemJpa {
     @Column(name = "item_id", nullable = false)
     private Integer itemId;
 
-    /** Allocation liên quan đến dòng trả */
     @Column(name = "allocation_id")
     private Integer allocationId;
 
-    /** Dòng issue gốc tương ứng để trả đúng sản phẩm đã xuất */
     @Column(name = "source_issue_item_id")
     private Integer sourceIssueItemId;
 
-    /** Lô nhập (entry_item_id) sẽ nhận hàng trả nếu trả về đúng lô */
     @Column(name = "entry_item_id")
     private Integer entryItemId;
 
     @Column(name = "quantity", nullable = false)
     private Integer quantity;
 
-    /** Mô tả tình trạng lỗi cụ thể của sản phẩm này */
     @Column(name = "condition_note", columnDefinition = "TEXT", nullable = false)
     private String conditionNote;
 
-    /**
-     * true = đây là item đổi mới (xuất ra cho khách), chỉ dùng khi returnType = EXCHANGE.
-     * false (default) = item trả về.
-     */
     @Column(name = "is_exchange_item", nullable = false)
     private boolean exchangeItem = false;
+
+    /**
+     * Phân loại lý do hoàn: WRONG_TYPE hoặc DEFECTIVE.
+     * Nullable để tương thích ngược với dữ liệu cũ (coi như WRONG_TYPE nếu null).
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "return_reason", length = 20, nullable = false)
+    private ReturnReason returnReason = ReturnReason.WRONG_TYPE;
+
+    /**
+     * Nguyên nhân gây lỗi – chỉ có giá trị khi return_reason = DEFECTIVE.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "defect_cause", length = 20)
+    private DefectCause defectCause;
+
+    /**
+     * Nhân viên chịu trách nhiệm về lỗi.
+     * Bắt buộc khi defect_cause = TECHNICIAN hoặc WAREHOUSE.
+     */
+    @Column(name = "responsible_staff_id")
+    private Integer responsibleStaffId;
+
+    /**
+     * Kho hàng lỗi nhận hàng, được resolve tự động khi confirm.
+     * NULL khi return_reason = WRONG_TYPE.
+     */
+    @Column(name = "defective_warehouse_id")
+    private Integer defectiveWarehouseId;
 }

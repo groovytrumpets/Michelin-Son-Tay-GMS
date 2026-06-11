@@ -130,6 +130,7 @@ public class ReturnEntryService {
     private final ServiceTicketRepo serviceTicketRepo;
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
     private final EstimateInternalApi estimateInternalApi;
+    private final com.g42.platform.gms.warehouse.infrastructure.repository.ReturnEntryItemJpaRepo returnEntryItemJpaRepo;
 
     @Transactional
     public ReturnEntryResponse create(CreateReturnEntryRequest request, Integer staffId) {
@@ -153,6 +154,7 @@ public class ReturnEntryService {
         for (ReturnEntryItemRequest itemReq : request.getItems()) {
             validateAllocation(request.getSourceIssueId(), itemReq); // kiểm tra qty không vượt allocation
             validateDuplicateAllocationOnCreate(itemReq.getAllocationId());
+            validateDefectiveItem(itemReq); // kiểm tra thông tin lỗi nếu DEFECTIVE
             // Mở rộng 1 dòng request thành nhiều dòng theo lô (FIFO từ issue gốc)
             saved.getItems().addAll(expandReturnItemsByLot(itemReq, saved.getReturnId(), request.getSourceIssueId()));
         }
@@ -162,6 +164,101 @@ public class ReturnEntryService {
             for (ReturnEntryItemRequest itemReq : request.getExchangeItems()) {
                 validateEntryItem(request.getWarehouseId(), itemReq);
                 saved.getItems().add(buildExchangeItem(itemReq, saved.getReturnId()));
+            }
+        }
+
+        return toResponse(returnEntryRepo.save(saved));
+    }
+
+    /**
+     * Tạo phiếu hoàn từ phiếu xuất đã xác nhận.
+     * Đảm bảo có đầy đủ context: allocation, phiếu dịch vụ, phiếu xuất nguồn.
+     * 
+     * @param request DTO chứa issueId và danh sách allocation cần hoàn
+     * @param staffId ID nhân viên tạo phiếu
+     * @return Response phiếu hoàn đã tạo
+     */
+    @Transactional
+    public ReturnEntryResponse createFromIssue(
+            com.g42.platform.gms.warehouse.api.dto.request.CreateReturnEntryFromIssueRequest request,
+            Integer staffId) {
+        // Validate phiếu xuất nguồn đã CONFIRMED
+        validateSourceIssueConfirmed(request.getIssueId());
+
+        // Lấy phiếu xuất để xác định warehouseId
+        StockIssue sourceIssue = stockIssueRepo.findById(request.getIssueId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Không tìm thấy phiếu xuất id=" + request.getIssueId()));
+
+        if (sourceIssue.getWarehouseId() == null) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Phiếu xuất không có warehouseId");
+        }
+
+        // Khởi tạo phiếu hoàn
+        ReturnEntry entry = new ReturnEntry();
+        entry.setReturnCode(generateCode());
+        entry.setWarehouseId(sourceIssue.getWarehouseId());
+        entry.setReturnReason(request.getReturnReason());
+        entry.setSourceIssueId(request.getIssueId());
+        entry.setReturnType(request.getReturnType() != null ? request.getReturnType() : ReturnType.CUSTOMER_RETURN);
+        entry.setStatus(ReturnEntryStatus.SUBMITTED);
+        entry.setCreatedBy(staffId);
+
+        // Lưu trước để có returnId
+        ReturnEntry saved = returnEntryRepo.save(entry);
+
+        // Xử lý từng allocation cần hoàn
+        for (com.g42.platform.gms.warehouse.api.dto.request.CreateReturnEntryFromIssueRequest.ReturnItemFromIssue itemReq : request.getItems()) {
+            // Lấy allocation để resolve itemId, issueItemId, entryItemId
+            StockAllocation allocation = stockAllocationRepo.findById(itemReq.getAllocationId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                            "Không tìm thấy allocation id=" + itemReq.getAllocationId()));
+
+            // Validate allocation thuộc phiếu xuất này và COMMITTED
+            if (allocation.getIssueId() == null || !allocation.getIssueId().equals(request.getIssueId())) {
+                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                        "Allocation " + itemReq.getAllocationId() + " không thuộc phiếu xuất này");
+            }
+
+            if (allocation.getStatus() != AllocationStatus.COMMITTED) {
+                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                        "Allocation " + itemReq.getAllocationId() + " phải ở trạng thái COMMITTED");
+            }
+
+            // Tạo ReturnEntryItemRequest để tái sử dụng logic validation và expand
+            ReturnEntryItemRequest converted = new ReturnEntryItemRequest();
+            converted.setItemId(allocation.getItemId());
+            converted.setAllocationId(itemReq.getAllocationId());
+            converted.setQuantity(itemReq.getQuantity());
+            converted.setConditionNote(itemReq.getConditionNote());
+            converted.setReturnReason(itemReq.getReturnReason());
+            converted.setDefectCause(itemReq.getDefectCause());
+            converted.setResponsibleStaffId(itemReq.getResponsibleStaffId());
+
+            // Validate và expand theo lô
+            validateAllocation(request.getIssueId(), converted);
+            validateDefectiveItem(converted);
+            validateDuplicateAllocationOnCreate(itemReq.getAllocationId());
+
+            // Mở rộng 1 dòng request thành nhiều dòng theo lô (FIFO)
+            saved.getItems().addAll(expandReturnItemsByLot(converted, saved.getReturnId(), request.getIssueId()));
+        }
+
+        // Xử lý hàng đổi nếu có
+        if (request.getExchangeItems() != null) {
+            for (com.g42.platform.gms.warehouse.api.dto.request.CreateReturnEntryFromIssueRequest.ReturnItemFromIssue exReq : request.getExchangeItems()) {
+                StockAllocation allocation = stockAllocationRepo.findById(exReq.getAllocationId())
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                "Không tìm thấy allocation id=" + exReq.getAllocationId()));
+
+                ReturnEntryItemRequest converted = new ReturnEntryItemRequest();
+                converted.setItemId(allocation.getItemId());
+                converted.setAllocationId(exReq.getAllocationId());
+                converted.setQuantity(exReq.getQuantity());
+
+                validateEntryItem(sourceIssue.getWarehouseId(), converted);
+                saved.getItems().add(buildExchangeItem(converted, saved.getReturnId()));
             }
         }
 
@@ -332,6 +429,7 @@ public class ReturnEntryService {
                     resolveIssueItemAndEntryFromAllocation(itemReq);
                     validateEntryItem(entry.getWarehouseId(), itemReq);
                     validateDuplicateAllocationOnUpdate(itemReq.getAllocationId(), returnId);
+                    validateDefectiveItem(itemReq);
 
                     ReturnEntryItem item = new ReturnEntryItem();
                     item.setReturnId(returnId);
@@ -342,6 +440,9 @@ public class ReturnEntryService {
                     item.setQuantity(itemReq.getQuantity());
                     item.setConditionNote(itemReq.getConditionNote());
                     item.setExchangeItem(false);
+                    item.setReturnReason(itemReq.getReturnReason() != null ? itemReq.getReturnReason() : com.g42.platform.gms.warehouse.domain.enums.ReturnReason.WRONG_TYPE);
+                    item.setDefectCause(itemReq.getDefectCause());
+                    item.setResponsibleStaffId(itemReq.getResponsibleStaffId());
                     entry.getItems().add(item);
                 }
             }
@@ -455,7 +556,22 @@ public class ReturnEntryService {
 
         // Cập nhật tồn kho và lô cho từng dòng trả
         for (ReturnEntryItem item : returnItems) {
-            Inventory inv = getOrCreateInventory(entry.getWarehouseId(), item.getItemId());
+            // Xác định kho nhận hàng trả:
+            // - DEFECTIVE: tìm kho hàng lỗi (type=DEFECTIVE) con của kho hiện tại
+            // - WRONG_TYPE hoặc null: trả về kho thường (entry.warehouseId)
+            Integer targetWarehouseId = entry.getWarehouseId();
+            boolean isDefective = item.getReturnReason() == com.g42.platform.gms.warehouse.domain.enums.ReturnReason.DEFECTIVE;
+            if (isDefective) {
+                Warehouse defectiveWarehouse = warehouseRepo
+                        .findByParentAndType(entry.getWarehouseId(), com.g42.platform.gms.common.enums.WarehouseTypeEnum.DEFECTIVE)
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                                "Chưa có kho hàng lỗi cho chi nhánh id=" + entry.getWarehouseId()
+                                + ". Vui lòng tạo kho loại DEFECTIVE trước."));
+                targetWarehouseId = defectiveWarehouse.getWarehouseId();
+                item.setDefectiveWarehouseId(targetWarehouseId);
+            }
+
+            Inventory inv = getOrCreateInventory(targetWarehouseId, item.getItemId());
 
             // SUPPLIER_RETURN: trả về nhà cung cấp → giảm tồn kho (OUT)
             // CUSTOMER_RETURN: khách trả lại → tăng tồn kho (IN)
@@ -471,7 +587,7 @@ public class ReturnEntryService {
             inventoryRepo.save(inv);
 
             // Ghi audit log
-            saveTransaction(entry.getWarehouseId(), item.getItemId(), item.getEntryItemId(),
+                saveTransaction(targetWarehouseId, item.getItemId(), item.getEntryItemId(),
                     txType, item.getQuantity(), newQty, returnId, staffId);
 
             // Cộng lại remainingQuantity của lô nhập nếu item gắn với lô cụ thể
@@ -545,6 +661,86 @@ public class ReturnEntryService {
         tx.setCreatedById(staffId);
         tx.setCreatedAt(Instant.now());
         transactionRepo.save(tx);
+    }
+
+    /**
+     * Tổng hợp số lỗi hàng theo nhân viên chịu trách nhiệm trong khoảng thời gian.
+     * Chỉ tính phiếu hoàn đã CONFIRMED và returnReason = DEFECTIVE.
+     *
+     * @param from  bắt đầu kỳ (null = không giới hạn)
+     * @param to    kết thúc kỳ (null = không giới hạn)
+     */
+    @Transactional(readOnly = true)
+    public List<com.g42.platform.gms.warehouse.api.dto.response.StaffDefectSummaryResponse> getDefectSummary(
+            java.time.LocalDateTime from, java.time.LocalDateTime to) {
+        List<Object[]> rows = returnEntryItemJpaRepo.summarizeDefectsByStaff(from, to);
+        return rows.stream().map(r -> {
+            Integer staffId  = (Integer) r[0];
+            com.g42.platform.gms.warehouse.domain.enums.DefectCause cause =
+                    r[1] != null
+                    ? com.g42.platform.gms.warehouse.domain.enums.DefectCause.valueOf(r[1].toString())
+                    : null;
+            Long count = ((Number) r[2]).longValue();
+            Long qty   = ((Number) r[3]).longValue();
+
+            String staffName = null;
+            if (staffId != null) {
+                staffName = staffProfileRepo.findById(staffId)
+                        .map(s -> s.getFullName())
+                        .orElse("NV #" + staffId);
+            }
+            return new com.g42.platform.gms.warehouse.api.dto.response.StaffDefectSummaryResponse(
+                    staffId, staffName, cause, count, qty);
+        }).collect(java.util.stream.Collectors.toList());
+    }
+
+    /**
+     * Validation cho từng dòng hoàn hàng bị lỗi.
+     *
+     * - WRONG_TYPE: không bắt buộc thông tin lỗi bổ sung
+     * - DEFECTIVE: bắt buộc defectCause và responsibleStaffId để truy vết trách nhiệm
+     */
+    private void validateDefectiveItem(ReturnEntryItemRequest itemReq) {
+        if (itemReq == null) {
+            return;
+        }
+
+        com.g42.platform.gms.warehouse.domain.enums.ReturnReason returnReason =
+                itemReq.getReturnReason() != null
+                        ? itemReq.getReturnReason()
+                        : com.g42.platform.gms.warehouse.domain.enums.ReturnReason.WRONG_TYPE;
+
+        if (returnReason != com.g42.platform.gms.warehouse.domain.enums.ReturnReason.DEFECTIVE) {
+            if (itemReq.getDefectCause() != null || itemReq.getResponsibleStaffId() != null) {
+                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                        "defectCause và responsibleStaffId chỉ được truyền khi returnReason = DEFECTIVE");
+            }
+            return;
+        }
+
+        if (itemReq.getDefectCause() == null) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "defectCause là bắt buộc khi returnReason = DEFECTIVE");
+        }
+
+        if (itemReq.getDefectCause() == com.g42.platform.gms.warehouse.domain.enums.DefectCause.SUPPLIER) {
+            if (itemReq.getResponsibleStaffId() != null) {
+                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                        "responsibleStaffId phải để trống khi defectCause = SUPPLIER");
+            }
+            return;
+        }
+
+        if (itemReq.getResponsibleStaffId() == null) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "responsibleStaffId là bắt buộc khi defectCause = TECHNICIAN hoặc WAREHOUSE");
+        }
+
+        boolean staffExists = staffProfileRepo.findById(itemReq.getResponsibleStaffId()).isPresent();
+        if (!staffExists) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Không tìm thấy nhân viên chịu trách nhiệm id=" + itemReq.getResponsibleStaffId());
+        }
     }
 
     /**
@@ -681,6 +877,10 @@ public class ReturnEntryService {
         item.setQuantity(quantity);
         item.setConditionNote(req.getConditionNote());
         item.setExchangeItem(false);
+        // Phân loại lý do hoàn và thông tin lỗi
+        item.setReturnReason(req.getReturnReason() != null ? req.getReturnReason() : com.g42.platform.gms.warehouse.domain.enums.ReturnReason.WRONG_TYPE);
+        item.setDefectCause(req.getDefectCause());
+        item.setResponsibleStaffId(req.getResponsibleStaffId());
         return item;
     }
 
@@ -814,6 +1014,19 @@ public class ReturnEntryService {
                             .map(WarehouseAttachment::getFileUrl)
                             .collect(Collectors.toList())
             );
+            // Map thông tin lỗi và trách nhiệm
+            ir.setReturnReason(i.getReturnReason());
+            ir.setDefectCause(i.getDefectCause());
+            ir.setResponsibleStaffId(i.getResponsibleStaffId());
+            if (i.getResponsibleStaffId() != null) {
+                staffProfileRepo.findById(i.getResponsibleStaffId())
+                        .ifPresent(s -> ir.setResponsibleStaffName(s.getFullName()));
+            }
+            ir.setDefectiveWarehouseId(i.getDefectiveWarehouseId());
+            if (i.getDefectiveWarehouseId() != null) {
+                warehouseRepo.findById(i.getDefectiveWarehouseId())
+                        .ifPresent(w -> ir.setDefectiveWarehouseName(w.getWarehouseName()));
+            }
             return ir;
         }).collect(Collectors.toList()));
 
