@@ -154,6 +154,7 @@ public interface StockEntryItemJpaRepo extends JpaRepository<StockEntryItemJpa, 
         sei.remainingQuantity,
         sei.importPrice,
         sei.markupMultiplier,
+        se.entryDate,
         null
     )
     FROM StockEntryItemJpa sei
