@@ -43,6 +43,7 @@ public class StockIssueDetailResponse {
         private Integer entryItemId;   // lô nhập tương ứng
         private String entryCode;
         private String entryLotCode;
+        private Integer allocationId;  // allocation gốc (cho phiếu SERVICE_TICKET)
         private Integer quantity;
         private BigDecimal exportPrice;   // = selling_price của lô
         private BigDecimal estimateUnitPrice; // giá đơn vị đã chốt trên estimate

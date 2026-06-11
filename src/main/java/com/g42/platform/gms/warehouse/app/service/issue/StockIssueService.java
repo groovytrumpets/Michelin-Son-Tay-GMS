@@ -632,6 +632,19 @@ public class StockIssueService {
             .collect(Collectors.toSet());
         Map<Integer, String> itemNameById = partCatalogRepo.findNamesByIds(itemIds.stream().toList());
 
+        // Tạo map từ itemId → allocationId để gắn vào response
+        Map<Integer, Integer> allocationIdByItemId = new HashMap<>();
+        if (issue.getIssueType() == IssueType.SERVICE_TICKET) {
+            // Tìm allocations RESERVED hoặc COMMITTED của phiếu này
+            List<StockAllocation> allocations = stockAllocationRepo.findByIssueIdAndStatus(issueId, AllocationStatus.RESERVED);
+            if (allocations.isEmpty()) {
+                allocations = stockAllocationRepo.findByIssueIdAndStatus(issueId, AllocationStatus.COMMITTED);
+            }
+            for (StockAllocation alloc : allocations) {
+                allocationIdByItemId.put(alloc.getItemId(), alloc.getAllocationId());
+            }
+        }
+
         StockIssueDetailResponse resp = new StockIssueDetailResponse();
         resp.setIssueId(issue.getIssueId());
         resp.setIssueCode(issue.getIssueCode());
@@ -662,6 +675,7 @@ public class StockIssueService {
             d.setItemId(it.getItemId());
             d.setItemName(itemNameById.get(it.getItemId()));
             d.setEntryItemId(it.getEntryItemId());
+            d.setAllocationId(allocationIdByItemId.get(it.getItemId()));
 
             if (it.getEntryItemId() != null && it.getEntryItemId() > 0) {
                 stockEntryRepo.findItemById(it.getEntryItemId()).ifPresent(entryItem -> {

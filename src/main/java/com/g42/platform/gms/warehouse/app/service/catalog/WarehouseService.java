@@ -24,6 +24,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.*;
@@ -45,6 +46,45 @@ public class WarehouseService {
     private StockEntryItemJpaRepo stockEntryItemJpaRepo;
     @Autowired
     private WarehousePricingRepo warehousePricingRepo;
+
+    /**
+     * Tạo kho hàng lỗi (DEFECTIVE) cho một chi nhánh.
+     * 
+     * @param branchWarehouseId - ID kho chi nhánh chính
+     */
+    @Transactional
+    public void createDefectiveWarehouse(Integer branchWarehouseId) {
+        com.g42.platform.gms.warehouse.domain.entity.Warehouse parentWarehouse = warehouseRepo.findById(branchWarehouseId)
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND,
+                        "Không tìm thấy kho với ID: " + branchWarehouseId
+                ));
+
+        Optional<com.g42.platform.gms.warehouse.domain.entity.Warehouse> existing = 
+                warehouseRepo.findByParentAndType(branchWarehouseId, com.g42.platform.gms.common.enums.WarehouseTypeEnum.DEFECTIVE);
+        
+        if (existing.isPresent()) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.CONFLICT,
+                    "Kho DEFECTIVE đã tồn tại cho warehouse ID: " + branchWarehouseId + 
+                    " (Kho lỗi ID: " + existing.get().getWarehouseId() + ")"
+            );
+        }
+
+        com.g42.platform.gms.warehouse.domain.entity.Warehouse defectiveWarehouse = 
+                new com.g42.platform.gms.warehouse.domain.entity.Warehouse();
+        
+        defectiveWarehouse.setWarehouseCode(parentWarehouse.getWarehouseCode() + "-LOI");
+        defectiveWarehouse.setWarehouseName("Kho hàng lỗi - " + parentWarehouse.getWarehouseName());
+        defectiveWarehouse.setWarehouseType(com.g42.platform.gms.common.enums.WarehouseTypeEnum.DEFECTIVE);
+        defectiveWarehouse.setParentWarehouseId(branchWarehouseId);
+        defectiveWarehouse.setAddress(parentWarehouse.getAddress());
+        defectiveWarehouse.setManagerStaffId(parentWarehouse.getManagerStaffId());
+        defectiveWarehouse.setIsActive(true);
+        defectiveWarehouse.setCreatedAt(java.time.Instant.now());
+
+        warehouseRepo   .save(defectiveWarehouse);
+    }
 
 
     public Page<CatalogSummaryDto> getListItems(int page, int size, CatalogItemType itemType, Boolean isActive, String search, Integer brand, Integer productLine, String categoryCode, BigDecimal minPrice, BigDecimal maxPrice, String sortBy) {

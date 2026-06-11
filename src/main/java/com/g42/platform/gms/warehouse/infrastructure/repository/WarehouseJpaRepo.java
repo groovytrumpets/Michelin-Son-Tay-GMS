@@ -4,11 +4,13 @@ import com.g42.platform.gms.warehouse.api.dto.WarehouseDetailDto;
 import com.g42.platform.gms.warehouse.domain.entity.Warehouse;
 import com.g42.platform.gms.warehouse.domain.repository.WarehouseDetailProjection;
 import com.g42.platform.gms.warehouse.infrastructure.entity.WarehouseJpa;
+import com.g42.platform.gms.common.enums.WarehouseTypeEnum;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 public interface WarehouseJpaRepo extends JpaRepository<WarehouseJpa,Integer> {
@@ -62,4 +64,6 @@ public interface WarehouseJpaRepo extends JpaRepository<WarehouseJpa,Integer> {
     List<WarehouseDetailDto> getListOfWarehouseDetailsByItemId(Integer itemId);
 
     List<WarehouseJpa> findAllByIsActive(Boolean isActive);
+
+    Optional<WarehouseJpa> findByParentWarehouseIdAndWarehouseType(Integer parentWarehouseId, WarehouseTypeEnum warehouseType);
 }

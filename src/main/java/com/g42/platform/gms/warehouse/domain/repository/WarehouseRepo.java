@@ -12,6 +12,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import com.g42.platform.gms.common.enums.WarehouseTypeEnum;
+
 @Repository
 public interface WarehouseRepo {
     Page<CatalogItem> getListOfCatalogItems(int page, int size, CatalogItemType itemType, Boolean isActive, String search, Integer brandId, Integer productLineId, Integer categoryId, BigDecimal minPrice, BigDecimal maxPrice, String sortBy);
@@ -23,4 +25,13 @@ public interface WarehouseRepo {
     List<Warehouse> getAllWarehouse();
 
     Optional<Warehouse> findById(Integer warehouseId);
+
+    /**
+     * Tìm kho con theo parentWarehouseId và loại kho.
+     * Dùng để resolve kho DEFECTIVE của 1 chi nhánh:
+     *   findByParentAndType(branchWarehouseId, WarehouseTypeEnum.DEFECTIVE)
+     */
+    Optional<Warehouse> findByParentAndType(Integer parentWarehouseId, WarehouseTypeEnum warehouseType);
+
+    Warehouse save(Warehouse warehouse);
 }
