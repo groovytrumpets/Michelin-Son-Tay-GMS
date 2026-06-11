@@ -25,6 +25,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import com.g42.platform.gms.common.enums.WarehouseTypeEnum;
+
 @Repository
 public class WarehouseRepoImpl implements WarehouseRepo {
     @Autowired
@@ -96,5 +98,27 @@ public class WarehouseRepoImpl implements WarehouseRepo {
     @Override
     public Optional<Warehouse> findById(Integer warehouseId) {
         return warehouseJpaRepo.findById(warehouseId).map(warehouseJpaMapper::toDomain);
+    }
+
+    @Override
+    public Optional<Warehouse> findByParentAndType(Integer parentWarehouseId, WarehouseTypeEnum warehouseType) {
+        return warehouseJpaRepo
+                .findByParentWarehouseIdAndWarehouseType(parentWarehouseId, warehouseType)
+                .map(warehouseJpaMapper::toDomain);
+    }
+
+    @Override
+    public Warehouse save(Warehouse warehouse) {
+        com.g42.platform.gms.warehouse.infrastructure.entity.WarehouseJpa jpa =
+                new com.g42.platform.gms.warehouse.infrastructure.entity.WarehouseJpa();
+        jpa.setWarehouseCode(warehouse.getWarehouseCode());
+        jpa.setWarehouseName(warehouse.getWarehouseName());
+        jpa.setWarehouseType(warehouse.getWarehouseType());
+        jpa.setParentWarehouseId(warehouse.getParentWarehouseId());
+        jpa.setAddress(warehouse.getAddress());
+        jpa.setManagerStaffId(warehouse.getManagerStaffId());
+        jpa.setIsActive(warehouse.getIsActive());
+        jpa.setCreatedAt(warehouse.getCreatedAt());
+        return warehouseJpaMapper.toDomain(warehouseJpaRepo.save(jpa));
     }
 }

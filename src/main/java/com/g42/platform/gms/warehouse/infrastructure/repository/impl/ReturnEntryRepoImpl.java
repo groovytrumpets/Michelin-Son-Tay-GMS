@@ -167,6 +167,10 @@ public class ReturnEntryRepoImpl implements ReturnEntryRepo {
         item.setQuantity(jpa.getQuantity());
         item.setConditionNote(jpa.getConditionNote());
         item.setExchangeItem(jpa.isExchangeItem());
+        item.setReturnReason(jpa.getReturnReason());
+        item.setDefectCause(jpa.getDefectCause());
+        item.setResponsibleStaffId(jpa.getResponsibleStaffId());
+        item.setDefectiveWarehouseId(jpa.getDefectiveWarehouseId());
         return item;
     }
 
@@ -181,6 +185,12 @@ public class ReturnEntryRepoImpl implements ReturnEntryRepo {
         item.setQuantity(domain.getQuantity());
         item.setConditionNote(domain.getConditionNote());
         item.setExchangeItem(domain.isExchangeItem());
+        item.setReturnReason(domain.getReturnReason() != null
+                ? domain.getReturnReason()
+                : com.g42.platform.gms.warehouse.domain.enums.ReturnReason.WRONG_TYPE);
+        item.setDefectCause(domain.getDefectCause());
+        item.setResponsibleStaffId(domain.getResponsibleStaffId());
+        item.setDefectiveWarehouseId(domain.getDefectiveWarehouseId());
         return item;
     }
 }

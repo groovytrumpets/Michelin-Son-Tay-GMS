@@ -58,6 +58,20 @@ public class ReturnEntryController {
     }
 
     /**
+     * Tạo phiếu hoàn từ phiếu xuất đã xác nhận.
+     * Endpoint mới này đảm bảo phiếu hoàn luôn có context đầy đủ: 
+     * phiếu xuất nguồn, allocation, phiếu dịch vụ.
+     */
+    @PostMapping("/from-issue")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<ReturnEntryResponse>> createFromIssue(
+            @Valid @RequestBody com.g42.platform.gms.warehouse.api.dto.request.CreateReturnEntryFromIssueRequest request,
+            @AuthenticationPrincipal StaffPrincipal principal) {
+        return ResponseEntity.ok(ApiResponses.success(
+                returnEntryService.createFromIssue(request, principal.getStaffId())));
+    }
+
+    /**
      * Upload ảnh lỗi cho từng sản phẩm trong phiếu hoàn.
      * Path: /api/warehouse/return-entries/items/{returnItemId}/attachments
      */
@@ -104,6 +118,14 @@ public class ReturnEntryController {
             @AuthenticationPrincipal StaffPrincipal principal) {
         return ResponseEntity.ok(ApiResponses.success(
                 returnEntryService.cancel(id, principal.getStaffId())));
+    }
+
+    @GetMapping("/defect-summary")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<List<com.g42.platform.gms.warehouse.api.dto.response.StaffDefectSummaryResponse>>> defectSummary(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime to) {
+        return ResponseEntity.ok(ApiResponses.success(returnEntryService.getDefectSummary(from, to)));
     }
 
     @GetMapping("/{id}")
