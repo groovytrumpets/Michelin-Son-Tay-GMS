@@ -25,7 +25,7 @@ public interface StockEntryJpaRepo extends JpaRepository<StockEntryJpa, Integer>
 
         @Query("""
         select e from StockEntryJpa e
-        where e.warehouseId = :warehouseId
+        where (:warehouseId is null or e.warehouseId = :warehouseId)
             and (:status is null or e.status = :status)
             and (:fromDate is null or e.entryDate >= :fromDate)
             and (:toDate is null or e.entryDate <= :toDate)
