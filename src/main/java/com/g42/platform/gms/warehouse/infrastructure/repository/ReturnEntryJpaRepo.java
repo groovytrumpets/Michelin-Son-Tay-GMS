@@ -20,7 +20,7 @@ public interface ReturnEntryJpaRepo extends JpaRepository<ReturnEntryJpa, Intege
 
     @Query("""
         select r from ReturnEntryJpa r
-        where r.warehouseId = :warehouseId
+        where (:warehouseId is null or r.warehouseId = :warehouseId)
             and (:status is null or r.status = :status)
             and (:returnType is null or r.returnType = :returnType)
             and (:fromDateTime is null or r.createdAt >= :fromDateTime)

@@ -37,7 +37,7 @@ public class StockIssueController {
     @GetMapping
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Page<StockIssueResponse>>> list(
-            @RequestParam Integer warehouseId,
+            @RequestParam(required = false) Integer warehouseId,
             @RequestParam(required = false) StockIssueStatus status,
             @RequestParam(required = false) IssueType issueType,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,

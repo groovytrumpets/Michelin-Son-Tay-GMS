@@ -22,7 +22,7 @@ public interface StockIssueJpaRepo extends JpaRepository<StockIssueJpa, Integer>
 
         @Query("""
         select i from StockIssueJpa i
-        where i.warehouseId = :warehouseId
+        where (:warehouseId is null or i.warehouseId = :warehouseId)
             and (:status is null or i.status = :status)
             and (:issueType is null or i.issueType = :issueType)
             and (:fromDateTime is null or i.createdAt >= :fromDateTime)

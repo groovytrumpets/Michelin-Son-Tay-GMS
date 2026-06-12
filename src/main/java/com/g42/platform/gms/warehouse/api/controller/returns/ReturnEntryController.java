@@ -36,7 +36,7 @@ public class ReturnEntryController {
     @GetMapping
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Page<ReturnEntryResponse>>> list(
-            @RequestParam Integer warehouseId,
+            @RequestParam(required = false) Integer warehouseId,
             @RequestParam(required = false) ReturnEntryStatus status,
             @RequestParam(required = false) ReturnType returnType,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
