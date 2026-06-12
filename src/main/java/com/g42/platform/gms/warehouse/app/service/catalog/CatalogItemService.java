@@ -15,12 +15,29 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.g42.platform.gms.warehouse.infrastructure.repository.InventoryJpaRepo;
+import com.g42.platform.gms.warehouse.infrastructure.repository.StockEntryItemJpaRepo;
+import com.g42.platform.gms.warehouse.domain.repository.WarehousePricingRepo;
+import com.g42.platform.gms.warehouse.infrastructure.entity.InventoryJpa;
+import com.g42.platform.gms.warehouse.infrastructure.entity.StockEntryItemJpa;
+import com.g42.platform.gms.warehouse.domain.entity.WarehousePricing;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.Optional;
+
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
 @Service("catalogItemWarehouseService")
 public class CatalogItemService {
+    @Autowired
+    private InventoryJpaRepo inventoryJpaRepo;
+    @Autowired
+    private StockEntryItemJpaRepo stockEntryItemJpaRepo;
+    @Autowired
+    private WarehousePricingRepo warehousePricingRepo;
+
     @Autowired
     private CatalogItemRepo catalogItemRepo;
     @Autowired
@@ -233,8 +250,27 @@ public class CatalogItemService {
             }
             warehouseDetailDto.setSellingPrice(selinPrice);
             warehouseDetailDto.setNotify(pricingResolve.getNotify());
-        }
 
+            List<WarehouseLotDto> lots = stockEntryItemJpaRepo.findWarehouseLots(warehouseDetailDto.getWarehouseId(), catalogItem.getItemId());
+            BigDecimal warehouseSellingPrice = warehousePricingRepo.findActiveByWarehouseAndItem(warehouseDetailDto.getWarehouseId(), catalogItem.getItemId())
+                    .map(WarehousePricing::getSellingPrice)
+                    .orElse(null);
+
+            for (WarehouseLotDto lot : lots) {
+                BigDecimal lotSellingPrice;
+                if (warehouseSellingPrice != null && warehouseSellingPrice.compareTo(BigDecimal.ZERO) > 0) {
+                    lotSellingPrice = warehouseSellingPrice;
+                } else if (lot.getImportPrice() != null && lot.getImportPrice().compareTo(BigDecimal.ZERO) > 0) {
+                    lotSellingPrice = lot.getImportPrice()
+                            .multiply(lot.getMarkupMultiplier() != null ? lot.getMarkupMultiplier() : BigDecimal.ONE)
+                            .setScale(2, java.math.RoundingMode.HALF_UP);
+                } else {
+                    lotSellingPrice = catalogItem.getPrice() != null ? catalogItem.getPrice() : BigDecimal.ZERO;
+                }
+                lot.setSellingPrice(lotSellingPrice);
+            }
+            warehouseDetailDto.setLots(lots);
+        }
 
         catalogDetailDto.setWarehouseDetails(warehouseDetails);
 
@@ -282,17 +318,29 @@ public class CatalogItemService {
         if (updateDto.getDescription() != null) {
             catalogItem.setDescription(updateDto.getDescription());
         }
-
-        Brand brand = updateDto.getBrandId() != null ? catalogItemRepo.getBrandById(updateDto.getBrandId()) : null;
-        ProductLine productLine = updateDto.getProductLineId() != null ? catalogItemRepo.getProductLineById(updateDto.getProductLineId()) : null;
-        WorkCategory itemCategory = updateDto.getWorkCategoryId() != null ? catalogItemRepo.getItemCategoryById(updateDto.getWorkCategoryId()) : null;
-        if (itemCategory == null) {
-            itemCategory = new WorkCategory();
+        if (updateDto.getColor() != null) {
+            catalogItem.setColor(updateDto.getColor());
+        }
+        if (updateDto.getMadeIn() != null) {
+            catalogItem.setMadeIn(updateDto.getMadeIn());
+        } else if (updateDto.getOrigin() != null) {
+            catalogItem.setMadeIn(updateDto.getOrigin());
         }
 
-        List<Specification> specifications = catalogItemRepo.getListOfSpecsByItem(itemId);
-        String displayName = builDisplayName(catalogItem, brand, productLine, specifications, itemCategory);
-        catalogItem.setItemName(displayName);
+        if (updateDto.getItemName() != null && !updateDto.getItemName().isBlank()) {
+            catalogItem.setItemName(updateDto.getItemName());
+        } else {
+            Brand brand = updateDto.getBrandId() != null ? catalogItemRepo.getBrandById(updateDto.getBrandId()) : null;
+            ProductLine productLine = updateDto.getProductLineId() != null ? catalogItemRepo.getProductLineById(updateDto.getProductLineId()) : null;
+            WorkCategory itemCategory = updateDto.getWorkCategoryId() != null ? catalogItemRepo.getItemCategoryById(updateDto.getWorkCategoryId()) : null;
+            if (itemCategory == null) {
+                itemCategory = new WorkCategory();
+            }
+
+            List<Specification> specifications = catalogItemRepo.getListOfSpecsByItem(itemId);
+            String displayName = builDisplayName(catalogItem, brand, productLine, specifications, itemCategory);
+            catalogItem.setItemName(displayName);
+        }
 
         Integer finalTaxId = updateDto.getTaxRuleId();
         if (finalTaxId == null) {
@@ -301,7 +349,73 @@ public class CatalogItemService {
         }
         catalogItem.setTaxRuleId(finalTaxId);
 
+        // Process warehouse and lot details
+        if (updateDto.getWarehouseDetails() != null) {
+            for (WarehouseUpdateDto whDto : updateDto.getWarehouseDetails()) {
+                // Update Inventory
+                Optional<InventoryJpa> invOpt = inventoryJpaRepo.findByWarehouseIdAndItemId(whDto.getWarehouseId(), itemId);
+                InventoryJpa inventory;
+                if (invOpt.isPresent()) {
+                    inventory = invOpt.get();
+                } else {
+                    inventory = new InventoryJpa();
+                    inventory.setItemId(itemId);
+                    inventory.setWarehouseId(whDto.getWarehouseId());
+                }
+                if (whDto.getQuantity() != null) {
+                    inventory.setQuantity(whDto.getQuantity());
+                }
+                if (whDto.getReservedQuantity() != null) {
+                    inventory.setReservedQuantity(whDto.getReservedQuantity());
+                }
+                inventoryJpaRepo.save(inventory);
+
+                // Update Warehouse Pricing
+                if (whDto.getSellingPrice() != null) {
+                    Optional<WarehousePricing> pricingOpt = warehousePricingRepo.findByItemIdAndWarehouseId(itemId, whDto.getWarehouseId());
+                    WarehousePricing pricing;
+                    if (pricingOpt.isPresent()) {
+                        pricing = pricingOpt.get();
+                        pricing.setSellingPrice(whDto.getSellingPrice());
+                        pricing.setIsActive(true);
+                    } else {
+                        pricing = new WarehousePricing();
+                        pricing.setItemId(itemId);
+                        pricing.setWarehouseId(whDto.getWarehouseId());
+                        pricing.setBasePrice(catalogItem.getPrice() != null ? catalogItem.getPrice() : BigDecimal.ZERO);
+                        pricing.setMarkupMultiplier(BigDecimal.ONE);
+                        pricing.setSellingPrice(whDto.getSellingPrice());
+                        pricing.setEffectiveFrom(LocalDate.now());
+                        pricing.setIsActive(true);
+                        pricing.setCreatedAt(Instant.now());
+                    }
+                    warehousePricingRepo.save(pricing);
+                }
+
+                // Update Lots
+                if (whDto.getLots() != null) {
+                    for (LotUpdateDto lotDto : whDto.getLots()) {
+                        if (lotDto.getEntryItemId() != null) {
+                            Optional<StockEntryItemJpa> lotOpt = stockEntryItemJpaRepo.findById(lotDto.getEntryItemId());
+                            if (lotOpt.isPresent()) {
+                                StockEntryItemJpa lotJpa = lotOpt.get();
+                                if (lotDto.getRemainingQuantity() != null) {
+                                    lotJpa.setRemainingQuantity(lotDto.getRemainingQuantity());
+                                }
+                                if (lotDto.getSellingPrice() != null && lotJpa.getImportPrice() != null && lotJpa.getImportPrice().compareTo(BigDecimal.ZERO) > 0) {
+                                    BigDecimal multiplier = lotDto.getSellingPrice().divide(lotJpa.getImportPrice(), 4, java.math.RoundingMode.HALF_UP);
+                                    lotJpa.setMarkupMultiplier(multiplier);
+                                }
+                                stockEntryItemJpaRepo.save(lotJpa);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         CatalogItem saved = catalogItemRepo.saveCatalogItem(catalogItem);
         return catalogDtoMapper.toDto(saved);
     }
 }
+
