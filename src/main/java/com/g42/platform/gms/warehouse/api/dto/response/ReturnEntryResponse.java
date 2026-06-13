@@ -27,4 +27,6 @@ public class ReturnEntryResponse {
     private LocalDateTime createdAt;
     private Integer serviceTicketId;
     private String serviceTicketCode;
+    /** true nếu có ít nhất 1 sản phẩm bị lỗi (DEFECTIVE) trong phiếu */
+    private Boolean hasDefectiveItems;
 }
