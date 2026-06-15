@@ -10,4 +10,6 @@ public class LotUpdateDto {
     private Integer entryItemId;
     private Integer remainingQuantity;
     private BigDecimal sellingPrice;
+    private BigDecimal importPrice;
+    private BigDecimal markupMultiplier;
 }

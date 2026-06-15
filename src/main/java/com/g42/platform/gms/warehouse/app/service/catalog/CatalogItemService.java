@@ -250,6 +250,8 @@ public class CatalogItemService {
             }
             warehouseDetailDto.setSellingPrice(selinPrice);
             warehouseDetailDto.setNotify(pricingResolve.getNotify());
+            Optional<WarehousePricing> pricingOpt = warehousePricingRepo.findByItemIdAndWarehouseId(catalogItem.getItemId(), warehouseDetailDto.getWarehouseId());
+            warehouseDetailDto.setHasCustomPricing(pricingOpt.isPresent());
 
             List<WarehouseLotDto> lots = stockEntryItemJpaRepo.findWarehouseLots(warehouseDetailDto.getWarehouseId(), catalogItem.getItemId());
             BigDecimal warehouseSellingPrice = warehousePricingRepo.findActiveByWarehouseAndItem(warehouseDetailDto.getWarehouseId(), catalogItem.getItemId())
@@ -373,23 +375,12 @@ public class CatalogItemService {
                 // Update Warehouse Pricing
                 if (whDto.getSellingPrice() != null) {
                     Optional<WarehousePricing> pricingOpt = warehousePricingRepo.findByItemIdAndWarehouseId(itemId, whDto.getWarehouseId());
-                    WarehousePricing pricing;
                     if (pricingOpt.isPresent()) {
-                        pricing = pricingOpt.get();
+                        WarehousePricing pricing = pricingOpt.get();
                         pricing.setSellingPrice(whDto.getSellingPrice());
                         pricing.setIsActive(true);
-                    } else {
-                        pricing = new WarehousePricing();
-                        pricing.setItemId(itemId);
-                        pricing.setWarehouseId(whDto.getWarehouseId());
-                        pricing.setBasePrice(catalogItem.getPrice() != null ? catalogItem.getPrice() : BigDecimal.ZERO);
-                        pricing.setMarkupMultiplier(BigDecimal.ONE);
-                        pricing.setSellingPrice(whDto.getSellingPrice());
-                        pricing.setEffectiveFrom(LocalDate.now());
-                        pricing.setIsActive(true);
-                        pricing.setCreatedAt(Instant.now());
+                        warehousePricingRepo.save(pricing);
                     }
-                    warehousePricingRepo.save(pricing);
                 }
 
                 // Update Lots
@@ -402,7 +393,12 @@ public class CatalogItemService {
                                 if (lotDto.getRemainingQuantity() != null) {
                                     lotJpa.setRemainingQuantity(lotDto.getRemainingQuantity());
                                 }
-                                if (lotDto.getSellingPrice() != null && lotJpa.getImportPrice() != null && lotJpa.getImportPrice().compareTo(BigDecimal.ZERO) > 0) {
+                                if (lotDto.getImportPrice() != null) {
+                                    lotJpa.setImportPrice(lotDto.getImportPrice());
+                                }
+                                if (lotDto.getMarkupMultiplier() != null) {
+                                    lotJpa.setMarkupMultiplier(lotDto.getMarkupMultiplier());
+                                } else if (lotDto.getSellingPrice() != null && lotJpa.getImportPrice() != null && lotJpa.getImportPrice().compareTo(BigDecimal.ZERO) > 0) {
                                     BigDecimal multiplier = lotDto.getSellingPrice().divide(lotJpa.getImportPrice(), 4, java.math.RoundingMode.HALF_UP);
                                     lotJpa.setMarkupMultiplier(multiplier);
                                 }
