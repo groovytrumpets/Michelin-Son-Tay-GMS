@@ -262,7 +262,9 @@ public class ReturnEntryService {
             }
         }
 
-        return toResponse(returnEntryRepo.save(saved));
+        // Fetch lại từ DB sau save để đảm bảo items được load đầy đủ (tránh LAZY load issue)
+        Integer savedId = returnEntryRepo.save(saved).getReturnId();
+        return toResponse(findOrThrow(savedId));
     }
 
     @Transactional
@@ -695,6 +697,39 @@ public class ReturnEntryService {
     }
 
     /**
+     * Lấy chi tiết từng lỗi của 1 nhân viên — dùng cho drill-down trong báo cáo KPI.
+     * Mỗi row gồm: mã phiếu hoàn, tên sản phẩm, ngày xác nhận, nguyên nhân, số lượng, ghi chú.
+     */
+    @Transactional(readOnly = true)
+    public List<java.util.Map<String, Object>> getDefectDetails(
+            Integer staffId, java.time.LocalDateTime from, java.time.LocalDateTime to) {
+        List<Object[]> rows = returnEntryItemJpaRepo.findDefectDetailsByStaff(staffId, from, to);
+        // Lấy tên sản phẩm theo batch
+        java.util.Set<Integer> itemIds = rows.stream()
+                .map(r -> (Integer) r[4])
+                .filter(java.util.Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+        java.util.Map<Integer, String> itemNameById = itemIds.isEmpty()
+                ? java.util.Map.of()
+                : partCatalogRepo.findNamesByIds(new java.util.ArrayList<>(itemIds));
+
+        return rows.stream().map(r -> {
+            java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("returnItemId",  r[0]);
+            m.put("returnId",      r[1]);
+            m.put("returnCode",    r[2]);
+            m.put("confirmedAt",   r[3]);
+            Integer itemId = (Integer) r[4];
+            m.put("itemId",        itemId);
+            m.put("itemName",      itemNameById.getOrDefault(itemId, "SP #" + itemId));
+            m.put("quantity",      r[5]);
+            m.put("defectCause",   r[6]);
+            m.put("conditionNote", r[7]);
+            return m;
+        }).collect(java.util.stream.Collectors.toList());
+    }
+
+    /**
      * Validation cho từng dòng hoàn hàng bị lỗi.
      *
      * - WRONG_TYPE: không bắt buộc thông tin lỗi bổ sung
@@ -976,8 +1011,7 @@ public class ReturnEntryService {
             });
         }
 
-        r.setItems(e.getItems().stream().map(i -> {
-            ReturnEntryItemResponse ir = new ReturnEntryItemResponse();
+        r.setItems(e.getItems().stream().map(i -> {            ReturnEntryItemResponse ir = new ReturnEntryItemResponse();
             ir.setReturnItemId(i.getReturnItemId());
             ir.setItemId(i.getItemId());
             ir.setItemName(itemNameById.get(i.getItemId()));
@@ -1029,6 +1063,11 @@ public class ReturnEntryService {
             }
             return ir;
         }).collect(Collectors.toList()));
+
+        // Đánh dấu phiếu có hàng lỗi để frontend hiển thị badge nhanh
+        boolean hasDefective = e.getItems().stream()
+                .anyMatch(i -> i.getReturnReason() == com.g42.platform.gms.warehouse.domain.enums.ReturnReason.DEFECTIVE);
+        r.setHasDefectiveItems(hasDefective);
 
         return r;
     }

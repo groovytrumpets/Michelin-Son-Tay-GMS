@@ -128,6 +128,16 @@ public class ReturnEntryController {
         return ResponseEntity.ok(ApiResponses.success(returnEntryService.getDefectSummary(from, to)));
     }
 
+    /** Chi tiết từng lỗi của 1 nhân viên trong kỳ — dùng drill-down */
+    @GetMapping("/defect-details")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<List<java.util.Map<String, Object>>>> defectDetails(
+            @RequestParam Integer staffId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime to) {
+        return ResponseEntity.ok(ApiResponses.success(returnEntryService.getDefectDetails(staffId, from, to)));
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<ReturnEntryResponse>> getDetail(@PathVariable Integer id) {
