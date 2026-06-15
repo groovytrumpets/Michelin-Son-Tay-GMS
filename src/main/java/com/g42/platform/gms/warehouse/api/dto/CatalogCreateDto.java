@@ -39,5 +39,7 @@ public class CatalogCreateDto {
     private String barcode;
     private String color;
     private Boolean isActive;
+    private String origin;
+    private java.util.List<WarehouseUpdateDto> warehouseDetails;
 
 }
