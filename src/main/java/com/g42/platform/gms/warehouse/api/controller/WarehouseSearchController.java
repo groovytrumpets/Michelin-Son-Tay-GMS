@@ -39,10 +39,12 @@ public class WarehouseSearchController {
                                                                             @RequestParam(required = false) String categoryCode,
                                                                             @RequestParam(required = false) BigDecimal minPrice,
                                                                             @RequestParam(required = false) BigDecimal maxPrice,
-                                                                            @RequestParam(required = false) String sortBy
+                                                                            @RequestParam(required = false) String sortBy,
+                                                                            @RequestParam(required = false) String vehicleBrand,
+                                                                            @RequestParam(required = false) String vehicleModel
                                                                             ){
         Page<CatalogSummaryDto> apiResponse = warehouseService.getListItems
-                (page,size,itemType,isActive,search,brand,productLine,categoryCode,minPrice,maxPrice,sortBy);
+                (page,size,itemType,isActive,search,brand,productLine,categoryCode,minPrice,maxPrice,sortBy,vehicleBrand,vehicleModel);
         return ResponseEntity.ok(ApiResponses.success(apiResponse));
     }
     @GetMapping("/catalog-items-detail")
@@ -56,10 +58,12 @@ public class WarehouseSearchController {
                                                                                     @RequestParam(required = false) String categoryCode,
                                                                                     @RequestParam(required = false) BigDecimal minPrice,
                                                                                     @RequestParam(required = false) BigDecimal maxPrice,
-                                                                                    @RequestParam(required = false) String sortBy
+                                                                                    @RequestParam(required = false) String sortBy,
+                                                                                    @RequestParam(required = false) String vehicleBrand,
+                                                                                    @RequestParam(required = false) String vehicleModel
     ){
         Page<CatalogWarehouseDto> apiResponse = warehouseService.getListItemsDetail
-                (page,size,itemType,isActive,search,brand,productLine,categoryCode,minPrice,maxPrice,sortBy);
+                (page,size,itemType,isActive,search,brand,productLine,categoryCode,minPrice,maxPrice,sortBy,vehicleBrand,vehicleModel);
         return ResponseEntity.ok(ApiResponses.success(apiResponse));
     }
     @GetMapping("/catalog-items/detail/{catalogItemId}")

@@ -38,6 +38,7 @@ public class CatalogCreateDto {
     private String partNumber;
     private String barcode;
     private String color;
+    private String compatibleCars;
     private Boolean isActive;
     private String origin;
     private java.util.List<WarehouseUpdateDto> warehouseDetails;

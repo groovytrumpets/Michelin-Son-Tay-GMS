@@ -31,4 +31,5 @@ public class CatalogItemDto {
     private Integer taxRuleId;
     private Integer productLineId;
     private Integer workCategoryId;
+    private String compatibleCars;
 }

@@ -92,9 +92,15 @@ public class CatalogItemService {
         Brand brand = catalogItemRepo.getBrandById(createDto.getBrandId());
         ProductLine productLine = catalogItemRepo.getProductLineById(createDto.getProductLineId());
         WorkCategory itemCategory = catalogItemRepo.getItemCategoryById(createDto.getWorkCategoryId());
-        CatalogItem catalogItem = catalogItemRepo.createCatalog(catalogDtoMapper.toDomain(createDto));
+        
+        CatalogItem domain = catalogDtoMapper.toDomain(createDto);
+        if (domain.getIsActive() == null) {
+            domain.setIsActive(true);
+        }
+        
+        CatalogItem catalogItem = catalogItemRepo.createCatalog(domain);
         List<Specification> specifications = catalogItemRepo.getListOfSpecsByItem(catalogItem.getItemId());
-        String itemName = builDisplayName(catalogDtoMapper.toDomain(createDto),brand,productLine,specifications,itemCategory);
+        String itemName = builDisplayName(domain,brand,productLine,specifications,itemCategory);
         catalogItem.setItemName(itemName);
         //todo: free tax
         Integer finalTaxId = createDto.getTaxRuleId();
@@ -322,6 +328,9 @@ public class CatalogItemService {
         }
         if (updateDto.getColor() != null) {
             catalogItem.setColor(updateDto.getColor());
+        }
+        if (updateDto.getCompatibleCars() != null) {
+            catalogItem.setCompatibleCars(updateDto.getCompatibleCars());
         }
         if (updateDto.getMadeIn() != null) {
             catalogItem.setMadeIn(updateDto.getMadeIn());

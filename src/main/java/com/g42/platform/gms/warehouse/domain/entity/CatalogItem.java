@@ -36,6 +36,7 @@ public class CatalogItem {
     private String partNumber;
     private String barcode;
     private String color;
+    private String compatibleCars;
 
     public Integer getBrandId() {
         return brandId;
