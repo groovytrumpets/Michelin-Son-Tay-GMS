@@ -79,4 +79,8 @@ public class CatalogItemJpa {
     @Column(name = "color", length = 50)
     private String color;
 
+    @Size(max = 500)
+    @Column(name = "compatible_cars", length = 500)
+    private String compatibleCars;
+
 }
