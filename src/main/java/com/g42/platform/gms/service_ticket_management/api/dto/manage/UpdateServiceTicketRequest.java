@@ -25,4 +25,16 @@ public class UpdateServiceTicketRequest {
      */
     @NotNull(message = "Danh sách dịch vụ không được null")
     private List<Integer> catalogItemIds;
+
+    private String customerName;
+    private String customerPhone;
+    private String customerEmail;
+    private java.time.LocalDateTime receivedAt;
+    private Boolean safetyInspectionEnabled;
+    private String vehicleModel;
+    private String licensePlate;
+    private Integer odometerKm;
+    private java.time.LocalDateTime estimatedDeliveryAt;
+    private java.time.LocalDateTime deliveredAt;
 }
+
