@@ -56,7 +56,7 @@ public class WarehouseRepoImpl implements WarehouseRepo {
 
     @Override
     public Page<CatalogItem> getListOfCatalogItems
-            (int page, int size, CatalogItemType itemType, Boolean isActive, String search, Integer brandId, Integer productLineId, Integer categoryId, BigDecimal minPrice, BigDecimal maxPrice, String sortBy)
+            (int page, int size, CatalogItemType itemType, Boolean isActive, String search, Integer brandId, Integer productLineId, Integer categoryId, BigDecimal minPrice, BigDecimal maxPrice, String sortBy, String vehicleBrand, String vehicleModel)
     {
         Sort sort = Sort.by(Sort.Direction.ASC, "itemName");
 
@@ -69,11 +69,18 @@ public class WarehouseRepoImpl implements WarehouseRepo {
         }
         Pageable  pageable = PageRequest.of(page, size, sort);
         Specification<CatalogItemJpa> specification = Specification.unrestricted();
-        specification =specification.and(CatalogItemSpecification.filterCatalog(itemType,isActive,brandId,productLineId,categoryId,minPrice,maxPrice));
+        specification =specification.and(CatalogItemSpecification.filterCatalog(itemType,isActive,brandId,productLineId,categoryId,minPrice,maxPrice,vehicleBrand,vehicleModel));
 
         if (search != null && !search.trim().isEmpty()) {
+            String searchLower = "%" + search.toLowerCase().trim() + "%";
             specification = specification.and((root, query, cb) ->
-                    cb.like(cb.lower(root.get("itemName")), "%" + search.toLowerCase() + "%")
+                    cb.or(
+                            cb.like(cb.lower(root.get("itemName")), searchLower),
+                            cb.like(cb.lower(root.get("sku")), searchLower),
+                            cb.like(cb.lower(root.get("partNumber")), searchLower),
+                            cb.like(cb.lower(root.get("barcode")), searchLower),
+                            cb.like(cb.lower(root.get("compatibleCars")), searchLower)
+                    )
             );
         }
             return catalogItemJpaRepo.findAll(specification, pageable)

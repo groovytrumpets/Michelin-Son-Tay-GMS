@@ -16,7 +16,7 @@ import com.g42.platform.gms.common.enums.WarehouseTypeEnum;
 
 @Repository
 public interface WarehouseRepo {
-    Page<CatalogItem> getListOfCatalogItems(int page, int size, CatalogItemType itemType, Boolean isActive, String search, Integer brandId, Integer productLineId, Integer categoryId, BigDecimal minPrice, BigDecimal maxPrice, String sortBy);
+    Page<CatalogItem> getListOfCatalogItems(int page, int size, CatalogItemType itemType, Boolean isActive, String search, Integer brandId, Integer productLineId, Integer categoryId, BigDecimal minPrice, BigDecimal maxPrice, String sortBy, String vehicleBrand, String vehicleModel);
 
     List<WarehouseDetailProjection> getWarehouseDetailsByItemIds(Set<Integer> itemIds);
 

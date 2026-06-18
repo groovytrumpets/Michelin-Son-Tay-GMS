@@ -253,15 +253,40 @@ public class EstimateService {
                 existing.setIsGift(req.getIsGift());
                 existing.setTriggeredByItemId(req.getTriggeredByItemId());
                 existing.setDiscountAmount(req.getDiscountAmount());
-                WorkCategory wc = workCategoryRepo.findById(req.getWorkCategoryId());
-                TaxRule taxRule = (wc != null) ? taxRuleRepository.findById(wc.getTaxRuleId()) : null;
-                Integer taxRuleId = (wc != null && wc.getTaxRuleId() != null)
-                        ? wc.getTaxRuleId()
-                        : null;
-                if (taxRule != null) {
-                applyTax(existing,taxRuleId);
+                WorkCategory wc = null;
+                if (req.getWorkCategoryId() != null) {
+                    wc = workCategoryRepo.findById(req.getWorkCategoryId());
                 }
-                existing.setFinalPrice(existing.getFinalPrice());
+                
+                BigDecimal quantity = BigDecimal.valueOf(existing.getQuantity() != null ? existing.getQuantity() : 0);
+                BigDecimal unitPrice = existing.getUnitPrice() != null ? existing.getUnitPrice() : BigDecimal.ZERO;
+                BigDecimal totalPrice = unitPrice.multiply(quantity);
+                existing.setTotalPrice(totalPrice);
+                existing.setTaxAmount(BigDecimal.ZERO);
+                existing.setAppliedTaxRate(BigDecimal.ZERO);
+
+                Integer ruleId = null;
+                if (existing.getItemId() != null) {
+                    CatalogItemDto itemDto = warehouseInternalApi.getItemInfo(existing.getItemId());
+                    if (itemDto != null && itemDto.getTaxRuleId() != null) {
+                        ruleId = itemDto.getTaxRuleId();
+                    }
+                }
+                if (ruleId == null && wc != null && wc.getTaxRuleId() != null) {
+                    ruleId = wc.getTaxRuleId();
+                }
+                if (ruleId == null && req.getTaxRuleId() != null) {
+                    ruleId = req.getTaxRuleId();
+                }
+
+                applyTax(existing, ruleId);
+
+                if (Boolean.TRUE.equals(existing.getIsGift())) {
+                    existing.setFinalPrice(BigDecimal.ZERO);
+                } else {
+                    existing.setFinalPrice(existing.getTotalPrice());
+                }
+                
                 toSave.add(existing);
                 incomingIds.add(req.getEstimateItemId());
             } else {
@@ -461,7 +486,41 @@ public class EstimateService {
         if (request.getIsRemoved() != null)estimateItem.setIsRemoved(request.getIsRemoved());
         if (request.getWarehouseId() != null) estimateItem.setWarehouseId(request.getWarehouseId());
         estimateItem.setEntryItemId(request.getEntryItemId());
-        applyTax(estimateItem,currentTaxRuleId);
+
+        BigDecimal quantity = BigDecimal.valueOf(estimateItem.getQuantity() != null ? estimateItem.getQuantity() : 0);
+        BigDecimal unitPrice = estimateItem.getUnitPrice() != null ? estimateItem.getUnitPrice() : BigDecimal.ZERO;
+        BigDecimal totalPriceVal = unitPrice.multiply(quantity);
+        estimateItem.setTotalPrice(totalPriceVal);
+        estimateItem.setTaxAmount(BigDecimal.ZERO);
+        estimateItem.setAppliedTaxRate(BigDecimal.ZERO);
+
+        Integer ruleId = currentTaxRuleId;
+        if (ruleId == null) {
+            if (estimateItem.getItemId() != null) {
+                CatalogItemDto itemDto = warehouseInternalApi.getItemInfo(estimateItem.getItemId());
+                if (itemDto != null && itemDto.getTaxRuleId() != null) {
+                    ruleId = itemDto.getTaxRuleId();
+                }
+            }
+            if (ruleId == null && estimateItem.getWorkCategoryId() != null) {
+                WorkCategory wc = workCategoryRepo.findById(estimateItem.getWorkCategoryId());
+                if (wc != null && wc.getTaxRuleId() != null) {
+                    ruleId = wc.getTaxRuleId();
+                }
+            }
+            if (ruleId == null && request.getTaxRuleId() != null) {
+                ruleId = request.getTaxRuleId();
+            }
+        }
+
+        applyTax(estimateItem, ruleId);
+
+        if (Boolean.TRUE.equals(estimateItem.getIsGift())) {
+            estimateItem.setFinalPrice(BigDecimal.ZERO);
+        } else {
+            estimateItem.setFinalPrice(estimateItem.getTotalPrice());
+        }
+
         EstimateItem saved = estimateItemRepository.save(estimateItem);
         //todo: recalculate
         List<EstimateItem> allItems = estimateItemRepository.findByEstimateId(saved.getEstimateId());

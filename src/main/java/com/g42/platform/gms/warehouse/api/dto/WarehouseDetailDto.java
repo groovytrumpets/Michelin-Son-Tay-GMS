@@ -34,6 +34,7 @@ public class WarehouseDetailDto {
     private Integer availableStockLevel;
     private String notify;
     private java.util.List<WarehouseLotDto> lots;
+    private Boolean hasCustomPricing = false;
 
     public Integer getAvailableStockLevel() {
         this.setAvailableStockLevel(this.quantity-this.reservedQuantity);

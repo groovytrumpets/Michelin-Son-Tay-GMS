@@ -33,4 +33,5 @@ public class CatalogSummaryDto {
     private String partNumber;
     private String barcode;
     private String color;
+    private String compatibleCars;
 }

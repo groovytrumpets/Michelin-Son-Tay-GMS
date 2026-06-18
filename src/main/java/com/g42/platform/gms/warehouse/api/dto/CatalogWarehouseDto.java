@@ -34,5 +34,6 @@ public class CatalogWarehouseDto {
     private String partNumber;
     private String barcode;
     private String color;
+    private String compatibleCars;
     private List<WarehouseDetailDto> warehouseDetails;
 }

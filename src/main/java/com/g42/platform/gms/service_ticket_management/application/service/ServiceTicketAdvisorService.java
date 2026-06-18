@@ -14,6 +14,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.g42.platform.gms.auth.repository.CustomerProfileRepository;
+import com.g42.platform.gms.vehicle.repository.VehicleRepository;
+import com.g42.platform.gms.service_ticket_management.domain.repository.OdometerReadingRepo;
 
 
 import java.time.LocalDateTime;
@@ -34,6 +37,9 @@ public class ServiceTicketAdvisorService {
     private final ServiceTicketManageService manageService; // delegate getDetail/getList
     private final TicketAssignmentService ticketAssignmentService;
     private final StaffNotifyService staffNotifyService;
+    private final CustomerProfileRepository customerRepository;
+    private final VehicleRepository vehicleRepository;
+    private final OdometerReadingRepo odometerReadingRepo;
 
 
     /** Advisor duyệt báo giá, bắt đầu sửa — ESTIMATED/PENDING → REPAIRING.
@@ -152,17 +158,104 @@ public class ServiceTicketAdvisorService {
         if (isFinalized) {
             throw new CheckInException("Không thể cập nhật báo giá khi phiếu đang " + current);
         }
+
+        // Update customerRequest
         if (request.getCustomerRequest() != null) {
             ticket.setCustomerRequest(request.getCustomerRequest());
         }
+
+        // Update customer profile name, phone, and email
+        if (request.getCustomerName() != null || request.getCustomerPhone() != null || request.getCustomerEmail() != null) {
+            com.g42.platform.gms.auth.entity.CustomerProfile customer = customerRepository.findById(ticket.getCustomerId())
+                    .orElseThrow(() -> new CheckInException("Không tìm thấy khách hàng"));
+            if (request.getCustomerName() != null) {
+                if (request.getCustomerName().trim().isEmpty()) {
+                    throw new CheckInException("Họ tên không được để trống");
+                }
+                customer.setFullName(request.getCustomerName().trim());
+            }
+            if (request.getCustomerPhone() != null) {
+                if (request.getCustomerPhone().trim().isEmpty()) {
+                    throw new CheckInException("Số điện thoại không được để trống");
+                }
+                customer.setPhone(request.getCustomerPhone().trim());
+            }
+            if (request.getCustomerEmail() != null) {
+                customer.setEmail(request.getCustomerEmail().trim());
+            }
+            customerRepository.save(customer);
+        }
+
+        // Update vehicle model and license plate
+        if (request.getVehicleModel() != null || request.getLicensePlate() != null) {
+            com.g42.platform.gms.vehicle.entity.Vehicle vehicle = vehicleRepository.findById(ticket.getVehicleId())
+                    .orElseThrow(() -> new CheckInException("Không tìm thấy xe"));
+            if (request.getVehicleModel() != null) {
+                if (request.getVehicleModel().trim().isEmpty()) {
+                    throw new CheckInException("Kiểu xe không được để trống");
+                }
+                vehicle.setModel(request.getVehicleModel().trim());
+            }
+            if (request.getLicensePlate() != null) {
+                if (request.getLicensePlate().trim().isEmpty()) {
+                    throw new CheckInException("Biển số xe không được để trống");
+                }
+                String newPlate = request.getLicensePlate().trim();
+                java.util.Optional<com.g42.platform.gms.vehicle.entity.Vehicle> existingVehicle = vehicleRepository.findByLicensePlate(newPlate);
+                if (existingVehicle.isPresent() && !existingVehicle.get().getVehicleId().equals(vehicle.getVehicleId())) {
+                    throw new CheckInException("Biển số xe đã được sử dụng bởi xe khác");
+                }
+                vehicle.setLicensePlate(newPlate);
+            }
+            vehicleRepository.save(vehicle);
+        }
+
+        // Update odometer reading
+        if (request.getOdometerKm() != null) {
+            if (request.getOdometerKm() < 0) {
+                throw new CheckInException("Số công tơ mét không hợp lệ");
+            }
+            java.util.List<com.g42.platform.gms.service_ticket_management.domain.entity.OdometerReading> readings =
+                    odometerReadingRepo.findByServiceTicketId(ticket.getServiceTicketId());
+            if (!readings.isEmpty()) {
+                com.g42.platform.gms.service_ticket_management.domain.entity.OdometerReading reading = readings.get(0);
+                reading.setReading(request.getOdometerKm());
+                odometerReadingRepo.save(reading);
+            } else {
+                com.g42.platform.gms.service_ticket_management.domain.entity.OdometerReading newReading =
+                        new com.g42.platform.gms.service_ticket_management.domain.entity.OdometerReading();
+                newReading.setVehicleId(ticket.getVehicleId());
+                newReading.setReading(request.getOdometerKm());
+                newReading.setRecordedAt(LocalDateTime.now());
+                newReading.setServiceTicketId(ticket.getServiceTicketId());
+                odometerReadingRepo.save(newReading);
+            }
+        }
+
+        // Update service ticket specific fields
+        if (request.getReceivedAt() != null) {
+            ticket.setReceivedAt(request.getReceivedAt());
+        }
+        if (request.getSafetyInspectionEnabled() != null) {
+            ticket.setSafetyInspectionEnabled(request.getSafetyInspectionEnabled());
+        }
+        if (request.getEstimatedDeliveryAt() != null) {
+            ticket.setEstimatedDeliveryAt(request.getEstimatedDeliveryAt());
+        }
+        if (request.getDeliveredAt() != null) {
+            ticket.setDeliveredAt(request.getDeliveredAt());
+        }
+
+        // Save catalog items if booking exists
         if (ticket.getBookingId() != null && request.getCatalogItemIds() != null) {
             Booking booking = bookingRepository.findById(ticket.getBookingId())
                     .orElseThrow(() -> new CheckInException("Không tìm thấy booking"));
             booking.setCatalogItemIds(request.getCatalogItemIds());
             bookingRepository.save(booking);
         }
+
         serviceTicketRepo.save(ticket);
-        log.info("Ticket {} estimate updated by advisor", ticketCode);
+        log.info("Ticket {} details and estimate updated by advisor", ticketCode);
         return manageService.getServiceTicketDetail(ticketCode);
     }
 
