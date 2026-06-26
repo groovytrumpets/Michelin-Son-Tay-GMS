@@ -1,14 +1,14 @@
 package com.g42.platform.gms.warehouse.app.service.inventory;
 
 import com.g42.platform.gms.common.service.ExcelService;
-import com.g42.platform.gms.warehouse.domain.entity.CatalogItem;
-import com.g42.platform.gms.warehouse.domain.entity.Inventory;
-import com.g42.platform.gms.warehouse.domain.entity.StockEntry;
-import com.g42.platform.gms.warehouse.domain.entity.StockEntryItem;
+import com.g42.platform.gms.warehouse.domain.entity.*;
 import com.g42.platform.gms.warehouse.domain.enums.StockEntryStatus;
+import com.g42.platform.gms.warehouse.domain.enums.InventoryTransactionType;
 import com.g42.platform.gms.warehouse.domain.repository.InventoryRepo;
 import com.g42.platform.gms.warehouse.domain.repository.PartCatalogRepo;
 import com.g42.platform.gms.warehouse.domain.repository.StockEntryRepo;
+import com.g42.platform.gms.warehouse.domain.repository.CatalogItemRepo;
+import com.g42.platform.gms.warehouse.domain.repository.InventoryTransactionRepo;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.*;
 import org.springframework.stereotype.Service;
@@ -22,22 +22,10 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Luồng sync Excel giữa GMS và hệ thống kho T3.
+ * Luồng nhập thêm tồn kho và thông tin sản phẩm từ file Excel.
  *
- * Format Excel đồng nhất (cả import lẫn export) — hỗ trợ nhiều lô per item:
- * | STT | SKU | Tên phụ tùng | Đơn vị | Mã lô | Ngày nhập | Tồn lô | Giá nhập (VNĐ) | Hệ số markup | Ghi chú |
- *
- * Mỗi dòng = 1 lô của 1 item. Cùng SKU có thể có nhiều dòng (nhiều lô).
- *
- * Import (T3 → GMS):
- *   - Tạo 1 stock_entry SYNC CONFIRMED per lần sync
- *   - Mỗi dòng → 1 stock_entry_item (1 lô) với giá nhập riêng
- *   - inventory.quantity = tổng tất cả lô của item đó trong file
- *   - Lô cũ trong GMS bị xóa (invalidate) trước khi insert lô mới từ T3
- *
- * Export (GMS → T3):
- *   - Xuất từng lô còn hàng (remainingQuantity > 0) theo từng item
- *   - Cùng format để T3 cập nhật lại kho của họ
+ * Format Excel đồng nhất (cả import lẫn export) — hỗ trợ đầy đủ thông tin:
+ * | STT | SKU | Tên phụ tùng | Hạng mục | Hãng sản xuất | Dòng sản phẩm | Đơn vị tính | Giá bán | Hiển thị giá | Bảo hành | Xuất xứ | Màu sắc | Xe tương thích | Mô tả | Thuế | Mã lô | Ngày nhập | Tồn lô | Giá nhập | Hệ số markup | Ghi chú | Tổng tồn kho |
  */
 @Service
 @RequiredArgsConstructor
@@ -46,87 +34,171 @@ public class InventoryExcelService {
     private final PartCatalogRepo partCatalogRepo;
     private final InventoryRepo inventoryRepo;
     private final StockEntryRepo stockEntryRepo;
+    private final CatalogItemRepo catalogItemRepo;
+    private final InventoryTransactionRepo inventoryTransactionRepo;
+    private final com.g42.platform.gms.estimation.api.internal.TaxRuleInternalApi taxRuleInternalApi;
+    private final com.g42.platform.gms.estimation.infrastructure.repository.TaxRuleRepositoryJpa taxRuleRepositoryJpa;
 
-    // Cột Excel (0-indexed) — format có lô
-    private static final int COL_STT       = 0;
-    private static final int COL_SKU       = 1;
-    private static final int COL_NAME      = 2;
-    private static final int COL_UNIT      = 3;
-    private static final int COL_LOT_CODE  = 4;  // Mã lô (từ T3)
-    private static final int COL_LOT_DATE  = 5;  // Ngày nhập lô
-    private static final int COL_QTY       = 6;  // Tồn lô này
-    private static final int COL_PRICE     = 7;  // Giá nhập lô này
-    private static final int COL_MARKUP    = 8;
-    private static final int COL_NOTE      = 9;
+    // Cột Excel (0-indexed) — format đầy đủ thông tin sản phẩm và lô
+    private static final int COL_STT          = 0;
+    private static final int COL_SKU          = 1;
+    private static final int COL_NAME         = 2;
+    private static final int COL_CATEGORY     = 3;
+    private static final int COL_BRAND        = 4;
+    private static final int COL_PRODUCT_LINE = 5;
+    private static final int COL_UNIT         = 6;
+    private static final int COL_PRICE_SELL   = 7;
+    private static final int COL_SHOW_PRICE   = 8;
+    private static final int COL_WARRANTY     = 9;
+    private static final int COL_ORIGIN       = 10;
+    private static final int COL_COLOR        = 11;
+    private static final int COL_COMPATIBLE   = 12;
+    private static final int COL_DESCRIPTION  = 13;
+    private static final int COL_TAX          = 14;
+    private static final int COL_LOT_CODE     = 15;
+    private static final int COL_LOT_DATE     = 16;
+    private static final int COL_QTY          = 17;
+    private static final int COL_PRICE_BUY    = 18;
+    private static final int COL_MARKUP       = 19;
+    private static final int COL_NOTE         = 20;
+    private static final int COL_TOTAL_STOCK  = 21;
 
     static final String[] HEADERS = {
-            "STT", "SKU", "Tên phụ tùng", "Đơn vị",
-            "Mã lô", "Ngày nhập", "Tồn lô",
-            "Giá nhập (VNĐ)", "Hệ số markup", "Ghi chú"
+            "STT", "SKU", "Tên phụ tùng", "Hạng mục", "Hãng sản xuất", "Dòng sản phẩm", "Đơn vị tính",
+            "Giá bán (VNĐ)", "Hiển thị giá", "Bảo hành (tháng)", "Xuất xứ", "Màu sắc", "Xe tương thích",
+            "Mô tả", "Thuế", "Mã lô", "Ngày nhập", "Tồn lô",
+            "Giá nhập (VNĐ)", "Hệ số markup", "Ghi chú", "Tổng tồn kho"
     };
 
-    // ── EXPORT (GMS → T3) ────────────────────────────────────────────────────
+    // ── EXPORT (GMS → Excel) ──────────────────────────────────────────────────
 
-    /**
-     * Xuất từng lô còn hàng trong GMS ra Excel — cùng format để T3 cập nhật lại.
-     * Mỗi dòng = 1 lô của 1 item (cùng SKU có thể có nhiều dòng).
-     * GET /api/warehouse/inventory/{warehouseId}/excel/sync-template
-     */
     public byte[] exportForSync(Integer warehouseId) {
-        // Lấy tất cả lô còn hàng trong kho
+        // 1. Lấy tất cả CatalogItem có dạng PART
+        List<CatalogItem> allParts = partCatalogRepo.findAllParts();
+
+        // 2. Lấy tất cả lô còn hàng trong kho
         List<StockEntryItem> activeLots = stockEntryRepo.findActiveLotsByWarehouse(warehouseId);
+        Map<Integer, List<StockEntryItem>> lotsByItemId = activeLots.stream()
+                .collect(Collectors.groupingBy(StockEntryItem::getItemId));
 
-        // Build map itemId → catalog item
-        List<Integer> itemIds = activeLots.stream().map(StockEntryItem::getItemId).distinct().toList();
-        Map<Integer, CatalogItem> catalogMap = itemIds.isEmpty()
-                ? Map.of()
-            : partCatalogRepo.findAllPartsByIds(itemIds).stream()
-                .collect(Collectors.toMap(CatalogItem::getItemId, c -> c));
+        // 3. Lấy tất cả inventory trong kho
+        List<Inventory> allInventory = inventoryRepo.findByWarehouse(warehouseId);
+        Map<Integer, Inventory> inventoryMap = allInventory.stream()
+                .collect(Collectors.toMap(Inventory::getItemId, i -> i, (a, b) -> a));
 
-        // Build map entryId → entry (để lấy entryCode và entryDate)
+        // 4. Lấy map thông tin master data
+        List<Brand> brands = catalogItemRepo.getAllBrands();
+        Map<Integer, String> brandMap = brands.stream()
+                .filter(b -> b.getBrandId() != null)
+                .collect(Collectors.toMap(Brand::getBrandId, Brand::getBrandName, (a, b) -> a));
+
+        List<ProductLine> lines = catalogItemRepo.getAllProductLines();
+        Map<Integer, String> lineMap = lines.stream()
+                .filter(l -> l.getProductLineId() != null)
+                .collect(Collectors.toMap(ProductLine::getProductLineId, ProductLine::getLineName, (a, b) -> a));
+
+        List<WorkCategory> categories = catalogItemRepo.getAllItemCategory();
+        Map<Integer, String> categoryMap = categories.stream()
+                .filter(c -> c.getWorkCategoryId() != null)
+                .collect(Collectors.toMap(WorkCategory::getWorkCategoryId, WorkCategory::getCategoryName, (a, b) -> a));
+
+        // 5. Build map entryId -> entry (lô)
         Map<Integer, StockEntry> entryMap = activeLots.stream()
                 .map(StockEntryItem::getEntryId)
                 .distinct()
                 .map(id -> stockEntryRepo.findEntryById(id).orElse(null))
                 .filter(Objects::nonNull)
-                .collect(Collectors.toMap(StockEntry::getEntryId, e -> e));
+                .collect(Collectors.toMap(StockEntry::getEntryId, e -> e, (a, b) -> a));
 
-        int[] stt = {1};
-        return ExcelService.exportToExcel(activeLots, HEADERS, lot -> {
-            CatalogItem cat = catalogMap.get(lot.getItemId());
-            StockEntry entry = entryMap.get(lot.getEntryId());
-            return new Object[]{
-                    stt[0]++,
-                    cat != null && cat.getSku() != null ? cat.getSku() : "",
-                    cat != null ? cat.getItemName() : "",
-                    cat != null && cat.getUnit() != null ? cat.getUnit() : "",
-                    entry != null ? entry.getEntryCode() : "",          // Mã lô
-                    entry != null && entry.getEntryDate() != null
-                            ? entry.getEntryDate().toString() : "",     // Ngày nhập
-                    lot.getRemainingQuantity(),                          // Tồn lô
-                    lot.getImportPrice(),                                // Giá nhập
-                    lot.getMarkupMultiplier(),
-                    lot.getNotes() != null ? lot.getNotes() : ""
-            };
-        });
+        // 6. Xây dựng danh sách dòng Excel
+        List<Object[]> rowsData = new ArrayList<>();
+        int stt = 1;
+
+        for (CatalogItem cat : allParts) {
+            Integer itemId = cat.getItemId();
+            List<StockEntryItem> lots = lotsByItemId.getOrDefault(itemId, Collections.emptyList());
+            Inventory inv = inventoryMap.get(itemId);
+            int totalStock = inv != null ? inv.getQuantity() : 0;
+
+            String categoryName = cat.getWorkCategoryId() != null ? categoryMap.get(cat.getWorkCategoryId()) : "";
+            String brandName = cat.getBrandId() != null ? brandMap.get(cat.getBrandId()) : "";
+            String lineName = cat.getProductLineId() != null ? lineMap.get(cat.getProductLineId()) : "";
+
+            String taxName = "";
+            if (cat.getTaxRuleId() != null) {
+                try {
+                    com.g42.platform.gms.estimation.domain.entity.TaxRule tr = taxRuleInternalApi.getTaxRuleById(cat.getTaxRuleId());
+                    if (tr != null) {
+                        taxName = tr.getTaxName() != null ? tr.getTaxName() : (tr.getTaxRate() != null ? tr.getTaxRate().multiply(BigDecimal.valueOf(100)) + "%" : "");
+                    }
+                } catch (Exception ignored) {}
+            }
+
+            if (lots.isEmpty()) {
+                rowsData.add(new Object[]{
+                        stt++,
+                        cat.getSku() != null ? cat.getSku() : "",
+                        cat.getItemName() != null ? cat.getItemName() : "",
+                        categoryName != null ? categoryName : "",
+                        brandName != null ? brandName : "",
+                        lineName != null ? lineName : "",
+                        cat.getUnit() != null ? cat.getUnit() : "",
+                        cat.getPrice() != null ? cat.getPrice() : BigDecimal.ZERO,
+                        cat.getShowPrice() != null && cat.getShowPrice() ? "Có" : "Không",
+                        cat.getWarrantyDurationMonths() != null ? cat.getWarrantyDurationMonths() : 0,
+                        cat.getMadeIn() != null ? cat.getMadeIn() : "",
+                        cat.getColor() != null ? cat.getColor() : "",
+                        cat.getCompatibleCars() != null ? cat.getCompatibleCars() : "",
+                        cat.getDescription() != null ? cat.getDescription() : "",
+                        taxName,
+                        "", // Mã lô
+                        "", // Ngày nhập
+                        0,  // Tồn lô
+                        "", // Giá nhập
+                        "", // Hệ số markup
+                        "", // Ghi chú
+                        totalStock
+                });
+            } else {
+                for (StockEntryItem lot : lots) {
+                    StockEntry entry = entryMap.get(lot.getEntryId());
+                    rowsData.add(new Object[]{
+                            stt++,
+                            cat.getSku() != null ? cat.getSku() : "",
+                            cat.getItemName() != null ? cat.getItemName() : "",
+                            categoryName != null ? categoryName : "",
+                            brandName != null ? brandName : "",
+                            lineName != null ? lineName : "",
+                            cat.getUnit() != null ? cat.getUnit() : "",
+                            cat.getPrice() != null ? cat.getPrice() : BigDecimal.ZERO,
+                            cat.getShowPrice() != null && cat.getShowPrice() ? "Có" : "Không",
+                            cat.getWarrantyDurationMonths() != null ? cat.getWarrantyDurationMonths() : 0,
+                            cat.getMadeIn() != null ? cat.getMadeIn() : "",
+                            cat.getColor() != null ? cat.getColor() : "",
+                            cat.getCompatibleCars() != null ? cat.getCompatibleCars() : "",
+                            cat.getDescription() != null ? cat.getDescription() : "",
+                            taxName,
+                            entry != null ? entry.getEntryCode() : "",
+                            entry != null && entry.getEntryDate() != null ? entry.getEntryDate().toString() : "",
+                            lot.getRemainingQuantity(),
+                            lot.getImportPrice() != null ? lot.getImportPrice() : BigDecimal.ZERO,
+                            lot.getMarkupMultiplier() != null ? lot.getMarkupMultiplier() : BigDecimal.valueOf(1.3),
+                            lot.getNotes() != null ? lot.getNotes() : "",
+                            totalStock
+                    });
+                }
+            }
+        }
+
+        return ExcelService.exportToExcel(rowsData, HEADERS, row -> row);
     }
 
-    // ── IMPORT (T3 → GMS) ────────────────────────────────────────────────────
+    // ── IMPORT (Excel → GMS) ──────────────────────────────────────────────────
 
-    /**
-     * Sync toàn bộ tồn kho từ file Excel của T3.
-     * Mỗi dòng = 1 lô của 1 item. Cùng SKU có thể có nhiều dòng.
-     * Logic:
-     *   1. Xóa tất cả lô SYNC cũ của warehouse này (invalidate lô cũ từ T3)
-     *   2. Tạo 1 stock_entry SYNC mới
-     *   3. Mỗi dòng → 1 stock_entry_item (lô riêng với giá riêng)
-     *   4. inventory.quantity = tổng remainingQuantity của tất cả lô item đó trong file
-     * POST /api/warehouse/inventory/{warehouseId}/excel/sync
-     */
     @Transactional
     public SyncResult syncFromT3Excel(MultipartFile file, Integer warehouseId, Integer staffId) {
 
-        // Build map SKU → catalog item
+        // Build maps SKU -> catalog item
         Map<String, CatalogItem> skuToCatalog = partCatalogRepo.findAllParts().stream()
                 .filter(p -> p.getSku() != null)
                 .collect(Collectors.toMap(
@@ -135,69 +207,218 @@ public class InventoryExcelService {
                         (a, b) -> a
                 ));
 
+        List<Brand> brands = catalogItemRepo.getAllBrands();
+        Map<String, Brand> nameToBrand = brands.stream()
+                .filter(b -> b.getBrandName() != null)
+                .collect(Collectors.toMap(
+                        b -> b.getBrandName().trim().toLowerCase(),
+                        b -> b,
+                        (a, b) -> a
+                ));
+
+        List<WorkCategory> categories = catalogItemRepo.getAllItemCategory();
+        Map<String, WorkCategory> nameToCategory = categories.stream()
+                .filter(c -> c.getCategoryName() != null)
+                .collect(Collectors.toMap(
+                        c -> c.getCategoryName().trim().toLowerCase(),
+                        c -> c,
+                        (a, b) -> a
+                ));
+
+        List<ProductLine> productLines = catalogItemRepo.getAllProductLines();
+        List<com.g42.platform.gms.estimation.infrastructure.entity.TaxRuleJpa> allTaxRules = taxRuleRepositoryJpa.findAll();
+
         List<Row> rows = ExcelService.importFromExcel(file, row -> row);
         List<String> errors = new ArrayList<>();
 
-        // Bước 1: Invalidate tất cả lô SYNC cũ của warehouse này
-        // (đặt remainingQuantity = 0 để FIFO không dùng nữa)
-        stockEntryRepo.invalidateSyncLotsByWarehouse(warehouseId);
-
-        // Bước 2: Tạo stock_entry SYNC mới
+        // Tạo stock_entry SYNC mới ở trạng thái DRAFT cho lần nhập này
         StockEntry syncEntry = buildSyncEntry(warehouseId, staffId);
         StockEntry savedEntry = stockEntryRepo.save(syncEntry);
 
-        // Bước 3: Parse từng dòng → tích lũy qty per item + tạo lô
-        Map<Integer, Integer> itemTotalQty = new LinkedHashMap<>(); // itemId → tổng qty từ file
+        List<StockEntryItem> itemsToSave = new java.util.ArrayList<>();
+        int inventoryUpdated = 0, inventoryInserted = 0;
 
         for (Row row : rows) {
-            int rowNum = row.getRowNum() + 1;
-
             String sku = getCellString(row, COL_SKU);
             if (sku == null || sku.isBlank()) continue;
+            String skuNorm = sku.trim().toLowerCase();
 
+            int rowNum = row.getRowNum() + 1;
             String itemName = getCellString(row, COL_NAME);
             if (itemName == null || itemName.isBlank()) {
                 errors.add("Dòng " + rowNum + ": Thiếu tên phụ tùng (SKU=" + sku + ")");
                 continue;
             }
 
-            Integer qty = getCellInt(row, COL_QTY);
-            if (qty == null || qty < 0) {
-                errors.add("Dòng " + rowNum + ": Số lượng không hợp lệ (SKU=" + sku + ")");
-                continue;
+            String categoryName = getCellString(row, COL_CATEGORY);
+            String brandName = getCellString(row, COL_BRAND);
+            String productLineName = getCellString(row, COL_PRODUCT_LINE);
+            String unit = getCellString(row, COL_UNIT);
+            BigDecimal priceSell = getCellDecimal(row, COL_PRICE_SELL);
+            if (priceSell == null) priceSell = BigDecimal.ZERO;
+
+            String showPriceStr = getCellString(row, COL_SHOW_PRICE);
+            Boolean showPrice = showPriceStr == null || !"Không".equalsIgnoreCase(showPriceStr.trim());
+
+            Integer warranty = getCellInt(row, COL_WARRANTY);
+            if (warranty == null) warranty = 0;
+
+            String origin = getCellString(row, COL_ORIGIN);
+            String color = getCellString(row, COL_COLOR);
+            String compatibleCars = getCellString(row, COL_COMPATIBLE);
+            String description = getCellString(row, COL_DESCRIPTION);
+            String taxStr = getCellString(row, COL_TAX);
+
+            CatalogItem catalogItem = skuToCatalog.get(skuNorm);
+            
+            // Resolve Brand, Category, Product Line
+            Integer brandId = null;
+            if (brandName != null && !brandName.isBlank()) {
+                String brandNorm = brandName.trim().toLowerCase();
+                Brand brand = nameToBrand.get(brandNorm);
+                if (brand == null) {
+                    brand = new Brand();
+                    brand.setBrandName(brandName.trim());
+                    brand.setIsActive((byte) 1);
+                    brand = catalogItemRepo.createBrand(brand);
+                    nameToBrand.put(brandNorm, brand);
+                }
+                brandId = brand.getBrandId();
             }
 
-            BigDecimal importPrice = getCellDecimal(row, COL_PRICE);
-            if (importPrice == null) importPrice = BigDecimal.ZERO;
+            Integer categoryId = null;
+            if (categoryName != null && !categoryName.isBlank()) {
+                String catNorm = categoryName.trim().toLowerCase();
+                WorkCategory cat = nameToCategory.get(catNorm);
+                if (cat == null) {
+                    cat = new WorkCategory();
+                    cat.setCategoryName(categoryName.trim());
+                    cat.setCategoryCode(generateCategoryCode(categoryName));
+                    cat.setCategoryType("PART");
+                    cat.setIsActive(true);
+                    cat = catalogItemRepo.saveItemCate(cat);
+                    nameToCategory.put(catNorm, cat);
+                }
+                categoryId = cat.getWorkCategoryId();
+            }
 
-            BigDecimal markup = getCellDecimal(row, COL_MARKUP);
-            if (markup == null || markup.compareTo(BigDecimal.ZERO) <= 0) markup = new BigDecimal("1.3");
+            Integer productLineId = null;
+            if (productLineName != null && !productLineName.isBlank() && brandId != null) {
+                String lineNorm = productLineName.trim().toLowerCase();
+                final Integer bId = brandId;
+                ProductLine line = productLines.stream()
+                        .filter(l -> l.getBrandId() != null && l.getBrandId().equals(bId)
+                                && l.getLineName() != null && l.getLineName().trim().toLowerCase().equals(lineNorm))
+                        .findFirst()
+                        .orElse(null);
+                if (line == null) {
+                    line = new ProductLine();
+                    line.setBrandId(brandId);
+                    line.setLineName(productLineName.trim());
+                    line.setIsActive((byte) 1);
+                    line = catalogItemRepo.saveProductLine(line);
+                    productLines.add(line);
+                }
+                productLineId = line.getProductLineId();
+            }
 
-            String unit    = getCellString(row, COL_UNIT);
-            String lotCode = getCellString(row, COL_LOT_CODE);
-            String notes   = lotCode != null ? "Lô " + lotCode : getCellString(row, COL_NOTE);
+            Integer taxRuleId = resolveTaxRuleId(taxStr, allTaxRules);
 
-            // Tìm catalog item theo SKU — tạo mới nếu chưa có (item từ T3)
-            CatalogItem catalogItem = skuToCatalog.get(sku.trim().toLowerCase());
             if (catalogItem == null) {
-                catalogItem = createDefaultCatalogItem(sku.trim(), itemName, unit);
+                // Tạo mới sản phẩm
+                catalogItem = new CatalogItem();
+                catalogItem.setSku(sku.trim());
+                catalogItem.setItemName(itemName.trim());
+                catalogItem.setItemType(com.g42.platform.gms.warehouse.domain.enums.CatalogItemType.PART);
+                catalogItem.setUnit(unit);
+                catalogItem.setPrice(priceSell);
+                catalogItem.setShowPrice(showPrice);
+                catalogItem.setWarrantyDurationMonths(warranty);
+                catalogItem.setMadeIn(origin);
+                catalogItem.setColor(color);
+                catalogItem.setCompatibleCars(compatibleCars);
+                catalogItem.setDescription(description);
+                catalogItem.setTaxRuleId(taxRuleId);
+                catalogItem.setIsActive(true);
+                catalogItem.setBrandId(brandId);
+                catalogItem.setWorkCategoryId(categoryId);
+                catalogItem.setProductLineId(productLineId);
+
                 catalogItem = partCatalogRepo.save(catalogItem);
-                skuToCatalog.put(sku.trim().toLowerCase(), catalogItem);
+                skuToCatalog.put(skuNorm, catalogItem);
             } else {
-                // Cập nhật unit nếu T3 có thay đổi
+                // Cập nhật thông tin sản phẩm nếu có thay đổi
+                boolean needsSave = false;
                 if (unit != null && !unit.isBlank() && !unit.equals(catalogItem.getUnit())) {
                     catalogItem.setUnit(unit);
+                    needsSave = true;
+                }
+                if (priceSell.compareTo(BigDecimal.ZERO) > 0 && (catalogItem.getPrice() == null || priceSell.compareTo(catalogItem.getPrice()) != 0)) {
+                    catalogItem.setPrice(priceSell);
+                    needsSave = true;
+                }
+                if (showPrice != null && !showPrice.equals(catalogItem.getShowPrice())) {
+                    catalogItem.setShowPrice(showPrice);
+                    needsSave = true;
+                }
+                if (warranty > 0 && (catalogItem.getWarrantyDurationMonths() == null || !warranty.equals(catalogItem.getWarrantyDurationMonths()))) {
+                    catalogItem.setWarrantyDurationMonths(warranty);
+                    needsSave = true;
+                }
+                if (origin != null && !origin.isBlank() && !origin.equals(catalogItem.getMadeIn())) {
+                    catalogItem.setMadeIn(origin);
+                    needsSave = true;
+                }
+                if (color != null && !color.isBlank() && !color.equals(catalogItem.getColor())) {
+                    catalogItem.setColor(color);
+                    needsSave = true;
+                }
+                if (compatibleCars != null && !compatibleCars.isBlank() && !compatibleCars.equals(catalogItem.getCompatibleCars())) {
+                    catalogItem.setCompatibleCars(compatibleCars);
+                    needsSave = true;
+                }
+                if (description != null && !description.isBlank() && !description.equals(catalogItem.getDescription())) {
+                    catalogItem.setDescription(description);
+                    needsSave = true;
+                }
+                if (taxRuleId != null && !taxRuleId.equals(catalogItem.getTaxRuleId())) {
+                    catalogItem.setTaxRuleId(taxRuleId);
+                    needsSave = true;
+                }
+                if (brandId != null && !brandId.equals(catalogItem.getBrandId())) {
+                    catalogItem.setBrandId(brandId);
+                    needsSave = true;
+                }
+                if (categoryId != null && !categoryId.equals(catalogItem.getWorkCategoryId())) {
+                    catalogItem.setWorkCategoryId(categoryId);
+                    needsSave = true;
+                }
+                if (productLineId != null && !productLineId.equals(catalogItem.getProductLineId())) {
+                    catalogItem.setProductLineId(productLineId);
+                    needsSave = true;
+                }
+
+                if (needsSave) {
                     partCatalogRepo.save(catalogItem);
                 }
             }
 
             Integer itemId = catalogItem.getItemId();
+            Integer qty = getCellInt(row, COL_QTY);
 
-            // Tích lũy tổng qty per item
-            itemTotalQty.merge(itemId, qty, Integer::sum);
+            if (qty != null && qty > 0) {
+                BigDecimal importPrice = getCellDecimal(row, COL_PRICE_BUY);
+                if (importPrice == null) importPrice = BigDecimal.ZERO;
 
-            // Tạo stock_entry_item cho lô này (chỉ khi qty > 0 và có giá)
-            if (qty > 0 && importPrice.compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal markup = getCellDecimal(row, COL_MARKUP);
+                if (markup == null || markup.compareTo(BigDecimal.ZERO) <= 0) markup = new BigDecimal("1.3");
+
+                String lotCode = getCellString(row, COL_LOT_CODE);
+                String notes = lotCode != null && !lotCode.isBlank() ? "Lô " + lotCode : getCellString(row, COL_NOTE);
+                if (notes == null || notes.isBlank()) {
+                    notes = "Nhập thêm từ Excel";
+                }
+
                 StockEntryItem entryItem = StockEntryItem.builder()
                         .entryId(savedEntry.getEntryId())
                         .itemId(itemId)
@@ -207,30 +428,20 @@ public class InventoryExcelService {
                         .remainingQuantity(qty)
                         .notes(notes)
                         .build();
-                stockEntryRepo.saveItem(entryItem);
+                itemsToSave.add(entryItem);
+
+                Inventory inv = inventoryRepo.findByWarehouseAndItem(warehouseId, itemId).orElse(null);
+                if (inv != null) {
+                    inventoryUpdated++;
+                } else {
+                    inventoryInserted++;
+                }
             }
         }
 
-        // Bước 4: Upsert inventory — set quantity = tổng tất cả lô của item trong file
-        int inventoryUpdated = 0, inventoryInserted = 0;
-        for (Map.Entry<Integer, Integer> e : itemTotalQty.entrySet()) {
-            Integer itemId = e.getKey();
-            Integer totalQty = e.getValue();
-            Inventory inv = inventoryRepo.findByWarehouseAndItem(warehouseId, itemId).orElse(null);
-            if (inv != null) {
-                inv.setQuantity(totalQty);
-                inventoryRepo.save(inv);
-                inventoryUpdated++;
-            } else {
-                Inventory newInv = Inventory.builder()
-                        .warehouseId(warehouseId)
-                        .itemId(itemId)
-                        .quantity(totalQty)
-                        .reservedQuantity(0)
-                        .build();
-                inventoryRepo.save(newInv);
-                inventoryInserted++;
-            }
+        if (!itemsToSave.isEmpty()) {
+            savedEntry.setItems(itemsToSave);
+            stockEntryRepo.save(savedEntry);
         }
 
         return new SyncResult(savedEntry.getEntryId(), inventoryUpdated, inventoryInserted, errors);
@@ -242,37 +453,68 @@ public class InventoryExcelService {
         return StockEntry.builder()
                 .entryCode("SYNC-" + warehouseId + "-" + System.currentTimeMillis())
                 .warehouseId(warehouseId)
-                .supplierName("SYNC - Đồng bộ từ kho T3")
+                .supplierName("SYNC - Nhập thêm từ Excel")
                 .entryDate(LocalDate.now())
-                .status(StockEntryStatus.CONFIRMED)
-                .notes("Đồng bộ tồn kho từ hệ thống kho T3")
+                .status(StockEntryStatus.DRAFT)
+                .notes("Nhập thêm tồn kho từ file Excel (Bản nháp)")
                 .createdBy(staffId)
-                .confirmedBy(staffId)
-                .confirmedAt(LocalDateTime.now())
                 .build();
     }
 
-    private Map<Integer, BigDecimal> buildLatestPriceMap(Integer warehouseId) {
-        return Map.of();
+    private String generateCategoryCode(String name) {
+        String clean = name != null ? name : "";
+        String code = clean.replaceAll("[^a-zA-Z0-9]", "").toUpperCase();
+        if (code.length() > 10) {
+            code = code.substring(0, 10);
+        }
+        if (code.isEmpty()) {
+            code = "CATE";
+        }
+        return code + "-" + (System.currentTimeMillis() % 1000);
     }
 
-    private Map<Integer, BigDecimal> buildLatestMarkupMap(Integer warehouseId) {
-        return Map.of();
-    }
+    private Integer resolveTaxRuleId(String taxStr, List<com.g42.platform.gms.estimation.infrastructure.entity.TaxRuleJpa> allTaxRules) {
+        if (taxStr == null || taxStr.isBlank()) {
+            return null;
+        }
+        String clean = taxStr.trim().toLowerCase();
+        if (clean.contains("free") || clean.contains("miễn") || clean.contains("0")) {
+            return allTaxRules.stream()
+                    .filter(t -> "FREE".equalsIgnoreCase(t.getTaxCode()))
+                    .map(com.g42.platform.gms.estimation.infrastructure.entity.TaxRuleJpa::getTaxRuleId)
+                    .findFirst()
+                    .orElse(null);
+        }
 
-    /**
-     * Tạo catalog item mới từ T3 — brand/product_line/work_category để null.
-     * Manager sẽ phân loại sau qua admin.
-     */
-    private CatalogItem createDefaultCatalogItem(String sku, String itemName, String unit) {
-        CatalogItem item = new CatalogItem();
-        item.setSku(sku);
-        item.setItemName(itemName);
-        item.setItemType(com.g42.platform.gms.warehouse.domain.enums.CatalogItemType.PART);
-        item.setUnit(unit);
-        item.setIsActive(true);
-        // brand_id, product_line_id, work_category_id để null — manager cập nhật sau
-        return item;
+        double percentValue = -1;
+        try {
+            String numStr = clean.replaceAll("[^0-9.]", "");
+            if (!numStr.isEmpty()) {
+                double val = Double.parseDouble(numStr);
+                if (val > 1) {
+                    percentValue = val / 100.0;
+                } else {
+                    percentValue = val;
+                }
+            }
+        } catch (Exception ignored) {}
+
+        if (percentValue >= 0) {
+            final double targetRate = percentValue;
+            Optional<com.g42.platform.gms.estimation.infrastructure.entity.TaxRuleJpa> match = allTaxRules.stream()
+                    .filter(t -> t.getTaxRate() != null && Math.abs(t.getTaxRate().doubleValue() - targetRate) < 0.001)
+                    .findFirst();
+            if (match.isPresent()) {
+                return match.get().getTaxRuleId();
+            }
+        }
+
+        return allTaxRules.stream()
+                .filter(t -> (t.getTaxName() != null && t.getTaxName().toLowerCase().contains(clean))
+                        || (t.getTaxCode() != null && t.getTaxCode().toLowerCase().contains(clean)))
+                .map(com.g42.platform.gms.estimation.infrastructure.entity.TaxRuleJpa::getTaxRuleId)
+                .findFirst()
+                .orElse(null);
     }
 
     private String getCellString(Row row, int col) {

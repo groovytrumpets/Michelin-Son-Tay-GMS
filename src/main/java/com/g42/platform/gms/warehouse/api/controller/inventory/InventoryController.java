@@ -153,13 +153,14 @@ public class InventoryController {
             @AuthenticationPrincipal StaffPrincipal principal) {
         InventoryExcelService.SyncResult result =
                 inventoryExcelService.syncFromT3Excel(file, warehouseId, principal.getStaffId());
-        java.util.Map<String, Object> resp = java.util.Map.of(
-                "syncEntryId", result.syncEntryId(),
-                "inventoryUpdated", result.inventoryUpdated(),
-                "inventoryInserted", result.inventoryInserted(),
-                "errors", result.errors(),
-                "hasErrors", !result.errors().isEmpty()
-        );
+        
+        java.util.Map<String, Object> resp = new java.util.HashMap<>();
+        resp.put("syncEntryId", result.syncEntryId());
+        resp.put("inventoryUpdated", result.inventoryUpdated());
+        resp.put("inventoryInserted", result.inventoryInserted());
+        resp.put("errors", result.errors());
+        resp.put("hasErrors", !result.errors().isEmpty());
+
         return ResponseEntity.ok(ApiResponses.success(resp));
     }
 
