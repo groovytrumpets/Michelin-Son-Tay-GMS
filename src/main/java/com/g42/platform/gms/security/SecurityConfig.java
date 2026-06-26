@@ -62,6 +62,8 @@ public class SecurityConfig {
                                 "/swagger-ui.html",
                                 "/zalo/callback",
                                 "/zalo/login",
+                                "/api/warehouse/item-categoy/all",
+                                "/api/warehouse/search/catalog-items-detail",
                                 "/home/**",
                                 "/api/webhook/**",
                                 "/error",
