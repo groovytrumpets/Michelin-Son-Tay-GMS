@@ -3,11 +3,15 @@ package com.g42.platform.gms.warehouse.api.controller;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.warehouse.api.dto.*;
+import com.g42.platform.gms.warehouse.api.dto.request.CreateWarehouseRequest;
+import com.g42.platform.gms.warehouse.api.dto.request.UpdateWarehouseRequest;
 import com.g42.platform.gms.warehouse.app.service.catalog.CatalogItemService;
 import com.g42.platform.gms.warehouse.app.service.catalog.WarehouseService;
 import com.g42.platform.gms.warehouse.domain.entity.*;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,40 +23,36 @@ public class WarehouseController {
     private WarehouseService warehouseService;
     @Autowired
     private CatalogItemService catalogItemService;
+
+    // ─── Catalog master data (giữ nguyên, không thêm auth để không breaking change) ───
+
     @GetMapping("/brand/all")
     public ResponseEntity<ApiResponse<List<BrandHintDto>>> getAllBrands() {
-        List<BrandHintDto> promotionCreateDtoList = catalogItemService.getAllBrands();
-        return ResponseEntity.ok(ApiResponses.success(promotionCreateDtoList));
+        return ResponseEntity.ok(ApiResponses.success(catalogItemService.getAllBrands()));
     }
     @GetMapping("/product-line/all")
     public ResponseEntity<ApiResponse<List<ProductLineDto>>> getAllProductLines() {
-        List<ProductLineDto> promotionCreateDtoList = catalogItemService.getAllProductLines();
-        return ResponseEntity.ok(ApiResponses.success(promotionCreateDtoList));
+        return ResponseEntity.ok(ApiResponses.success(catalogItemService.getAllProductLines()));
     }
     @GetMapping("/specification/all")
     public ResponseEntity<ApiResponse<List<SpecificationDto>>> getAllSpecs() {
-        List<SpecificationDto> promotionCreateDtoList = catalogItemService.getAllSpecs();
-        return ResponseEntity.ok(ApiResponses.success(promotionCreateDtoList));
+        return ResponseEntity.ok(ApiResponses.success(catalogItemService.getAllSpecs()));
     }
     @GetMapping("/specification/all/{CatalogItemId}")
     public ResponseEntity<ApiResponse<List<SpecificationDto>>> getAllSpecsById(@PathVariable Integer CatalogItemId) {
-        List<SpecificationDto> promotionCreateDtoList = catalogItemService.getAllSpecsById(CatalogItemId);
-        return ResponseEntity.ok(ApiResponses.success(promotionCreateDtoList));
+        return ResponseEntity.ok(ApiResponses.success(catalogItemService.getAllSpecsById(CatalogItemId)));
     }
     @GetMapping("/spec-attribute/all")
     public ResponseEntity<ApiResponse<List<SpecAttributeDto>>> getAllSpecAttributes() {
-        List<SpecAttributeDto> promotionCreateDtoList = catalogItemService.getAllSpecAttributes();
-        return ResponseEntity.ok(ApiResponses.success(promotionCreateDtoList));
+        return ResponseEntity.ok(ApiResponses.success(catalogItemService.getAllSpecAttributes()));
     }
     @GetMapping("/spec-attribute/{attributeId}")
     public ResponseEntity<ApiResponse<SpecAttributeDto>> getSpecsAttributeById(@PathVariable Integer attributeId) {
-        SpecAttributeDto specAttributeDto = catalogItemService.getSpecsAttributeById(attributeId);
-        return ResponseEntity.ok(ApiResponses.success(specAttributeDto));
+        return ResponseEntity.ok(ApiResponses.success(catalogItemService.getSpecsAttributeById(attributeId)));
     }
     @GetMapping("/item-categoy/all")
     public ResponseEntity<ApiResponse<List<WorkCategoryHintDto>>> getAllItemCategory() {
-        List<WorkCategoryHintDto> promotionCreateDtoList = catalogItemService.getAllItemCategory();
-        return ResponseEntity.ok(ApiResponses.success(promotionCreateDtoList));
+        return ResponseEntity.ok(ApiResponses.success(catalogItemService.getAllItemCategory()));
     }
     @PostMapping("/brand/create")
     public ResponseEntity<ApiResponse<Brand>> createBrand(@RequestBody Brand brand) {
@@ -82,19 +82,74 @@ public class WarehouseController {
     public ResponseEntity<ApiResponse<SpecAttribute>> createSpecAttribute(@RequestBody SpecAttribute specAttribute) {
         return ResponseEntity.ok(ApiResponses.success(catalogItemService.saveSpecAttribute(specAttribute)));
     }
+
+    // ─── Warehouse CRUD ───────────────────────────────────────────────────────
+
+    /**
+     * Danh sách tất cả kho.
+     * WAREHOUSE_KEEPER / WAREHOUSE_MANAGER / MANAGER / ADMIN đều được xem.
+     */
     @GetMapping("/warehouse/all")
-    public ResponseEntity<ApiResponse<List<WarehouseDto>>> getAllWarehouse() {
-        List<WarehouseDto> promotionCreateDtoList = catalogItemService.getAllWarehouse();
-        return ResponseEntity.ok(ApiResponses.success(promotionCreateDtoList));
+    @PreAuthorize("hasAnyRole('WAREHOUSE_KEEPER','WAREHOUSE_MANAGER','MANAGER','ADMIN')")
+    public ResponseEntity<ApiResponse<List<WarehouseDto>>> getAllWarehouse(
+            @RequestParam(required = false) Boolean isActive) {
+        return ResponseEntity.ok(ApiResponses.success(warehouseService.listWarehouses(isActive)));
+    }
+
+    /** Chi tiết 1 kho. */
+    @GetMapping("/warehouse/{id}")
+    @PreAuthorize("hasAnyRole('WAREHOUSE_KEEPER','WAREHOUSE_MANAGER','MANAGER','ADMIN')")
+    public ResponseEntity<ApiResponse<WarehouseDto>> getWarehouse(@PathVariable Integer id) {
+        return ResponseEntity.ok(ApiResponses.success(warehouseService.getWarehouse(id)));
     }
 
     /**
-     * Tạo kho hàng lỗi (DEFECTIVE) cho một chi nhánh.
-     * 
-     * @param branchWarehouseId - ID kho chi nhánh chính (parent warehouse)
-     * @return Thông tin kho DEFECTIVE vừa tạo
+     * Tạo kho mới (MASTER / BRANCH / DEFECTIVE).
+     * Chỉ WAREHOUSE_MANAGER / MANAGER / ADMIN.
      */
+    @PostMapping("/warehouse")
+    @PreAuthorize("hasAnyRole('WAREHOUSE_MANAGER','MANAGER','ADMIN')")
+    public ResponseEntity<ApiResponse<WarehouseDto>> createWarehouse(
+            @Valid @RequestBody CreateWarehouseRequest request) {
+        return ResponseEntity.ok(ApiResponses.success(warehouseService.createWarehouse(request)));
+    }
+
+    /**
+     * Cập nhật tên / địa chỉ / manager của kho.
+     * Chỉ WAREHOUSE_MANAGER / MANAGER / ADMIN.
+     */
+    @PutMapping("/warehouse/{id}")
+    @PreAuthorize("hasAnyRole('WAREHOUSE_MANAGER','MANAGER','ADMIN')")
+    public ResponseEntity<ApiResponse<WarehouseDto>> updateWarehouse(
+            @PathVariable Integer id,
+            @Valid @RequestBody UpdateWarehouseRequest request) {
+        return ResponseEntity.ok(ApiResponses.success(warehouseService.updateWarehouse(id, request)));
+    }
+
+    /**
+     * Bật kho (isActive = true).
+     * Chỉ WAREHOUSE_MANAGER / MANAGER / ADMIN.
+     */
+    @PostMapping("/warehouse/{id}/activate")
+    @PreAuthorize("hasAnyRole('WAREHOUSE_MANAGER','MANAGER','ADMIN')")
+    public ResponseEntity<ApiResponse<WarehouseDto>> activateWarehouse(@PathVariable Integer id) {
+        return ResponseEntity.ok(ApiResponses.success(warehouseService.setWarehouseActive(id, true)));
+    }
+
+    /**
+     * Tắt kho (isActive = false).
+     * Chỉ WAREHOUSE_MANAGER / MANAGER / ADMIN.
+     */
+    @PostMapping("/warehouse/{id}/deactivate")
+    @PreAuthorize("hasAnyRole('WAREHOUSE_MANAGER','MANAGER','ADMIN')")
+    public ResponseEntity<ApiResponse<WarehouseDto>> deactivateWarehouse(@PathVariable Integer id) {
+        return ResponseEntity.ok(ApiResponses.success(warehouseService.setWarehouseActive(id, false)));
+    }
+
+    // ─── Legacy defective endpoint (giữ nguyên để không breaking change) ─────
+
     @PostMapping("/warehouse/defective/create/{branchWarehouseId}")
+    @PreAuthorize("hasAnyRole('WAREHOUSE_MANAGER','MANAGER','ADMIN')")
     public ResponseEntity<ApiResponse<String>> createDefectiveWarehouse(@PathVariable Integer branchWarehouseId) {
         try {
             warehouseService.createDefectiveWarehouse(branchWarehouseId);
@@ -103,5 +158,4 @@ public class WarehouseController {
             return ResponseEntity.badRequest().body(ApiResponses.error("ERROR", e.getMessage()));
         }
     }
-
 }

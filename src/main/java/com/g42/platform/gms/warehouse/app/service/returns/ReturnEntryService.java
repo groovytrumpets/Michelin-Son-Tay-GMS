@@ -566,9 +566,7 @@ public class ReturnEntryService {
             if (isDefective) {
                 Warehouse defectiveWarehouse = warehouseRepo
                         .findByParentAndType(entry.getWarehouseId(), com.g42.platform.gms.common.enums.WarehouseTypeEnum.DEFECTIVE)
-                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
-                                "Chưa có kho hàng lỗi cho chi nhánh id=" + entry.getWarehouseId()
-                                + ". Vui lòng tạo kho loại DEFECTIVE trước."));
+                        .orElseGet(() -> createDefectiveWarehouse(entry.getWarehouseId()));
                 targetWarehouseId = defectiveWarehouse.getWarehouseId();
                 item.setDefectiveWarehouseId(targetWarehouseId);
             }
@@ -1309,5 +1307,31 @@ public class ReturnEntryService {
     private void validateDuplicateAllocationOnUpdate(Integer allocationId, Integer returnId) {
         // Không block update nhiều phiếu hoàn cho cùng allocationId.
         // Việc kiểm soát số lượng đã được xử lý trong validateAllocation().
+    }
+
+    /**
+     * Tự động tạo kho DEFECTIVE cho chi nhánh nếu chưa có.
+     * Kho được đặt tên theo pattern: "Kho Lỗi - {tên chi nhánh}"
+     * và code: "DEFECTIVE_{warehouseCode của chi nhánh}"
+     */
+    private Warehouse createDefectiveWarehouse(Integer parentWarehouseId) {
+        Warehouse parent = warehouseRepo.findById(parentWarehouseId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Không tìm thấy kho id=" + parentWarehouseId));
+
+        String defectiveCode = "DEFECTIVE_" + parent.getWarehouseCode();
+        String defectiveName = "Kho Lỗi - " + parent.getWarehouseName();
+
+        Warehouse defective = new Warehouse();
+        defective.setWarehouseCode(defectiveCode);
+        defective.setWarehouseName(defectiveName);
+        defective.setWarehouseType(com.g42.platform.gms.common.enums.WarehouseTypeEnum.DEFECTIVE);
+        defective.setParentWarehouseId(parentWarehouseId);
+        defective.setAddress(parent.getAddress());
+        defective.setManagerStaffId(parent.getManagerStaffId());
+        defective.setIsActive(true);
+        defective.setCreatedAt(java.time.Instant.now());
+
+        return warehouseRepo.save(defective);
     }
 }
