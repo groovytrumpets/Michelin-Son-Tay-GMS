@@ -158,6 +158,7 @@ public class PartCatalogRepoImpl implements PartCatalogRepo {
         domain.setPartNumber(jpa.getPartNumber());
         domain.setBarcode(jpa.getBarcode());
         domain.setColor(jpa.getColor());
+        domain.setCompatibleCars(jpa.getCompatibleCars());
         return domain;
     }
 
@@ -187,6 +188,7 @@ public class PartCatalogRepoImpl implements PartCatalogRepo {
         jpa.setPartNumber(domain.getPartNumber());
         jpa.setBarcode(domain.getBarcode());
         jpa.setColor(domain.getColor());
+        jpa.setCompatibleCars(domain.getCompatibleCars());
         return jpa;
     }
 }
