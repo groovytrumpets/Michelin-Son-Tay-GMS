@@ -21,4 +21,7 @@ public class ComboItemJpa {
 
     @Column(name = "quantity")
     private Integer quantity = 1;
+
+    @Column(name = "odometer_km", nullable = false)
+    private Integer odometerKm = 0;
 }

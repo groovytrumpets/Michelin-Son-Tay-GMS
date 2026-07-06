@@ -12,4 +12,5 @@ public class ComboItem {
     private Integer comboId;//service Id
     private Integer includedItemId;
     private Integer quantity;
+    private Integer odometerKm;
 }

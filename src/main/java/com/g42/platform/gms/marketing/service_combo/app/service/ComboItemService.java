@@ -22,9 +22,14 @@ public class ComboItemService {
     @Autowired
     private ComboItemDtoMapper comboItemDtoMapper;
 
-    public List<ComboResDto> getListItemByCombo(Integer catalogId) {
-        List<ComboResDto> apiResponse = comboItemRepo.getListItemByCatalog(catalogId).stream().map(comboItemDtoMapper::toDto).toList();
-        return apiResponse;
+    public List<ComboResDto> getListItemByCombo(Integer catalogId, Integer odometerKm) {
+        List<ComboItem> items = comboItemRepo.getListItemByCatalog(catalogId);
+        if (odometerKm != null) {
+            items = items.stream()
+                    .filter(item -> item.getOdometerKm() == null || item.getOdometerKm() == 0 || item.getOdometerKm().equals(odometerKm))
+                    .toList();
+        }
+        return items.stream().map(comboItemDtoMapper::toDto).toList();
     }
 
     public List<ComboCreateDto> createListItemByCatalogId(List<ComboCreateDto> comboCreateDtos, Integer catalogId) {

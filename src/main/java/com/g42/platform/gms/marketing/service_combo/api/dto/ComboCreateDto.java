@@ -11,4 +11,5 @@ public class ComboCreateDto {
     private Integer comboId;
     private Integer includedItemId;
     private Integer quantity;
+    private Integer odometerKm;
 }

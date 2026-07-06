@@ -19,8 +19,10 @@ public class ComboItemController {
     @Autowired
     private ComboItemService comboItemService;
     @GetMapping("/{catalogId}")
-    public ResponseEntity<ApiResponse<List<ComboResDto>>> getComboByCatalogId(@PathVariable Integer catalogId){
-    List<ComboResDto> apiResponse = comboItemService.getListItemByCombo(catalogId);
+    public ResponseEntity<ApiResponse<List<ComboResDto>>> getComboByCatalogId(
+            @PathVariable Integer catalogId,
+            @RequestParam(required = false) Integer odometerKm){
+        List<ComboResDto> apiResponse = comboItemService.getListItemByCombo(catalogId, odometerKm);
         return ResponseEntity.ok(ApiResponses.success(apiResponse));
     }
     @PostMapping("/{catalogId}")
