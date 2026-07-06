@@ -45,40 +45,16 @@ public class ComboItemService {
     }
     @Transactional
     public List<ComboResDto> updateListItemByCatalogId(List<ComboResDto> comboResDto, Integer catalogId) {
-        List<ComboItem> existingComboItems = comboItemRepo.getListItemByCatalog(catalogId);
-        Map<Integer, ComboResDto> requestItemMap = comboResDto.stream().filter(Dto -> Dto.getComboItemId() !=null)
-                .collect(Collectors.toMap(ComboResDto::getComboItemId,dto ->dto ));
-        List<ComboItem> itemsToUpdate = new ArrayList<>();
-        List<ComboItem> itemsToDelete = new ArrayList<>();
+        comboItemRepo.deleteByComboId(catalogId);
 
-        //category for update or delete
-        for (ComboItem comboItem : existingComboItems) {
-            if (requestItemMap.containsKey(comboItem.getComboItemId())) {
-                ComboResDto updateItem = requestItemMap.get(comboItem.getComboItemId());
-                comboItem = comboItemDtoMapper.fromRestDto(updateItem);
-                itemsToUpdate.add(comboItem);
-            }else {
-                itemsToDelete.add(comboItem);
-            }
-        }
+        List<ComboItem> itemsToAdd = comboResDto.stream().map(dto -> {
+            ComboItem newItem = comboItemDtoMapper.toDomainRes(dto);
+            newItem.setComboId(catalogId);
+            newItem.setComboItemId(null);
+            return newItem;
+        }).collect(Collectors.toList());
 
-        //category add new
-        List<ComboItem> itemsToAdd = comboResDto.stream().filter(dto ->dto.getComboItemId()==null ).map(dto ->{
-                ComboItem newItem = comboItemDtoMapper.toDomainRes(dto);
-                newItem.setComboId(catalogId);
-                return newItem;
-                }).collect(Collectors.toList());
-
-        if (!itemsToDelete.isEmpty()) {
-            comboItemRepo.deleteAll(itemsToDelete);
-        }
-
-        comboItemRepo.saveListOfComboItems(itemsToUpdate);
         List<ComboItem> savedNewItems = comboItemRepo.saveListOfComboItems(itemsToAdd);
-        List<ComboItem> finalItems = itemsToUpdate;
-        finalItems.addAll(savedNewItems);
-        return finalItems.stream().map(comboItemDtoMapper::toDto).toList();
-
-
+        return savedNewItems.stream().map(comboItemDtoMapper::toDto).toList();
     }
 }

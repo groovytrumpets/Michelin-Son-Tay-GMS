@@ -10,4 +10,5 @@ import java.util.List;
 @Repository
 public interface ComboItemRepoJpa extends JpaRepository<ComboItemJpa,Integer> {
     List<ComboItemJpa> findAllByComboId(Integer comboId);
+    void deleteByComboId(Integer comboId);
 }

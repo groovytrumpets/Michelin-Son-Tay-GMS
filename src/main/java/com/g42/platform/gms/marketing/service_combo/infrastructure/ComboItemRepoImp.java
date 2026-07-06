@@ -41,4 +41,9 @@ public class ComboItemRepoImp implements ComboItemRepo {
         List<ComboItemJpa> comboItemJpas = itemsToDelete.stream().map(comboItemJpaMapper::toJpa).toList();
         comboItemRepoJpa.deleteAll(comboItemJpas);
     }
+
+    @Override
+    public void deleteByComboId(Integer comboId) {
+        comboItemRepoJpa.deleteByComboId(comboId);
+    }
 }

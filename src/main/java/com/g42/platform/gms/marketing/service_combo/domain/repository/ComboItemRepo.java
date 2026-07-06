@@ -14,4 +14,6 @@ public interface ComboItemRepo {
     List<ComboItem> saveListOfComboItems(List<ComboItem> apiResponse);
 
     void deleteAll(List<ComboItem> itemsToDelete);
+
+    void deleteByComboId(Integer comboId);
 }
