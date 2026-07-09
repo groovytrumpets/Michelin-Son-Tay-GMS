@@ -47,6 +47,8 @@ public class CatalogItemService {
     private ProductLineJpaRepo productLineJpaRepo;
     @Autowired
     private WorkCategoryJpaEntityRepo itemCategoryJpaRepo;
+    @Autowired
+    private ProductUnitJpaRepo productUnitJpaRepo;
 
     @Autowired
     private CatalogItemRepo catalogItemRepo;
@@ -470,6 +472,43 @@ public class CatalogItemService {
             itemCategoryJpaRepo.save(workCategory);
         } else {
             itemCategoryJpaRepo.deleteById(categoryId);
+        }
+    }
+
+    public List<ProductUnitJpa> getAllProductUnits() {
+        return productUnitJpaRepo.findAll();
+    }
+
+    @Transactional
+    public ProductUnitJpa createProductUnit(String unitName) {
+        String trimmed = unitName != null ? unitName.trim() : "";
+        if (trimmed.isEmpty()) {
+            throw new WarehouseException("Unit name cannot be empty", WarehouseErrorCode.INVALID_CATEGORY);
+        }
+        if (productUnitJpaRepo.existsByUnitName(trimmed)) {
+            ProductUnitJpa existing = productUnitJpaRepo.findByUnitName(trimmed);
+            if (existing.getIsActive() == 0) {
+                existing.setIsActive((byte) 1);
+                return productUnitJpaRepo.save(existing);
+            }
+            throw new WarehouseException("Unit name already exists", WarehouseErrorCode.INVALID_CATEGORY);
+        }
+        ProductUnitJpa unit = new ProductUnitJpa();
+        unit.setUnitName(trimmed);
+        unit.setIsActive((byte) 1);
+        return productUnitJpaRepo.save(unit);
+    }
+
+    @Transactional
+    public void deleteProductUnit(Integer unitId) {
+        ProductUnitJpa unit = productUnitJpaRepo.findById(unitId)
+                .orElseThrow(() -> new WarehouseException("Unit not found", WarehouseErrorCode.INVALID_CATEGORY));
+        boolean isUsed = catalogItemJpaRepo.existsByUnit(unit.getUnitName());
+        if (isUsed) {
+            unit.setIsActive((byte) 0);
+            productUnitJpaRepo.save(unit);
+        } else {
+            productUnitJpaRepo.deleteById(unitId);
         }
     }
 }

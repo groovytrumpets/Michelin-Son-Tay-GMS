@@ -20,4 +20,6 @@ public interface CatalogItemJpaRepo extends JpaRepository<CatalogItemJpa,Integer
     boolean existsByProductLineId(Integer productLineId);
 
     boolean existsByWorkCategoryId(Integer workCategoryId);
+
+    boolean existsByUnit(String unit);
 }
