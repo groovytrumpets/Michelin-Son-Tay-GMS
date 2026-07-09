@@ -1,6 +1,7 @@
 package com.g42.platform.gms.estimation.app.service;
 
 import com.g42.platform.gms.auth.entity.StaffPrincipal;
+import com.g42.platform.gms.estimation.api.dto.InactiveCustomerDto;
 import com.g42.platform.gms.estimation.api.dto.RemindReason;
 import com.g42.platform.gms.estimation.api.dto.RemindSearchDto;
 import com.g42.platform.gms.estimation.api.dto.ReminderCreateDto;
@@ -69,8 +70,14 @@ public class ReminderService {
         return reminderDtoMapper.toResDto(reminder);
     }
 
-    public Page<RemindSearchDto> searchReminders(int page, int size, LocalDateTime date, String status, String search, String sortBy) {
-        return remindRepo.searchReminders(page,size,date,status,search,sortBy);
+    public Page<RemindSearchDto> searchReminders(int page, int size, LocalDateTime date, String status, String search, String phone, String sortBy) {
+        return remindRepo.searchReminders(page,size,date,status,search,phone,sortBy);
 
+    }
+
+    public List<InactiveCustomerDto> getInactiveCustomers(int minDays, int maxDays) {
+        LocalDateTime endDate = LocalDateTime.now().minusDays(minDays);
+        LocalDateTime startDate = LocalDateTime.now().minusDays(maxDays);
+        return remindRepo.findInactiveCustomers(startDate, endDate);
     }
 }

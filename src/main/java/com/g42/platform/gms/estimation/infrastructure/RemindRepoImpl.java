@@ -1,5 +1,6 @@
 package com.g42.platform.gms.estimation.infrastructure;
 
+import com.g42.platform.gms.estimation.api.dto.InactiveCustomerDto;
 import com.g42.platform.gms.estimation.api.dto.RemindSearchDto;
 import com.g42.platform.gms.estimation.domain.entity.ServiceReminder;
 import com.g42.platform.gms.estimation.domain.exception.EstimateErrorCode;
@@ -77,7 +78,7 @@ public class RemindRepoImpl implements RemindRepo {
     }
 
     @Override
-    public Page<RemindSearchDto> searchReminders(int page, int size, LocalDateTime date, String status, String search, String sortBy) {
+    public Page<RemindSearchDto> searchReminders(int page, int size, LocalDateTime date, String status, String search, String phone, String sortBy) {
         Sort.Direction direction = Sort.Direction.DESC;
         if (sortBy != null && !sortBy.isEmpty()) {
             if (sortBy.equalsIgnoreCase("asc")) {
@@ -93,6 +94,11 @@ public class RemindRepoImpl implements RemindRepo {
         LocalDate datePart = (date != null) ? date.toLocalDate() : null;
 
         // 3. Gọi thẳng Repository lấy kết quả
-        return serviceRemindJpaRepo.searchAllCustom(status, datePart, search, pageable);
+        return serviceRemindJpaRepo.searchAllCustom(status, datePart, search, phone, pageable);
+    }
+
+    @Override
+    public List<InactiveCustomerDto> findInactiveCustomers(LocalDateTime startDate, LocalDateTime endDate) {
+        return serviceRemindJpaRepo.findInactiveCustomers(startDate, endDate);
     }
 }

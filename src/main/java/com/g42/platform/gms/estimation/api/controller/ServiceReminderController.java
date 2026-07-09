@@ -5,6 +5,7 @@ import com.g42.platform.gms.booking_management.api.dto.confirmed.BookedRespond;
 import com.g42.platform.gms.booking_management.domain.enums.BookingEnum;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
+import com.g42.platform.gms.estimation.api.dto.InactiveCustomerDto;
 import com.g42.platform.gms.estimation.api.dto.RemindReason;
 import com.g42.platform.gms.estimation.api.dto.RemindSearchDto;
 import com.g42.platform.gms.estimation.api.dto.ReminderCreateDto;
@@ -76,11 +77,18 @@ public class ServiceReminderController {
                                                                               @RequestParam(required = false) LocalDateTime date,
                                                                               @RequestParam(required = false) String status,
                                                                               @RequestParam(required = false) String search,
+                                                                              @RequestParam(required = false) String phone,
                                                                               @RequestParam(required = false) String sortBy){
-        Page<RemindSearchDto> apiResponse = reminderService.searchReminders(page,size,date,status,search,sortBy);
+        Page<RemindSearchDto> apiResponse = reminderService.searchReminders(page,size,date,status,search,phone,sortBy);
         return ResponseEntity.ok(ApiResponses.success(apiResponse));
     }
 
-
-
+    @GetMapping("/inactive-customers")
+    public ResponseEntity<ApiResponse<List<InactiveCustomerDto>>> getInactiveCustomers(
+            @RequestParam(defaultValue = "30") int minDays,
+            @RequestParam(defaultValue = "60") int maxDays){
+        List<InactiveCustomerDto> inactive = reminderService.getInactiveCustomers(minDays, maxDays);
+        return ResponseEntity.ok(ApiResponses.success(inactive));
+    }
 }
+
