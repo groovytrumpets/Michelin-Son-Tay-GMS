@@ -15,6 +15,8 @@ public interface ProductLineJpaRepo extends JpaRepository<ProductLineJpa,Integer
     ProductLineJpa findByLineName(String lineName);
 
     ProductLineJpa findByLineNameContainsIgnoreCase(String lineName);
+
+    boolean existsByBrandId(Integer brandId);
     interface ProductLineProjection {
         Integer getProductLineId();
         String getLineName();

@@ -65,6 +65,7 @@ public class WarehouseInternalApiImpl implements WarehouseInternalApi {
             throw new WarehouseException("Catalog already have service id", WarehouseErrorCode.CATALOG_404);
         }
         catalogItemJpa.setServiceId(serviceSaved.getServiceId());
+        catalogItemRepo.save(catalogItemJpa);
         System.out.println("DEBUG: catalogItem ID: " + catalogItemJpa.getServiceId()+" Saved wth serviceId: " + serviceSaved.getServiceId());
     }
 

@@ -156,7 +156,10 @@ public class CatalogItemRepoImpl implements CatalogItemRepo {
     @Override
     public List<WorkCategory> getAllItemCategory() {
         List<WorkCategoryJpaEntity> itemCategoryJpas = itemCategoryJpaRepo.findAll();
-        return itemCategoryJpas.stream().map(itemCategoryJpaMapper::toDomain).toList();
+        return itemCategoryJpas.stream()
+                .filter(c -> c.getIsActive() == null || c.getIsActive())
+                .map(itemCategoryJpaMapper::toDomain)
+                .toList();
     }
 
     @Override
