@@ -522,7 +522,7 @@ public class ServiceTicketManageService {
             throw new AssignmentException("CustomerId or VehicleId are null!",AssignmentErrorCode.BAD_REQUEST);
         }
         List<ServiceTicket> serviceTickets = serviceTicketRepo.findByCustomerId(customerId);
-        return serviceTickets.stream().map(serviceTicketDtoMapper::toDto).toList();
+        return serviceTickets.stream().map(this::mapToListResponse).toList();
     }
 }
 

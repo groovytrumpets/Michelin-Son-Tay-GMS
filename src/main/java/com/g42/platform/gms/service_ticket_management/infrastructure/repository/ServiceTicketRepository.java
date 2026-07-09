@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import org.springframework.data.repository.query.Param;
+
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -68,4 +70,7 @@ public interface ServiceTicketRepository extends JpaRepository<ServiceTicketJpa,
     List<ServiceTicketJpa> findAllByCustomerIdAndVehicleIdOrderByReceivedAtDesc(Integer customerId, Integer vehicleId);
 
     List<ServiceTicketJpa> findAllByCustomerIdOrderByReceivedAtDesc(Integer customerId);
+
+    @Query("select count(st) from ServiceTicketManagement st where st.customerId = :customerId and (st.isDeleted is null or st.isDeleted = false)")
+    long countActiveTicketsByCustomerId(@Param("customerId") Integer customerId);
 }

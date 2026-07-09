@@ -1,5 +1,6 @@
 package com.g42.platform.gms.booking.customer.api.controller;
 
+import com.g42.platform.gms.service_ticket_management.infrastructure.repository.ServiceTicketRepository;
 import com.g42.platform.gms.auth.dto.CustomerLookupResponse;
 import com.g42.platform.gms.auth.entity.CustomerProfile;
 import com.g42.platform.gms.auth.entity.StaffPrincipal;
@@ -37,6 +38,7 @@ public class StaffBookingController {
     private final BookingService bookingService;
     private final BookingDtoMapper dtoMapper;
     private final CustomerProfileRepository customerRepository;
+    private final ServiceTicketRepository serviceTicketRepository;
 
     /**
      * Lookup customer info bằng số điện thoại
@@ -55,12 +57,14 @@ public class StaffBookingController {
         
         CustomerLookupResponse response;
         if (customer != null) {
+            long count = serviceTicketRepository.countActiveTicketsByCustomerId(customer.getCustomerId());
             response = new CustomerLookupResponse(
                     customer.getCustomerId(),
                     customer.getPhone(),
                     customer.getFullName(),
                     customer.getEmail(),
-                    true
+                    true,
+                    count
             );
         } else {
             response = new CustomerLookupResponse(

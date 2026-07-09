@@ -1,5 +1,6 @@
 package com.g42.platform.gms.estimation.domain.repository;
 
+import com.g42.platform.gms.estimation.api.dto.InactiveCustomerDto;
 import com.g42.platform.gms.estimation.api.dto.RemindSearchDto;
 import com.g42.platform.gms.estimation.domain.entity.ServiceReminder;
 import org.springframework.data.domain.Page;
@@ -22,5 +23,7 @@ public interface RemindRepo {
 
     ServiceReminder updateStatusRemind(Integer remindId, String status, String reason);
 
-    Page<RemindSearchDto> searchReminders(int page, int size, LocalDateTime date, String status, String search, String sortBy);
+    Page<RemindSearchDto> searchReminders(int page, int size, LocalDateTime date, String status, String search, String phone, String sortBy);
+
+    List<InactiveCustomerDto> findInactiveCustomers(LocalDateTime startDate, LocalDateTime endDate);
 }
