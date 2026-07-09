@@ -14,4 +14,10 @@ public interface CatalogItemJpaRepo extends JpaRepository<CatalogItemJpa,Integer
     List<CatalogItemJpa> findByItemType(CatalogItemType itemType);
 
     List<CatalogItemJpa> findByItemTypeAndItemIdIn(CatalogItemType itemType, List<Integer> ids);
+
+    boolean existsByBrandId(Integer brandId);
+
+    boolean existsByProductLineId(Integer productLineId);
+
+    boolean existsByWorkCategoryId(Integer workCategoryId);
 }

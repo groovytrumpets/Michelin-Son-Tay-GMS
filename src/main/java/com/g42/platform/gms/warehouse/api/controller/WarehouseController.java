@@ -74,6 +74,21 @@ public class WarehouseController {
     public ResponseEntity<ApiResponse<WorkCategory>> createItemCategory(@RequestBody WorkCategory itemCategory) {
         return ResponseEntity.ok(ApiResponses.success(catalogItemService.saveItemCate(itemCategory)));
     }
+    @DeleteMapping("/brand/{brandId}")
+    public ResponseEntity<ApiResponse<Void>> deleteBrand(@PathVariable Integer brandId) {
+        catalogItemService.deleteBrand(brandId);
+        return ResponseEntity.ok(ApiResponses.success(null));
+    }
+    @DeleteMapping("/product-line/{productLineId}")
+    public ResponseEntity<ApiResponse<Void>> deleteProductLine(@PathVariable Integer productLineId) {
+        catalogItemService.deleteProductLine(productLineId);
+        return ResponseEntity.ok(ApiResponses.success(null));
+    }
+    @DeleteMapping("/item-category/{categoryId}")
+    public ResponseEntity<ApiResponse<Void>> deleteItemCategory(@PathVariable Integer categoryId) {
+        catalogItemService.deleteItemCategory(categoryId);
+        return ResponseEntity.ok(ApiResponses.success(null));
+    }
     @PostMapping("/specs/create")
     public ResponseEntity<ApiResponse<Specification>> createSpec(@RequestBody Specification specification) {
         return ResponseEntity.ok(ApiResponses.success(catalogItemService.saveSpecs(specification)));

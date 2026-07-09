@@ -21,6 +21,8 @@ import com.g42.platform.gms.warehouse.domain.repository.WarehousePricingRepo;
 import com.g42.platform.gms.warehouse.infrastructure.entity.InventoryJpa;
 import com.g42.platform.gms.warehouse.infrastructure.entity.StockEntryItemJpa;
 import com.g42.platform.gms.warehouse.domain.entity.WarehousePricing;
+import com.g42.platform.gms.warehouse.infrastructure.repository.*;
+import com.g42.platform.gms.warehouse.infrastructure.entity.*;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Optional;
@@ -37,6 +39,14 @@ public class CatalogItemService {
     private StockEntryItemJpaRepo stockEntryItemJpaRepo;
     @Autowired
     private WarehousePricingRepo warehousePricingRepo;
+    @Autowired
+    private CatalogItemJpaRepo catalogItemJpaRepo;
+    @Autowired
+    private BrandJpaRepo brandJpaRepo;
+    @Autowired
+    private ProductLineJpaRepo productLineJpaRepo;
+    @Autowired
+    private WorkCategoryJpaEntityRepo itemCategoryJpaRepo;
 
     @Autowired
     private CatalogItemRepo catalogItemRepo;
@@ -421,6 +431,46 @@ public class CatalogItemService {
 
         CatalogItem saved = catalogItemRepo.saveCatalogItem(catalogItem);
         return catalogDtoMapper.toDto(saved);
+    }
+
+    @Transactional
+    public void deleteBrand(Integer brandId) {
+        boolean hasProductLines = productLineJpaRepo.existsByBrandId(brandId);
+        boolean hasCatalogItems = catalogItemJpaRepo.existsByBrandId(brandId);
+        if (hasProductLines || hasCatalogItems) {
+            BrandJpa brandJpa = brandJpaRepo.findById(brandId)
+                    .orElseThrow(() -> new WarehouseException("Brand not found", WarehouseErrorCode.INVALID_BRAND));
+            brandJpa.setIsActive((byte) 0);
+            brandJpaRepo.save(brandJpa);
+        } else {
+            brandJpaRepo.deleteById(brandId);
+        }
+    }
+
+    @Transactional
+    public void deleteProductLine(Integer productLineId) {
+        boolean hasCatalogItems = catalogItemJpaRepo.existsByProductLineId(productLineId);
+        if (hasCatalogItems) {
+            ProductLineJpa productLineJpa = productLineJpaRepo.findById(productLineId)
+                    .orElseThrow(() -> new WarehouseException("Product line not found", WarehouseErrorCode.INVALID_PRODUCT_LINE));
+            productLineJpa.setIsActive((byte) 0);
+            productLineJpaRepo.save(productLineJpa);
+        } else {
+            productLineJpaRepo.deleteById(productLineId);
+        }
+    }
+
+    @Transactional
+    public void deleteItemCategory(Integer categoryId) {
+        boolean hasCatalogItems = catalogItemJpaRepo.existsByWorkCategoryId(categoryId);
+        if (hasCatalogItems) {
+            WorkCategoryJpaEntity workCategory = itemCategoryJpaRepo.findById(categoryId)
+                    .orElseThrow(() -> new WarehouseException("Category not found", WarehouseErrorCode.INVALID_CATEGORY));
+            workCategory.setIsActive(false);
+            itemCategoryJpaRepo.save(workCategory);
+        } else {
+            itemCategoryJpaRepo.deleteById(categoryId);
+        }
     }
 }
 
