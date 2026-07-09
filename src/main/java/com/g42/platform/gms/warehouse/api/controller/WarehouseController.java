@@ -8,6 +8,7 @@ import com.g42.platform.gms.warehouse.api.dto.request.UpdateWarehouseRequest;
 import com.g42.platform.gms.warehouse.app.service.catalog.CatalogItemService;
 import com.g42.platform.gms.warehouse.app.service.catalog.WarehouseService;
 import com.g42.platform.gms.warehouse.domain.entity.*;
+import com.g42.platform.gms.warehouse.infrastructure.entity.ProductUnitJpa;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -87,6 +88,19 @@ public class WarehouseController {
     @DeleteMapping("/item-category/{categoryId}")
     public ResponseEntity<ApiResponse<Void>> deleteItemCategory(@PathVariable Integer categoryId) {
         catalogItemService.deleteItemCategory(categoryId);
+        return ResponseEntity.ok(ApiResponses.success(null));
+    }
+    @GetMapping("/units")
+    public ResponseEntity<ApiResponse<List<ProductUnitJpa>>> getAllUnits() {
+        return ResponseEntity.ok(ApiResponses.success(catalogItemService.getAllProductUnits()));
+    }
+    @PostMapping("/units")
+    public ResponseEntity<ApiResponse<ProductUnitJpa>> createUnit(@RequestParam String unitName) {
+        return ResponseEntity.ok(ApiResponses.success(catalogItemService.createProductUnit(unitName)));
+    }
+    @DeleteMapping("/units/{unitId}")
+    public ResponseEntity<ApiResponse<Void>> deleteUnit(@PathVariable Integer unitId) {
+        catalogItemService.deleteProductUnit(unitId);
         return ResponseEntity.ok(ApiResponses.success(null));
     }
     @PostMapping("/specs/create")
