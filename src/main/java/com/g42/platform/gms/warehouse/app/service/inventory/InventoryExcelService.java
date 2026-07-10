@@ -425,6 +425,7 @@ public class InventoryExcelService {
                         .quantity(qty)
                         .importPrice(importPrice)
                         .markupMultiplier(markup)
+                        .markupMultiplierWholesale(markup)
                         .remainingQuantity(qty)
                         .notes(notes)
                         .build();

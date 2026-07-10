@@ -268,12 +268,20 @@ public class CatalogItemService {
             }
             warehouseDetailDto.setSellingPrice(selinPrice);
             warehouseDetailDto.setNotify(pricingResolve.getNotify());
+
+            PricingResolve pricingResolveWholesale = pricingService.getEffectivePriceWholesale(catalogItem.getItemId(),warehouseDetailDto.getWarehouseId(),catalogItem.getPrice());
+            BigDecimal selinPriceWholesale = pricingResolveWholesale != null ? pricingResolveWholesale.getFinalPrice() : BigDecimal.ZERO;
+            warehouseDetailDto.setSellingPriceWholesale(selinPriceWholesale);
+
             Optional<WarehousePricing> pricingOpt = warehousePricingRepo.findByItemIdAndWarehouseId(catalogItem.getItemId(), warehouseDetailDto.getWarehouseId());
             warehouseDetailDto.setHasCustomPricing(pricingOpt.isPresent());
 
             List<WarehouseLotDto> lots = stockEntryItemJpaRepo.findWarehouseLots(warehouseDetailDto.getWarehouseId(), catalogItem.getItemId());
             BigDecimal warehouseSellingPrice = warehousePricingRepo.findActiveByWarehouseAndItem(warehouseDetailDto.getWarehouseId(), catalogItem.getItemId())
                     .map(WarehousePricing::getSellingPrice)
+                    .orElse(null);
+            BigDecimal warehouseSellingPriceWholesale = warehousePricingRepo.findActiveByWarehouseAndItem(warehouseDetailDto.getWarehouseId(), catalogItem.getItemId())
+                    .map(WarehousePricing::getSellingPriceWholesale)
                     .orElse(null);
 
             for (WarehouseLotDto lot : lots) {
@@ -288,6 +296,18 @@ public class CatalogItemService {
                     lotSellingPrice = catalogItem.getPrice() != null ? catalogItem.getPrice() : BigDecimal.ZERO;
                 }
                 lot.setSellingPrice(lotSellingPrice);
+
+                BigDecimal lotSellingPriceWholesale;
+                if (warehouseSellingPriceWholesale != null && warehouseSellingPriceWholesale.compareTo(BigDecimal.ZERO) > 0) {
+                    lotSellingPriceWholesale = warehouseSellingPriceWholesale;
+                } else if (lot.getImportPrice() != null && lot.getImportPrice().compareTo(BigDecimal.ZERO) > 0) {
+                    lotSellingPriceWholesale = lot.getImportPrice()
+                            .multiply(lot.getMarkupMultiplierWholesale() != null ? lot.getMarkupMultiplierWholesale() : lot.getMarkupMultiplier() != null ? lot.getMarkupMultiplier() : BigDecimal.ONE)
+                            .setScale(2, java.math.RoundingMode.HALF_UP);
+                } else {
+                    lotSellingPriceWholesale = catalogItem.getPrice() != null ? catalogItem.getPrice() : BigDecimal.ZERO;
+                }
+                lot.setSellingPriceWholesale(lotSellingPriceWholesale);
             }
             warehouseDetailDto.setLots(lots);
         }
@@ -422,6 +442,13 @@ public class CatalogItemService {
                                 } else if (lotDto.getSellingPrice() != null && lotJpa.getImportPrice() != null && lotJpa.getImportPrice().compareTo(BigDecimal.ZERO) > 0) {
                                     BigDecimal multiplier = lotDto.getSellingPrice().divide(lotJpa.getImportPrice(), 4, java.math.RoundingMode.HALF_UP);
                                     lotJpa.setMarkupMultiplier(multiplier);
+                                }
+
+                                if (lotDto.getMarkupMultiplierWholesale() != null) {
+                                    lotJpa.setMarkupMultiplierWholesale(lotDto.getMarkupMultiplierWholesale());
+                                } else if (lotDto.getSellingPriceWholesale() != null && lotJpa.getImportPrice() != null && lotJpa.getImportPrice().compareTo(BigDecimal.ZERO) > 0) {
+                                    BigDecimal multiplierWholesale = lotDto.getSellingPriceWholesale().divide(lotJpa.getImportPrice(), 4, java.math.RoundingMode.HALF_UP);
+                                    lotJpa.setMarkupMultiplierWholesale(multiplierWholesale);
                                 }
                                 stockEntryItemJpaRepo.save(lotJpa);
                             }

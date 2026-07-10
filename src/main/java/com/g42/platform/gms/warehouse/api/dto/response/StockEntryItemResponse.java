@@ -12,6 +12,7 @@ public class StockEntryItemResponse {
     private Integer quantity;
     private BigDecimal importPrice;
     private BigDecimal markupMultiplier;
+    private BigDecimal markupMultiplierWholesale;
     private Integer remainingQuantity;
     private String notes;
 }

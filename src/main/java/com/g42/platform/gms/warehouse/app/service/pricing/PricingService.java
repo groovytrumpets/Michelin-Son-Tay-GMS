@@ -58,4 +58,27 @@ public class PricingService {
         pricingResolve.setNotify("Không tìm thấy giá phù hợp trong cơ sở dữ liệu");
         return pricingResolve;
     }
+
+    public PricingResolve getEffectivePriceWholesale(Integer itemId, Integer warehouseId, BigDecimal price) {
+        PricingResolve pricingResolve = new PricingResolve();
+        // 1. Ưu tiên warehouse_pricing (manager set)
+        WarehousePricing warehousePricing = warehousePricingRepo
+                .findByItemIdAndWarehouseId(itemId, warehouseId).orElse(null);
+        if (warehousePricing != null && warehousePricing.getSellingPriceWholesale() != null
+                && warehousePricing.getSellingPriceWholesale().compareTo(BigDecimal.ZERO) > 0) {
+            pricingResolve.setFinalPrice(warehousePricing.getSellingPriceWholesale());
+            pricingResolve.setNotify("Đang dùng giá cài đặt sẵn");
+            return pricingResolve;
+        }
+
+        // 2. Fallback: giá nhập mới nhất từ lô với wholesale multiplier
+        BigDecimal finalPrice = stockEntryService.findLatesFallBackPriceWholesale(itemId, warehouseId);
+        if (finalPrice != null && finalPrice.compareTo(BigDecimal.ZERO) > 0) {
+            pricingResolve.setFinalPrice(finalPrice);
+            return pricingResolve;
+        }
+
+        // 3. Fallback to retail pricing resolve if wholesale is not set
+        return getEffectivePrice(itemId, warehouseId, price);
+    }
 }

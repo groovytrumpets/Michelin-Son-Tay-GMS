@@ -119,6 +119,7 @@ public class StockEntryRepoImpl implements StockEntryRepo {
                 .quantity(jpa.getQuantity())
                 .importPrice(jpa.getImportPrice())
                 .markupMultiplier(jpa.getMarkupMultiplier())
+                .markupMultiplierWholesale(jpa.getMarkupMultiplierWholesale())
                 .remainingQuantity(jpa.getRemainingQuantity())
                 .notes(jpa.getNotes())
                 .build();
@@ -134,6 +135,8 @@ public class StockEntryRepoImpl implements StockEntryRepo {
         jpa.setImportPrice(domain.getImportPrice());
         jpa.setMarkupMultiplier(domain.getMarkupMultiplier() != null
                 ? domain.getMarkupMultiplier() : BigDecimal.ONE);
+        jpa.setMarkupMultiplierWholesale(domain.getMarkupMultiplierWholesale() != null
+                ? domain.getMarkupMultiplierWholesale() : BigDecimal.ONE);
         jpa.setRemainingQuantity(domain.getRemainingQuantity() != null
                 ? domain.getRemainingQuantity() : 0);
         jpa.setNotes(domain.getNotes());
@@ -335,6 +338,11 @@ public class StockEntryRepoImpl implements StockEntryRepo {
     @Override
     public BigDecimal findLatesFallBackPrice(Integer itemId, Integer warehouseId) {
         return jpaRepo.findLatesFallBackPrice(itemId, warehouseId).orElse(null);
+    }
+
+    @Override
+    public BigDecimal findLatesFallBackPriceWholesale(Integer itemId, Integer warehouseId) {
+        return jpaRepo.findLatesFallBackPriceWholesale(itemId, warehouseId).orElse(null);
     }
 
     /** SQL: SELECT * FROM stock_entry WHERE entry_code = ? */

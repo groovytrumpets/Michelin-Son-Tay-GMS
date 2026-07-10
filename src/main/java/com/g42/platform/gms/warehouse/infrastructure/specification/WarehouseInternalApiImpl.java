@@ -139,4 +139,16 @@ public class WarehouseInternalApiImpl implements WarehouseInternalApi {
         }
             return BigDecimal.ZERO;
     }
+
+    @Override
+    public BigDecimal findLatesFallBackPriceWholesale(Integer itemId, Integer warehouseId) {
+        PricingResolve pricingResolve = pricingService.getEffectivePriceWholesale(itemId,warehouseId,null);
+        if (pricingResolve == null) {
+            return BigDecimal.ZERO;
+        }
+        if (pricingResolve.getFinalPrice() != null) {
+            return pricingResolve.getFinalPrice();
+        }
+        return BigDecimal.ZERO;
+    }
 }

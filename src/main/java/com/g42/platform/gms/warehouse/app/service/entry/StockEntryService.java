@@ -312,6 +312,7 @@ public class StockEntryService {
         }
         if (request.getImportPrice() != null) item.setImportPrice(request.getImportPrice());
         if (request.getMarkupMultiplier() != null) item.setMarkupMultiplier(request.getMarkupMultiplier());
+        if (request.getMarkupMultiplierWholesale() != null) item.setMarkupMultiplierWholesale(request.getMarkupMultiplierWholesale());
         if (request.getNotes() != null) item.setNotes(request.getNotes());
 
         stockEntryRepo.saveItem(item);
@@ -422,6 +423,10 @@ public class StockEntryService {
         return stockEntryRepo.findLatesFallBackPrice(itemId, warehouseId);
     }
 
+    public BigDecimal findLatesFallBackPriceWholesale(Integer itemId, Integer warehouseId) {
+        return stockEntryRepo.findLatesFallBackPriceWholesale(itemId, warehouseId);
+    }
+
     /**
      * Tăng tồn kho cho 1 item và ghi audit log.
      *
@@ -522,6 +527,7 @@ public class StockEntryService {
                     .quantity(req.getQuantity())
                     .importPrice(req.getImportPrice())
                     .markupMultiplier(req.getMarkupMultiplier() != null ? req.getMarkupMultiplier() : BigDecimal.ONE)
+                    .markupMultiplierWholesale(req.getMarkupMultiplierWholesale() != null ? req.getMarkupMultiplierWholesale() : BigDecimal.ONE)
                     .remainingQuantity(req.getQuantity()) // ban đầu = quantity, chưa xuất gì
                     .notes(req.getNotes())
                     .build());
@@ -661,6 +667,7 @@ public class StockEntryService {
             ir.setQuantity(i.getQuantity());
             ir.setImportPrice(i.getImportPrice());
             ir.setMarkupMultiplier(i.getMarkupMultiplier());
+            ir.setMarkupMultiplierWholesale(i.getMarkupMultiplierWholesale());
             ir.setRemainingQuantity(i.getRemainingQuantity()); // bao nhiêu chưa xuất kho
             ir.setNotes(i.getNotes());
             return ir;

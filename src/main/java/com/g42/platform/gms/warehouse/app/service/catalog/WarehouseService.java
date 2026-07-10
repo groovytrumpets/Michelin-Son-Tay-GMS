@@ -316,6 +316,9 @@ public class WarehouseService {
                 BigDecimal warehouseSellingPrice = warehousePricingRepo.findActiveByWarehouseAndItem(detail.getWarehouseId(), catalogItem.getItemId())
                         .map(WarehousePricing::getSellingPrice)
                         .orElse(null);
+                BigDecimal warehouseSellingPriceWholesale = warehousePricingRepo.findActiveByWarehouseAndItem(detail.getWarehouseId(), catalogItem.getItemId())
+                        .map(WarehousePricing::getSellingPriceWholesale)
+                        .orElse(null);
 
                 for (WarehouseLotDto lot : lots) {
                     BigDecimal lotSellingPrice;
@@ -329,6 +332,18 @@ public class WarehouseService {
                         lotSellingPrice = catalogItem.getPrice() != null ? catalogItem.getPrice() : BigDecimal.ZERO;
                     }
                     lot.setSellingPrice(lotSellingPrice);
+
+                    BigDecimal lotSellingPriceWholesale;
+                    if (warehouseSellingPriceWholesale != null && warehouseSellingPriceWholesale.compareTo(BigDecimal.ZERO) > 0) {
+                        lotSellingPriceWholesale = warehouseSellingPriceWholesale;
+                    } else if (lot.getImportPrice() != null && lot.getImportPrice().compareTo(BigDecimal.ZERO) > 0) {
+                        lotSellingPriceWholesale = lot.getImportPrice()
+                                .multiply(lot.getMarkupMultiplierWholesale() != null ? lot.getMarkupMultiplierWholesale() : lot.getMarkupMultiplier() != null ? lot.getMarkupMultiplier() : BigDecimal.ONE)
+                                .setScale(2, java.math.RoundingMode.HALF_UP);
+                    } else {
+                        lotSellingPriceWholesale = catalogItem.getPrice() != null ? catalogItem.getPrice() : BigDecimal.ZERO;
+                    }
+                    lot.setSellingPriceWholesale(lotSellingPriceWholesale);
                 }
                 detail.setLots(lots);
             }

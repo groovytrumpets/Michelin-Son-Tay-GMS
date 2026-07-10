@@ -33,4 +33,5 @@ public interface WarehouseInternalApi {
     Pair<Integer,String> getReturnStatusByAlloId(Integer allocationId);
 
     BigDecimal findLatesFallBackPrice(Integer itemId, Integer warehouseId);
+    BigDecimal findLatesFallBackPriceWholesale(Integer itemId, Integer warehouseId);
 }

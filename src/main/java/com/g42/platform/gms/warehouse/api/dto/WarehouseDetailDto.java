@@ -21,6 +21,7 @@ public class WarehouseDetailDto {
     private String warehouseAddress;
     private Integer itemId;
     private BigDecimal sellingPrice;
+    private BigDecimal sellingPriceWholesale;
 
 
 
