@@ -66,7 +66,9 @@ public class WarehousePricingRepoImpl implements WarehousePricingRepo {
         domain.setItemId(jpa.getItemId());
         domain.setBasePrice(jpa.getBasePrice());
         domain.setMarkupMultiplier(jpa.getMarkupMultiplier());
+        domain.setMarkupMultiplierWholesale(jpa.getMarkupMultiplierWholesale());
         domain.setSellingPrice(jpa.getSellingPrice());
+        domain.setSellingPriceWholesale(jpa.getSellingPriceWholesale());
         domain.setEffectiveFrom(jpa.getEffectiveFrom());
         domain.setEffectiveTo(jpa.getEffectiveTo());
         domain.setIsActive(jpa.getIsActive());
@@ -81,7 +83,9 @@ public class WarehousePricingRepoImpl implements WarehousePricingRepo {
         jpa.setItemId(domain.getItemId());
         jpa.setBasePrice(domain.getBasePrice());
         jpa.setMarkupMultiplier(domain.getMarkupMultiplier());
+        jpa.setMarkupMultiplierWholesale(domain.getMarkupMultiplierWholesale());
         jpa.setSellingPrice(domain.getSellingPrice());
+        jpa.setSellingPriceWholesale(domain.getSellingPriceWholesale());
         jpa.setEffectiveFrom(domain.getEffectiveFrom());
         jpa.setEffectiveTo(domain.getEffectiveTo());
         jpa.setIsActive(domain.getIsActive());

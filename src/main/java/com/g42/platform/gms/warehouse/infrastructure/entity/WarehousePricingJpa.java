@@ -39,9 +39,16 @@ public class WarehousePricingJpa {
     @Column(name = "markup_multiplier", precision = 5, scale = 2)
     private BigDecimal markupMultiplier;
 
+    @ColumnDefault("1.00")
+    @Column(name = "markup_multiplier_wholesale", precision = 5, scale = 2)
+    private BigDecimal markupMultiplierWholesale;
+
     @NotNull
     @Column(name = "selling_price", nullable = false, precision = 12, scale = 2)
     private BigDecimal sellingPrice;
+
+    @Column(name = "selling_price_wholesale", precision = 12, scale = 2)
+    private BigDecimal sellingPriceWholesale;
 
     @NotNull
     @Column(name = "effective_from", nullable = false)

@@ -27,6 +27,7 @@ public class StockEntryItemRequest {
      * Mặc định 1.0 (bán bằng giá nhập).
      */
     private BigDecimal markupMultiplier = BigDecimal.ONE;
+    private BigDecimal markupMultiplierWholesale = BigDecimal.ONE;
 
     private String notes;
 }

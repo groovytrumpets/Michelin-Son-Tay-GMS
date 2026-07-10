@@ -10,5 +10,6 @@ public class PatchEntryItemRequest {
     private Integer quantity;
     private BigDecimal importPrice;
     private BigDecimal markupMultiplier;
+    private BigDecimal markupMultiplierWholesale;
     private String notes;
 }

@@ -772,9 +772,8 @@ public class StockIssueService {
                         ? requestedDiscount
                         : discountService.resolveDiscountRate(itemId, issue.getIssueType(), needed);
 
-        BigDecimal marketSellingPrice = pricingRepo
+        WarehousePricing marketPricing = pricingRepo
                 .findActiveByWarehouseAndItem(issue.getWarehouseId(), itemId)
-                .map(WarehousePricing::getSellingPrice)
                 .orElse(null);
 
         List<StockEntryItem> lots = new ArrayList<>();
@@ -793,7 +792,7 @@ public class StockIssueService {
             int consume = Math.min(remaining, lot.getRemainingQuantity());
             if (consume <= 0) continue;
 
-            BigDecimal sellingPrice = resolveSellingPrice(marketSellingPrice, latestLot, lot, issue.getIssueType());
+            BigDecimal sellingPrice = resolveSellingPrice(marketPricing, latestLot, lot, issue.getIssueType());
 
             // final_price = giá kho thu được per unit (trước thuế, sau discount kho)
             // SERVICE_TICKET: dùng estimateUnitPrice (giá báo giá trước thuế)
@@ -842,18 +841,32 @@ public class StockIssueService {
      * 3. Lô hiện tại * markup làm fallback cuối
      * Áp dụng WHOLESALE_FACTOR (0.85) nếu là phiếu buôn.
      */
-    private BigDecimal resolveSellingPrice(BigDecimal marketPrice, StockEntryItem latestLot,
+    private BigDecimal resolveSellingPrice(WarehousePricing pricing, StockEntryItem latestLot,
                                            StockEntryItem currentLot, IssueType issueType) {
         BigDecimal price;
-        if (marketPrice != null) {
-            price = marketPrice;
-        } else if (latestLot != null) {
-            price = latestLot.getImportPrice().multiply(latestLot.getMarkupMultiplier()).setScale(2, RoundingMode.HALF_UP);
+        if (pricing != null) {
+            if (issueType == IssueType.WHOLESALE) {
+                price = (pricing.getSellingPriceWholesale() != null && pricing.getSellingPriceWholesale().compareTo(BigDecimal.ZERO) > 0)
+                        ? pricing.getSellingPriceWholesale()
+                        : pricing.getSellingPrice().multiply(WHOLESALE_FACTOR).setScale(2, RoundingMode.HALF_UP);
+            } else {
+                price = pricing.getSellingPrice();
+            }
         } else {
-            price = currentLot.getImportPrice().multiply(currentLot.getMarkupMultiplier()).setScale(2, RoundingMode.HALF_UP);
-        }
-        if (issueType == IssueType.WHOLESALE) {
-            price = price.multiply(WHOLESALE_FACTOR).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal importPrice = BigDecimal.ZERO;
+            BigDecimal multiplier = BigDecimal.ONE;
+            StockEntryItem targetLot = latestLot != null ? latestLot : currentLot;
+            if (targetLot != null) {
+                importPrice = targetLot.getImportPrice();
+                if (issueType == IssueType.WHOLESALE) {
+                    multiplier = (targetLot.getMarkupMultiplierWholesale() != null && targetLot.getMarkupMultiplierWholesale().compareTo(BigDecimal.ZERO) > 0)
+                            ? targetLot.getMarkupMultiplierWholesale()
+                            : targetLot.getMarkupMultiplier().multiply(WHOLESALE_FACTOR).setScale(4, RoundingMode.HALF_UP);
+                } else {
+                    multiplier = targetLot.getMarkupMultiplier();
+                }
+            }
+            price = importPrice.multiply(multiplier != null ? multiplier : BigDecimal.ONE).setScale(2, RoundingMode.HALF_UP);
         }
         return price;
     }
@@ -897,13 +910,12 @@ public class StockIssueService {
         BigDecimal importPrice = computeAverageImportPrice(lots, quantity);
 
         StockEntryItem latestLot = stockEntryRepo.findLatestLot(issue.getWarehouseId(), item.getItemId()).orElse(null);
-        BigDecimal marketPrice = pricingRepo.findActiveByWarehouseAndItem(issue.getWarehouseId(), item.getItemId())
-                .map(WarehousePricing::getSellingPrice).orElse(null);
+        WarehousePricing marketPricing = pricingRepo.findActiveByWarehouseAndItem(issue.getWarehouseId(), item.getItemId()).orElse(null);
 
         // Dùng lô đầu tiên làm currentLot fallback khi tính sellingPrice
         StockEntryItem firstLot = lots.isEmpty() ? null : lots.get(0);
-        BigDecimal sellingPrice = (marketPrice != null || firstLot != null)
-                ? resolveSellingPrice(marketPrice, latestLot, firstLot != null ? firstLot : latestLot, issue.getIssueType())
+        BigDecimal sellingPrice = (marketPricing != null || firstLot != null)
+                ? resolveSellingPrice(marketPricing, latestLot, firstLot != null ? firstLot : latestLot, issue.getIssueType())
                 : BigDecimal.ZERO;
 
         BigDecimal estimateUnitPrice = item.getEstimateUnitPrice() != null

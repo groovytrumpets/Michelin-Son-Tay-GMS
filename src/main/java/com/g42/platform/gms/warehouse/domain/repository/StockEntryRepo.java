@@ -171,6 +171,7 @@ public interface StockEntryRepo {
      * Giá bán fallback = importPrice × markupMultiplier từ lô còn hàng cũ nhất.
      */
     BigDecimal findLatesFallBackPrice(Integer itemId, Integer warehouseId);
+    BigDecimal findLatesFallBackPriceWholesale(Integer itemId, Integer warehouseId);
 
     /** Tìm phiếu nhập theo mã phiếu (entryCode). */
     Optional<StockEntry> findByEntryCode(String entryCode);

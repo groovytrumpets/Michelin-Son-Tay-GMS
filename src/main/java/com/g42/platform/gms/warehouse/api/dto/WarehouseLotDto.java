@@ -18,9 +18,11 @@ public class WarehouseLotDto {
     private Integer remainingQuantity;
     private BigDecimal importPrice;
     private BigDecimal markupMultiplier;
+    private BigDecimal markupMultiplierWholesale;
     private java.time.LocalDate entryDate;
     /** Giá bán — được tính và set sau khi query, không lấy từ DB trực tiếp */
     private BigDecimal sellingPrice;
+    private BigDecimal sellingPriceWholesale;
 
     public WarehouseLotDto(
             Integer entryItemId,
@@ -30,8 +32,10 @@ public class WarehouseLotDto {
             Integer remainingQuantity,
             BigDecimal importPrice,
             BigDecimal markupMultiplier,
+            BigDecimal markupMultiplierWholesale,
             java.time.LocalDate entryDate,
-            BigDecimal sellingPrice) {
+            BigDecimal sellingPrice,
+            BigDecimal sellingPriceWholesale) {
         this.entryItemId       = entryItemId;
         this.entryId           = entryId;
         this.entryCode         = entryCode;
@@ -39,7 +43,9 @@ public class WarehouseLotDto {
         this.remainingQuantity = remainingQuantity;
         this.importPrice       = importPrice;
         this.markupMultiplier  = markupMultiplier;
+        this.markupMultiplierWholesale = markupMultiplierWholesale;
         this.entryDate         = entryDate;
         this.sellingPrice      = sellingPrice;
+        this.sellingPriceWholesale = sellingPriceWholesale;
     }
 }

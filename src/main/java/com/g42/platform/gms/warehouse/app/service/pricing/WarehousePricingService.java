@@ -81,12 +81,20 @@ public class WarehousePricingService {
                 ? request.getSellingPrice()
                 : request.getBasePrice().multiply(multiplier).setScale(2, RoundingMode.HALF_UP);
 
+        BigDecimal multiplierWholesale = request.getMarkupMultiplierWholesale() != null
+                ? request.getMarkupMultiplierWholesale() : BigDecimal.ONE;
+        BigDecimal sellingPriceWholesale = request.getSellingPriceWholesale() != null
+                ? request.getSellingPriceWholesale()
+                : request.getBasePrice().multiply(multiplierWholesale).setScale(2, RoundingMode.HALF_UP);
+
         WarehousePricing pricing = new WarehousePricing();
         pricing.setWarehouseId(request.getWarehouseId());
         pricing.setItemId(request.getItemId());
         pricing.setBasePrice(request.getBasePrice());
         pricing.setMarkupMultiplier(multiplier);
+        pricing.setMarkupMultiplierWholesale(multiplierWholesale);
         pricing.setSellingPrice(sellingPrice);
+        pricing.setSellingPriceWholesale(sellingPriceWholesale);
         pricing.setEffectiveFrom(request.getEffectiveFrom() != null ? request.getEffectiveFrom() : LocalDate.now());
         pricing.setEffectiveTo(request.getEffectiveTo());
         pricing.setIsActive(true);
@@ -98,7 +106,7 @@ public class WarehousePricingService {
     public void deactivate(Integer pricingId) {
         WarehousePricing pricing = pricingRepo.findById(pricingId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "Không tìm thấy cấu hình giá id=" + pricingId));
+                         "Không tìm thấy cấu hình giá id=" + pricingId));
         pricing.setIsActive(false);
         pricingRepo.save(pricing);
     }
@@ -120,7 +128,9 @@ public class WarehousePricingService {
         r.setItemName(itemName);
         r.setBasePrice(p.getBasePrice());
         r.setMarkupMultiplier(p.getMarkupMultiplier());
+        r.setMarkupMultiplierWholesale(p.getMarkupMultiplierWholesale());
         r.setSellingPrice(p.getSellingPrice());
+        r.setSellingPriceWholesale(p.getSellingPriceWholesale());
         r.setEffectiveFrom(p.getEffectiveFrom());
         r.setEffectiveTo(p.getEffectiveTo());
         r.setIsActive(p.getIsActive());

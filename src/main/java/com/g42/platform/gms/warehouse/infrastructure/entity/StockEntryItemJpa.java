@@ -38,6 +38,9 @@ public class StockEntryItemJpa {
     @Column(name = "markup_multiplier", nullable = false, precision = 6, scale = 4)
     private BigDecimal markupMultiplier = BigDecimal.ONE;
 
+    @Column(name = "markup_multiplier_wholesale", nullable = false, precision = 6, scale = 4)
+    private BigDecimal markupMultiplierWholesale = BigDecimal.ONE;
+
     /** Số lượng còn lại trong lô này — giảm dần theo FIFO khi xuất */
     @Column(name = "remaining_quantity", nullable = false)
     private Integer remainingQuantity = 0;

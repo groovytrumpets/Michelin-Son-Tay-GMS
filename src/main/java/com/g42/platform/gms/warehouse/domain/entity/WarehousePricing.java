@@ -22,7 +22,9 @@ public class WarehousePricing {
     private Integer itemId;
     private BigDecimal basePrice;
     private BigDecimal markupMultiplier;
+    private BigDecimal markupMultiplierWholesale;
     private BigDecimal sellingPrice;
+    private BigDecimal sellingPriceWholesale;
     private LocalDate effectiveFrom;
     private LocalDate effectiveTo;
     private Boolean isActive;

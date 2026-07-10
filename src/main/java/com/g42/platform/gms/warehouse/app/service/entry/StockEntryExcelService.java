@@ -148,6 +148,7 @@ public class StockEntryExcelService {
             item.setQuantity(quantity);
             item.setImportPrice(importPrice);
             item.setMarkupMultiplier(markup);
+            item.setMarkupMultiplierWholesale(markup);
             item.setNotes(notes);
             validItems.add(item);
         }
