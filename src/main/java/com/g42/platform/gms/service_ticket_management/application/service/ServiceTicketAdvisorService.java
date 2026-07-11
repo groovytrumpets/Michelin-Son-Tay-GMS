@@ -274,10 +274,18 @@ public class ServiceTicketAdvisorService {
         log.info("Advisor changed successfully for ticket: {}", ticketCode);
 
         // Thông báo cho advisor mới được giao phiếu
+        String customerInfo = "";
+        if (ticket.getCustomerId() != null) {
+            var customerOpt = customerRepository.findById(ticket.getCustomerId());
+            if (customerOpt.isPresent()) {
+                var c = customerOpt.get();
+                customerInfo = " - KH: " + c.getFullName() + " (" + c.getPhone() + ")";
+            }
+        }
         staffNotifyService.createNotificationAssignAuto(
             newAdvisorId,
-            "Đã được giao phiếu: " + ticketCode,
-            "Đã được giao phiếu: " + ticketCode + "; Vui lòng mở trang Điều phối dịch vụ để xác nhận!",
+            "Đã được giao phiếu: " + ticketCode + customerInfo,
+            "Đã được giao phiếu: " + ticketCode + customerInfo + "; Vui lòng mở trang Điều phối dịch vụ để xác nhận!",
             newAdvisorId,
             "http://localhost:5173/advisor/inspection"
         );
@@ -328,10 +336,18 @@ public class ServiceTicketAdvisorService {
         log.info("Technician changed successfully for ticket: {}", ticketCode);
 
         // Thông báo cho kỹ thuật viên mới được phân công
+        String customerInfo = "";
+        if (ticket.getCustomerId() != null) {
+            var customerOpt = customerRepository.findById(ticket.getCustomerId());
+            if (customerOpt.isPresent()) {
+                var c = customerOpt.get();
+                customerInfo = " - KH: " + c.getFullName() + " (" + c.getPhone() + ")";
+            }
+        }
         staffNotifyService.createNotificationAssignAuto(
             newTechnicianId,
-            "Đã được phân công vào phiếu: " + ticketCode,
-            "Bạn đã được phân công vào phiếu dịch vụ " + ticketCode + "; Vui lòng kiểm tra và xác nhận!",
+            "Đã được phân công vào phiếu: " + ticketCode + customerInfo,
+            "Bạn đã được phân công vào phiếu dịch vụ " + ticketCode + customerInfo + "; Vui lòng kiểm tra và xác nhận!",
             newTechnicianId,
             "http://localhost:5173/advisor/inspection"
         );

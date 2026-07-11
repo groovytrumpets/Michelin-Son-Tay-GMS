@@ -18,6 +18,7 @@ import com.g42.platform.gms.service_ticket_management.domain.repository.TicketAs
 import com.g42.platform.gms.staff.profile.infrastructure.entity.StaffProfileJpa;
 import com.g42.platform.gms.staff.profile.infrastructure.repository.StaffProileJpaRepo;
 import com.g42.platform.gms.dashboard.application.service.StaffNotifyService;
+import com.g42.platform.gms.auth.repository.CustomerProfileRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,6 +47,7 @@ public class TicketAssignmentService {
     private final StaffProileJpaRepo staffProfileRepo;
     private final ServiceTicketRepo serviceTicketRepo;
     private final StaffNotifyService staffNotifyService;
+    private final CustomerProfileRepository customerRepository;
 
 
     @Transactional(readOnly = true)
@@ -119,13 +121,21 @@ public class TicketAssignmentService {
             // Thông báo cho kỹ thuật viên vừa được phân công
             ServiceTicket ticket = serviceTicketRepo.findByServiceTicketId(ticketId);
             String ticketCode = String.valueOf(ticketId);
+            String customerInfo = "";
             if (ticket != null) {
                 ticketCode = ticket.getTicketCode();
+                if (ticket.getCustomerId() != null) {
+                    var customerOpt = customerRepository.findById(ticket.getCustomerId());
+                    if (customerOpt.isPresent()) {
+                        var c = customerOpt.get();
+                        customerInfo = " - KH: " + c.getFullName() + " (" + c.getPhone() + ")";
+                    }
+                }
             }
             staffNotifyService.createNotificationAssignAuto(
                 dto.getStaffId(),
-                "Đã được phân công vào phiếu: " + ticketCode,
-                "Bạn đã được phân công vào phiếu dịch vụ " + ticketCode + "; Vui lòng kiểm tra và xác nhận!",
+                "Đã được phân công vào phiếu: " + ticketCode + customerInfo,
+                "Bạn đã được phân công vào phiếu dịch vụ " + ticketCode + customerInfo + "; Vui lòng kiểm tra và xác nhận!",
                 dto.getStaffId(),
                 "http://localhost:5173/advisor/inspection"
             );

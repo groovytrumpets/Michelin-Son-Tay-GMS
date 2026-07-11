@@ -343,7 +343,21 @@ public class CheckInService {
         log.info("Single-page check-in completed successfully: ticketCode={}, photoCount={}, warnings={}",
             savedTicketAll.getTicketCode(), photoCount, warnings.size());
         //
-        staffNotifyService.createNotificationAssignAuto(response.getAdvisorId(),"Đã được giao phiếu: "+savedTicketAll.getTicketCode(),"Đã được giao phiếu: "+savedTicketAll.getTicketCode()+"; Vui lòng mở trang Điều phối dịch vụ để xác nhận!",savedTicketAll.getCreatedBy(),"http://localhost:5173/advisor/inspection");
+        String customerInfo = "";
+        if (request.getCustomerId() != null) {
+            var customerOpt = customerRepository.findById(request.getCustomerId());
+            if (customerOpt.isPresent()) {
+                var c = customerOpt.get();
+                customerInfo = " - KH: " + c.getFullName() + " (" + c.getPhone() + ")";
+            }
+        }
+        staffNotifyService.createNotificationAssignAuto(
+            response.getAdvisorId(),
+            "Đã được giao phiếu: " + savedTicketAll.getTicketCode() + customerInfo,
+            "Đã được giao phiếu: " + savedTicketAll.getTicketCode() + customerInfo + "; Vui lòng mở trang Điều phối dịch vụ để xác nhận!",
+            savedTicketAll.getCreatedBy(),
+            "http://localhost:5173/advisor/inspection"
+        );
         return response;
     }
 

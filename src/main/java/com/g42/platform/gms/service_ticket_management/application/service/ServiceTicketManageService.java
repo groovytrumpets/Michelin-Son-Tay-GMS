@@ -371,7 +371,21 @@ public class ServiceTicketManageService {
         ticketAssignmentService.changeAdvisor(ticket.getServiceTicketId(), newAdvisorId, note);
 
         log.info("Advisor changed successfully for ticket: {}", ticketCode);
-        staffNotifyService.createNotificationAssignAuto(newAdvisorId,"Đã được giao phiếu: "+ticketCode, "Đã được giao phiếu: "+ticketCode+"; Vui lòng mở trang Điều phối dịch vụ để xác nhận!",newAdvisorId,null);
+        String customerInfo = "";
+        if (ticket.getCustomerId() != null) {
+            var customerOpt = customerRepository.findById(ticket.getCustomerId());
+            if (customerOpt.isPresent()) {
+                var c = customerOpt.get();
+                customerInfo = " - KH: " + c.getFullName() + " (" + c.getPhone() + ")";
+            }
+        }
+        staffNotifyService.createNotificationAssignAuto(
+            newAdvisorId,
+            "Đã được giao phiếu: " + ticketCode + customerInfo,
+            "Đã được giao phiếu: " + ticketCode + customerInfo + "; Vui lòng mở trang Điều phối dịch vụ để xác nhận!",
+            newAdvisorId,
+            null
+        );
         return getServiceTicketDetail(ticketCode);
     }
 
