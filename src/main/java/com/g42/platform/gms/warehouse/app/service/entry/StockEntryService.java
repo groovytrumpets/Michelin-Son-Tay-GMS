@@ -47,6 +47,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.g42.platform.gms.auth.entity.StaffProfile;
 import com.g42.platform.gms.auth.repository.StaffProfileRepo;
+import com.g42.platform.gms.dashboard.application.service.StaffNotifyService;
 import com.g42.platform.gms.common.service.ImageUploadService;
 import com.g42.platform.gms.warehouse.api.dto.entry.CreateStockEntryRequest;
 import com.g42.platform.gms.warehouse.api.dto.entry.CreateStockEntryWithAttachmentRequest;
@@ -117,6 +118,7 @@ public class StockEntryService {
     private final WarehouseRepo warehouseRepo;           // lấy tên/mã kho để hiển thị
     private final StaffProfileRepo staffProfileRepo;     // lấy tên nhân viên để hiển thị
     private final PartCatalogRepo partCatalogRepo;       // lấy tên sản phẩm theo itemId (batch)
+    private final StaffNotifyService staffNotifyService;
 
     // ObjectMapper để parse JSON string "items" từ multipart form
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
@@ -204,7 +206,9 @@ public class StockEntryService {
 
         // Bước 3: Build items với entryId vừa có, rồi save lần 2
         saved.setItems(buildEntryItems(request.getItems(), saved.getEntryId()));
-        return toResponse(stockEntryRepo.save(saved));
+        StockEntry finalSaved = stockEntryRepo.save(saved);
+        notifyManagersAboutStockEntry(finalSaved, "Tạo phiếu nhập kho", "Có phiếu nhập kho mới " + finalSaved.getEntryCode() + " ở trạng thái nháp.");
+        return toResponse(finalSaved);
     }
 
     /**
@@ -405,8 +409,41 @@ public class StockEntryService {
         entry.setStatus(StockEntryStatus.CONFIRMED);
         entry.setConfirmedBy(staffId);
         entry.setConfirmedAt(LocalDateTime.now());
+        StockEntry finalSaved = stockEntryRepo.save(entry);
+        notifyManagersAboutStockEntry(finalSaved, "Xác nhận phiếu nhập kho", "Phiếu nhập kho " + finalSaved.getEntryCode() + " đã được xác nhận thành công.");
 
-        return toResponse(stockEntryRepo.save(entry));
+        return toResponse(finalSaved);
+    }
+
+    private void notifyManagersAboutStockEntry(StockEntry entry, String title, String message) {
+        try {
+            java.util.Set<Integer> targetStaffIds = new java.util.HashSet<>();
+            for (String role : List.of("MANAGER", "WAREHOUSE_MANAGER", "ADMIN")) {
+                List<StaffProfile> profiles = staffProfileRepo.findByRoleCode(role);
+                if (profiles != null) {
+                    for (StaffProfile profile : profiles) {
+                        if (profile.getStaffId() != null) {
+                            targetStaffIds.add(profile.getStaffId());
+                        }
+                    }
+                }
+            }
+            for (Integer managerId : targetStaffIds) {
+                Integer senderId = entry.getCreatedBy();
+                if (senderId == null || senderId == 0) {
+                    senderId = managerId;
+                }
+                staffNotifyService.createNotificationAssignAuto(
+                    managerId,
+                    title + ": " + entry.getEntryCode(),
+                    message,
+                    senderId,
+                    "http://localhost:5173/warehouse-stock-entries/" + entry.getEntryId()
+                );
+            }
+        } catch (Exception e) {
+            // Ignore error to avoid blocking transaction
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────

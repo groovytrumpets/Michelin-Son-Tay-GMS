@@ -6,6 +6,7 @@ import com.g42.platform.gms.estimation.domain.repository.EstimateItemRepository;
 import com.g42.platform.gms.estimation.domain.repository.EstimateRepository;
 import com.g42.platform.gms.auth.entity.StaffProfile;
 import com.g42.platform.gms.auth.repository.StaffProfileRepo;
+import com.g42.platform.gms.dashboard.application.service.StaffNotifyService;
 import com.g42.platform.gms.billing.domain.entity.ServiceBill;
 import com.g42.platform.gms.billing.domain.repository.BillingRepository;
 import com.g42.platform.gms.common.service.ImageUploadService;
@@ -120,6 +121,7 @@ public class StockIssueService {
     private final BillingRepository billingRepository;
 
     private final SimpMessagingTemplate messagingTemplate;
+    private final StaffNotifyService staffNotifyService;
 
     private static final String FOLDER_STOCK_ISSUE = "stock-issues";
 
@@ -173,7 +175,9 @@ public class StockIssueService {
         }
         stockIssueItemRepo.saveAll(draftItems);
 
-        return toResponse(findOrThrow(saved.getIssueId()));
+        StockIssueResponse response = toResponse(findOrThrow(saved.getIssueId()));
+        notifyManagersAboutStockIssue(saved, "Tạo phiếu xuất kho", "Có phiếu yêu cầu xuất kho mới " + saved.getIssueCode() + " cần xử lý.");
+        return response;
     }
 
     @Transactional
@@ -538,7 +542,40 @@ public class StockIssueService {
             }
         }
 
-        return toResponse(findOrThrow(issueId));
+        StockIssueResponse response = toResponse(findOrThrow(issueId));
+        notifyManagersAboutStockIssue(issue, "Xác nhận phiếu xuất kho", "Phiếu xuất kho " + issue.getIssueCode() + " đã được xác nhận thành công.");
+        return response;
+    }
+
+    private void notifyManagersAboutStockIssue(StockIssue issue, String title, String message) {
+        try {
+            java.util.Set<Integer> targetStaffIds = new java.util.HashSet<>();
+            for (String role : List.of("MANAGER", "WAREHOUSE_MANAGER", "ADMIN")) {
+                List<StaffProfile> profiles = staffProfileRepo.findByRoleCode(role);
+                if (profiles != null) {
+                    for (StaffProfile profile : profiles) {
+                        if (profile.getStaffId() != null) {
+                            targetStaffIds.add(profile.getStaffId());
+                        }
+                    }
+                }
+            }
+            for (Integer managerId : targetStaffIds) {
+                Integer senderId = issue.getCreatedBy();
+                if (senderId == null || senderId == 0) {
+                    senderId = managerId;
+                }
+                staffNotifyService.createNotificationAssignAuto(
+                    managerId,
+                    title + ": " + issue.getIssueCode(),
+                    message,
+                    senderId,
+                    "http://localhost:5173/warehouse-stock-issues/" + issue.getIssueId()
+                );
+            }
+        } catch (Exception e) {
+            // Ignore error
+        }
     }
 
     /**

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.g42.platform.gms.auth.entity.StaffProfile;
 import com.g42.platform.gms.auth.repository.StaffProfileRepo;
+import com.g42.platform.gms.dashboard.application.service.StaffNotifyService;
 import com.g42.platform.gms.common.service.ImageUploadService;
 import com.g42.platform.gms.estimation.api.internal.EstimateInternalApi;
 import com.g42.platform.gms.warehouse.api.dto.request.CreateReturnEntryFormRequest;
@@ -131,6 +132,7 @@ public class ReturnEntryService {
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
     private final EstimateInternalApi estimateInternalApi;
     private final com.g42.platform.gms.warehouse.infrastructure.repository.ReturnEntryItemJpaRepo returnEntryItemJpaRepo;
+    private final StaffNotifyService staffNotifyService;
 
     @Transactional
     public ReturnEntryResponse create(CreateReturnEntryRequest request, Integer staffId) {
@@ -167,7 +169,9 @@ public class ReturnEntryService {
             }
         }
 
-        return toResponse(returnEntryRepo.save(saved));
+        ReturnEntry finalSaved = returnEntryRepo.save(saved);
+        notifyManagersAboutReturnEntry(finalSaved, "Tạo yêu cầu hoàn hàng", "Có phiếu yêu cầu hoàn hàng mới " + finalSaved.getReturnCode() + " cần xử lý.");
+        return toResponse(finalSaved);
     }
 
     /**
@@ -263,8 +267,9 @@ public class ReturnEntryService {
         }
 
         // Fetch lại từ DB sau save để đảm bảo items được load đầy đủ (tránh LAZY load issue)
-        Integer savedId = returnEntryRepo.save(saved).getReturnId();
-        return toResponse(findOrThrow(savedId));
+        ReturnEntry finalSaved = returnEntryRepo.save(saved);
+        notifyManagersAboutReturnEntry(finalSaved, "Tạo yêu cầu hoàn hàng", "Có phiếu yêu cầu hoàn hàng mới " + finalSaved.getReturnCode() + " cần xử lý.");
+        return toResponse(findOrThrow(finalSaved.getReturnId()));
     }
 
     @Transactional
@@ -629,7 +634,40 @@ public class ReturnEntryService {
         entry.setStatus(ReturnEntryStatus.CONFIRMED);
         entry.setConfirmedBy(staffId);
         entry.setConfirmedAt(LocalDateTime.now());
-        return toResponse(returnEntryRepo.save(entry));
+        ReturnEntry finalSaved = returnEntryRepo.save(entry);
+        notifyManagersAboutReturnEntry(finalSaved, "Xác nhận phiếu hoàn hàng", "Phiếu yêu cầu hoàn hàng " + finalSaved.getReturnCode() + " đã được xác nhận thành công.");
+        return toResponse(finalSaved);
+    }
+
+    private void notifyManagersAboutReturnEntry(ReturnEntry entry, String title, String message) {
+        try {
+            java.util.Set<Integer> targetStaffIds = new java.util.HashSet<>();
+            for (String role : List.of("MANAGER", "WAREHOUSE_MANAGER", "ADMIN")) {
+                List<StaffProfile> profiles = staffProfileRepo.findByRoleCode(role);
+                if (profiles != null) {
+                    for (StaffProfile profile : profiles) {
+                        if (profile.getStaffId() != null) {
+                            targetStaffIds.add(profile.getStaffId());
+                        }
+                    }
+                }
+            }
+            for (Integer managerId : targetStaffIds) {
+                Integer senderId = entry.getCreatedBy();
+                if (senderId == null || senderId == 0) {
+                    senderId = managerId;
+                }
+                staffNotifyService.createNotificationAssignAuto(
+                    managerId,
+                    title + ": " + entry.getReturnCode(),
+                    message,
+                    senderId,
+                    "http://localhost:5173/warehouse-return-entries/" + entry.getReturnId()
+                );
+            }
+        } catch (Exception e) {
+            // Ignore error
+        }
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────

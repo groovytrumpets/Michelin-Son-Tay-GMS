@@ -3,6 +3,7 @@ package com.g42.platform.gms.booking.customer.application.service;
 import com.g42.platform.gms.auth.entity.CustomerProfile;
 import com.g42.platform.gms.auth.repository.CustomerProfileRepository;
 import com.g42.platform.gms.auth.repository.StaffProfileRepo;
+import com.g42.platform.gms.dashboard.application.service.StaffNotifyService;
 import com.g42.platform.gms.booking.customer.api.dto.GuestBookingRequest;
 import com.g42.platform.gms.booking.customer.domain.entity.BookingRequest;
 import com.g42.platform.gms.booking.customer.domain.entity.BookingRequestDetail;
@@ -37,6 +38,7 @@ public class BookingRequestService {
     private final CatalogItemRepository catalogItemRepository;
     private final StaffProfileRepo staffRepository;
     private final BookingCodeGenerator bookingCodeGenerator;
+    private final StaffNotifyService staffNotifyService;
     
     private final Map<String, RateLimitInfo> rateLimitCache = new ConcurrentHashMap<>();
     
@@ -137,7 +139,29 @@ public class BookingRequestService {
         }
         
         log.info("Guest booking request created: requestId={}, phone={}", savedRequest.getRequestId(), request.getPhone());
+        notifyReceptionistsAboutBookingRequest(savedRequest);
         return savedRequest;
+    }
+
+    private void notifyReceptionistsAboutBookingRequest(BookingRequest request) {
+        try {
+            List<com.g42.platform.gms.auth.entity.StaffProfile> profiles = staffRepository.findByRoleCode("RECEPTIONIST");
+            if (profiles != null) {
+                for (com.g42.platform.gms.auth.entity.StaffProfile profile : profiles) {
+                    if (profile.getStaffId() != null) {
+                        staffNotifyService.createNotificationAssignAuto(
+                            profile.getStaffId(),
+                            "Yêu cầu đặt lịch mới: " + request.getRequestCode(),
+                            "Có yêu cầu đặt lịch mới từ khách hàng " + request.getFullName() + " (" + request.getPhone() + ")",
+                            profile.getStaffId(),
+                            "http://localhost:5173/booking-request-management/" + request.getRequestCode()
+                        );
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // Ignore error to avoid blocking request creation
+        }
     }
 
     @Transactional
