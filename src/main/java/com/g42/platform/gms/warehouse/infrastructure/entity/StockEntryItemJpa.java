@@ -35,11 +35,11 @@ public class StockEntryItemJpa {
      * Hệ số markup fallback — dùng khi warehouse_pricing chưa được cấu hình.
      * selling_price_fallback = import_price × markup_multiplier
      */
-    @Column(name = "markup_multiplier", nullable = false, precision = 6, scale = 4)
-    private BigDecimal markupMultiplier = BigDecimal.ONE;
+    @Column(name = "markup_multiplier", precision = 6, scale = 4)
+    private BigDecimal markupMultiplier;
 
-    @Column(name = "markup_multiplier_wholesale", nullable = false, precision = 6, scale = 4)
-    private BigDecimal markupMultiplierWholesale = BigDecimal.ONE;
+    @Column(name = "markup_multiplier_wholesale", precision = 6, scale = 4)
+    private BigDecimal markupMultiplierWholesale;
 
     /** Số lượng còn lại trong lô này — giảm dần theo FIFO khi xuất */
     @Column(name = "remaining_quantity", nullable = false)

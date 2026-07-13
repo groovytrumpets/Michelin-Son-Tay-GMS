@@ -563,8 +563,8 @@ public class StockEntryService {
                     .itemId(req.getItemId())
                     .quantity(req.getQuantity())
                     .importPrice(req.getImportPrice())
-                    .markupMultiplier(req.getMarkupMultiplier() != null ? req.getMarkupMultiplier() : BigDecimal.ONE)
-                    .markupMultiplierWholesale(req.getMarkupMultiplierWholesale() != null ? req.getMarkupMultiplierWholesale() : BigDecimal.ONE)
+                    .markupMultiplier(req.getMarkupMultiplier())
+                    .markupMultiplierWholesale(req.getMarkupMultiplierWholesale())
                     .remainingQuantity(req.getQuantity()) // ban đầu = quantity, chưa xuất gì
                     .notes(req.getNotes())
                     .build());

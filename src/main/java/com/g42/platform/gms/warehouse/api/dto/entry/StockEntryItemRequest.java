@@ -26,8 +26,8 @@ public class StockEntryItemRequest {
      * Giá bán fallback = importPrice × markupMultiplier.
      * Mặc định 1.0 (bán bằng giá nhập).
      */
-    private BigDecimal markupMultiplier = BigDecimal.ONE;
-    private BigDecimal markupMultiplierWholesale = BigDecimal.ONE;
+    private BigDecimal markupMultiplier;
+    private BigDecimal markupMultiplierWholesale;
 
     private String notes;
 }

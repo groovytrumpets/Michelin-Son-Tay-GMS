@@ -12,6 +12,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
+import com.g42.platform.gms.warehouse.infrastructure.repository.FallbackPricingConfigJpaRepo;
+import com.g42.platform.gms.warehouse.infrastructure.repository.CatalogItemJpaRepo;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -62,6 +64,8 @@ public class StockEntryRepoImpl implements StockEntryRepo {
 
     private final StockEntryJpaRepo jpaRepo;         // Spring Data JPA cho bảng stock_entry
     private final StockEntryItemJpaRepo itemJpaRepo; // Spring Data JPA cho bảng stock_entry_item
+    private final FallbackPricingConfigJpaRepo fallbackPricingConfigJpaRepo;
+    private final CatalogItemJpaRepo catalogItemJpaRepo;
 
     // ── Mappers: chuyển đổi giữa JPA entity và domain entity ─────────────────
 
@@ -133,10 +137,8 @@ public class StockEntryRepoImpl implements StockEntryRepo {
         jpa.setItemId(domain.getItemId());
         jpa.setQuantity(domain.getQuantity());
         jpa.setImportPrice(domain.getImportPrice());
-        jpa.setMarkupMultiplier(domain.getMarkupMultiplier() != null
-                ? domain.getMarkupMultiplier() : BigDecimal.ONE);
-        jpa.setMarkupMultiplierWholesale(domain.getMarkupMultiplierWholesale() != null
-                ? domain.getMarkupMultiplierWholesale() : BigDecimal.ONE);
+        jpa.setMarkupMultiplier(domain.getMarkupMultiplier());
+        jpa.setMarkupMultiplierWholesale(domain.getMarkupMultiplierWholesale());
         jpa.setRemainingQuantity(domain.getRemainingQuantity() != null
                 ? domain.getRemainingQuantity() : 0);
         jpa.setNotes(domain.getNotes());
@@ -335,14 +337,47 @@ public class StockEntryRepoImpl implements StockEntryRepo {
      *
      * Trả về: null nếu chưa có lô nào → PricingService dùng giá catalog thay thế.
      */
+    private BigDecimal resolveFallbackMultiplier(Integer itemId, boolean isWholesale) {
+        return catalogItemJpaRepo.findById(itemId).map(item -> {
+            var itemType = item.getItemType();
+            var configOpt = fallbackPricingConfigJpaRepo.findFirstByItemTypeAndIsActiveTrue(itemType);
+            if (configOpt.isPresent()) {
+                return isWholesale ? configOpt.get().getMarkupMultiplierWholesale() : configOpt.get().getMarkupMultiplier();
+            }
+            var defaultOpt = fallbackPricingConfigJpaRepo.findFirstByItemTypeIsNullAndIsActiveTrue();
+            if (defaultOpt.isPresent()) {
+                return isWholesale ? defaultOpt.get().getMarkupMultiplierWholesale() : defaultOpt.get().getMarkupMultiplier();
+            }
+            return BigDecimal.ONE;
+        }).orElse(BigDecimal.ONE);
+    }
+
     @Override
     public BigDecimal findLatesFallBackPrice(Integer itemId, Integer warehouseId) {
-        return jpaRepo.findLatesFallBackPrice(itemId, warehouseId).orElse(null);
+        List<StockEntryItemJpa> latestLots = itemJpaRepo.findLatestLot(warehouseId, itemId);
+        if (latestLots.isEmpty()) {
+            return null;
+        }
+        StockEntryItemJpa latest = latestLots.get(0);
+        BigDecimal multiplier = latest.getMarkupMultiplier();
+        if (multiplier == null) {
+            multiplier = resolveFallbackMultiplier(itemId, false);
+        }
+        return latest.getImportPrice().multiply(multiplier);
     }
 
     @Override
     public BigDecimal findLatesFallBackPriceWholesale(Integer itemId, Integer warehouseId) {
-        return jpaRepo.findLatesFallBackPriceWholesale(itemId, warehouseId).orElse(null);
+        List<StockEntryItemJpa> latestLots = itemJpaRepo.findLatestLot(warehouseId, itemId);
+        if (latestLots.isEmpty()) {
+            return null;
+        }
+        StockEntryItemJpa latest = latestLots.get(0);
+        BigDecimal multiplier = latest.getMarkupMultiplierWholesale();
+        if (multiplier == null) {
+            multiplier = resolveFallbackMultiplier(itemId, true);
+        }
+        return latest.getImportPrice().multiply(multiplier);
     }
 
     /** SQL: SELECT * FROM stock_entry WHERE entry_code = ? */
