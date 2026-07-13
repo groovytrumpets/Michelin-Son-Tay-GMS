@@ -29,6 +29,7 @@ public class Estimate {
     private Instant approvedAt;
     private Integer version;
     private Integer revisedFromId;
+    private Integer fallbackPricingConfigId;
     private BigDecimal totalPrice;
     private BigDecimal grossProfit;
     private List<EstimateItem> items;

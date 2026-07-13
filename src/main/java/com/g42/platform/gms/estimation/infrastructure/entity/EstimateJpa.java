@@ -51,6 +51,8 @@
 
         @Column(name = "revised_from_id")
         private Integer revisedFromId;
+        @Column(name = "fallback_pricing_config_id")
+        private Integer fallbackPricingConfigId;
         @Column(name = "total_price", precision = 12, scale = 2)
         private BigDecimal totalPrice;
         @Column(name = "gross_profit", precision = 12, scale = 2)

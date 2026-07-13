@@ -15,6 +15,7 @@ import java.util.List;
 public class EstimateRequestDto {
     private Integer serviceTicketId;
     private EstimateTypeEnum estimateType;
+    private Integer fallbackPricingConfigId;
     private List<EstimateItemReqDto> items;
 
 }

@@ -97,4 +97,12 @@ public class EstimateController {
         return ResponseEntity.ok(ApiResponses.success(estimate));
     }
 
+    @PutMapping("/{estimateId}/apply-fallback-pricing")
+    public ResponseEntity<ApiResponse<EstimateRespondDto>> applyFallbackPricing(
+            @PathVariable Integer estimateId,
+            @RequestParam(required = false) Integer configId) {
+        return ResponseEntity.ok(
+                ApiResponses.success(estimateService.applyFallbackPricingToEstimate(estimateId, configId))
+        );
+    }
 }

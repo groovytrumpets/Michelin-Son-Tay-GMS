@@ -21,6 +21,11 @@ import com.g42.platform.gms.warehouse.api.mapper.WarehouseDtoMapper;
 import com.g42.platform.gms.warehouse.domain.entity.CatalogItem;
 import com.g42.platform.gms.warehouse.domain.entity.Inventory;
 import com.g42.platform.gms.warehouse.domain.entity.Warehouse;
+import com.g42.platform.gms.warehouse.infrastructure.repository.FallbackPricingConfigJpaRepo;
+import com.g42.platform.gms.warehouse.infrastructure.repository.StockEntryItemJpaRepo;
+import com.g42.platform.gms.warehouse.infrastructure.entity.FallbackPricingConfigJpa;
+import com.g42.platform.gms.warehouse.infrastructure.entity.StockEntryItemJpa;
+import com.g42.platform.gms.estimation.domain.enums.EstimateTypeEnum;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,6 +53,9 @@ public class EstimateService {
     private final StockAllocationRepository stockAllocationRepository;
     private final StockAllocationDtoMapper stockAllocationDtoMapper;
     private final BookingManageInternalApi bookingManageInternalApi;
+
+    private final FallbackPricingConfigJpaRepo fallbackPricingConfigJpaRepo;
+    private final StockEntryItemJpaRepo stockEntryItemJpaRepo;
 
 
     public List<EstimateRespondDto> getEstimateByCode(Integer serviceTicketId) {
@@ -208,9 +216,10 @@ public class EstimateService {
         estimate.setVersion(latestEstimateVersion);
         estimate.setTotalPrice(BigDecimal.ZERO);
         estimate.setRevisedFromId(revisedEstimateId);
+        estimate.setFallbackPricingConfigId(request.getFallbackPricingConfigId());
         Estimate saved = estimateRepository.save(estimate);
 
-        List<EstimateItem> items = resolveItems(request.getItems(), saved.getId());
+        List<EstimateItem> items = resolveItems(request.getItems(), saved.getId(), request.getFallbackPricingConfigId(), request.getEstimateType());
         estimateItemRepository.saveAll(items);
 
         //todo: update total_price
@@ -230,6 +239,7 @@ public class EstimateService {
     public EstimateRespondDto updateEstimate(Integer estimateId, EstimateRequestDto request) {
         Estimate estimate = estimateRepository.findEstimateById(estimateId);
         if (estimate == null) throw new RuntimeException("Estimate not found");
+        estimate.setFallbackPricingConfigId(request.getFallbackPricingConfigId());
 
         List<EstimateItem> estimateItems = estimateItemRepository.findByEstimateId(estimateId);
         Map<Integer, EstimateItem> existingMap = estimateItems.stream()
@@ -244,7 +254,17 @@ public class EstimateService {
                 existing.setItemName(req.getItemName());
                 existing.setItemId(req.getItemId());
                 existing.setQuantity(req.getQuantity());
-                existing.setUnitPrice(req.getUnitPrice());
+                
+                // Recalculate unit price using config if provided, otherwise use request unit price
+                BigDecimal calculatedUnitPrice = calculateMarkupUnitPrice(
+                    existing.getItemId(),
+                    existing.getWarehouseId(),
+                    request.getFallbackPricingConfigId(),
+                    request.getEstimateType(),
+                    req.getUnitPrice()
+                );
+                existing.setUnitPrice(calculatedUnitPrice);
+
                 existing.setWorkCategoryId(req.getWorkCategoryId());
                 existing.setWarehouseId(req.getWarehouseId());
                 existing.setEntryItemId(req.getEntryItemId());
@@ -290,7 +310,7 @@ public class EstimateService {
                 toSave.add(existing);
                 incomingIds.add(req.getEstimateItemId());
             } else {
-                toSave.addAll(resolveItems(List.of(req), estimateId));
+                toSave.addAll(resolveItems(List.of(req), estimateId, request.getFallbackPricingConfigId(), request.getEstimateType()));
             }
         }
         estimateItems.stream()
@@ -314,7 +334,9 @@ public class EstimateService {
         return getEstimateRespondDto(estimateId);
     }
     private List<EstimateItem> resolveItems(List<EstimateItemReqDto> itemRequests,
-                                            Integer estimateId) {
+                                            Integer estimateId,
+                                            Integer fallbackPricingConfigId,
+                                            EstimateTypeEnum estimateType) {
         return itemRequests.stream().map(req -> {
             Integer categoryId = req.getWorkCategoryId();
             WorkCategory workCategory = null;
@@ -350,7 +372,17 @@ public class EstimateService {
             item.setItemId(req.getItemId());
             item.setItemName(req.getItemName());
             item.setQuantity(req.getQuantity());
-            item.setUnitPrice(req.getUnitPrice());
+
+            // Recalculate unit price using config if provided, otherwise use request unit price
+            BigDecimal calculatedUnitPrice = calculateMarkupUnitPrice(
+                req.getItemId(),
+                req.getWarehouseId(),
+                fallbackPricingConfigId,
+                estimateType,
+                req.getUnitPrice()
+            );
+            item.setUnitPrice(calculatedUnitPrice);
+
             item.setWarehouseId(req.getWarehouseId());
             item.setUnit(req.getUnit());
             item.setIsChecked(req.getIsChecked() != null ? req.getIsChecked() : false);
@@ -420,6 +452,28 @@ public class EstimateService {
         for (EstimateItem item : items) {
             // MapStruct tự động lôi taxAmount, appliedTaxRate, totalPrice từ Entity sang DTO
             EstimateItemDto itemDto = estimateDtoMapper.toEstimateItemDto(item);
+
+            // Populate import price for frontend calculation
+            BigDecimal itemImportPrice = null;
+            if (item.getEntryItemId() != null) {
+                Optional<StockEntryItemJpa> entryItemOpt = stockEntryItemJpaRepo.findById(item.getEntryItemId());
+                if (entryItemOpt.isPresent()) {
+                    itemImportPrice = entryItemOpt.get().getImportPrice();
+                }
+            }
+            if (itemImportPrice == null && item.getItemId() != null && item.getWarehouseId() != null) {
+                List<StockEntryItemJpa> lots = stockEntryItemJpaRepo.findLatestLot(item.getWarehouseId(), item.getItemId());
+                if (lots != null && !lots.isEmpty()) {
+                    itemImportPrice = lots.get(0).getImportPrice();
+                }
+            }
+            if (itemImportPrice == null && item.getItemId() != null) {
+                CatalogItem catalogItem = warehouseInternalApi.findCatalogById(item.getItemId());
+                if (catalogItem != null) {
+                    itemImportPrice = catalogItem.getPrice();
+                }
+            }
+            itemDto.setImportPrice(itemImportPrice != null ? itemImportPrice : BigDecimal.ZERO);
 
             // Map tên hạng mục
             WorkCategory wc = categoryMap.get(item.getWorkCategoryId());
@@ -966,5 +1020,84 @@ public class EstimateService {
         }
 
         return dto;
+    }
+
+    private BigDecimal calculateMarkupUnitPrice(Integer itemId, Integer warehouseId, Integer configId, EstimateTypeEnum type, BigDecimal defaultPrice) {
+        if (configId == null || itemId == null) {
+            return defaultPrice != null ? defaultPrice : BigDecimal.ZERO;
+        }
+        try {
+            Optional<FallbackPricingConfigJpa> configOpt = fallbackPricingConfigJpaRepo.findById(configId);
+            if (configOpt.isEmpty() || !Boolean.TRUE.equals(configOpt.get().getIsActive())) {
+                return defaultPrice != null ? defaultPrice : BigDecimal.ZERO;
+            }
+            FallbackPricingConfigJpa config = configOpt.get();
+
+            // Find cost (importPrice)
+            BigDecimal cost = null;
+            if (warehouseId != null) {
+                List<StockEntryItemJpa> lots = stockEntryItemJpaRepo.findLatestLot(warehouseId, itemId);
+                if (lots != null && !lots.isEmpty()) {
+                    cost = lots.get(0).getImportPrice();
+                }
+            }
+            if (cost == null) {
+                CatalogItem catalogItem = warehouseInternalApi.findCatalogById(itemId);
+                cost = catalogItem != null ? catalogItem.getPrice() : BigDecimal.ZERO;
+            }
+            if (cost == null) {
+                cost = BigDecimal.ZERO;
+            }
+
+            boolean isWholesale = false;
+            BigDecimal multiplier = isWholesale ? config.getMarkupMultiplierWholesale() : config.getMarkupMultiplier();
+            if (multiplier == null) {
+                multiplier = BigDecimal.ONE;
+            }
+
+            return cost.multiply(multiplier).setScale(2, RoundingMode.HALF_UP);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return defaultPrice != null ? defaultPrice : BigDecimal.ZERO;
+        }
+    }
+
+    @Transactional
+    public EstimateRespondDto applyFallbackPricingToEstimate(Integer estimateId, Integer configId) {
+        Estimate estimate = estimateRepository.findEstimateById(estimateId);
+        if (estimate == null) {
+            throw new RuntimeException("Estimate not found");
+        }
+        estimate.setFallbackPricingConfigId(configId);
+        estimateRepository.save(estimate);
+
+        List<EstimateItem> items = estimateItemRepository.findByEstimateId(estimateId);
+        for (EstimateItem item : items) {
+            if (Boolean.TRUE.equals(item.getIsRemoved()) || Boolean.TRUE.equals(item.getIsGift())) {
+                continue;
+            }
+            if (item.getItemId() != null) {
+                BigDecimal originalPrice = item.getUnitPrice();
+                BigDecimal nextPrice = calculateMarkupUnitPrice(item.getItemId(), item.getWarehouseId(), configId, estimate.getEstimateType(), originalPrice);
+                item.setUnitPrice(nextPrice);
+                
+                // Recalculate subtotal and tax based on existing appliedTaxRate
+                BigDecimal quantity = BigDecimal.valueOf(item.getQuantity() != null ? item.getQuantity() : 0);
+                BigDecimal subTotal = nextPrice.multiply(quantity);
+                BigDecimal taxRate = item.getAppliedTaxRate();
+                if (taxRate != null && taxRate.compareTo(BigDecimal.ZERO) > 0) {
+                    BigDecimal taxAmount = subTotal.multiply(taxRate).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+                    item.setTaxAmount(taxAmount);
+                    item.setTotalPrice(subTotal.add(taxAmount));
+                } else {
+                    item.setTaxAmount(BigDecimal.ZERO);
+                    item.setTotalPrice(subTotal);
+                }
+                item.setFinalPrice(item.getTotalPrice());
+                
+                estimateItemRepository.save(item);
+            }
+        }
+        return getEstimateRespondDto(estimateId);
     }
 }

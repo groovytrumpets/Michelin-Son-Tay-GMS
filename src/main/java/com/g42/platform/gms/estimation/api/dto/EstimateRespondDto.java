@@ -24,6 +24,7 @@ public class EstimateRespondDto {
     private Instant approvedAt;
     private Integer version;
     private Integer revisedFromId;
+    private Integer fallbackPricingConfigId;
     private BigDecimal subTotal;
     private BigDecimal totalTaxAmount;
     private BigDecimal totalPrice;

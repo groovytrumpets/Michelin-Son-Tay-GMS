@@ -46,6 +46,7 @@ public class EstimateItem {
     private BigDecimal finalPrice;
     private BigDecimal grossProfit;
     private Integer entryItemId;
+    private BigDecimal importPrice;
     public BigDecimal getSubTotal() {
         if (unitPrice == null || quantity == null) return BigDecimal.ZERO;
         return unitPrice.multiply(BigDecimal.valueOf(quantity));

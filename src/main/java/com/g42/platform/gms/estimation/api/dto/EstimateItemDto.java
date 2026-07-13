@@ -36,4 +36,5 @@ public class EstimateItemDto {
     private WarehouseDto warehouse;
     private StockAllocationDto stockAllocation;
     private Integer entryItemId;
+    private BigDecimal importPrice;
 }
