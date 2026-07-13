@@ -145,7 +145,10 @@ public class ServiceTicketManageService {
 
     private ServiceTicketListResponse mapToListResponse(ServiceTicket ticket) {
         CustomerProfile customer = customerRepository.findById(ticket.getCustomerId()).orElse(null);
-        Vehicle vehicle = vehicleRepository.findById(ticket.getVehicleId()).orElse(null);
+        // Phiếu bán linh kiện (PARTS_SALE) không gắn xe
+        Vehicle vehicle = ticket.getVehicleId() != null
+                ? vehicleRepository.findById(ticket.getVehicleId()).orElse(null)
+                : null;
 
 
         Booking booking = null;
@@ -180,6 +183,7 @@ public class ServiceTicketManageService {
             response.setEstimateId(latestEstimate.getId());
         }
         response.setTicketStatus(ticket.getTicketStatus());
+        response.setTicketType(ticket.getTicketType());
         response.setCustomerRequest(ticket.getCustomerRequest());
         response.setCheckInNotes(ticket.getCheckInNotes());
         response.setReceivedAt(ticket.getReceivedAt());
@@ -195,10 +199,12 @@ public class ServiceTicketManageService {
                 .orElseThrow(() -> new CheckInException("Không tìm thấy khách hàng"));
         response.setCustomer(detailMapper.toManageCustomerInfo(customer));
 
-        // Vehicle info
-        Vehicle vehicle = vehicleRepository.findById(ticket.getVehicleId())
-                .orElseThrow(() -> new CheckInException("Không tìm thấy xe"));
-        response.setVehicle(detailMapper.toManageVehicleInfo(vehicle));
+        // Vehicle info — phiếu bán linh kiện (PARTS_SALE) không gắn xe
+        if (ticket.getVehicleId() != null) {
+            Vehicle vehicle = vehicleRepository.findById(ticket.getVehicleId())
+                    .orElseThrow(() -> new CheckInException("Không tìm thấy xe"));
+            response.setVehicle(detailMapper.toManageVehicleInfo(vehicle));
+        }
 
         // Booking info
         if (ticket.getBookingId() != null) {
@@ -218,9 +224,11 @@ public class ServiceTicketManageService {
         }
 
         // Odometer
-        Optional<OdometerReading> latestOdometer = odometerRepo.findLatestByVehicleId(ticket.getVehicleId());
-        if (latestOdometer.isPresent()) {
-            response.setOdometerReading(latestOdometer.get().getReading());
+        if (ticket.getVehicleId() != null) {
+            Optional<OdometerReading> latestOdometer = odometerRepo.findLatestByVehicleId(ticket.getVehicleId());
+            if (latestOdometer.isPresent()) {
+                response.setOdometerReading(latestOdometer.get().getReading());
+            }
         }
 
         // Photos
@@ -444,7 +452,8 @@ public class ServiceTicketManageService {
         List<ServiceTicket> serviceTickets = serviceTicketRepo.findBetween(start,end);
 
         List<Integer> customerIds = serviceTickets.stream().map(ServiceTicket::getCustomerId).distinct().toList();
-        List<Integer> vehicleIds = serviceTickets.stream().map(ServiceTicket::getVehicleId).distinct().toList();
+        List<Integer> vehicleIds = serviceTickets.stream().map(ServiceTicket::getVehicleId)
+                .filter(id -> id != null).distinct().toList();
         List<Integer> ticketIds = serviceTickets.stream().map(ServiceTicket::getServiceTicketId).toList();
 
         List<CustomerProfile> customerProfiles = customerInternalApi.findAllByIds(customerIds);
@@ -511,8 +520,9 @@ public class ServiceTicketManageService {
         ServiceTicket serviceTicket = serviceTicketRepo.findByServiceTicketId(serviceTicketId);
         CustomerProfile customerProfile = customerInternalApi.findById(serviceTicket.getCustomerId());
         /* todo: get previous custumer service ticket id */
-        Integer previousId = serviceTicketRepo.findPerviousCustomerService(customerProfile.getCustomerId(),serviceTicketId
-        ,serviceTicket.getVehicleId()).getServiceTicketId();
+        ServiceTicket previousTicket = serviceTicketRepo.findPerviousCustomerService(customerProfile.getCustomerId(),serviceTicketId
+        ,serviceTicket.getVehicleId());
+        Integer previousId = previousTicket != null ? previousTicket.getServiceTicketId() : null;
         System.out.println("DEBUG: "+previousId);
         if (previousId != null) {
             //todo: get recomment

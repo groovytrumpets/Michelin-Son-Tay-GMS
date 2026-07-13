@@ -1,6 +1,7 @@
 package com.g42.platform.gms.service_ticket_management.infrastructure.entity;
 
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
+import com.g42.platform.gms.service_ticket_management.domain.enums.TicketType;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -30,7 +31,8 @@ public class ServiceTicketJpa {
     @Column(name = "booking_id")
     private Integer bookingId;
     
-    @Column(name = "vehicle_id", nullable = false)
+    // Nullable: phiếu bán linh kiện (PARTS_SALE) không gắn xe
+    @Column(name = "vehicle_id")
     private Integer vehicleId;
     
     @Column(name = "customer_id", nullable = false)
@@ -42,6 +44,10 @@ public class ServiceTicketJpa {
     @Enumerated(EnumType.STRING)
     @Column(name = "ticket_status", length = 50)
     private TicketStatus ticketStatus;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "ticket_type", length = 20)
+    private TicketType ticketType = TicketType.SERVICE;
     
     @Column(name = "received_at")
     private LocalDateTime receivedAt;

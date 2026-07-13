@@ -57,6 +57,9 @@ public class CustomerRepoImpl implements CustomerRepo {
         entity.setEmail(customerDto.getEmail());
         entity.setGender(customerDto.getGender());
         entity.setAvatar(customerDto.getAvatar());
+        if (customerDto.getCustomerType() != null) {
+            entity.setCustomerType(customerDto.getCustomerType());
+        }
 
 
         if (customerDto.getDob() != null && !customerDto.getDob().isBlank()) {

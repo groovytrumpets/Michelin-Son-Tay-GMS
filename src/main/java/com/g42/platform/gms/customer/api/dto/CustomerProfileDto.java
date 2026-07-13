@@ -2,6 +2,7 @@ package com.g42.platform.gms.customer.api.dto;
 
 import com.g42.platform.gms.auth.entity.CustomerStatus;
 import com.g42.platform.gms.auth.entity.Gender;
+import com.g42.platform.gms.customer.domain.enums.CustomerType;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -23,5 +24,6 @@ public class CustomerProfileDto {
     private String avatar;
     private LocalDateTime firstBookingAt;
     private LocalDateTime createdAt;
+    private CustomerType customerType;
     private CustomerStatus status;
 }

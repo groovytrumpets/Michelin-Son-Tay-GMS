@@ -10,7 +10,8 @@ import lombok.Getter;
 public enum CodePrefix {
     BOOKING("MST"),          // Booking codes: MST_XXXXXX (Maintenance Service Ticket)
     REQUEST("MST"),          // Request codes: MST_XXXXXX
-    SERVICE_TICKET("MST");   // Service Ticket codes: MST_XXXXXX
+    SERVICE_TICKET("MST"),   // Service Ticket codes: MST_XXXXXX
+    PARTS_SALE("BLK");       // Parts sale ticket codes: BLK_XXXXXX (Bán Linh Kiện)
     
     private final String prefix;
     

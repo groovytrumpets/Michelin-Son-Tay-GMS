@@ -1,6 +1,7 @@
 package com.g42.platform.gms.service_ticket_management.domain.entity;
 
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
+import com.g42.platform.gms.service_ticket_management.domain.enums.TicketType;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -21,6 +22,7 @@ public class ServiceTicket {
     private Integer customerId;
     private Integer createdBy;
     private TicketStatus ticketStatus;
+    private TicketType ticketType;
     private LocalDateTime receivedAt;
     private String customerRequest;
     private String technicianNotes;
@@ -50,6 +52,9 @@ public class ServiceTicket {
         }
         if (ticketStatus == null) {
             ticketStatus = TicketStatus.CREATED;
+        }
+        if (ticketType == null) {
+            ticketType = TicketType.SERVICE;
         }
         if (immutable == null) {
             immutable = false;

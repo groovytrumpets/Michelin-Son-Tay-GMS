@@ -16,6 +16,7 @@ public interface CustomerDtoMapper {
     @Mapping(source = "customerProfile.gender", target = "gender")
     @Mapping(source = "customerProfile.avatar", target = "avatar")
     @Mapping(source = "customerProfile.dob", target = "dob", dateFormat = "yyyy-MM-dd")
+    @Mapping(source = "customerProfile.customerType", target = "customerType")
     CustomerCreateDto toCusCreateDto(CustomerProfile customerProfile, CustomerAuth customerAuth);
 
     CustomerDto toCustomerDto(com.g42.platform.gms.auth.entity.CustomerProfile customerProfile);

@@ -44,6 +44,9 @@ public class CustomerService {
         customerProfile.setEmail(customerUpdateDto.getEmail());
         customerProfile.setGender(customerUpdateDto.getGender());
         customerProfile.setAvatar(customerUpdateDto.getAvatar());
+        if (customerUpdateDto.getCustomerType() != null) {
+            customerProfile.setCustomerType(customerUpdateDto.getCustomerType());
+        }
         customerAuth.setStatus(customerUpdateDto.getStatus());
         customerAuth.setLastLoginAt(customerUpdateDto.getLastLoginAt());
         if (!customerRepo.updateCustomer(customerId,customerProfile,customerAuth)){

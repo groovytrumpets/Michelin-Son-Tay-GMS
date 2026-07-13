@@ -81,7 +81,7 @@ public class VehicleService {
             List<ServiceTicketJpa> tickets = serviceTicketRepository.findAll();
             ServiceTicketJpa lastTicket = null;
             for (ServiceTicketJpa ticket : tickets) {
-                if (ticket.getVehicleId().equals(vehicle.getVehicleId())) {
+                if (vehicle.getVehicleId().equals(ticket.getVehicleId())) {
                     if (lastTicket == null || ticket.getCreatedAt().isAfter(lastTicket.getCreatedAt())) {
                         lastTicket = ticket;
                     }

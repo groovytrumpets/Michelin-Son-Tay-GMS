@@ -95,9 +95,10 @@ public class WorkHistoryService {
      * @return WorkHistoryResponse DTO
      */
     private WorkHistoryResponse mapToWorkHistoryResponse(ServiceTicket ticket) {
-        Vehicle vehicle = vehicleRepository.findById(ticket.getVehicleId())
-            .orElseThrow(() -> new IllegalStateException(
-                "Vehicle not found for service ticket: " + ticket.getTicketCode()));
+        // Phiếu bán linh kiện (PARTS_SALE) không gắn xe
+        Vehicle vehicle = ticket.getVehicleId() != null
+            ? vehicleRepository.findById(ticket.getVehicleId()).orElse(null)
+            : null;
 
         CustomerProfile customer = customerRepository.findById(ticket.getCustomerId())
             .orElseThrow(() -> new IllegalStateException(

@@ -1,6 +1,7 @@
 package com.g42.platform.gms.customer.infrastructure.entity;
 
 import com.g42.platform.gms.auth.entity.Gender;
+import com.g42.platform.gms.customer.domain.enums.CustomerType;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -37,6 +38,10 @@ public class CustomerProfileJpa {
 
     @Column(name = "avatar")
     private String avatar;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "customer_type", length = 20)
+    private CustomerType customerType = CustomerType.INDIVIDUAL;
 
     @Column(name = "first_booking_at")
     private LocalDateTime firstBookingAt;

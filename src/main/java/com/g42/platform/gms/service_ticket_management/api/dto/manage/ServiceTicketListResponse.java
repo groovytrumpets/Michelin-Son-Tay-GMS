@@ -1,6 +1,7 @@
 package com.g42.platform.gms.service_ticket_management.api.dto.manage;
 
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
+import com.g42.platform.gms.service_ticket_management.domain.enums.TicketType;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -44,6 +45,7 @@ public class ServiceTicketListResponse {
     
     // Status
     private TicketStatus ticketStatus;
+    private TicketType ticketType;
     private LocalDateTime receivedAt;
     private LocalDateTime createdAt;
     
