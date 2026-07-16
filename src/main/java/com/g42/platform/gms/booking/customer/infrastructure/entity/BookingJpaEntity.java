@@ -49,6 +49,9 @@ public class BookingJpaEntity {
     @Column(name = "estimate_id")
     private Integer estimateId;
 
+    @Column(name = "is_parts_sale", nullable = false)
+    private Boolean isPartsSale = false;
+
     @ManyToMany
     @JoinTable(
             name = "booking_details",
@@ -67,6 +70,9 @@ public class BookingJpaEntity {
         }
         if (isGuest == null) {
             isGuest = false;
+        }
+        if (isPartsSale == null) {
+            isPartsSale = false;
         }
     }
 }

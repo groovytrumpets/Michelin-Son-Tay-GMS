@@ -21,4 +21,6 @@ public class StaffDirectBookingRequest extends BaseBookingRequest {
     @NotBlank(message = "Ten khach hang la bat buoc")
     @Size(min = 2, max = 100, message = "Ten khach hang phai tu 2 den 100 ky tu")
     private String fullName;
+
+    private Boolean isPartsSale;
 }

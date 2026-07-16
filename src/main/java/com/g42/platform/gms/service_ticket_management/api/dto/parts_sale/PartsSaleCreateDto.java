@@ -16,4 +16,5 @@ public class PartsSaleCreateDto {
     private Integer customerId;
     private Integer estimateId;
     private String note;
+    private Integer bookingId;
 }

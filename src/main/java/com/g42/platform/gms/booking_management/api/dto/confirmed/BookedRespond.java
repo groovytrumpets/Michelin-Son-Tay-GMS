@@ -27,4 +27,6 @@ public class BookedRespond {
     private LocalDateTime createdAt;
     private Integer estimateTime;
     private Integer queueOrder;
+    private Integer estimateId;
+    private Boolean isPartsSale;
 }

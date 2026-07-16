@@ -62,4 +62,6 @@ public class BookingJpa {
     private Integer estimateTime;
     @Column(name = "estimate_id")
     private Integer estimateId;
+    @Column(name = "is_parts_sale", nullable = false)
+    private Boolean isPartsSale = false;
 }

@@ -17,6 +17,9 @@ import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicke
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketType;
 import com.g42.platform.gms.service_ticket_management.domain.repository.ServiceTicketRepo;
+import com.g42.platform.gms.booking.customer.domain.entity.Booking;
+import com.g42.platform.gms.booking.customer.domain.enums.BookingStatus;
+import com.g42.platform.gms.booking.customer.domain.repository.BookingRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -48,6 +51,7 @@ public class PartsSaleService {
     private final EstimateService estimateService;
     private final StockAllocationService stockAllocationService;
     private final BillingService billingService;
+    private final BookingRepository bookingRepository;
 
     /**
      * Tạo phiếu bán linh kiện từ báo giá DRAFT: tạo ticket (không booking,
@@ -75,10 +79,21 @@ public class PartsSaleService {
             throw new RuntimeException("Báo giá đã được gắn vào phiếu khác: " + estimate.getServiceTicketId());
         }
 
-        // 1. Tạo phiếu PARTS_SALE: không booking, không xe, không kiểm tra an toàn
+        // 1. Tạo phiếu PARTS_SALE: không xe, không kiểm tra an toàn
         ServiceTicket ticket = new ServiceTicket();
-        ticket.setTicketCode(ticketCodeGenerator.generateCode(LocalDate.now(), CodePrefix.PARTS_SALE));
-        ticket.setBookingId(null);
+        String ticketCode;
+        if (dto.getBookingId() != null) {
+            Booking booking = bookingRepository.findById(dto.getBookingId())
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy booking: " + dto.getBookingId()));
+            booking.setStatus(BookingStatus.DONE);
+            bookingRepository.save(booking);
+            ticketCode = booking.getBookingCode();
+            ticket.setBookingId(dto.getBookingId());
+        } else {
+            ticketCode = ticketCodeGenerator.generateCode(LocalDate.now(), CodePrefix.PARTS_SALE);
+            ticket.setBookingId(null);
+        }
+        ticket.setTicketCode(ticketCode);
         ticket.setVehicleId(null);
         ticket.setCustomerId(dto.getCustomerId());
         ticket.setCreatedBy(staffId);

@@ -333,6 +333,7 @@ public class BookingService {
         booking.setIsGuest(false);
         booking.setStatus(BookingStatus.CONFIRMED);
         booking.setEstimateId(request.getEstimateId());
+        booking.setIsPartsSale(request.getIsPartsSale() != null ? request.getIsPartsSale() : false);
 
         if (request.getSelectedServiceIds() != null && !request.getSelectedServiceIds().isEmpty()) {
             booking.setCatalogItemIds(request.getSelectedServiceIds());

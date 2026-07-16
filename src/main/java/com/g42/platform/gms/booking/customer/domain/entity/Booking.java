@@ -24,6 +24,7 @@ public class Booking {
     private Integer queueOrder;
     private Integer estimateId;
     private List<Integer> catalogItemIds = new ArrayList<>();
+    private Boolean isPartsSale = false;
     
     public void initializeDefaults() {
         if (createdAt == null) {
@@ -34,6 +35,9 @@ public class Booking {
         }
         if (isGuest == null) {
             isGuest = false;
+        }
+        if (isPartsSale == null) {
+            isPartsSale = false;
         }
     }
 }

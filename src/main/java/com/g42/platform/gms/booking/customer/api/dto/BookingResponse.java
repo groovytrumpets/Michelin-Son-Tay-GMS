@@ -19,6 +19,7 @@ public class BookingResponse {
     private String description;
     private String status;
     private Boolean isGuest;
+    private Boolean isPartsSale;
     private List<Integer> serviceIds;
     private List<ServiceItemDto> services;
     private Integer totalEstimatedTime;

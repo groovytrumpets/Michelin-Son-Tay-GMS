@@ -97,7 +97,9 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
                     b.getIsGuest(),
                     b.getCreatedAt(),
                     b.getEstimateTime(),
-                    b.getQueueOrder()
+                    b.getQueueOrder(),
+                    b.getEstimateId(),
+                    b.getIsPartsSale()
             );
         });
     }
