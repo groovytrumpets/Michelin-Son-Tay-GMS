@@ -62,10 +62,10 @@ public class BookingManageService {
         //todo: null handle exception
     }
 
-    public Page<BookingRequestRes> getListBookingRequest(int page, int size, LocalDate date, Boolean isGuest, BookingRequestStatus status, String search) {
+    public Page<BookingRequestRes> getListBookingRequest(int page, int size, LocalDate date, LocalDate toDate, Boolean isGuest, BookingRequestStatus status, String search) {
         // Lazy expire: update trước khi query
         bookingRepository.bulkExpireOldRequests();
-        Page<BookingRequest> bookingList = bookingRepository.getBookingRequestList(page,size,date,isGuest,status,search);
+        Page<BookingRequest> bookingList = bookingRepository.getBookingRequestList(page,size,date,toDate,isGuest,status,search);
         //return bookingMRequestDtoMapper.toBookingRequestResPage(bookingList);
         return bookingList.map(bookingMRequestDtoMapper::toBookingRequestRes);
     }

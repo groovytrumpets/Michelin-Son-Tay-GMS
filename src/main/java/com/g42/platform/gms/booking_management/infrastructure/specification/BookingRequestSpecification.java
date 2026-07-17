@@ -15,15 +15,24 @@ import java.util.List;
 
 public class BookingRequestSpecification {
     public static Specification<BookingRequestJpa> filter(LocalDate date,
+                                                          LocalDate toDate,
                                                           Boolean isGuest,
                                                           BookingRequestStatus status) {
         return (root, query, cb) -> {
 
             List<Predicate> predicates = new ArrayList<>();
 
-            if (date != null) {
+            if (date != null && toDate != null) {
+                predicates.add(
+                        cb.between(root.get("scheduledDate"), date, toDate)
+                );
+            } else if (date != null) {
                 predicates.add(
                         cb.equal(root.get("scheduledDate"), date)
+                );
+            } else if (toDate != null) {
+                predicates.add(
+                        cb.lessThanOrEqualTo(root.get("scheduledDate"), toDate)
                 );
             }
 

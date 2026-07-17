@@ -44,10 +44,11 @@ public class BookingManageController {
     public ResponseEntity<ApiResponse<Page<BookingRequestRes>>> getAllBookingRequest(@RequestParam(defaultValue = "0") int page,
                                                                                      @RequestParam(defaultValue = "10") int size,
                                                                                      @RequestParam(required = false) LocalDate date,
+                                                                                     @RequestParam(required = false) LocalDate toDate,
                                                                                      @RequestParam(required = false) Boolean isGuest,
                                                                                      @RequestParam(required = false) BookingRequestStatus status,
                                                                                      @RequestParam(required = false) String search){
-        Page<BookingRequestRes> bookingRequestResList = bookingService.getListBookingRequest(page,size,date,isGuest,status,search);
+        Page<BookingRequestRes> bookingRequestResList = bookingService.getListBookingRequest(page,size,date,toDate,isGuest,status,search);
         return ResponseEntity.ok(ApiResponses.success(bookingRequestResList));
     }
 

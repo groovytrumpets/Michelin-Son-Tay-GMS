@@ -110,10 +110,10 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
         return bookingManagerMapper.toDomain(bookingJpa);
     }
     @Override
-    public Page<BookingRequest> getBookingRequestList(int page, int size, LocalDate date, Boolean isGuest, BookingRequestStatus status, String search) {
+    public Page<BookingRequest> getBookingRequestList(int page, int size, LocalDate date, LocalDate toDate, Boolean isGuest, BookingRequestStatus status, String search) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         Specification<BookingRequestJpa> specification = Specification.unrestricted();
-        specification = specification.and(BookingRequestSpecification.filter(date,isGuest,status));
+        specification = specification.and(BookingRequestSpecification.filter(date,toDate,isGuest,status));
         if (search != null && !search.isBlank()) {
             specification = specification.and(BookingRequestSpecification.searchBookingRequest(search));
         }

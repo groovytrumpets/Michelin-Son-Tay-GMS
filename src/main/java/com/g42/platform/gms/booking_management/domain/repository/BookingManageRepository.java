@@ -19,7 +19,7 @@ public interface BookingManageRepository {
 
     Booking getBookedDetailById(String bookingId);
 
-    Page<BookingRequest> getBookingRequestList(int page, int size, LocalDate date, Boolean isGuest, BookingRequestStatus status, String search);
+    Page<BookingRequest> getBookingRequestList(int page, int size, LocalDate date, LocalDate toDate, Boolean isGuest, BookingRequestStatus status, String search);
 
     BookingRequest getBookingRequestById(String bookingCode);
 
