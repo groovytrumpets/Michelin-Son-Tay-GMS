@@ -1,5 +1,6 @@
 package com.g42.platform.gms.warehouse.domain.repository;
 
+import com.g42.platform.gms.warehouse.domain.entity.ItemProfitAggregate;
 import com.g42.platform.gms.warehouse.domain.entity.StockIssue;
 import com.g42.platform.gms.warehouse.domain.enums.IssueType;
 import com.g42.platform.gms.warehouse.domain.enums.StockIssueStatus;
@@ -43,4 +44,10 @@ public interface StockIssueRepo {
     boolean existsDraftServiceTicketIssueInWarehouse(Integer serviceTicketId, Integer warehouseId);
 
     Optional<StockIssue> findDraftServiceTicketIssueInWarehouse(Integer serviceTicketId, Integer warehouseId);
+
+    /**
+     * Tổng hợp doanh thu/chi phí/lãi gộp theo item cho các phiếu xuất kho
+     * CONFIRMED, lọc theo warehouse (tùy chọn) và khoảng ngày confirmed (tùy chọn).
+     */
+    List<ItemProfitAggregate> aggregateItemProfit(Integer warehouseId, LocalDate fromDate, LocalDate toDate);
 }

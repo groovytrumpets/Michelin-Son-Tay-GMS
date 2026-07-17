@@ -42,6 +42,21 @@ public class AttendanceCheckinJpa {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
+    @Column(name = "location_id")
+    private Integer locationId;
+
+    @Column(name = "check_in_method", length = 20)
+    private String checkInMethod = "MANUAL";
+
+    @Column(name = "check_in_lat")
+    private Double checkInLat;
+
+    @Column(name = "check_in_lng")
+    private Double checkInLng;
+
+    @Column(name = "distance_meters")
+    private Double distanceMeters;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "shift_id", insertable = false, updatable = false)
     private WorkShiftJpa shift;

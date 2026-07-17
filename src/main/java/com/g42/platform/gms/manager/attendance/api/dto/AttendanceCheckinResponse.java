@@ -21,4 +21,9 @@ public class AttendanceCheckinResponse {
     private String status;
     private String notes;
     private LocalDateTime createdAt;
+    private Integer locationId;
+    private String checkInMethod;
+    private Double checkInLat;
+    private Double checkInLng;
+    private Double distanceMeters;
 }

@@ -1,5 +1,6 @@
 package com.g42.platform.gms.warehouse.infrastructure.repository.impl;
 
+import com.g42.platform.gms.warehouse.domain.entity.ItemProfitAggregate;
 import com.g42.platform.gms.warehouse.domain.entity.StockIssue;
 import com.g42.platform.gms.warehouse.domain.entity.StockIssueItem;
 import com.g42.platform.gms.warehouse.domain.enums.IssueType;
@@ -7,6 +8,7 @@ import com.g42.platform.gms.warehouse.domain.enums.StockIssueStatus;
 import com.g42.platform.gms.warehouse.domain.repository.StockIssueRepo;
 import com.g42.platform.gms.warehouse.infrastructure.entity.StockIssueItemJpa;
 import com.g42.platform.gms.warehouse.infrastructure.entity.StockIssueJpa;
+import com.g42.platform.gms.warehouse.infrastructure.repository.StockIssueItemJpaRepo;
 import com.g42.platform.gms.warehouse.infrastructure.repository.StockIssueJpaRepo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -25,6 +27,7 @@ import java.util.Optional;
 public class StockIssueRepoImpl implements StockIssueRepo {
 
     private final StockIssueJpaRepo jpaRepo;
+    private final StockIssueItemJpaRepo itemJpaRepo;
 
     @Override
     public Optional<StockIssue> findById(Integer issueId) {
@@ -101,6 +104,21 @@ public class StockIssueRepoImpl implements StockIssueRepo {
                 IssueType.SERVICE_TICKET,
                 StockIssueStatus.DRAFT)
                 .map(this::toDomain);
+    }
+
+    @Override
+    public List<ItemProfitAggregate> aggregateItemProfit(Integer warehouseId, LocalDate fromDate, LocalDate toDate) {
+        LocalDateTime fromDateTime = fromDate != null ? fromDate.atStartOfDay() : null;
+        LocalDateTime toDateTime = toDate != null ? toDate.atTime(23, 59, 59) : null;
+        return itemJpaRepo.aggregateProfitByItem(warehouseId, fromDateTime, toDateTime)
+                .stream()
+                .map(p -> new ItemProfitAggregate(
+                        p.getItemId(),
+                        p.getTotalQuantity(),
+                        p.getTotalRevenue(),
+                        p.getTotalCost(),
+                        p.getTotalGrossProfit()))
+                .toList();
     }
 
     // ── mappers ──────────────────────────────────────────────────────────────
