@@ -9,6 +9,8 @@ import com.g42.platform.gms.auth.repository.StaffAuthRepo;
 import com.g42.platform.gms.auth.repository.StaffProfileRepo;
 import com.g42.platform.gms.auth.repository.StaffRoleRepository;
 import com.g42.platform.gms.common.service.OtpService;
+import com.g42.platform.gms.systemlog.service.AuditRecord;
+import com.g42.platform.gms.systemlog.service.AuditService;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -40,6 +42,8 @@ public class StaffAuthService {
     private OtpService otpService;
     @Autowired
     private PasswordEncoder passwordEncoder;
+    @Autowired
+    private AuditService auditService;
 
     public Iterable<StaffAuthDto> getAllStaffAuth() {
         return staffAuthRepo.findAll().stream().map(staffAuthMapper::toDto).toList();
@@ -107,6 +111,19 @@ public class StaffAuthService {
                     .stream()
                     .map(staffRole -> staffRole.getRole().getRoleCode())
                     .toList();
+            try {
+                AuditRecord.AuditRecordBuilder auditBuilder = AuditRecord.builder()
+                        .action("LOGIN")
+                        .module("AUTH")
+                        .severity("INFO")
+                        .actorStaffId(staffProfile.getStaffId())
+                        .actorName(staffProfile.getFullName())
+                        .actorRole(roles.isEmpty() ? null : roles.get(0))
+                        .description("Đăng nhập thành công");
+                auditService.fillRequestInfo(auditBuilder);
+                auditService.record(auditBuilder.build());
+            } catch (Exception ignored) {
+            }
             return new StaffAuthResponse(staffProfile.getStaffId(),staffProfile.getFullName(),staffProfile.getAvatar(),"LOGIN_SUCCESS", roles, token);
         }
         }catch (BadCredentialsException e){

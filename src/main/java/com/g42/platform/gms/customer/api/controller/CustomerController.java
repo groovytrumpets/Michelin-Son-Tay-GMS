@@ -7,6 +7,7 @@ import com.g42.platform.gms.customer.api.dto.CustomerCreateDto;
 import com.g42.platform.gms.customer.api.dto.CustomerUpdateDto;
 import com.g42.platform.gms.customer.application.service.CustomerService;
 import com.g42.platform.gms.customer.domain.entity.CustomerProfile;
+import com.g42.platform.gms.systemlog.annotation.Auditable;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -22,6 +23,7 @@ public class CustomerController {
     @Autowired
     CustomerService customerService;
     @PostMapping("create")
+    @Auditable(action = "CREATE", module = "CUSTOMER", description = "Tạo hồ sơ khách hàng", targetType = "CUSTOMER")
     public ResponseEntity<ApiResponse<CustomerCreateDto>> createCustomer(@RequestBody CustomerCreateDto customerDto) {
         return ResponseEntity.ok(ApiResponses.success(customerService.createNewCustomer(customerDto)));
     }
@@ -36,6 +38,7 @@ public class CustomerController {
         return ResponseEntity.ok(ApiResponses.success(customerService.getListOfAllCustomerProfile(page, size, date, isGuest, search, status)));
     }
     @PutMapping("{customerId}/update")
+    @Auditable(action = "UPDATE", module = "CUSTOMER", description = "Cập nhật hồ sơ khách hàng", targetType = "CUSTOMER")
     public ResponseEntity<ApiResponse<CustomerCreateDto>> updateProfile(@PathVariable Integer customerId,@RequestBody CustomerUpdateDto customerUpdateDto) {
         return ResponseEntity.ok(ApiResponses.success(customerService.updateCustomer(customerId, customerUpdateDto)));
     }
@@ -44,10 +47,12 @@ public class CustomerController {
         return ResponseEntity.ok(ApiResponses.success(customerService.findByCustomerId(customerId)));
     }
     @PutMapping("{customerId}/delete")
+    @Auditable(action = "DELETE", module = "CUSTOMER", severity = "CRITICAL", description = "Xóa hồ sơ khách hàng", targetType = "CUSTOMER")
     public ResponseEntity<ApiResponse<CustomerProfile>> deleteProfile(@PathVariable Integer customerId) {
         return ResponseEntity.ok(ApiResponses.success(customerService.deleteCustomer(customerId)));
     }
     @PutMapping("{customerId}/locked")
+    @Auditable(action = "UPDATE", module = "CUSTOMER", severity = "WARNING", description = "Khóa tài khoản khách hàng", targetType = "CUSTOMER")
     public ResponseEntity<ApiResponse<CustomerProfile>> lockedProfile(@PathVariable Integer customerId) {
         return ResponseEntity.ok(ApiResponses.success(customerService.lockedCustomer(customerId)));
     }

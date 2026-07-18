@@ -8,6 +8,7 @@ import com.g42.platform.gms.staff.profile.api.dto.StaffCreateDto;
 import com.g42.platform.gms.staff.profile.api.dto.StaffProfileDto;
 import com.g42.platform.gms.staff.profile.api.dto.StaffUpdateDto;
 import com.g42.platform.gms.staff.profile.app.service.StaffService;
+import com.g42.platform.gms.systemlog.annotation.Auditable;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -41,19 +42,23 @@ public class StaffController {
         return ResponseEntity.ok(ApiResponses.success(staffService.getListOfRoles()));
     }
     @PostMapping("create")
+    @Auditable(action = "CREATE", module = "STAFF", description = "Tạo hồ sơ nhân viên", targetType = "STAFF")
     public ResponseEntity<ApiResponse<StaffProfileDto>> createStaffProfile(@RequestBody StaffCreateDto staffProfileDto) {
         return ResponseEntity.ok(ApiResponses.success(staffService.createStaff(staffProfileDto)));
     }
     @PutMapping("{staffId}/update")
+    @Auditable(action = "UPDATE", module = "STAFF", description = "Cập nhật hồ sơ nhân viên", targetType = "STAFF")
     public ResponseEntity<ApiResponse<StaffProfileDto>> updateStaffProfile(@PathVariable Integer staffId,
                                                                            @RequestBody StaffUpdateDto staffProfileDto) {
         return ResponseEntity.ok(ApiResponses.success(staffService.updateStaff(staffId, staffProfileDto)));
     }
     @PutMapping("{staffId}/delete")
+    @Auditable(action = "DELETE", module = "STAFF", severity = "CRITICAL", description = "Xóa hồ sơ nhân viên", targetType = "STAFF")
     public ResponseEntity<ApiResponse<StaffProfileDto>> deleteStaffProfile(@PathVariable Integer staffId) {
         return ResponseEntity.ok(ApiResponses.success(staffService.deleteStaff(staffId)));
     }
     @PutMapping("{staffId}/lock")
+    @Auditable(action = "PERMISSION", module = "STAFF", severity = "WARNING", description = "Khóa tài khoản nhân viên", targetType = "STAFF")
     public ResponseEntity<ApiResponse<StaffProfileDto>> lockStaffProfile(@PathVariable Integer staffId) {
         return ResponseEntity.ok(ApiResponses.success(staffService.lockStaff(staffId)));
     }
