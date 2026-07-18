@@ -21,6 +21,15 @@ public class ComboItemJpaEntity {
     @Column(name = "quantity")
     private Integer quantity = 1;
 
+    @Column(name = "odometer_km")
+    private Integer odometerKm = 0;
+
+    @Column(name = "allocation_method")
+    private String allocationMethod = "FIFO";
+
+    @Column(name = "entry_item_id")
+    private Integer entryItemId;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "included_item_id", insertable = false, updatable = false)
     private CatalogItemJpaEntity includedItem;

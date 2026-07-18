@@ -13,4 +13,6 @@ public class ComboItem {
     private Integer includedItemId;
     private Integer quantity;
     private Integer odometerKm;
+    private String allocationMethod;
+    private Integer entryItemId;
 }

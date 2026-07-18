@@ -8,10 +8,13 @@ import lombok.Setter;
 @Getter
 @Setter
 @AllArgsConstructor
+@NoArgsConstructor
 public class ComboResDto {
     private Integer comboItemId;
     private Integer comboId;
     private Integer includedItemId;
     private Integer quantity;
     private Integer odometerKm;
+    private String allocationMethod;
+    private Integer entryItemId;
 }

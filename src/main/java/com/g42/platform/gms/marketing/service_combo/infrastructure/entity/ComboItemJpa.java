@@ -24,4 +24,10 @@ public class ComboItemJpa {
 
     @Column(name = "odometer_km", nullable = false)
     private Integer odometerKm = 0;
+
+    @Column(name = "allocation_method")
+    private String allocationMethod = "FIFO";
+
+    @Column(name = "entry_item_id")
+    private Integer entryItemId;
 }
