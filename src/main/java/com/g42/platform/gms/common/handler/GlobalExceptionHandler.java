@@ -1,5 +1,6 @@
 package com.g42.platform.gms.common.handler;
 
+import com.g42.platform.gms.attendancerequest.domain.exception.AttendanceRequestException;
 import com.g42.platform.gms.auth.constant.AuthErrorCode;
 import com.g42.platform.gms.billing.domain.exception.BillingException;
 import com.g42.platform.gms.booking.customer.domain.exception.BookingException;
@@ -153,6 +154,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AttendanceException.class)
     public ResponseEntity<ApiResponse<?>> handleAttendanceException(AttendanceException ex) {
         System.err.println("Attendance Error: " + ex.getErrorCode().getCode() + " - " + ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponses.error(ex.getErrorCode().getCode(), ex.getMessage()));
+    }
+
+    @ExceptionHandler(AttendanceRequestException.class)
+    public ResponseEntity<ApiResponse<?>> handleAttendanceRequestException(AttendanceRequestException ex) {
+        System.err.println("Attendance Request Error: " + ex.getErrorCode().getCode() + " - " + ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponses.error(ex.getErrorCode().getCode(), ex.getMessage()));

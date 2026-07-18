@@ -45,6 +45,11 @@ public class AttendanceCheckinRepoImpl implements AttendanceCheckinRepo {
     }
 
     @Override
+    public List<AttendanceCheckin> findByStaffAndDate(Integer staffId, LocalDate date) {
+        return jpaRepo.findByStaffIdAndAttendanceDate(staffId, date).stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
     public AttendanceCheckin save(AttendanceCheckin checkin) {
         AttendanceCheckinJpa saved = jpaRepo.save(mapper.toJpa(checkin));
         return mapper.toDomain(saved);

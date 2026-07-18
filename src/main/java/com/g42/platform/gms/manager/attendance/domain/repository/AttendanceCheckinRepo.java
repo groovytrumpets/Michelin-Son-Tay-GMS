@@ -12,6 +12,7 @@ public interface AttendanceCheckinRepo {
     List<AttendanceCheckin> findByDate(LocalDate date);
     Optional<AttendanceCheckin> findById(Integer checkinId);
     Optional<AttendanceCheckin> findByStaffAndDateAndShift(Integer staffId, LocalDate date, Integer shiftId);
+    List<AttendanceCheckin> findByStaffAndDate(Integer staffId, LocalDate date);
     AttendanceCheckin save(AttendanceCheckin checkin);
     void deleteById(Integer checkinId);
 }
