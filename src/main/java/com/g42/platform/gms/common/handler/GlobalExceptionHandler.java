@@ -1,5 +1,6 @@
 package com.g42.platform.gms.common.handler;
 
+import com.g42.platform.gms.aiassistant.exception.AiAssistantException;
 import com.g42.platform.gms.attendancerequest.domain.exception.AttendanceRequestException;
 import com.g42.platform.gms.auth.constant.AuthErrorCode;
 import com.g42.platform.gms.billing.domain.exception.BillingException;
@@ -259,6 +260,18 @@ public class GlobalExceptionHandler {
         System.err.println("Chat Error: " + ex.getErrorCode().getCode() + " - " + ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponses.error(ex.getErrorCode().getCode(), ex.getMessage()));
+    }
+
+    @ExceptionHandler(AiAssistantException.class)
+    public ResponseEntity<ApiResponse<?>> handleAiAssistantException(AiAssistantException ex) {
+        System.err.println("AI Assistant Error: " + ex.getErrorCode().getCode() + " - " + ex.getMessage());
+        HttpStatus status = switch (ex.getErrorCode()) {
+            case NOT_CONFIGURED -> HttpStatus.SERVICE_UNAVAILABLE;
+            case UPSTREAM_ERROR, EMPTY_RESPONSE -> HttpStatus.BAD_GATEWAY;
+        };
+        return ResponseEntity
+                .status(status)
                 .body(ApiResponses.error(ex.getErrorCode().getCode(), ex.getMessage()));
     }
 
