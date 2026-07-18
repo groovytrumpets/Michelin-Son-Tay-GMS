@@ -3,6 +3,7 @@ package com.g42.platform.gms.common.handler;
 import com.g42.platform.gms.attendancerequest.domain.exception.AttendanceRequestException;
 import com.g42.platform.gms.auth.constant.AuthErrorCode;
 import com.g42.platform.gms.billing.domain.exception.BillingException;
+import com.g42.platform.gms.chat.exception.ChatException;
 import com.g42.platform.gms.booking.customer.domain.exception.BookingException;
 import com.g42.platform.gms.booking_management.domain.exception.BookingStaffException;
 import com.g42.platform.gms.common.dto.ApiResponse;
@@ -253,6 +254,14 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponses.errorBill(ex.getCode().name(), ex.getMessage()));
     }
+    @ExceptionHandler(ChatException.class)
+    public ResponseEntity<ApiResponse<?>> handleChatException(ChatException ex) {
+        System.err.println("Chat Error: " + ex.getErrorCode().getCode() + " - " + ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponses.error(ex.getErrorCode().getCode(), ex.getMessage()));
+    }
+
     @ExceptionHandler(ComboItemException.class)
     public ResponseEntity<ApiResponse<?>> handleComboException(ComboItemException ex) {
         System.err.println("ComboItem Error: " + ex.getCode() + " - " + ex.getMessage());

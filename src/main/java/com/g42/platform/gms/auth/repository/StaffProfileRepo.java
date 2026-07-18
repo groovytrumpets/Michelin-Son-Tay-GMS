@@ -24,4 +24,7 @@ public interface StaffProfileRepo extends JpaRepository<StaffProfile,Integer> {
     StaffProfile findByPhone(String phone);
     @Query("SELECT sp FROM StaffProfile sp WHERE sp.phone LIKE %:phone%")
     StaffProfile findByPhoneEquals(@Param("phone")String phone);
+
+    // Dùng cho danh bạ chat nội bộ (GET /api/chat/contacts?search=)
+    List<StaffProfile> findByFullNameContainingIgnoreCase(String fullName);
 }

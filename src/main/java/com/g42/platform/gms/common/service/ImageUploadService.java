@@ -166,4 +166,75 @@ public class ImageUploadService {
         log.info("Video uploaded successfully: {}", url);
         return url;
     }
+
+    /**
+     * Upload video kèm đầy đủ metadata (duration/width/height/thumbnail) — dùng cho chat.
+     * Không đổi chữ ký uploadVideo() cũ để tránh phá chỗ khác đang gọi.
+     */
+    public Map<String, Object> uploadVideoDetailed(MultipartFile file, String folder) throws IOException {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException(FileUploadConstants.ERROR_FILE_EMPTY);
+        }
+        if (file.getSize() > FileUploadConstants.MAX_VIDEO_SIZE_BYTES) {
+            throw new IllegalArgumentException("Dung lượng video vượt quá mức cho phép!");
+        }
+
+        Map<String, Object> options = new HashMap<>();
+        options.put("folder", folder);
+        options.put("resource_type", "video");
+        options.put("quality", "auto");
+        options.put("fetch_format", "auto");
+
+        Map uploadResult = cloudinary.uploader().upload(file.getBytes(), options);
+        String url = (String) uploadResult.get("secure_url");
+        log.info("Video uploaded successfully: {}", url);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("videoUrl", url);
+        result.put("publicId", extractPublicId(url));
+        result.put("durationSec", uploadResult.get("duration"));
+        result.put("width", uploadResult.get("width"));
+        result.put("height", uploadResult.get("height"));
+        result.put("format", uploadResult.get("format"));
+        Object thumb = uploadResult.get("secure_url");
+        result.put("thumbnailUrl", thumb == null ? null : String.valueOf(thumb).replaceFirst("\\.[a-zA-Z0-9]+$", ".jpg"));
+        return result;
+    }
+
+    /**
+     * Upload tệp bất kỳ (generic, resource_type=raw) — dùng cho chat file đính kèm.
+     */
+    public Map<String, Object> uploadFile(MultipartFile file, String folder) throws IOException {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException(FileUploadConstants.ERROR_FILE_EMPTY);
+        }
+        if (file.getSize() > FileUploadConstants.MAX_GENERIC_FILE_SIZE_BYTES) {
+            throw new IllegalArgumentException("File vượt quá dung lượng cho phép!");
+        }
+
+        // Upload bằng byte[] (không phải File) nên Cloudinary SDK không tự biết tên gốc —
+        // phải truyền rõ "filename", nếu không use_filename sẽ rơi về tên mặc định dạng
+        // "file_<random>" (mất tên gốc, người nhận tải về không biết đó là file gì).
+        String originalName = file.getOriginalFilename();
+        String baseName = originalName != null ? originalName.replaceFirst("\\.[^.]+$", "") : "file";
+
+        Map<String, Object> options = new HashMap<>();
+        options.put("folder", folder);
+        options.put("resource_type", "raw");
+        options.put("filename", baseName);
+        options.put("use_filename", true);
+        options.put("unique_filename", true);
+
+        Map uploadResult = cloudinary.uploader().upload(file.getBytes(), options);
+        String url = (String) uploadResult.get("secure_url");
+        log.info("File uploaded successfully: {}", url);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("fileUrl", url);
+        result.put("publicId", extractPublicId(url));
+        result.put("name", file.getOriginalFilename());
+        result.put("size", file.getSize());
+        result.put("format", uploadResult.get("format"));
+        return result;
+    }
 }

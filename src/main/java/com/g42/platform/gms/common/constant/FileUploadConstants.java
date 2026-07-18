@@ -30,6 +30,12 @@ public final class FileUploadConstants {
     public static final String FOLDER_STAFF_AVATAR = "garage/avatars/staff";
     public static final String FOLDER_BOOKING = "garage/booking";
     public static final String FOLDER_VEHICLE = "garage/vehicles";
+    public static final String FOLDER_CHAT_IMAGE = "garage/chat/images";
+    public static final String FOLDER_CHAT_VIDEO = "garage/chat/videos";
+    public static final String FOLDER_CHAT_FILE = "garage/chat/files";
+
+    // Generic file upload (chat) limits
+    public static final long MAX_GENERIC_FILE_SIZE_BYTES = 25L * 1024 * 1024; // 25MB
     
     // Image transformation
     public static final int AVATAR_SIZE = 500; // 500x500 pixels
