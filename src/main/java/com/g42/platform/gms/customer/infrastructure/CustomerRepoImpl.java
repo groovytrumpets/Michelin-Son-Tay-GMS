@@ -10,10 +10,12 @@ import com.g42.platform.gms.customer.domain.exception.CustomerErrorCode;
 import com.g42.platform.gms.customer.domain.exception.CustomerException;
 import com.g42.platform.gms.customer.domain.repository.CustomerRepo;
 import com.g42.platform.gms.customer.infrastructure.entity.CustomerAuthJpa;
+import com.g42.platform.gms.customer.infrastructure.entity.CustomerPointsJpa;
 import com.g42.platform.gms.customer.infrastructure.entity.CustomerProfileJpa;
 import com.g42.platform.gms.customer.infrastructure.mapper.CustomerAuthJpaMapper;
 import com.g42.platform.gms.customer.infrastructure.mapper.CustomerJpaMapper;
 import com.g42.platform.gms.customer.infrastructure.repository.CustomerAuthJpaRepo;
+import com.g42.platform.gms.customer.infrastructure.repository.CustomerPointsJpaRepo;
 import com.g42.platform.gms.customer.infrastructure.repository.CustomerProfileJpaRepo;
 import com.g42.platform.gms.customer.infrastructure.spectification.CustomerProfileSpecification;
 import lombok.AllArgsConstructor;
@@ -44,6 +46,8 @@ public class CustomerRepoImpl implements CustomerRepo {
     private PasswordEncoder passwordEncoder;
     @Autowired
     private CustomerProfileMapper customerProfileMapper;
+    @Autowired
+    private CustomerPointsJpaRepo customerPointsJpaRepo;
 
     @Override
     public CustomerProfile createNewCustomerProfile(CustomerCreateDto customerDto) {
@@ -92,6 +96,13 @@ public class CustomerRepoImpl implements CustomerRepo {
             CustomerProfile profile = customerJpaMapper.toDomain(jpa);
             CustomerAuthJpa auth = customerAuthJpaRepo.findByCustomerId(jpa.getCustomerId());
             if (auth != null) profile.setStatus(auth.getStatus());
+            // Default BRONZE nếu chưa có record điểm
+            profile.setCurrentRank(com.g42.platform.gms.customer.domain.enums.CustomerRank.BRONZE);
+            profile.setTotalPoints(0);
+            customerPointsJpaRepo.findByCustomerId(jpa.getCustomerId()).ifPresent(pts -> {
+                profile.setCurrentRank(pts.getCurrentRank());
+                profile.setTotalPoints(pts.getTotalPoints());
+            });
             return profile;
         });
     }
@@ -125,6 +136,13 @@ public class CustomerRepoImpl implements CustomerRepo {
         CustomerProfile profile = customerJpaMapper.toDomain(jpa);
         CustomerAuthJpa auth = customerAuthJpaRepo.findByCustomerId(customerId);
         if (auth != null) profile.setStatus(auth.getStatus());
+        // Default BRONZE nếu chưa có record điểm
+        profile.setCurrentRank(com.g42.platform.gms.customer.domain.enums.CustomerRank.BRONZE);
+        profile.setTotalPoints(0);
+        customerPointsJpaRepo.findByCustomerId(customerId).ifPresent(pts -> {
+            profile.setCurrentRank(pts.getCurrentRank());
+            profile.setTotalPoints(pts.getTotalPoints());
+        });
         return profile;
     }
 }
