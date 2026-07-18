@@ -3,6 +3,9 @@ package com.g42.platform.gms.warehouse.infrastructure.specification;
 import com.g42.platform.gms.warehouse.app.service.dto.PricingResolve;
 import org.apache.commons.lang3.tuple.Pair;
 import com.g42.platform.gms.warehouse.api.dto.CatalogItemDto;
+import com.g42.platform.gms.warehouse.api.dto.HomeCatalogItemInfoDto;
+import com.g42.platform.gms.warehouse.api.dto.HomeStockLocationDto;
+import com.g42.platform.gms.warehouse.api.dto.WarehouseDetailDto;
 import com.g42.platform.gms.warehouse.api.internal.WarehouseInternalApi;
 import com.g42.platform.gms.warehouse.app.service.inventory.InventoryService;
 import com.g42.platform.gms.warehouse.app.service.pricing.PricingService;
@@ -48,6 +51,10 @@ public class WarehouseInternalApiImpl implements WarehouseInternalApi {
     private ReturnEntryItemJpaRepo returnEntryItemJpaRepo;
     @Autowired
     private ReturnEntryJpaRepo returnEntryJpaRepo;
+    @Autowired
+    private BrandJpaRepo brandJpaRepo;
+    @Autowired
+    private ProductLineJpaRepo productLineJpaRepo;
 
     @Override
     public CatalogItemDto getItemInfo(Integer itemId) {
@@ -150,5 +157,87 @@ public class WarehouseInternalApiImpl implements WarehouseInternalApi {
             return pricingResolve.getFinalPrice();
         }
         return BigDecimal.ZERO;
+    }
+
+    @Override
+    public Map<Integer, HomeCatalogItemInfoDto> getHomeCatalogInfoByItemIds(java.util.Set<Integer> itemIds) {
+        if (itemIds == null || itemIds.isEmpty()) {
+            return Map.of();
+        }
+        List<CatalogItemJpa> items = catalogItemRepo.findAllById(itemIds);
+
+        java.util.Set<Integer> categoryIds = new java.util.HashSet<>();
+        java.util.Set<Integer> brandIds = new java.util.HashSet<>();
+        java.util.Set<Integer> lineIds = new java.util.HashSet<>();
+        for (CatalogItemJpa item : items) {
+            if (item.getWorkCategoryId() != null) categoryIds.add(item.getWorkCategoryId());
+            if (item.getBrandId() != null && item.getBrandId() != 0) brandIds.add(item.getBrandId());
+            if (item.getProductLineId() != null && item.getProductLineId() != 0) lineIds.add(item.getProductLineId());
+        }
+
+        Map<Integer, WorkCategoryJpaEntity> categoryMap = new HashMap<>();
+        if (!categoryIds.isEmpty()) {
+            for (WorkCategoryJpaEntity category : itemCategoryJpaRepo.findAllById(categoryIds)) {
+                categoryMap.put(category.getWorkCategoryId(), category);
+            }
+        }
+        Map<Integer, String> brandMap = brandJpaRepo.getBrandMapByIds(brandIds);
+        Map<Integer, String> lineMap = productLineJpaRepo.findAllLinesByIds(lineIds);
+
+        Map<Integer, Long> availableMap = new HashMap<>();
+        for (InventoryJpaRepo.ItemAvailableProjection row : inventoryJpaRepo.sumAvailableByItemIds(itemIds)) {
+            availableMap.put(row.getItemId(), row.getAvailableQty());
+        }
+
+        Map<Integer, HomeCatalogItemInfoDto> result = new HashMap<>();
+        for (CatalogItemJpa item : items) {
+            HomeCatalogItemInfoDto dto = new HomeCatalogItemInfoDto();
+            dto.setItemId(item.getItemId());
+            dto.setItemType(item.getItemType() != null ? item.getItemType().name() : null);
+            dto.setPrice(item.getPrice());
+            dto.setWorkCategoryId(item.getWorkCategoryId());
+            WorkCategoryJpaEntity category = item.getWorkCategoryId() != null ? categoryMap.get(item.getWorkCategoryId()) : null;
+            if (category != null) {
+                dto.setCategoryCode(category.getCategoryCode());
+                dto.setCategoryName(category.getCategoryName());
+            }
+            dto.setBrandId(item.getBrandId());
+            dto.setBrandName(item.getBrandId() != null ? brandMap.get(item.getBrandId()) : null);
+            dto.setProductLineId(item.getProductLineId());
+            dto.setProductLineName(item.getProductLineId() != null ? lineMap.get(item.getProductLineId()) : null);
+            dto.setCompatibleCars(item.getCompatibleCars());
+            Long available = availableMap.get(item.getItemId());
+            dto.setAvailableQty(available != null ? Math.toIntExact(Math.max(0, available)) : 0);
+            result.put(item.getItemId(), dto);
+        }
+        return result;
+    }
+
+    @Override
+    public List<HomeStockLocationDto> getHomeStockLocations(Integer itemId) {
+        if (itemId == null) {
+            return List.of();
+        }
+        List<WarehouseDetailDto> details = warehouseJpaRepo.getListOfWarehouseDetailsByItemId(itemId);
+        List<HomeStockLocationDto> result = new java.util.ArrayList<>();
+        for (WarehouseDetailDto detail : details) {
+            int available = (detail.getQuantity() != null ? detail.getQuantity() : 0)
+                    - (detail.getReservedQuantity() != null ? detail.getReservedQuantity() : 0);
+            if (available <= 0) continue;
+
+            WarehouseJpa warehouse = warehouseJpaRepo.findById(detail.getWarehouseId()).orElse(null);
+            if (warehouse == null || Boolean.FALSE.equals(warehouse.getIsActive())) continue;
+            if (warehouse.getWarehouseType() == com.g42.platform.gms.common.enums.WarehouseTypeEnum.DEFECTIVE) continue;
+
+            result.add(new HomeStockLocationDto(
+                    detail.getWarehouseId(),
+                    detail.getWarehouseCode(),
+                    detail.getWarehouseName(),
+                    warehouse.getWarehouseType() != null ? warehouse.getWarehouseType().name() : null,
+                    detail.getWarehouseAddress(),
+                    available
+            ));
+        }
+        return result;
     }
 }

@@ -10,6 +10,7 @@ import com.g42.platform.gms.marketing.service_catalog.api.dto.ServiceSumaryRespo
 import com.g42.platform.gms.marketing.service_catalog.application.service.ServiceCatalogService;
 import com.g42.platform.gms.warehouse.api.dto.CatalogCreateDto;
 import com.g42.platform.gms.warehouse.api.dto.CatalogItemDto;
+import com.g42.platform.gms.warehouse.api.dto.HomeStockLocationDto;
 import com.g42.platform.gms.warehouse.domain.entity.CatalogItem;
 import com.g42.platform.gms.warehouse.domain.enums.CatalogItemType;
 import com.g42.platform.gms.warehouse.infrastructure.entity.CatalogItemJpa;
@@ -46,9 +47,17 @@ public class ServiceController {
                    @RequestParam(required = false) BigDecimal maxPrice,
                    @RequestParam(required = false) String categoryCode,
                    @RequestParam(required = false) Integer brandId,
-                   @RequestParam(required = false) Integer productLineId){
-        Page<ServiceSumaryRespond> apiResponse = serviceCatalogService.getListProducts(page,size,itemType,search,sortBy,minPrice,maxPrice,categoryCode,brandId,productLineId);
+                   @RequestParam(required = false) Integer productLineId,
+                   @RequestParam(required = false) String vehicleBrand,
+                   @RequestParam(required = false) String vehicleModel){
+        Page<ServiceSumaryRespond> apiResponse = serviceCatalogService.getListProducts(page,size,itemType,search,sortBy,minPrice,maxPrice,categoryCode,brandId,productLineId,vehicleBrand,vehicleModel);
         return ResponseEntity.ok(ApiResponses.success(apiResponse));
+    }
+
+    /** Danh sách kho/cửa hàng còn hàng của một phụ tùng — public cho trang chi tiết sản phẩm. */
+    @GetMapping("/products/{catalogItemId}/stock-locations")
+    public ResponseEntity<ApiResponse<List<HomeStockLocationDto>>> getProductStockLocations(@PathVariable Integer catalogItemId) {
+        return ResponseEntity.ok(ApiResponses.success(serviceCatalogService.getPublicStockLocations(catalogItemId)));
     }
     @GetMapping("/service/{serviceId}")
     public ResponseEntity<ApiResponse<ServiceDetailRespond>> getServiceDetail(@PathVariable Long serviceId) {

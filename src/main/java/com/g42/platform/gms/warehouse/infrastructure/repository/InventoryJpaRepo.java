@@ -56,4 +56,21 @@ public interface InventoryJpaRepo extends JpaRepository<InventoryJpa, Integer> {
     List<InventoryJpa> findLowStockByWarehouse(@Param("warehouseId") Integer warehouseId);
 
     InventoryJpa getInventoryJpaByWarehouseIdAndItemId(Integer warehouseId, Integer itemId);
+
+    /** Tổng tồn khả dụng (quantity - reserved) theo item, chỉ tính kho active và không phải kho hàng lỗi. */
+    interface ItemAvailableProjection {
+        Integer getItemId();
+        Long getAvailableQty();
+    }
+
+    @Query("""
+        SELECT i.itemId as itemId, SUM(i.quantity - i.reservedQuantity) as availableQty
+        FROM InventoryJpa i, WarehouseJpa w
+        WHERE w.warehouseId = i.warehouseId
+          AND w.isActive = true
+          AND w.warehouseType <> com.g42.platform.gms.common.enums.WarehouseTypeEnum.DEFECTIVE
+          AND i.itemId IN :itemIds
+        GROUP BY i.itemId
+    """)
+    List<ItemAvailableProjection> sumAvailableByItemIds(@Param("itemIds") java.util.Set<Integer> itemIds);
 }

@@ -33,4 +33,18 @@ public class CatalogItemJpa {
     private ServiceJpaEntity serviceService;
     @Column(name = "work_category_id")
     private Integer workCategoryId;
+
+    // Các cột đọc-thêm phục vụ lọc sản phẩm public (/home/products);
+    // ghi/cập nhật các cột này do module warehouse (CatalogItemJpa bên warehouse) đảm nhiệm.
+    @Column(name = "price", insertable = false, updatable = false)
+    private java.math.BigDecimal price;
+
+    @Column(name = "brand_id", insertable = false, updatable = false)
+    private Integer brandId;
+
+    @Column(name = "product_line_id", insertable = false, updatable = false)
+    private Integer productLineId;
+
+    @Column(name = "compatible_cars", insertable = false, updatable = false)
+    private String compatibleCars;
 }

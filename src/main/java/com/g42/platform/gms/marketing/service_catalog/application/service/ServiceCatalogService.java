@@ -11,6 +11,7 @@ import com.g42.platform.gms.marketing.service_catalog.domain.enums.MediaType;
 import com.g42.platform.gms.marketing.service_catalog.domain.exception.ServiceErrorCode;
 import com.g42.platform.gms.marketing.service_catalog.domain.exception.ServiceException;
 import com.g42.platform.gms.marketing.service_catalog.domain.repository.ServiceRepository;
+import com.g42.platform.gms.warehouse.api.dto.HomeCatalogItemInfoDto;
 import com.g42.platform.gms.warehouse.api.internal.WarehouseInternalApi;
 import com.g42.platform.gms.warehouse.domain.enums.CatalogItemType;
 import lombok.AllArgsConstructor;
@@ -171,13 +172,54 @@ public class ServiceCatalogService {
         return serviceDtoMapper.toDetailDto(serviceRepository.save(service));
     }
 
-    public Page<ServiceSumaryRespond> getListProducts(int page, int size, CatalogItemType itemType, String search, String sortBy, BigDecimal minPrice, BigDecimal maxPrice, String categoryCode, Integer brandId, Integer productLineId) {
+    public Page<ServiceSumaryRespond> getListProducts(int page, int size, CatalogItemType itemType, String search, String sortBy, BigDecimal minPrice, BigDecimal maxPrice, String categoryCode, Integer brandId, Integer productLineId, String vehicleBrand, String vehicleModel) {
         Integer resolvedCategoryId = null;
         if (categoryCode != null) {
             resolvedCategoryId = warehouseInternalApi.findCodeByCategoryCode(categoryCode);
         }
         Page<com.g42.platform.gms.marketing.service_catalog.domain.entity.Service> services =
-                serviceRepository.getListOfProductsByCatalogItem(page,size,itemType,search,sortBy,maxPrice,minPrice,resolvedCategoryId,brandId,productLineId);
-        return services.map(serviceDtoMapper::toDto);
+                serviceRepository.getListOfProductsByCatalogItem(page,size,itemType,search,sortBy,maxPrice,minPrice,resolvedCategoryId,brandId,productLineId,vehicleBrand,vehicleModel);
+        Page<ServiceSumaryRespond> dtoPage = services.map(serviceDtoMapper::toDto);
+        enrichWithWarehouseInfo(dtoPage.getContent());
+        return dtoPage;
+    }
+
+    /** Kho/cửa hàng còn hàng của một item — public cho trang chi tiết phụ tùng. */
+    public List<com.g42.platform.gms.warehouse.api.dto.HomeStockLocationDto> getPublicStockLocations(Integer catalogItemId) {
+        return warehouseInternalApi.getHomeStockLocations(catalogItemId);
+    }
+
+    /**
+     * Bổ sung thông tin từ kho (hạng mục báo giá, hãng/dòng, xe tương thích, tồn kho khả dụng)
+     * cho danh sách sản phẩm public. Batch một lượt theo catalogItemId để tránh N+1.
+     */
+    private void enrichWithWarehouseInfo(List<ServiceSumaryRespond> dtos) {
+        java.util.Set<Integer> itemIds = new java.util.HashSet<>();
+        for (ServiceSumaryRespond dto : dtos) {
+            if (dto.getCatalogItemId() > 0) itemIds.add(dto.getCatalogItemId());
+        }
+        if (itemIds.isEmpty()) return;
+
+        java.util.Map<Integer, HomeCatalogItemInfoDto> infoMap = warehouseInternalApi.getHomeCatalogInfoByItemIds(itemIds);
+        for (ServiceSumaryRespond dto : dtos) {
+            HomeCatalogItemInfoDto info = infoMap.get(dto.getCatalogItemId());
+            if (info == null) continue;
+            dto.setItemType(info.getItemType());
+            dto.setPrice(info.getPrice());
+            dto.setWorkCategoryId(info.getWorkCategoryId());
+            dto.setCategoryCode(info.getCategoryCode());
+            dto.setCategoryName(info.getCategoryName());
+            dto.setBrandId(info.getBrandId());
+            dto.setBrandName(info.getBrandName());
+            dto.setProductLineId(info.getProductLineId());
+            dto.setProductLineName(info.getProductLineName());
+            dto.setCompatibleCars(info.getCompatibleCars());
+            Integer availableQty = info.getAvailableQty();
+            dto.setAvailableQty(availableQty);
+            // inStock chỉ có ý nghĩa với phụ tùng; dịch vụ không quản lý tồn kho
+            if ("PART".equalsIgnoreCase(info.getItemType())) {
+                dto.setInStock(availableQty != null && availableQty > 0);
+            }
+        }
     }
 }

@@ -54,7 +54,7 @@ public class ServiceRepositoryImpl implements ServiceRepository {
     }
 
     @Override
-    public Page<Service> getListOfProductsByCatalogItem(int page, int size, CatalogItemType itemType, String search, String sortBy, BigDecimal maxPrice, BigDecimal minPrice, Integer categoryCode, Integer brandId, Integer productLineId) {
+    public Page<Service> getListOfProductsByCatalogItem(int page, int size, CatalogItemType itemType, String search, String sortBy, BigDecimal maxPrice, BigDecimal minPrice, Integer categoryCode, Integer brandId, Integer productLineId, String vehicleBrand, String vehicleModel) {
         Sort sort = Sort.by(Sort.Direction.ASC, "createdAt");
         if (sortBy != null && !sortBy.isEmpty()) {
             String[] parts = sortBy.split(",");
@@ -66,7 +66,7 @@ public class ServiceRepositoryImpl implements ServiceRepository {
         Pageable pageable = PageRequest.of(page, size, sort);
         Specification<ServiceJpaEntity> specification = Specification.unrestricted();
         specification = specification.and(ServiceSpecification.
-                filterServices(itemType,maxPrice,minPrice,categoryCode,brandId,productLineId,search));
+                filterServices(itemType,maxPrice,minPrice,categoryCode,brandId,productLineId,search,vehicleBrand,vehicleModel));
         return serviceJpaRepository.findAll(specification,pageable).map(serviceMapper::toDomain);
     }
 }

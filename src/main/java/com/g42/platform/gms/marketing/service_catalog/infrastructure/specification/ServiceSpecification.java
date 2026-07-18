@@ -17,7 +17,8 @@ import java.util.List;
 public class ServiceSpecification {
     public static Specification<ServiceJpaEntity> filterServices(
             CatalogItemType itemType, BigDecimal maxPrice, BigDecimal minPrice,
-            Integer categoryCode, Integer brandId, Integer productLineId, String search) {
+            Integer categoryCode, Integer brandId, Integer productLineId, String search,
+            String vehicleBrand, String vehicleModel) {
 
         return (root, query, cb) -> {
             // QUAN TRỌNG: Loại bỏ các Service bị trùng lặp trong kết quả trả về
@@ -53,12 +54,21 @@ public class ServiceSpecification {
                 predicates.add(cb.equal(catalogJoin.get("brandId"), brandId));
             }
             if (productLineId != null) {
-                // Đảm bảo tên "productLine" khớp với tên biến trong CatalogItemJpa
-                predicates.add(cb.equal(catalogJoin.get("productLine"), productLineId));
+                predicates.add(cb.equal(catalogJoin.get("productLineId"), productLineId));
             }
             if (categoryCode != null) {
                 // Đã sửa lại tên trường "workCategoryId" và dùng biến categoryCode truyền vào
                 predicates.add(cb.equal(catalogJoin.get("workCategoryId"), categoryCode));
+            }
+
+            // Lọc theo hãng xe / dòng xe tương thích (LIKE trên cột compatible_cars)
+            if (vehicleBrand != null && !vehicleBrand.trim().isEmpty()) {
+                predicates.add(cb.like(cb.lower(catalogJoin.get("compatibleCars")),
+                        "%" + vehicleBrand.trim().toLowerCase() + "%"));
+            }
+            if (vehicleModel != null && !vehicleModel.trim().isEmpty()) {
+                predicates.add(cb.like(cb.lower(catalogJoin.get("compatibleCars")),
+                        "%" + vehicleModel.trim().toLowerCase() + "%"));
             }
 
             // Gộp tất cả các điều kiện lại bằng AND
