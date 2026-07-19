@@ -7,4 +7,6 @@ import lombok.Data;
 @AllArgsConstructor
 public class AiChatResponse {
     private String reply;
+    private AiUsageDto usage;
+    private AiQuotaDto quota;
 }

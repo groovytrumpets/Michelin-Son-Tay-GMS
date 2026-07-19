@@ -8,7 +8,8 @@ import lombok.RequiredArgsConstructor;
 public enum AiAssistantErrorCode {
     NOT_CONFIGURED("AI_NOT_CONFIGURED", "Trợ lý AI chưa được cấu hình"),
     UPSTREAM_ERROR("AI_UPSTREAM_ERROR", "Trợ lý AI đang gặp sự cố, vui lòng thử lại sau"),
-    EMPTY_RESPONSE("AI_EMPTY_RESPONSE", "Trợ lý AI không trả về nội dung");
+    EMPTY_RESPONSE("AI_EMPTY_RESPONSE", "Trợ lý AI không trả về nội dung"),
+    RATE_LIMITED("AI_RATE_LIMITED", "Bạn đang gửi quá nhiều yêu cầu, vui lòng thử lại sau ít phút");
 
     private final String code;
     private final String message;

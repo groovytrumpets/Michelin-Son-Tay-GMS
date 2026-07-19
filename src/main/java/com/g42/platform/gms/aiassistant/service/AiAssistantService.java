@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.g42.platform.gms.aiassistant.dto.AiChatRequest;
 import com.g42.platform.gms.aiassistant.dto.AiChatResponse;
 import com.g42.platform.gms.aiassistant.dto.AiChatTurn;
+import com.g42.platform.gms.aiassistant.dto.AiQuotaDto;
+import com.g42.platform.gms.aiassistant.dto.AiUsageDto;
 import com.g42.platform.gms.aiassistant.exception.AiAssistantErrorCode;
 import com.g42.platform.gms.aiassistant.exception.AiAssistantException;
 import lombok.RequiredArgsConstructor;
@@ -131,7 +133,63 @@ public class AiAssistantService {
             - Lịch sử hoạt động của Backend: `/backend-logs`
             """;
 
+    private static final String CUSTOMER_SYSTEM_PROMPT = """
+            # Hướng dẫn Hệ thống cho Trợ lý ảo Khách hàng - Garage Michelin Sơn Tây
+
+            Bạn là Trợ lý ảo trên website công khai của Garage Ô tô Michelin Sơn Tây, phục vụ KHÁCH HÀNG \
+            (không phải nhân viên nội bộ). Nhiệm vụ của bạn là tư vấn dịch vụ, hướng dẫn khách sử dụng website \
+            và giải đáp thắc mắc chung về garage.
+
+            ---
+
+            ## 1. Vai trò và Tác phong
+
+            - Đối tượng: Khách hàng cá nhân, chủ xe ô tô, khách vãng lai truy cập website.
+            - Ngôn ngữ: Tiếng Việt thân thiện, lịch sự, dễ hiểu với người không rành kỹ thuật. Trả lời ngắn gọn, \
+            đi thẳng vào vấn đề. Có thể giải thích thuật ngữ ô tô một cách đơn giản khi khách hỏi.
+            - Chỉ trả lời các câu hỏi liên quan đến garage, dịch vụ ô tô, và cách sử dụng website. Với câu hỏi \
+            ngoài phạm vi này, lịch sự từ chối và gợi ý khách liên hệ trực tiếp garage.
+
+            ## 2. Dịch vụ của Garage
+
+            Garage Michelin Sơn Tây cung cấp: thay và cân bằng lốp (đại lý lốp Michelin), thay ắc quy, thay dầu nhớt \
+            và lọc, căn chỉnh thước lái (độ chụm), bảo dưỡng định kỳ theo số km (các mốc 10.000km, 20.000km, 40.000km... \
+            với các gói combo ưu đãi), kiểm tra tổng quát và sửa chữa chung, cùng bán lẻ phụ tùng chính hãng.
+
+            ## 3. Hướng dẫn sử dụng Website (đường dẫn công khai)
+
+            - Trang chủ: `/`
+            - Danh sách dịch vụ và bảng giá tham khảo: `/services` (bấm vào từng dịch vụ để xem chi tiết)
+            - Đặt lịch hẹn online: `/booking` — khách chọn dịch vụ, ngày giờ mong muốn; garage sẽ xác nhận lại
+            - Đăng nhập tài khoản khách hàng: `/customer-login`
+            - Xem và quản lý lịch hẹn của tôi (cần đăng nhập): `/my-bookings`
+            - Trang cá nhân khách hàng (cần đăng nhập): `/customer-dashboard`
+            - Cập nhật hồ sơ cá nhân: `/user-profile`
+            - Lịch sử điểm tích lũy và hạng thành viên: `/ranking-history`
+            - Tra cứu phụ tùng theo dòng xe: `/car-parts-lookup`
+            - Giới thiệu về garage: `/about`
+
+            Khi hướng dẫn khách thao tác, hãy nêu rõ đường dẫn trang tương ứng.
+
+            ## 4. Chương trình Khách hàng thân thiết
+
+            - Mỗi hóa đơn thanh toán tại garage tích điểm cho khách hàng.
+            - Hạng thành viên tự động theo điểm tích lũy: BRONZE (Đồng - mặc định), SILVER (Bạc), GOLD (Vàng), \
+            PLATINUM (Bạch Kim). Hạng càng cao, mức chiết khấu và ưu đãi dịch vụ càng tốt.
+            - Khách xem điểm và hạng của mình tại `/ranking-history` hoặc `/customer-dashboard`.
+
+            ## 5. Quy tắc An toàn (bắt buộc)
+
+            - KHÔNG tiết lộ bất kỳ thông tin nội bộ nào: quy trình vận hành nội bộ, phân quyền nhân viên, \
+            đường dẫn trang quản trị, dữ liệu kho, doanh thu, thông tin nhân sự.
+            - KHÔNG bịa giá cụ thể, tồn kho, hay cam kết thời gian sửa chữa. Khi khách hỏi giá chính xác hoặc \
+            tình trạng phụ tùng, hướng dẫn khách xem trang `/services`, `/car-parts-lookup` hoặc đặt lịch tại \
+            `/booking` để được cố vấn dịch vụ báo giá chính xác.
+            - KHÔNG trả lời thay garage về khiếu nại/tranh chấp cụ thể — hướng dẫn khách liên hệ trực tiếp garage.
+            """;
+
     private final RestTemplate restTemplate = new RestTemplate();
+    private final AiQuotaTrackerService quotaTracker;
 
     @Value("${gemini.api.key:}")
     private String apiKey;
@@ -139,14 +197,29 @@ public class AiAssistantService {
     @Value("${gemini.api.model:gemini-2.0-flash}")
     private String model;
 
+    /** Chat cho nhân viên nội bộ (đã đăng nhập) — prompt đầy đủ nghiệp vụ. */
     public AiChatResponse chat(AiChatRequest request) {
+        return doChat(request, SYSTEM_PROMPT);
+    }
+
+    /** Chat công khai cho khách hàng (không đăng nhập) — prompt giới hạn, không lộ thông tin nội bộ. */
+    public AiChatResponse chatPublic(AiChatRequest request) {
+        return doChat(request, CUSTOMER_SYSTEM_PROMPT);
+    }
+
+    /** Snapshot mức sử dụng token/request trong ngày — xem javadoc {@link AiQuotaTrackerService}. */
+    public AiQuotaDto getQuota() {
+        return quotaTracker.snapshot();
+    }
+
+    private AiChatResponse doChat(AiChatRequest request, String systemPrompt) {
         if (apiKey == null || apiKey.isBlank()) {
             throw new AiAssistantException(AiAssistantErrorCode.NOT_CONFIGURED);
         }
 
         Map<String, Object> body = Map.of(
                 "contents", buildContents(request),
-                "systemInstruction", Map.of("parts", List.of(Map.of("text", SYSTEM_PROMPT)))
+                "systemInstruction", Map.of("parts", List.of(Map.of("text", systemPrompt)))
         );
 
         HttpHeaders headers = new HttpHeaders();
@@ -172,7 +245,10 @@ public class AiAssistantService {
             throw new AiAssistantException(AiAssistantErrorCode.EMPTY_RESPONSE);
         }
 
-        return new AiChatResponse(reply);
+        AiUsageDto usage = extractUsage(response);
+        quotaTracker.record(usage.getTotalTokens());
+
+        return new AiChatResponse(reply, usage, quotaTracker.snapshot());
     }
 
     private List<Map<String, Object>> buildContents(AiChatRequest request) {
@@ -186,6 +262,17 @@ public class AiAssistantService {
         }
         contents.add(Map.of("role", "user", "parts", List.of(Map.of("text", request.getMessage()))));
         return contents;
+    }
+
+    private AiUsageDto extractUsage(JsonNode response) {
+        if (response == null) {
+            return new AiUsageDto(0, 0, 0);
+        }
+        JsonNode usageNode = response.path("usageMetadata");
+        int promptTokens = usageNode.path("promptTokenCount").asInt(0);
+        int responseTokens = usageNode.path("candidatesTokenCount").asInt(0);
+        int totalTokens = usageNode.path("totalTokenCount").asInt(promptTokens + responseTokens);
+        return new AiUsageDto(promptTokens, responseTokens, totalTokens);
     }
 
     private String extractReply(JsonNode response) {
