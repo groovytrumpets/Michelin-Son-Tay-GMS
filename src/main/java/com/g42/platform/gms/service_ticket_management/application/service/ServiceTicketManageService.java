@@ -13,8 +13,10 @@ import com.g42.platform.gms.common.service.ExcelService;
 import com.g42.platform.gms.billing.domain.entity.ServiceBill;
 import com.g42.platform.gms.billing.domain.repository.BillingRepository;
 import com.g42.platform.gms.dashboard.application.service.StaffNotifyService;
+import com.g42.platform.gms.estimation.api.dto.UsedEstimateItemDto;
 import com.g42.platform.gms.estimation.api.internal.EstimateInternalApi;
 import com.g42.platform.gms.estimation.domain.entity.Estimate;
+import com.g42.platform.gms.service_ticket_management.api.dto.manage.UsedItemHistoryResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceQueueResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceTicketDetailResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceTicketListResponse;
@@ -53,6 +55,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -547,6 +551,54 @@ public class ServiceTicketManageService {
         }
         List<ServiceTicket> serviceTickets = serviceTicketRepo.findByCustomerId(customerId);
         return serviceTickets.stream().map(this::mapToListResponse).toList();
+    }
+
+    /** Số phiếu dịch vụ gần nhất được dùng để tổng hợp lịch sử phụ tùng/dịch vụ đã sử dụng. */
+    private static final int USED_ITEMS_HISTORY_TICKET_LIMIT = 5;
+
+    /**
+     * Danh sách phụ tùng/dịch vụ khách đã sử dụng, tổng hợp từ bản báo giá mới nhất của N phiếu
+     * dịch vụ gần nhất của khách hàng. Mỗi dòng kèm ticketCode để FE mở lại phiếu dịch vụ.
+     */
+    @Transactional(readOnly = true)
+    public List<UsedItemHistoryResponse> getUsedItemsHistory(Integer customerId) {
+        if (customerId == null) {
+            throw new AssignmentException("CustomerId is null!", AssignmentErrorCode.BAD_REQUEST);
+        }
+
+        List<ServiceTicket> serviceTickets = serviceTicketRepo.findByCustomerId(customerId);
+        if (serviceTickets.isEmpty()) {
+            return List.of();
+        }
+
+        List<ServiceTicket> recentTickets = serviceTickets.stream()
+                .sorted(Comparator.comparing(ServiceTicket::getReceivedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .limit(USED_ITEMS_HISTORY_TICKET_LIMIT)
+                .toList();
+
+        Map<Integer, ServiceTicket> ticketById = recentTickets.stream()
+                .collect(Collectors.toMap(ServiceTicket::getServiceTicketId, t -> t));
+
+        List<UsedEstimateItemDto> items = estimateInternalApi.findUsedItemsHistoryByServiceTicketIds(
+                new ArrayList<>(ticketById.keySet()));
+
+        return items.stream()
+                .map(item -> {
+                    ServiceTicket ticket = ticketById.get(item.getServiceTicketId());
+                    UsedItemHistoryResponse response = new UsedItemHistoryResponse();
+                    response.setServiceTicketId(item.getServiceTicketId());
+                    response.setTicketCode(ticket != null ? ticket.getTicketCode() : null);
+                    response.setReceivedAt(ticket != null ? ticket.getReceivedAt() : null);
+                    response.setItemName(item.getItemName());
+                    response.setCategoryName(item.getCategoryName());
+                    response.setQuantity(item.getQuantity());
+                    response.setUnitPrice(item.getUnitPrice());
+                    response.setFinalPrice(item.getFinalPrice());
+                    response.setIsGift(item.getIsGift());
+                    return response;
+                })
+                .sorted(Comparator.comparing(UsedItemHistoryResponse::getReceivedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList();
     }
 }
 

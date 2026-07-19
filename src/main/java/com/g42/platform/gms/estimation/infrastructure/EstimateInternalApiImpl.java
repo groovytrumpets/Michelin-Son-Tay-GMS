@@ -1,12 +1,15 @@
 package com.g42.platform.gms.estimation.infrastructure;
 
+import com.g42.platform.gms.estimation.api.dto.UsedEstimateItemDto;
 import com.g42.platform.gms.estimation.api.internal.EstimateInternalApi;
 import com.g42.platform.gms.estimation.domain.entity.Estimate;
 import com.g42.platform.gms.estimation.domain.entity.EstimateItem;
+import com.g42.platform.gms.estimation.domain.entity.WorkCategory;
 import com.g42.platform.gms.estimation.domain.exception.EstimateErrorCode;
 import com.g42.platform.gms.estimation.domain.exception.EstimateException;
 import com.g42.platform.gms.estimation.domain.repository.EstimateItemRepository;
 import com.g42.platform.gms.estimation.domain.repository.EstimateRepository;
+import com.g42.platform.gms.estimation.domain.repository.WorkCategoryRepository;
 import com.g42.platform.gms.estimation.infrastructure.entity.EstimateItemJpa;
 import com.g42.platform.gms.estimation.infrastructure.entity.EstimateJpa;
 import com.g42.platform.gms.estimation.infrastructure.entity.ServiceReminderJpa;
@@ -28,9 +31,12 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 public class EstimateInternalApiImpl implements EstimateInternalApi {
@@ -54,10 +60,55 @@ public class EstimateInternalApiImpl implements EstimateInternalApi {
     private WarehouseInternalApi warehouseInternalApi;
     @Autowired
     private StockIssueJpaRepo stockIssueJpaRepo;
+    @Autowired
+    private WorkCategoryRepository workCategoryRepository;
 
     @Override
     public List<Estimate> findAllByServiceTicketId(List<Integer> ticketIds) {
         return estimateRepositoryJpa.findByServiceTicketIdsAndVersionTop(ticketIds).stream().map(estimateJpaMapper::toDomain).toList();
+    }
+
+    @Override
+    public List<UsedEstimateItemDto> findUsedItemsHistoryByServiceTicketIds(List<Integer> ticketIds) {
+        if (ticketIds == null || ticketIds.isEmpty()) {
+            return List.of();
+        }
+
+        // Estimate mới nhất (theo version) của mỗi service ticket
+        List<EstimateJpa> latestEstimates = estimateRepositoryJpa.findByServiceTicketIdsAndVersionTop(ticketIds);
+        if (latestEstimates.isEmpty()) {
+            return List.of();
+        }
+        Map<Integer, Integer> estimateIdToTicketId = latestEstimates.stream()
+                .collect(Collectors.toMap(EstimateJpa::getId, EstimateJpa::getServiceTicketId));
+
+        List<EstimateItemJpa> items = estimateItemRepositoryJpa.findByEstimateIds(new ArrayList<>(estimateIdToTicketId.keySet()));
+
+        List<Integer> categoryIds = items.stream()
+                .map(EstimateItemJpa::getWorkCategoryId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<Integer, WorkCategory> categoryMap = categoryIds.isEmpty()
+                ? Map.of()
+                : workCategoryRepository.findAllById(categoryIds).stream()
+                        .collect(Collectors.toMap(WorkCategory::getId, wc -> wc));
+
+        return items.stream()
+                .filter(item -> !Boolean.TRUE.equals(item.getIsRemoved()))
+                .map(item -> {
+                    UsedEstimateItemDto dto = new UsedEstimateItemDto();
+                    dto.setServiceTicketId(estimateIdToTicketId.get(item.getEstimateId()));
+                    dto.setItemName(item.getItemName());
+                    WorkCategory category = categoryMap.get(item.getWorkCategoryId());
+                    dto.setCategoryName(category != null ? category.getCategoryName() : null);
+                    dto.setQuantity(item.getQuantity());
+                    dto.setUnitPrice(item.getUnitPrice());
+                    dto.setFinalPrice(item.getFinalPrice());
+                    dto.setIsGift(item.getIsGift());
+                    return dto;
+                })
+                .toList();
     }
 
     @Override

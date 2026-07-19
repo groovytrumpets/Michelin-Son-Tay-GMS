@@ -6,6 +6,7 @@ import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceTicketDetailResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceTicketListResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.UpdateServiceTicketRequest;
+import com.g42.platform.gms.service_ticket_management.api.dto.manage.UsedItemHistoryResponse;
 import com.g42.platform.gms.service_ticket_management.application.service.ServiceTicketAdvisorService;
 import com.g42.platform.gms.service_ticket_management.application.service.ServiceTicketManageService;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
@@ -187,6 +188,16 @@ public class ServiceTicketAdvisorController {
     public ResponseEntity<ApiResponse<List<ServiceTicketListResponse>>> getBookedHistory
             (@RequestParam Integer customerId) {
         return ResponseEntity.ok(ApiResponses.success(manageService.getBookedHistory(customerId)));
+    }
+
+    /**
+     * Danh sách phụ tùng/dịch vụ khách đã sử dụng (tổng hợp từ các phiếu dịch vụ gần nhất của khách hàng).
+     * Mỗi dòng kèm ticketCode để FE mở lại phiếu dịch vụ tương ứng.
+     */
+    @GetMapping("/booking/history/items")
+    public ResponseEntity<ApiResponse<List<UsedItemHistoryResponse>>> getUsedItemsHistory
+            (@RequestParam Integer customerId) {
+        return ResponseEntity.ok(ApiResponses.success(manageService.getUsedItemsHistory(customerId)));
     }
 }
 
