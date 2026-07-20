@@ -1,5 +1,6 @@
 package com.g42.platform.gms.systemlog.service;
 
+import com.g42.platform.gms.auth.entity.CustomerPrincipal;
 import com.g42.platform.gms.auth.entity.StaffPrincipal;
 import com.g42.platform.gms.systemlog.entity.SystemLogJpa;
 import com.g42.platform.gms.systemlog.repository.SystemLogJpaRepo;
@@ -58,6 +59,9 @@ public class AuditService {
                 principal.getAuthorities().stream().findFirst()
                         .map(a -> a.getAuthority().replaceFirst("^ROLE_", ""))
                         .ifPresent(builder::actorRole);
+            } else if (auth != null && auth.getPrincipal() instanceof CustomerPrincipal customer) {
+                builder.actorName(customer.getName());
+                builder.actorRole("CUSTOMER");
             }
         } catch (Exception ignored) {
         }
