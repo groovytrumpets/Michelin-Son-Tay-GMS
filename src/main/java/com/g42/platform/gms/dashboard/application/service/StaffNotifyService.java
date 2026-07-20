@@ -6,6 +6,7 @@ import com.g42.platform.gms.dashboard.api.mapper.StaffNotifyDtoMapper;
 import com.g42.platform.gms.dashboard.domain.entity.StaffNotification;
 import com.g42.platform.gms.dashboard.domain.enums.NotificationType;
 import com.g42.platform.gms.dashboard.domain.repository.StaffNotifyRepo;
+import com.g42.platform.gms.push.application.service.WebPushDispatchService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,8 @@ public class StaffNotifyService {
     private SimpMessagingTemplate simpMessagingTemplate;
     @Autowired
     private StaffNotifyDtoMapper staffNotifyDtoMapper;
+    @Autowired
+    private WebPushDispatchService webPushDispatchService;
 
     public void sendNotification(StaffNotification saved) {
         if (saved.getStaffId()==null) {
@@ -30,6 +33,10 @@ public class StaffNotifyService {
         }else {
             simpMessagingTemplate.convertAndSendToUser(saved.getStaffId().toString(), "/queue/private-notifications", saved);
         }
+
+        // Đẩy thông báo cấp hệ điều hành (Web Push) để nhận cả khi đã tắt web.
+        // Chạy bất đồng bộ; nếu chưa cấu hình VAPID thì tự no-op.
+        webPushDispatchService.dispatch(saved);
     }
     @Transactional
     public void createAndSendManual(NotificationCreateDto dto) {

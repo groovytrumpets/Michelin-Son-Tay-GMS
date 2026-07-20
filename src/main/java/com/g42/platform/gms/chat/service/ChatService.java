@@ -13,6 +13,7 @@ import com.g42.platform.gms.chat.repository.ChatMessageJpaRepo;
 import com.g42.platform.gms.chat.repository.ConversationJpaRepo;
 import com.g42.platform.gms.chat.repository.ConversationParticipantJpaRepo;
 import com.g42.platform.gms.chat.repository.MessageAttachmentJpaRepo;
+import com.g42.platform.gms.push.application.service.WebPushDispatchService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -35,6 +36,7 @@ public class ChatService {
     private final StaffProfileRepo staffProfileRepo;
     private final ChatPresenceService presenceService;
     private final SimpMessagingTemplate simpMessagingTemplate;
+    private final WebPushDispatchService webPushDispatchService;
 
     // ===================== Contacts =====================
 
@@ -256,7 +258,36 @@ public class ChatService {
             simpMessagingTemplate.convertAndSendToUser(p.getStaffId().toString(), "/queue/chat-messages", dto);
         }
 
+        // Web Push cho người nhận (trừ người gửi) — chỉ khi tin nhắn mới, tránh push
+        // lại khi client gửi trùng clientMsgId. SW tự bỏ qua nếu tab người nhận đang mở.
+        if (existing.isEmpty()) {
+            List<Integer> recipients = participants.stream()
+                    .map(ConversationParticipantJpa::getStaffId)
+                    .filter(id -> id != null && !id.equals(senderId))
+                    .toList();
+            webPushDispatchService.sendChatMessage(recipients, dto.getSenderName(),
+                    buildChatPreview(dto), conversationId);
+        }
+
         return dto;
+    }
+
+    /** Tạo dòng xem trước ngắn gọn cho thông báo đẩy từ một tin nhắn chat. */
+    private String buildChatPreview(MessageDto dto) {
+        String text = dto.getText();
+        if (StringUtils.hasText(text)) {
+            String trimmed = text.trim();
+            return trimmed.length() > 120 ? trimmed.substring(0, 120) + "…" : trimmed;
+        }
+        String type = dto.getType() == null ? "" : dto.getType().toLowerCase();
+        return switch (type) {
+            case "sticker" -> "Đã gửi một nhãn dán";
+            case "image" -> "Đã gửi một hình ảnh";
+            default -> {
+                boolean hasAttachment = dto.getAttachments() != null && !dto.getAttachments().isEmpty();
+                yield hasAttachment ? "Đã gửi một tệp đính kèm" : "Đã gửi một tin nhắn";
+            }
+        };
     }
 
     @Transactional
