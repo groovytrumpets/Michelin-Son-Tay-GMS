@@ -256,9 +256,10 @@ public class EstimateService {
                 existing.setQuantity(req.getQuantity());
                 
                 // Recalculate unit price using config if provided, otherwise use request unit price
+                // Dùng warehouseId mới nhất từ request (chưa được set vào existing ở dưới) để tra đúng lô hàng.
                 BigDecimal calculatedUnitPrice = calculateMarkupUnitPrice(
                     existing.getItemId(),
-                    existing.getWarehouseId(),
+                    req.getWarehouseId(),
                     request.getFallbackPricingConfigId(),
                     request.getEstimateType(),
                     req.getUnitPrice()
@@ -1043,10 +1044,12 @@ public class EstimateService {
             }
             if (cost == null) {
                 CatalogItem catalogItem = warehouseInternalApi.findCatalogById(itemId);
-                cost = catalogItem != null ? catalogItem.getPrice() : BigDecimal.ZERO;
+                cost = catalogItem != null ? catalogItem.getPrice() : null;
             }
-            if (cost == null) {
-                cost = BigDecimal.ZERO;
+            // Không tra được giá vốn hợp lệ (không có lô hàng, catalog chưa có giá...) thì giữ nguyên
+            // đơn giá đã gửi lên thay vì nhân với 0, tránh đánh mất đơn giá/thành tiền của dòng ước tính.
+            if (cost == null || cost.compareTo(BigDecimal.ZERO) <= 0) {
+                return defaultPrice != null ? defaultPrice : BigDecimal.ZERO;
             }
 
             boolean isWholesale = false;
