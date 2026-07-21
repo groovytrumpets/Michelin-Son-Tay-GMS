@@ -31,6 +31,7 @@ public class CatalogWarehouseDto {
     private String itemCategoryCode;
     private String madeIn;
     private Integer taxRuleId;
+    private Integer workCategoryId;
     private String partNumber;
     private String barcode;
     private String color;

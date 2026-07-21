@@ -7,6 +7,7 @@ import com.g42.platform.gms.booking_management.infrastructure.entity.BookingRequ
 import com.g42.platform.gms.customer.domain.entity.CustomerProfile;
 import com.g42.platform.gms.customer.infrastructure.entity.CustomerAuthJpa;
 import com.g42.platform.gms.customer.infrastructure.entity.CustomerProfileJpa;
+import com.g42.platform.gms.vehicle.entity.Vehicle;
 import jakarta.persistence.criteria.*;
 import org.springframework.data.jpa.domain.Specification;
 
@@ -50,6 +51,13 @@ public class CustomerProfileSpecification {
             predicates.add(cb.like(root.get("phone").as(String.class), like));
             predicates.add(cb.like(root.get("email").as(String.class), like));
             predicates.add(cb.like(root.get("dob").as(String.class), like));
+
+            Subquery<Integer> vehicleSubquery = query.subquery(Integer.class);
+            Root<Vehicle> vehicleRoot = vehicleSubquery.from(Vehicle.class);
+            vehicleSubquery.select(vehicleRoot.get("customer").get("customerId"))
+                    .where(cb.like(cb.lower(vehicleRoot.get("licensePlate")), like));
+            predicates.add(root.get("customerId").in(vehicleSubquery));
+
             return cb.or(predicates.toArray(new Predicate[0]));
         };
     }
