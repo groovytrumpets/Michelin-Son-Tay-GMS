@@ -31,7 +31,7 @@ public interface StockIssueJpaRepo extends JpaRepository<StockIssueJpa, Integer>
                 :search is null
                 or lower(i.issueCode) like lower(concat('%', :search, '%'))
                 or lower(i.issueReason) like lower(concat('%', :search, '%'))
-                or str(i.serviceTicketId) like concat('%', :search, '%')
+                or cast(i.serviceTicketId as string) like concat('%', :search, '%')
             )
         """)
         Page<StockIssueJpa> search(

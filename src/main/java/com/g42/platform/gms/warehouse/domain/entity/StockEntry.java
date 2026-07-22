@@ -28,6 +28,11 @@ public class StockEntry {
     private Integer createdBy;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    private String delivererName;
+    private String delivererPhone;
+    private String licensePlate;
+
     @Builder.Default
     private List<StockEntryItem> items = new ArrayList<>();
 }

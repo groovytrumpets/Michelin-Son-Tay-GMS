@@ -18,6 +18,11 @@ public class StockEntryResponse {
     private LocalDate entryDate;
     private StockEntryStatus status;
     private String notes;
+
+    private String delivererName;
+    private String delivererPhone;
+    private String licensePlate;
+
     private List<StockEntryItemResponse> items;
     private List<String> attachments; // danh sách URL ảnh chứng từ
     private Integer confirmedBy;

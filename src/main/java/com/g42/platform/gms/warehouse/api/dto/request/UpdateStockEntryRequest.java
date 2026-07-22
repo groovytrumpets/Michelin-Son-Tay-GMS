@@ -12,6 +12,11 @@ public class UpdateStockEntryRequest {
     private String supplierName;
     private LocalDate entryDate;
     private String notes;
+    
+    private String delivererName;
+    private String delivererPhone;
+    private String licensePlate;
+
     /** Nếu truyền thì replace toàn bộ items */
     private List<StockEntryItemRequest> items;
 }

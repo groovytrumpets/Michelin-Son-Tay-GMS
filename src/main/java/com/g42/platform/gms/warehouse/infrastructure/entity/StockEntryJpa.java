@@ -61,6 +61,15 @@ public class StockEntryJpa {
     @OneToMany(mappedBy = "entryId", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     private List<StockEntryItemJpa> items = new ArrayList<>();
 
+    @Column(name = "deliverer_name")
+    private String delivererName;
+
+    @Column(name = "deliverer_phone", length = 20)
+    private String delivererPhone;
+
+    @Column(name = "license_plate", length = 20)
+    private String licensePlate;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();

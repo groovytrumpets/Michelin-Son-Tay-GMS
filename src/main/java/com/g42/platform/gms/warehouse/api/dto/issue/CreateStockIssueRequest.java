@@ -24,6 +24,10 @@ public class CreateStockIssueRequest {
 
     private Integer serviceTicketId;
 
+    private String receiverName;
+    private String receiverPhone;
+    private String licensePlate;
+
     @NotEmpty
     @Valid
     private List<IssueItemRequest> items;

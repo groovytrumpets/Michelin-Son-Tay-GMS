@@ -131,6 +131,9 @@ public class StockIssueRepoImpl implements StockIssueRepo {
                 .issueType(jpa.getIssueType())
                 .issueReason(jpa.getIssueReason())
                 .serviceTicketId(jpa.getServiceTicketId())
+                .receiverName(jpa.getReceiverName())
+                .receiverPhone(jpa.getReceiverPhone())
+                .licensePlate(jpa.getLicensePlate())
                 .discountRate(jpa.getDiscountRate())
                 .status(jpa.getStatus())
                 .confirmedBy(jpa.getConfirmedBy())
@@ -152,6 +155,9 @@ public class StockIssueRepoImpl implements StockIssueRepo {
         jpa.setIssueType(domain.getIssueType());
         jpa.setIssueReason(domain.getIssueReason());
         jpa.setServiceTicketId(domain.getServiceTicketId());
+        jpa.setReceiverName(domain.getReceiverName());
+        jpa.setReceiverPhone(domain.getReceiverPhone());
+        jpa.setLicensePlate(domain.getLicensePlate());
         jpa.setDiscountRate(domain.getDiscountRate() != null ? domain.getDiscountRate() : BigDecimal.ZERO);
         jpa.setStatus(domain.getStatus() != null ? domain.getStatus()
                 : com.g42.platform.gms.warehouse.domain.enums.StockIssueStatus.DRAFT);

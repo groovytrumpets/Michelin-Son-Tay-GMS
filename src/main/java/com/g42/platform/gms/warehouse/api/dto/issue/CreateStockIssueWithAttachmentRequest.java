@@ -26,6 +26,10 @@ public class CreateStockIssueWithAttachmentRequest {
     /** Nếu issueType = SERVICE_TICKET */
     private Integer serviceTicketId;
 
+    private String receiverName;
+    private String receiverPhone;
+    private String licensePlate;
+
     /**
      * JSON array string của items.
      * Ví dụ: [{"itemId":8,"quantity":50,"discountRate":0}]

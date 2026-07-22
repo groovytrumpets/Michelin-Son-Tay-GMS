@@ -61,6 +61,15 @@ public class StockIssueJpa {
     @OneToMany(mappedBy = "issueId", fetch = FetchType.LAZY)
     private List<StockIssueItemJpa> items = new ArrayList<>();
 
+    @Column(name = "receiver_name")
+    private String receiverName;
+
+    @Column(name = "receiver_phone", length = 20)
+    private String receiverPhone;
+
+    @Column(name = "license_plate", length = 20)
+    private String licensePlate;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();

@@ -23,6 +23,10 @@ public class CreateStockEntryRequest {
 
     private String notes;
 
+    private String delivererName;
+    private String delivererPhone;
+    private String licensePlate;
+
     @NotEmpty
     @Valid
     private List<StockEntryItemRequest> items;

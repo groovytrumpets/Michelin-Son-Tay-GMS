@@ -79,6 +79,9 @@ public class StockEntryRepoImpl implements StockEntryRepo {
                 .entryCode(jpa.getEntryCode())
                 .warehouseId(jpa.getWarehouseId())
                 .supplierName(jpa.getSupplierName())
+                .delivererName(jpa.getDelivererName())
+                .delivererPhone(jpa.getDelivererPhone())
+                .licensePlate(jpa.getLicensePlate())
                 .entryDate(jpa.getEntryDate())
                 .status(jpa.getStatus())
                 .notes(jpa.getNotes())
@@ -103,6 +106,9 @@ public class StockEntryRepoImpl implements StockEntryRepo {
         jpa.setEntryCode(domain.getEntryCode());
         jpa.setWarehouseId(domain.getWarehouseId());
         jpa.setSupplierName(domain.getSupplierName());
+        jpa.setDelivererName(domain.getDelivererName());
+        jpa.setDelivererPhone(domain.getDelivererPhone());
+        jpa.setLicensePlate(domain.getLicensePlate());
         jpa.setEntryDate(domain.getEntryDate());
         jpa.setStatus(domain.getStatus() != null ? domain.getStatus() : StockEntryStatus.DRAFT);
         jpa.setNotes(domain.getNotes());
