@@ -18,6 +18,11 @@ public class StockIssueResponse {
     private String issueReason;
     private Integer serviceTicketId;
     private String serviceTicketCode;
+    
+    private String receiverName;
+    private String receiverPhone;
+    private String licensePlate;
+
     private BigDecimal discountRate;
     private StockIssueStatus status;
     private Integer confirmedBy;

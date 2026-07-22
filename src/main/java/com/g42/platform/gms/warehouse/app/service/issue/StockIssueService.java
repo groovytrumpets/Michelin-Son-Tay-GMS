@@ -151,6 +151,9 @@ public class StockIssueService {
                 .issueType(request.getIssueType())
                 .issueReason(request.getIssueReason())
                 .serviceTicketId(request.getServiceTicketId())
+                .receiverName(request.getReceiverName())
+                .receiverPhone(request.getReceiverPhone())
+                .licensePlate(request.getLicensePlate())
                 .discountRate(BigDecimal.ZERO)
                 .status(StockIssueStatus.DRAFT)
                 .createdBy(staffId)
@@ -217,6 +220,9 @@ public class StockIssueService {
         request.setIssueType(IssueType.valueOf(req.getIssueType()));
         request.setIssueReason(req.getIssueReason());
         request.setServiceTicketId(req.getServiceTicketId());
+        request.setReceiverName(req.getReceiverName());
+        request.setReceiverPhone(req.getReceiverPhone());
+        request.setLicensePlate(req.getLicensePlate());
         request.setItems(items);
 
         return createWithAttachment(request, req.getFile(), staffId);
@@ -689,6 +695,9 @@ public class StockIssueService {
         resp.setIssueType(issue.getIssueType());
         resp.setIssueReason(issue.getIssueReason());
         resp.setServiceTicketId(issue.getServiceTicketId());
+        resp.setReceiverName(issue.getReceiverName());
+        resp.setReceiverPhone(issue.getReceiverPhone());
+        resp.setLicensePlate(issue.getLicensePlate());
         resp.setDiscountRate(issue.getDiscountRate());
         resp.setStatus(issue.getStatus());
         resp.setConfirmedBy(issue.getConfirmedBy());
@@ -1060,6 +1069,9 @@ public class StockIssueService {
         r.setIssueType(e.getIssueType());
         r.setIssueReason(e.getIssueReason());
         r.setServiceTicketId(e.getServiceTicketId());
+        r.setReceiverName(e.getReceiverName());
+        r.setReceiverPhone(e.getReceiverPhone());
+        r.setLicensePlate(e.getLicensePlate());
         r.setDiscountRate(e.getDiscountRate());
         r.setStatus(e.getStatus());
         r.setConfirmedBy(e.getConfirmedBy());

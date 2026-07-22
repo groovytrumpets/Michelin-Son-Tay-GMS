@@ -197,6 +197,9 @@ public class StockEntryService {
                 .supplierName(request.getSupplierName())
                 .entryDate(request.getEntryDate() != null ? request.getEntryDate() : LocalDate.now())
                 .notes(request.getNotes())
+                .delivererName(request.getDelivererName())
+                .delivererPhone(request.getDelivererPhone())
+                .licensePlate(request.getLicensePlate())
                 .status(StockEntryStatus.DRAFT)      // luôn bắt đầu bằng DRAFT
                 .createdBy(staffId)
                 .build();
@@ -274,6 +277,9 @@ public class StockEntryService {
         if (request.getSupplierName() != null) entry.setSupplierName(request.getSupplierName());
         if (request.getEntryDate() != null) entry.setEntryDate(request.getEntryDate());
         if (request.getNotes() != null) entry.setNotes(request.getNotes());
+        if (request.getDelivererName() != null) entry.setDelivererName(request.getDelivererName());
+        if (request.getDelivererPhone() != null) entry.setDelivererPhone(request.getDelivererPhone());
+        if (request.getLicensePlate() != null) entry.setLicensePlate(request.getLicensePlate());
 
         // Nếu truyền items → xóa hết items cũ, thay bằng list mới
         if (request.getItems() != null) {
@@ -662,6 +668,9 @@ public class StockEntryService {
         r.setEntryDate(entry.getEntryDate());
         r.setStatus(entry.getStatus());
         r.setNotes(entry.getNotes());
+        r.setDelivererName(entry.getDelivererName());
+        r.setDelivererPhone(entry.getDelivererPhone());
+        r.setLicensePlate(entry.getLicensePlate());
         r.setConfirmedBy(entry.getConfirmedBy());
         r.setConfirmedAt(entry.getConfirmedAt());
         r.setCreatedBy(entry.getCreatedBy());

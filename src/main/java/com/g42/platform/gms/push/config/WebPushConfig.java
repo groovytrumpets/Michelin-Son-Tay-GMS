@@ -51,17 +51,23 @@ public class WebPushConfig {
      */
     @Bean
     @Nullable
-    public PushService pushService() throws GeneralSecurityException {
+    public PushService pushService() {
         if (publicKey == null || publicKey.isBlank() || privateKey == null || privateKey.isBlank()) {
             log.warn("Web Push chưa bật: thiếu vapid.public-key/vapid.private-key. "
                     + "Sinh khoá bằng `npx web-push generate-vapid-keys` rồi set env VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY.");
             return null;
         }
-        PushService service = new PushService();
-        service.setPublicKey(publicKey);
-        service.setPrivateKey(privateKey);
-        service.setSubject(subject);
-        log.info("Web Push đã bật (VAPID).");
-        return service;
+        
+        try {
+            PushService service = new PushService();
+            service.setPublicKey(publicKey);
+            service.setPrivateKey(privateKey);
+            service.setSubject(subject);
+            log.info("Web Push đã bật (VAPID).");
+            return service;
+        } catch (Exception e) {
+            log.error("Khoá VAPID không hợp lệ (lỗi format). Web Push sẽ tự động tắt. Lỗi: {}", e.getMessage());
+            return null;
+        }
     }
 }

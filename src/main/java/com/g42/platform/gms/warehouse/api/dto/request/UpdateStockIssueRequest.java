@@ -9,6 +9,11 @@ import java.util.List;
 @Data
 public class UpdateStockIssueRequest {
     private String issueReason;
+    
+    private String receiverName;
+    private String receiverPhone;
+    private String licensePlate;
+
     /** Nếu truyền thì replace toàn bộ items */
     private List<CreateStockIssueRequest.IssueItemRequest> items;
 }

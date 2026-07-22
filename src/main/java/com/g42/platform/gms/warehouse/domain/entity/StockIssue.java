@@ -30,6 +30,11 @@ public class StockIssue {
     private Integer createdBy;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    private String receiverName;
+    private String receiverPhone;
+    private String licensePlate;
+
     @Builder.Default
     private List<StockIssueItem> items = new ArrayList<>();
 }
