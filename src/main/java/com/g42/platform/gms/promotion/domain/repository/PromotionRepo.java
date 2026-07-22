@@ -2,7 +2,9 @@ package com.g42.platform.gms.promotion.domain.repository;
 
 import com.g42.platform.gms.billing.api.dto.ServiceBillDto;
 import com.g42.platform.gms.promotion.domain.entity.Promotion;
+import com.g42.platform.gms.promotion.domain.entity.PromotionBuyItem;
 import com.g42.platform.gms.promotion.domain.entity.PromotionCustomer;
+import com.g42.platform.gms.promotion.domain.entity.PromotionGiftItem;
 import com.g42.platform.gms.promotion.domain.entity.PromotionItem;
 import org.springframework.stereotype.Repository;
 
@@ -28,9 +30,17 @@ public interface PromotionRepo {
 
     void saveCustomers(List<Integer> customers, Promotion promotion);
 
+    void saveBuyItems(List<PromotionBuyItem> buyItems, Promotion promotion);
+
+    void saveGiftItems(List<PromotionGiftItem> giftItems, Promotion promotion);
+
     List<PromotionItem> findPromotionItemById(Promotion promotionId);
 
     List<PromotionCustomer> findPromotionCustomerById(Promotion promotion);
+
+    List<PromotionBuyItem> findPromotionBuyItemById(Promotion promotion);
+
+    List<PromotionGiftItem> findPromotionGiftItemById(Promotion promotion);
 
     void deleteOldItems(Promotion promotion);
 }

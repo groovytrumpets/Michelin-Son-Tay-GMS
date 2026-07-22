@@ -21,10 +21,8 @@ public class PromotionCreateDto {
     private BigDecimal discountPercent;
     private Boolean isActive;
     private String applyTo;
-    private Integer buyItemId;
-    private Integer buyQuantity;
-    private Integer getItemId;
-    private Integer getQuantity;
+    private List<PromotionBuyGiftItemDto> buyItems;
+    private List<PromotionBuyGiftItemDto> giftItems;
     private String targetType;
     private BigDecimal minOrderValue;
     private LocalDate startDate;

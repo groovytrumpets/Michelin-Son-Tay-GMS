@@ -1,9 +1,12 @@
 package com.g42.platform.gms.promotion.app.service;
 
+import com.g42.platform.gms.promotion.api.dto.PromotionBuyGiftItemDto;
 import com.g42.platform.gms.promotion.api.dto.PromotionCreateDto;
 import com.g42.platform.gms.promotion.api.mapper.PromotionDtoMapper;
 import com.g42.platform.gms.promotion.domain.entity.Promotion;
+import com.g42.platform.gms.promotion.domain.entity.PromotionBuyItem;
 import com.g42.platform.gms.promotion.domain.entity.PromotionCustomer;
+import com.g42.platform.gms.promotion.domain.entity.PromotionGiftItem;
 import com.g42.platform.gms.promotion.domain.entity.PromotionItem;
 import com.g42.platform.gms.promotion.domain.exception.PromotionErrorCode;
 import com.g42.platform.gms.promotion.domain.exception.PromotionException;
@@ -41,6 +44,12 @@ public class PromotionService {
         List<Integer> customers = promotionCreateDto.getPromotionCustomers();
         promotionRepo.saveCustomers(customers,promotion);
         }
+        if (promotionCreateDto.getBuyItems()!=null) {
+            promotionRepo.saveBuyItems(toBuyItems(promotionCreateDto.getBuyItems()), promotion);
+        }
+        if (promotionCreateDto.getGiftItems()!=null) {
+            promotionRepo.saveGiftItems(toGiftItems(promotionCreateDto.getGiftItems()), promotion);
+        }
         return promotionDtoMapper.toDto(promotion);
     }
 
@@ -64,6 +73,8 @@ public class PromotionService {
             dto.setPromotionItems(promotionItems.stream().map(PromotionItem::getCatalogItemId).toList());
             dto.setPromotionCustomers(customerIds.stream().map(PromotionCustomer::getCustomerProfileId).
                     toList());
+            dto.setBuyItems(fromBuyItems(promotionRepo.findPromotionBuyItemById(promotion)));
+            dto.setGiftItems(fromGiftItems(promotionRepo.findPromotionGiftItemById(promotion)));
             promotionCreateDtoList.add(dto);
         }
 
@@ -83,6 +94,8 @@ public class PromotionService {
         promotionCreateDto.setPromotionItems(promotionItems.stream().map(PromotionItem::getCatalogItemId).toList());
         promotionCreateDto.setPromotionCustomers(customerIds.stream().map(PromotionCustomer::getCustomerProfileId).
                 toList());
+        promotionCreateDto.setBuyItems(fromBuyItems(promotionRepo.findPromotionBuyItemById(promotion)));
+        promotionCreateDto.setGiftItems(fromGiftItems(promotionRepo.findPromotionGiftItemById(promotion)));
         return promotionCreateDto;
     }
     @Transactional
@@ -102,7 +115,29 @@ public class PromotionService {
             List<Integer> customers = promotionCreateDto.getPromotionCustomers();
             promotionRepo.saveCustomers(customers,promotion);
         }
+        if (promotionCreateDto.getBuyItems()!=null) {
+            promotionRepo.saveBuyItems(toBuyItems(promotionCreateDto.getBuyItems()), promotion);
+        }
+        if (promotionCreateDto.getGiftItems()!=null) {
+            promotionRepo.saveGiftItems(toGiftItems(promotionCreateDto.getGiftItems()), promotion);
+        }
         return promotionDtoMapper.toDto(promotion);
+    }
+
+    private List<PromotionBuyItem> toBuyItems(List<PromotionBuyGiftItemDto> dtos) {
+        return dtos.stream().map(dto -> new PromotionBuyItem(null, dto.getCatalogItemId(), dto.getQuantity(), null)).toList();
+    }
+
+    private List<PromotionGiftItem> toGiftItems(List<PromotionBuyGiftItemDto> dtos) {
+        return dtos.stream().map(dto -> new PromotionGiftItem(null, dto.getCatalogItemId(), dto.getQuantity(), null)).toList();
+    }
+
+    private List<PromotionBuyGiftItemDto> fromBuyItems(List<PromotionBuyItem> items) {
+        return items.stream().map(item -> new PromotionBuyGiftItemDto(item.getCatalogItemId(), item.getQuantity())).toList();
+    }
+
+    private List<PromotionBuyGiftItemDto> fromGiftItems(List<PromotionGiftItem> items) {
+        return items.stream().map(item -> new PromotionBuyGiftItemDto(item.getCatalogItemId(), item.getQuantity())).toList();
     }
     private void validatePromotion(PromotionCreateDto promotionCreateDto){
         if (promotionCreateDto.getApplyTo() == null ||  (!promotionCreateDto.getApplyTo().equals("ALL") && !promotionCreateDto.getApplyTo().equals("SPECIFIC")) ) {
@@ -128,10 +163,18 @@ public class PromotionService {
             Assert.notNull(promotionCreateDto.getDiscountPercent(), "PROMOTION_DISCOUNT_PERCENT REQUIRED");
         }
         if (type.equals("BUY_X_GET_Y")) {
-            Assert.notNull(promotionCreateDto.getBuyItemId(), "PROMOTION_BUY_ITEM_ID REQUIRED");
-            Assert.notNull(promotionCreateDto.getBuyQuantity(), "PROMOTION_BUY_QUANTITY REQUIRED");
-            Assert.notNull(promotionCreateDto.getGetItemId(), "PROMOTION_GET_ITEM_ID REQUIRED");
-            Assert.notNull(promotionCreateDto.getGetQuantity(), "PROMOTION_GET_QUANTITY REQUIRED");
+            Assert.notNull(promotionCreateDto.getBuyItems(), "PROMOTION_BUY_ITEMS REQUIRED");
+            Assert.notEmpty(promotionCreateDto.getBuyItems(), "PROMOTION_BUY_ITEMS REQUIRED");
+            Assert.notNull(promotionCreateDto.getGiftItems(), "PROMOTION_GIFT_ITEMS REQUIRED");
+            Assert.notEmpty(promotionCreateDto.getGiftItems(), "PROMOTION_GIFT_ITEMS REQUIRED");
+            for (PromotionBuyGiftItemDto item : promotionCreateDto.getBuyItems()) {
+                Assert.notNull(item.getCatalogItemId(), "PROMOTION_BUY_ITEM_CATALOG_ITEM_ID REQUIRED");
+                Assert.isTrue(item.getQuantity() != null && item.getQuantity() > 0, "PROMOTION_BUY_ITEM_QUANTITY MUST BE POSITIVE");
+            }
+            for (PromotionBuyGiftItemDto item : promotionCreateDto.getGiftItems()) {
+                Assert.notNull(item.getCatalogItemId(), "PROMOTION_GIFT_ITEM_CATALOG_ITEM_ID REQUIRED");
+                Assert.isTrue(item.getQuantity() != null && item.getQuantity() > 0, "PROMOTION_GIFT_ITEM_QUANTITY MUST BE POSITIVE");
+            }
         }
         if (targetType.equals("SPECIFIC")) {
             Assert.notNull(promotionCreateDto.getPromotionCustomers(), "PROMOTION_PROMOTION_CUSTOMERS REQUIRED");

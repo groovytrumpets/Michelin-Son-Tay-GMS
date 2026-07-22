@@ -15,6 +15,8 @@ import com.g42.platform.gms.estimation.domain.exception.EstimateException;
 import com.g42.platform.gms.estimation.domain.repository.*;
 import com.g42.platform.gms.promotion.api.internal.PromotionInternalApi;
 import com.g42.platform.gms.promotion.domain.entity.Promotion;
+import com.g42.platform.gms.promotion.domain.entity.PromotionBuyItem;
+import com.g42.platform.gms.promotion.domain.entity.PromotionGiftItem;
 import com.g42.platform.gms.warehouse.api.dto.CatalogItemDto;
 import com.g42.platform.gms.warehouse.api.internal.WarehouseInternalApi;
 import com.g42.platform.gms.warehouse.api.mapper.WarehouseDtoMapper;
@@ -686,49 +688,77 @@ public class EstimateService {
     }
 
     private void applyBuyXGetY(Promotion promotion, List<EstimateItem> items, Integer estimateId) {
+        List<PromotionBuyItem> buyItems = promotionInternalApi.findBuyItemsByPromotionId(promotion);
+        List<PromotionGiftItem> giftItems = promotionInternalApi.findGiftItemsByPromotionId(promotion);
+        int multiplier = computeGiftMultiplier(buyItems, items);
+        if (multiplier < 1) {
+            throw new EstimateException("Sản phẩm không đủ điều kiện khuyến mãi", EstimateErrorCode.PROMOTION_404);
+        }
         EstimateItem triggerItem = items.stream()
-        .filter(item -> item.getItemId().equals(promotion.getBuyItemId()))
-        .findFirst()
-        .orElseThrow();
-        //count gift quantity
-        int giftQuantity = (triggerItem.getQuantity()/promotion.getBuyQuantity())*promotion.getGetQuantity();
+                .filter(item -> item.getItemId().equals(buyItems.get(0).getCatalogItemId()))
+                .findFirst()
+                .orElseThrow();
 
         //todo:delete old gift items
         estimateRepository.deleteOldGitItemsByEstimateId(estimateId);
 
-        //find catalog that become gift
-        CatalogItem catalogItem = warehouseInternalApi.findCatalogById(promotion.getGetItemId());
+        for (PromotionGiftItem giftItemConfig : giftItems) {
+            //find catalog that become gift
+            CatalogItem catalogItem = warehouseInternalApi.findCatalogById(giftItemConfig.getCatalogItemId());
+            int giftQuantity = giftItemConfig.getQuantity() * multiplier;
 
-        EstimateItem giftItem = new EstimateItem();
-        giftItem.setEstimateId(estimateId);
-        giftItem.setItemId(promotion.getGetItemId());
-        giftItem.setItemName(catalogItem.getItemName());
-        giftItem.setQuantity(giftQuantity);
-        //before promotion
-        //find price in db
+            EstimateItem giftItem = new EstimateItem();
+            giftItem.setEstimateId(estimateId);
+            giftItem.setItemId(giftItemConfig.getCatalogItemId());
+            giftItem.setItemName(catalogItem.getItemName());
+            giftItem.setQuantity(giftQuantity);
+            //before promotion
+            //find price in db
 
-        giftItem.setTotalPrice(BigDecimal.ZERO);
+            giftItem.setTotalPrice(BigDecimal.ZERO);
 
-        //after promotion
-        giftItem.setDiscountAmount(giftItem.getTotalPrice());
-        giftItem.setFinalPrice(BigDecimal.ZERO);
-        giftItem.setPromotionId(promotion.getPromotionId());
-        giftItem.setIsGift(Boolean.TRUE);
-        giftItem.setIsChecked(Boolean.TRUE);
-        giftItem.setUnit(triggerItem.getUnit());
-        giftItem.setTriggeredByItemId(triggerItem.getItemId());
-        //todo: find FREE workCate if Catalog have no W
-        if (catalogItem.getWorkCategoryId()==null||catalogItem.getWorkCategoryId()==0){
-            throw new EstimateException("Danh mục không được tạo với phân loại phù hợp (workCategory_404)", EstimateErrorCode.BAD_DATA);
+            //after promotion
+            giftItem.setDiscountAmount(giftItem.getTotalPrice());
+            giftItem.setFinalPrice(BigDecimal.ZERO);
+            giftItem.setPromotionId(promotion.getPromotionId());
+            giftItem.setIsGift(Boolean.TRUE);
+            giftItem.setIsChecked(Boolean.TRUE);
+            giftItem.setUnit(triggerItem.getUnit());
+            giftItem.setTriggeredByItemId(triggerItem.getItemId());
+            //todo: find FREE workCate if Catalog have no W
+            if (catalogItem.getWorkCategoryId()==null||catalogItem.getWorkCategoryId()==0){
+                throw new EstimateException("Danh mục không được tạo với phân loại phù hợp (workCategory_404)", EstimateErrorCode.BAD_DATA);
+            }
+            giftItem.setWorkCategoryId(catalogItem.getWorkCategoryId());
+            //todo: check warehouse quantity available
+            Integer warehouseId = resolveGiftItemWarehouse(giftItem,triggerItem);
+            giftItem.setWarehouseId(warehouseId);
+            BigDecimal unitPrice = warehouseInternalApi.findItemPricing(catalogItem.getItemId(),warehouseId!= null ? warehouseId : triggerItem.getWarehouseId(),catalogItem.getPrice());
+            giftItem.setUnitPrice(unitPrice!=null?unitPrice:BigDecimal.ZERO);
+
+            estimateItemRepository.save(giftItem);
         }
-        giftItem.setWorkCategoryId(catalogItem.getWorkCategoryId());
-        //todo: check warehouse quantity available
-        Integer warehouseId = resolveGiftItemWarehouse(giftItem,triggerItem);
-        giftItem.setWarehouseId(warehouseId);
-        BigDecimal unitPrice = warehouseInternalApi.findItemPricing(catalogItem.getItemId(),warehouseId!= null ? warehouseId : triggerItem.getWarehouseId(),catalogItem.getPrice());
-        giftItem.setUnitPrice(unitPrice!=null?unitPrice:BigDecimal.ZERO);
+    }
 
-        estimateItemRepository.save(giftItem);
+    /**
+     * Nhóm mua là điều kiện AND: phải mua đủ TẤT CẢ item trong nhóm mua.
+     * Hệ số nhân quà tặng = số lần tối đa combo mua được lặp lại, tức min(floor(soLuongMua_i / soLuongYeuCau_i)).
+     */
+    private int computeGiftMultiplier(List<PromotionBuyItem> buyItems, List<EstimateItem> items) {
+        if (buyItems.isEmpty()) {
+            return 0;
+        }
+        int multiplier = Integer.MAX_VALUE;
+        for (PromotionBuyItem buyItem : buyItems) {
+            int purchasedQuantity = items.stream()
+                    .filter(item -> !Boolean.TRUE.equals(item.getIsGift()))
+                    .filter(item -> item.getItemId().equals(buyItem.getCatalogItemId()))
+                    .mapToInt(EstimateItem::getQuantity)
+                    .sum();
+            int ratio = purchasedQuantity / buyItem.getQuantity();
+            multiplier = Math.min(multiplier, ratio);
+        }
+        return multiplier == Integer.MAX_VALUE ? 0 : multiplier;
     }
 
     private Integer resolveGiftItemWarehouse(EstimateItem giftItem, EstimateItem triggerItem) {
@@ -809,10 +839,8 @@ public class EstimateService {
             }
         }
         if (promotion.getType().equals("BUY_X_GET_Y")){
-            boolean hasMatchItems = items.stream().anyMatch(estimateItem ->
-                    estimateItem.getItemId().equals(promotion.getBuyItemId())
-                            &&estimateItem.getQuantity().equals(promotion.getBuyQuantity()));
-            if (!hasMatchItems) {
+            List<PromotionBuyItem> buyItems = promotionInternalApi.findBuyItemsByPromotionId(promotion);
+            if (computeGiftMultiplier(buyItems, items) < 1) {
                 throw new EstimateException("Sản phẩm không đủ điều kiện khuyến mãi", EstimateErrorCode.PROMOTION_404);
             }
         }

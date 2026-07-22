@@ -2,6 +2,8 @@ package com.g42.platform.gms.promotion.infrastructure;
 
 import com.g42.platform.gms.promotion.api.internal.PromotionInternalApi;
 import com.g42.platform.gms.promotion.domain.entity.Promotion;
+import com.g42.platform.gms.promotion.domain.entity.PromotionBuyItem;
+import com.g42.platform.gms.promotion.domain.entity.PromotionGiftItem;
 import com.g42.platform.gms.promotion.domain.entity.PromotionItem;
 import com.g42.platform.gms.promotion.infrastructure.entity.PromotionJpa;
 import com.g42.platform.gms.promotion.infrastructure.mapper.PromotionCustomerJpaMapper;
@@ -43,6 +45,16 @@ public class PromotionInternalApiImpl implements PromotionInternalApi {
     @Override
     public List<Integer> findItemIdsByPromotionId(Promotion promotionId) {
         return promotionRepo.findPromotionItemById(promotionId).stream().map(PromotionItem::getCatalogItemId).toList();
+    }
+
+    @Override
+    public List<PromotionBuyItem> findBuyItemsByPromotionId(Promotion promotion) {
+        return promotionRepo.findPromotionBuyItemById(promotion);
+    }
+
+    @Override
+    public List<PromotionGiftItem> findGiftItemsByPromotionId(Promotion promotion) {
+        return promotionRepo.findPromotionGiftItemById(promotion);
     }
 
     @Override

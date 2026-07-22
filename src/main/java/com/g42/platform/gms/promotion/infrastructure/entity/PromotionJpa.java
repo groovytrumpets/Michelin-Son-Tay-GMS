@@ -44,18 +44,6 @@ public class PromotionJpa {
     @Column(name = "apply_to")
     private String applyTo;
 
-    @Column(name = "buy_item_id")
-    private Integer buyItemId;
-
-    @Column(name = "buy_quantity")
-    private Integer buyQuantity;
-
-    @Column(name = "get_item_id")
-    private Integer getItemId;
-
-    @Column(name = "get_quantity")
-    private Integer getQuantity;
-
     @Lob
     @Column(name = "target_type")
     private String targetType;

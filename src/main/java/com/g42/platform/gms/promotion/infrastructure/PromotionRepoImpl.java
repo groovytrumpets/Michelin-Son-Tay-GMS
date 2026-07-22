@@ -2,13 +2,19 @@ package com.g42.platform.gms.promotion.infrastructure;
 
 import com.g42.platform.gms.billing.api.dto.ServiceBillDto;
 import com.g42.platform.gms.promotion.domain.entity.Promotion;
+import com.g42.platform.gms.promotion.domain.entity.PromotionBuyItem;
 import com.g42.platform.gms.promotion.domain.entity.PromotionCustomer;
+import com.g42.platform.gms.promotion.domain.entity.PromotionGiftItem;
 import com.g42.platform.gms.promotion.domain.entity.PromotionItem;
 import com.g42.platform.gms.promotion.domain.repository.PromotionRepo;
+import com.g42.platform.gms.promotion.infrastructure.entity.PromotionBuyItemJpa;
 import com.g42.platform.gms.promotion.infrastructure.entity.PromotionCustomerJpa;
+import com.g42.platform.gms.promotion.infrastructure.entity.PromotionGiftItemJpa;
 import com.g42.platform.gms.promotion.infrastructure.entity.PromotionItemJpa;
 import com.g42.platform.gms.promotion.infrastructure.entity.PromotionJpa;
+import com.g42.platform.gms.promotion.infrastructure.mapper.PromotionBuyItemJpaMapper;
 import com.g42.platform.gms.promotion.infrastructure.mapper.PromotionCustomerJpaMapper;
+import com.g42.platform.gms.promotion.infrastructure.mapper.PromotionGiftItemJpaMapper;
 import com.g42.platform.gms.promotion.infrastructure.mapper.PromotionItemJpaMapper;
 import com.g42.platform.gms.promotion.infrastructure.mapper.PromotionJpaMapper;
 import com.g42.platform.gms.promotion.infrastructure.repository.PromotionJpaRepo;
@@ -31,9 +37,17 @@ public class PromotionRepoImpl implements PromotionRepo {
     @Autowired
     private PromotionCustomerJpaRepository promotionCustomerJpaRepository;
     @Autowired
+    private PromotionBuyItemJpaRepository promotionBuyItemJpaRepository;
+    @Autowired
+    private PromotionGiftItemJpaRepository promotionGiftItemJpaRepository;
+    @Autowired
     private PromotionItemJpaMapper promotionItemJpaMapper;
     @Autowired
     private PromotionCustomerJpaMapper promotionCustomerJpaMapper;
+    @Autowired
+    private PromotionBuyItemJpaMapper promotionBuyItemJpaMapper;
+    @Autowired
+    private PromotionGiftItemJpaMapper promotionGiftItemJpaMapper;
 
     @Override
     public Promotion createNewPromotion(Promotion promotionCreateDto) {
@@ -111,6 +125,32 @@ public class PromotionRepoImpl implements PromotionRepo {
     }
 
     @Override
+    public void saveBuyItems(List<PromotionBuyItem> buyItems, Promotion promotion) {
+        PromotionJpa promotionJpa = promotionJpaMapper.fromDomain(promotion);
+        List<PromotionBuyItemJpa> itemJpas = buyItems.stream().map(item -> {
+            PromotionBuyItemJpa itemJpa = new PromotionBuyItemJpa();
+            itemJpa.setPromotion(promotionJpa);
+            itemJpa.setCatalogItemId(item.getCatalogItemId());
+            itemJpa.setQuantity(item.getQuantity());
+            return itemJpa;
+        }).toList();
+        promotionBuyItemJpaRepository.saveAll(itemJpas);
+    }
+
+    @Override
+    public void saveGiftItems(List<PromotionGiftItem> giftItems, Promotion promotion) {
+        PromotionJpa promotionJpa = promotionJpaMapper.fromDomain(promotion);
+        List<PromotionGiftItemJpa> itemJpas = giftItems.stream().map(item -> {
+            PromotionGiftItemJpa itemJpa = new PromotionGiftItemJpa();
+            itemJpa.setPromotion(promotionJpa);
+            itemJpa.setCatalogItemId(item.getCatalogItemId());
+            itemJpa.setQuantity(item.getQuantity());
+            return itemJpa;
+        }).toList();
+        promotionGiftItemJpaRepository.saveAll(itemJpas);
+    }
+
+    @Override
     public List<PromotionItem> findPromotionItemById(Promotion promotion) {
         return promotionItemJpaRepository.
                 getAllByPromotion(promotionJpaMapper.fromDomain(promotion)).
@@ -124,8 +164,22 @@ public class PromotionRepoImpl implements PromotionRepo {
     }
 
     @Override
+    public List<PromotionBuyItem> findPromotionBuyItemById(Promotion promotion) {
+        return promotionBuyItemJpaRepository.getAllByPromotion(promotionJpaMapper.fromDomain(promotion)).
+                stream().map(promotionBuyItemJpaMapper::toDomain).toList();
+    }
+
+    @Override
+    public List<PromotionGiftItem> findPromotionGiftItemById(Promotion promotion) {
+        return promotionGiftItemJpaRepository.getAllByPromotion(promotionJpaMapper.fromDomain(promotion)).
+                stream().map(promotionGiftItemJpaMapper::toDomain).toList();
+    }
+
+    @Override
     public void deleteOldItems(Promotion promotion) {
         promotionCustomerJpaRepository.deleteByPromotion(promotionJpaMapper.fromDomain(promotion));
         promotionItemJpaRepository.deleteByPromotion(promotionJpaMapper.fromDomain(promotion));
+        promotionBuyItemJpaRepository.deleteByPromotion(promotionJpaMapper.fromDomain(promotion));
+        promotionGiftItemJpaRepository.deleteByPromotion(promotionJpaMapper.fromDomain(promotion));
     }
 }

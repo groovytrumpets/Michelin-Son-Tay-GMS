@@ -25,10 +25,6 @@ public class Promotion {
     private BigDecimal discountPercent;
     private Boolean isActive;
     private String applyTo;
-    private Integer buyItemId;
-    private Integer buyQuantity;
-    private Integer getItemId;
-    private Integer getQuantity;
     private String targetType;
     private BigDecimal minOrderValue;
     private LocalDate startDate;

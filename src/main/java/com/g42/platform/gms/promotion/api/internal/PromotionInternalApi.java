@@ -1,6 +1,8 @@
 package com.g42.platform.gms.promotion.api.internal;
 
 import com.g42.platform.gms.promotion.domain.entity.Promotion;
+import com.g42.platform.gms.promotion.domain.entity.PromotionBuyItem;
+import com.g42.platform.gms.promotion.domain.entity.PromotionGiftItem;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -12,6 +14,10 @@ public interface PromotionInternalApi {
     Promotion findByPromotionCode(String promotionCode);
 
     List<Integer> findItemIdsByPromotionId(Promotion promotionId);
+
+    List<PromotionBuyItem> findBuyItemsByPromotionId(Promotion promotion);
+
+    List<PromotionGiftItem> findGiftItemsByPromotionId(Promotion promotion);
 
     void initializePromotionCount(Promotion promotion);
 
