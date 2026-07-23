@@ -84,7 +84,7 @@ public class BookingManageService {
 
         // Tạo hoặc lấy customer account
         int customerId = customerGateway.getOrCreateCustomer(
-                new CreateCustomerCommand(request.getFullName(), request.getPhone(), request.getCreatedAt())
+                new CreateCustomerCommand(request.getFullName(), request.getPhone(), request.getCreatedAt(), request.getReferrerPhone())
         );
 
         // Tạo booking record

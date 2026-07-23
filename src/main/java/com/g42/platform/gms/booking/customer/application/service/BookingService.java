@@ -305,17 +305,35 @@ public class BookingService {
             newCustomer.setFullName(request.getFullName());
             newCustomer.setCreatedAt(LocalDateTime.now());
             
+            if (request.getReferrerPhone() != null && !request.getReferrerPhone().isBlank()) {
+                customerRepository.findByPhone(request.getReferrerPhone()).ifPresent(referrer -> {
+                    newCustomer.setReferrerId(referrer.getCustomerId());
+                });
+            }
+            
             CustomerProfile savedCustomer = customerRepository.save(newCustomer);
             customerId = savedCustomer.getCustomerId();
             log.info("Created new customer account: customerId={}, phone={}", customerId, request.getPhone());
         } else {
             customerId = customer.getCustomerId();
             
+            boolean updated = false;
             // Update tên nếu khác
             if (!request.getFullName().equals(customer.getFullName())) {
                 customer.setFullName(request.getFullName());
-                customerRepository.save(customer);
+                updated = true;
                 log.info("Updated customer name: customerId={}, newName={}", customerId, request.getFullName());
+            }
+            // Update referrerPhone neu chua co
+            if (customer.getReferrerId() == null && request.getReferrerPhone() != null && !request.getReferrerPhone().isBlank()) {
+                customerRepository.findByPhone(request.getReferrerPhone()).ifPresent(referrer -> {
+                    customer.setReferrerId(referrer.getCustomerId());
+                });
+                updated = true;
+            }
+            
+            if (updated) {
+                customerRepository.save(customer);
             }
         }
         

@@ -23,4 +23,6 @@ public class StaffDirectBookingRequest extends BaseBookingRequest {
     private String fullName;
 
     private Boolean isPartsSale;
+
+    private String referrerPhone;
 }

@@ -13,4 +13,6 @@ public interface CustomerInternalApi {
     String getCustomerPhoneByServiceTicketId(Integer serviceTicketId);
 
     String getNameByServiceTicketId(Integer serviceTicketId);
+
+    void adjustPoints(Integer customerId, int points, String reason);
 }

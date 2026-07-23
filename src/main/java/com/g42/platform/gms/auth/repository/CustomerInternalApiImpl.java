@@ -34,4 +34,12 @@ public class CustomerInternalApiImpl implements CustomerInternalApi {
         CustomerProfileJpa customerProfile = customerProfileRepository.getCustomerProfilesByServiceTicketId(serviceTicketId);
         return customerProfile.getFullName();
     }
+
+    @Autowired
+    private com.g42.platform.gms.customer.application.service.CustomerRankingService customerRankingService;
+
+    @Override
+    public void adjustPoints(Integer customerId, int points, String reason) {
+        customerRankingService.adjustPoints(customerId, points, reason);
+    }
 }

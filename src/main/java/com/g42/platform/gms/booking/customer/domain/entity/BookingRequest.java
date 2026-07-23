@@ -29,6 +29,7 @@ public class BookingRequest {
     private LocalDateTime expiresAt;
     private String clientIp;
     private List<Integer> catalogItemIds = new ArrayList<>();
+    private String referrerPhone;
     
     public void initializeDefaults() {
         if (createdAt == null) {

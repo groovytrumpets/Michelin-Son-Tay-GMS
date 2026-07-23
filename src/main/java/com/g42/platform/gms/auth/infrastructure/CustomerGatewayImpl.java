@@ -49,14 +49,29 @@ public class CustomerGatewayImpl implements CustomerGateway {
 
     @Override
     public Integer getOrCreateCustomer(CreateCustomerCommand command) {
-        return customerProfileRepository.findByPhone(command.phone()).map(CustomerProfile::getCustomerId)
-                .orElseGet(() -> {
-                    CustomerProfile cus = new CustomerProfile();
-                    cus.setFullName(command.fullName());
-                    cus.setPhone(command.phone());
-                    cus.setFirstBookingAt(command.firstBookingAt());
-                    return customerProfileRepository.save(cus).getCustomerId();
+        return customerProfileRepository.findByPhone(command.phone()).map(cus -> {
+            if (cus.getReferrerId() == null && command.referrerPhone() != null && !command.referrerPhone().isBlank()) {
+                customerProfileRepository.findByPhone(command.referrerPhone()).ifPresent(referrer -> {
+                    cus.setReferrerId(referrer.getCustomerId());
+                    customerProfileRepository.save(cus);
                 });
+            }
+            return cus.getCustomerId();
+        }).orElseGet(() -> {
+            CustomerProfile cus = new CustomerProfile();
+            cus.setFullName(command.fullName());
+            cus.setPhone(command.phone());
+            cus.setFirstBookingAt(command.firstBookingAt());
+            
+            if (command.referrerPhone() != null && !command.referrerPhone().isBlank()) {
+                customerProfileRepository.findByPhone(command.referrerPhone()).ifPresent(referrer -> {
+                    cus.setReferrerId(referrer.getCustomerId());
+                });
+            }
+            
+            CustomerProfile saved = customerProfileRepository.save(cus);
+            return saved.getCustomerId();
+        });
     }
 
     @Override

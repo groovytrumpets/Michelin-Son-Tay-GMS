@@ -8,4 +8,6 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 public interface CustomerProfileJpaRepo extends JpaRepository<CustomerProfileJpa,Integer> , JpaSpecificationExecutor<CustomerProfileJpa> {
 
     CustomerProfileJpa findByCustomerId(Integer customerId);
+    
+    CustomerProfileJpa findByPhone(String phone);
 }
