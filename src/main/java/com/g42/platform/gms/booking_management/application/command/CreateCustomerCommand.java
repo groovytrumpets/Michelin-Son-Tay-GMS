@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 public record CreateCustomerCommand (
         String fullName,
         String phone,
-        LocalDateTime firstBookingAt
+        LocalDateTime firstBookingAt,
+        String referrerPhone
 ) {
 }

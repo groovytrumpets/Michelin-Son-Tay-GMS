@@ -165,6 +165,20 @@ public class BillingService {
         zaloNotificationSender.sendFeedback(phone,name,code);
         }
         billingRepository.save(serviceBill);
+        
+        // Reward referrer if this is the customer's first paid ticket
+        try {
+            com.g42.platform.gms.auth.entity.CustomerProfile customer = customerInternalApi.findById(serviceTicketJpa.getCustomerId());
+            if (customer != null && customer.getReferrerId() != null) {
+                long paidCount = serviceTicketRepository.countByCustomerIdAndTicketStatus(customer.getCustomerId(), TicketStatus.PAID);
+                if (paidCount == 1) { // 1 means this newly paid ticket is the first one
+                    customerInternalApi.adjustPoints(customer.getReferrerId(), 50, "Thưởng giới thiệu khách hàng: " + customer.getPhone() + " (Đã hoàn thành dịch vụ đầu tiên)");
+                }
+            }
+        } catch (Exception e) {
+            // Ignore reward error
+        }
+
         //todo: change status of assignment
 
         ticketAssignmentService.markAssignmentDone(serviceBill.getServiceTicketId());

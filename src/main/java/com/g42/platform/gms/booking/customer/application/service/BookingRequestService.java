@@ -90,6 +90,7 @@ public class BookingRequestService {
         bookingRequest.setScheduledDate(request.getAppointmentDate());
         bookingRequest.setScheduledTime(request.getAppointmentTime());
         bookingRequest.setDescription(request.getUserNote());
+        bookingRequest.setReferrerPhone(request.getReferrerPhone());
         bookingRequest.setStatus(BookingRequestStatus.PENDING);
         bookingRequest.setIsGuest(true);
         

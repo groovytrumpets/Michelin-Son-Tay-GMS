@@ -37,6 +37,7 @@ public class BookingRequest {
     private List<CatalogItem> services;
     private String requestCode;
     private String note;
+    private String referrerPhone;
 
     public boolean isGuest() {
         return isGuest;

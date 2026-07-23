@@ -89,6 +89,9 @@ public class BookingRequestJpa {
     @Column(name = "note")
     private String note;
 
+    @Column(name = "referrer_phone", length = 20)
+    private String referrerPhone;
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) {

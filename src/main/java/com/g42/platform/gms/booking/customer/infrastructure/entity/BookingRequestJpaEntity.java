@@ -81,6 +81,9 @@ public class BookingRequestJpaEntity {
     @OneToMany(mappedBy = "request", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<BookingRequestDetailJpaEntity> details;
 
+    @Column(name = "referrer_phone", length = 20)
+    private String referrerPhone;
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) {

@@ -24,11 +24,15 @@ public class CustomerService {
     CustomerRepo customerRepo;
     @Autowired
     CustomerDtoMapper customerDtoMapper;
+    @Autowired
+    CustomerRankingService customerRankingService;
     private PasswordEncoder passwordEncoder;
+    
     @Transactional
     public CustomerCreateDto createNewCustomer(CustomerCreateDto customerDto) {
         CustomerProfile customerProfile = customerRepo.createNewCustomerProfile(customerDto);
         CustomerAuth customerAuth = customerRepo.createNewCustomerAuth(customerDto,customerProfile);
+        
         return customerDtoMapper.toCusCreateDto(customerProfile,customerAuth);
     }
 

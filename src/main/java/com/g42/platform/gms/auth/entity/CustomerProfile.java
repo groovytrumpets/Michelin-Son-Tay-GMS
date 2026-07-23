@@ -42,4 +42,7 @@ public class CustomerProfile {
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
+
+    @Column(name = "referrer_id")
+    private Integer referrerId;
 }

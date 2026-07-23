@@ -22,4 +22,7 @@ public abstract class BaseBookingRequest extends ReminderRequest {
     
     @Size(max = 10, message = "Chỉ được chọn tối đa 10 dịch vụ")
     protected List<@Positive(message = "ID dịch vụ phải là số dương") Integer> selectedServiceIds;
+
+    @Size(max = 20, message = "Số điện thoại người giới thiệu không hợp lệ")
+    protected String referrerPhone;
 }

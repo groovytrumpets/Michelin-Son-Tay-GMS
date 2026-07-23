@@ -64,7 +64,13 @@ public class CustomerRepoImpl implements CustomerRepo {
         if (customerDto.getCustomerType() != null) {
             entity.setCustomerType(customerDto.getCustomerType());
         }
-
+        
+        if (customerDto.getReferrerPhone() != null && !customerDto.getReferrerPhone().isBlank()) {
+            CustomerProfileJpa referrer = customerProfileJpaRepo.findByPhone(customerDto.getReferrerPhone());
+            if (referrer != null) {
+                entity.setReferrerId(referrer.getCustomerId());
+            }
+        }
 
         if (customerDto.getDob() != null && !customerDto.getDob().isBlank()) {
             entity.setDob(LocalDate.parse(customerDto.getDob()));

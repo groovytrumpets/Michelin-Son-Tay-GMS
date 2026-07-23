@@ -73,4 +73,7 @@ public interface ServiceTicketRepository extends JpaRepository<ServiceTicketJpa,
 
     @Query("select count(st) from ServiceTicketManagement st where st.customerId = :customerId and (st.isDeleted is null or st.isDeleted = false)")
     long countActiveTicketsByCustomerId(@Param("customerId") Integer customerId);
+
+    long countByCustomerIdAndTicketStatus(Integer customerId, com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus ticketStatus);
+
 }

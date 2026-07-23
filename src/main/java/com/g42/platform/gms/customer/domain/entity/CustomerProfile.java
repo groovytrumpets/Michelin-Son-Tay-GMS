@@ -32,4 +32,5 @@ public class CustomerProfile {
     // Ranking fields (populated from customer_points table)
     private CustomerRank currentRank;
     private Integer totalPoints;
+    private Integer referrerId;
 }

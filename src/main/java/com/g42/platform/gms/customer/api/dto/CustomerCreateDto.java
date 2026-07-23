@@ -20,4 +20,5 @@ public class CustomerCreateDto {
     private String dob;
     private String avatar;
     private CustomerType customerType;
+    private String referrerPhone;
 }
