@@ -79,7 +79,10 @@ public class WarehouseRepoImpl implements WarehouseRepo {
                             cb.like(cb.lower(root.get("sku")), searchLower),
                             cb.like(cb.lower(root.get("partNumber")), searchLower),
                             cb.like(cb.lower(root.get("barcode")), searchLower),
-                            cb.like(cb.lower(root.get("compatibleCars")), searchLower)
+                            cb.like(cb.lower(root.get("compatibleCars")), searchLower),
+                            // Precomputed blob (name/sku/codes/brand/category/product line/specs) — catches
+                            // matches that the individual-field LIKEs above miss, e.g. brand or category name.
+                            cb.like(root.get("searchKey"), searchLower)
                     )
             );
         }

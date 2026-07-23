@@ -83,4 +83,8 @@ public class CatalogItemJpa {
     @Column(name = "compatible_cars", length = 500)
     private String compatibleCars;
 
+    @Size(max = 2000)
+    @Column(name = "search_key", length = 2000)
+    private String searchKey;
+
 }

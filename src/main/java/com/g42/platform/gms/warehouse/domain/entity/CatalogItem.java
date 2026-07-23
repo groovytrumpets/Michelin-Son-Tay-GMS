@@ -37,6 +37,7 @@ public class CatalogItem {
     private String barcode;
     private String color;
     private String compatibleCars;
+    private String searchKey;
 
     public Integer getBrandId() {
         return brandId;

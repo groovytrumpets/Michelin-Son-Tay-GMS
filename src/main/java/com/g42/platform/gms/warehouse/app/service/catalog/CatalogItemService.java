@@ -112,8 +112,12 @@ public class CatalogItemService {
         
         CatalogItem catalogItem = catalogItemRepo.createCatalog(domain);
         List<Specification> specifications = catalogItemRepo.getListOfSpecsByItem(catalogItem.getItemId());
-        String itemName = builDisplayName(domain,brand,productLine,specifications,itemCategory);
+        // Respect a manually entered item name; only auto-suggest one when the caller left it blank.
+        String itemName = (createDto.getItemName() != null && !createDto.getItemName().isBlank())
+                ? createDto.getItemName().trim()
+                : builDisplayName(domain,brand,productLine,specifications,itemCategory);
         catalogItem.setItemName(itemName);
+        catalogItem.setSearchKey(buildSearchKey(catalogItem, brand, productLine, specifications, itemCategory));
         //todo: free tax
         Integer finalTaxId = createDto.getTaxRuleId();
         if (finalTaxId == null) {
@@ -175,6 +179,45 @@ public class CatalogItemService {
 
     }
 
+    /**
+     * Builds a denormalized lowercase blob of every field a user might search by
+     * (name, codes, brand/category/product line names, spec values, compatible cars),
+     * so search can match a single column instead of joining/LIKE-ing many.
+     */
+    private String buildSearchKey(CatalogItem catalogItem, Brand brand, ProductLine productLine, List<Specification> specs, WorkCategory itemCategory) {
+        StringBuilder searchKey = new StringBuilder();
+        appendSearchToken(searchKey, catalogItem.getItemName());
+        appendSearchToken(searchKey, catalogItem.getSku());
+        appendSearchToken(searchKey, catalogItem.getPartNumber());
+        appendSearchToken(searchKey, catalogItem.getBarcode());
+        appendSearchToken(searchKey, catalogItem.getColor());
+        appendSearchToken(searchKey, catalogItem.getMadeIn());
+        appendSearchToken(searchKey, catalogItem.getCompatibleCars());
+        appendSearchToken(searchKey, catalogItem.getDescription());
+        if (brand != null) {
+            appendSearchToken(searchKey, brand.getBrandName());
+        }
+        if (productLine != null) {
+            appendSearchToken(searchKey, productLine.getLineName());
+        }
+        if (itemCategory != null) {
+            appendSearchToken(searchKey, itemCategory.getCategoryName());
+        }
+        if (specs != null) {
+            for (Specification specification : specs) {
+                appendSearchToken(searchKey, specification.getSpecValue());
+            }
+        }
+        String result = searchKey.toString().trim().toLowerCase();
+        return result.length() > 2000 ? result.substring(0, 2000) : result;
+    }
+
+    private void appendSearchToken(StringBuilder searchKey, String value) {
+        if (value != null && !value.isBlank()) {
+            searchKey.append(value.trim()).append(" ");
+        }
+    }
+
     public ProductLine saveProductLine(ProductLine productLine) {
         if (productLine.getBrandId() == null) {
             throw new WarehouseException("Product line must have brand", WarehouseErrorCode.INVALID_BRAND);
@@ -218,8 +261,13 @@ public class CatalogItemService {
         WorkCategory itemCategory = catalogItemRepo.getItemCategoryById(catalogItem.getWorkCategoryId());
         Specification savedSpec = catalogItemRepo.saveSpec(specification);
         List<Specification> specifications = catalogItemRepo.getListOfSpecsByItem(catalogItem.getItemId());
-        String itemName = builDisplayName(catalogItem,brand,productLine,specifications,itemCategory);
-        catalogItem.setItemName(itemName);
+        // Only auto-fill the item name when none was ever set (e.g. left blank at creation);
+        // a manually entered or already-suggested name must not be silently overwritten
+        // just because a spec value changed.
+        if (catalogItem.getItemName() == null || catalogItem.getItemName().isBlank()) {
+            catalogItem.setItemName(builDisplayName(catalogItem,brand,productLine,specifications,itemCategory));
+        }
+        catalogItem.setSearchKey(buildSearchKey(catalogItem, brand, productLine, specifications, itemCategory));
         CatalogItem saveCatalogItem = catalogItemRepo.saveCatalogItem(catalogItem);
 
         return savedSpec;
@@ -370,20 +418,20 @@ public class CatalogItemService {
             catalogItem.setMadeIn(updateDto.getOrigin());
         }
 
+        // Brand/productLine/workCategory ids on catalogItem are already the final (updated) values at this point.
+        Brand brandForSearch = catalogItem.getBrandId() != null ? catalogItemRepo.getBrandById(catalogItem.getBrandId()) : null;
+        ProductLine productLineForSearch = catalogItem.getProductLineId() != null ? catalogItemRepo.getProductLineById(catalogItem.getProductLineId()) : null;
+        WorkCategory itemCategoryForSearch = catalogItem.getWorkCategoryId() != null ? catalogItemRepo.getItemCategoryById(catalogItem.getWorkCategoryId()) : null;
+        List<Specification> specificationsForSearch = catalogItemRepo.getListOfSpecsByItem(itemId);
+
         if (updateDto.getItemName() != null && !updateDto.getItemName().isBlank()) {
             catalogItem.setItemName(updateDto.getItemName());
         } else {
-            Brand brand = updateDto.getBrandId() != null ? catalogItemRepo.getBrandById(updateDto.getBrandId()) : null;
-            ProductLine productLine = updateDto.getProductLineId() != null ? catalogItemRepo.getProductLineById(updateDto.getProductLineId()) : null;
-            WorkCategory itemCategory = updateDto.getWorkCategoryId() != null ? catalogItemRepo.getItemCategoryById(updateDto.getWorkCategoryId()) : null;
-            if (itemCategory == null) {
-                itemCategory = new WorkCategory();
-            }
-
-            List<Specification> specifications = catalogItemRepo.getListOfSpecsByItem(itemId);
-            String displayName = builDisplayName(catalogItem, brand, productLine, specifications, itemCategory);
+            WorkCategory categoryForName = itemCategoryForSearch != null ? itemCategoryForSearch : new WorkCategory();
+            String displayName = builDisplayName(catalogItem, brandForSearch, productLineForSearch, specificationsForSearch, categoryForName);
             catalogItem.setItemName(displayName);
         }
+        catalogItem.setSearchKey(buildSearchKey(catalogItem, brandForSearch, productLineForSearch, specificationsForSearch, itemCategoryForSearch));
 
         Integer finalTaxId = updateDto.getTaxRuleId();
         if (finalTaxId == null) {
