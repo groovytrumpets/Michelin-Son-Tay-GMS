@@ -68,7 +68,8 @@ public class SecurityConfig {
                                 "/api/webhook/**",
                                 "/error",
                                 "/ws-notifications/**",
-                                "/ws-chat/**"
+                                "/ws-chat/**",
+                                "/api/public/sliders/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
