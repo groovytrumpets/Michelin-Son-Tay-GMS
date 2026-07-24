@@ -21,4 +21,5 @@ public class CustomerCreateDto {
     private String avatar;
     private CustomerType customerType;
     private String referrerPhone;
+    private Boolean isDealer;
 }

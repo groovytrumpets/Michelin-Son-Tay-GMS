@@ -5,7 +5,8 @@ package com.g42.platform.gms.customer.domain.enums;
  */
 public enum CustomerRank {
     BRONZE,   // Đồng  - mặc định, 0+ điểm
-    SILVER,   // Bạc   - 500+ điểm
-    GOLD,     // Vàng  - 2000+ điểm
-    PLATINUM  // Bạch Kim - 5000+ điểm
+    SILVER,   // Bạc   - 5.000+ điểm
+    GOLD,     // Vàng  - 15.000+ điểm
+    PLATINUM, // Bạch Kim - 30.000+ điểm
+    DIAMOND   // Kim Cương - 50.000+ điểm
 }

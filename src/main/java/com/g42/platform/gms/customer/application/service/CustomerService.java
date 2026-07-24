@@ -51,6 +51,9 @@ public class CustomerService {
         if (customerUpdateDto.getCustomerType() != null) {
             customerProfile.setCustomerType(customerUpdateDto.getCustomerType());
         }
+        if (customerUpdateDto.getIsDealer() != null) {
+            customerProfile.setIsDealer(customerUpdateDto.getIsDealer());
+        }
         customerAuth.setStatus(customerUpdateDto.getStatus());
         customerAuth.setLastLoginAt(customerUpdateDto.getLastLoginAt());
         if (!customerRepo.updateCustomer(customerId,customerProfile,customerAuth)){

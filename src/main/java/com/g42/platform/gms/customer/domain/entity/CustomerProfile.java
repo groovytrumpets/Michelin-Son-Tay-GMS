@@ -33,4 +33,5 @@ public class CustomerProfile {
     private CustomerRank currentRank;
     private Integer totalPoints;
     private Integer referrerId;
+    private Boolean isDealer = false;
 }

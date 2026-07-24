@@ -45,4 +45,11 @@ public class CustomerProfile {
 
     @Column(name = "referrer_id")
     private Integer referrerId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "customer_type", length = 20)
+    private com.g42.platform.gms.customer.domain.enums.CustomerType customerType;
+
+    @Column(name = "is_dealer")
+    private Boolean isDealer;
 }
