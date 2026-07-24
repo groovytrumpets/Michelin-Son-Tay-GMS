@@ -26,4 +26,5 @@ public class CustomerUpdateDto {
     private String avatar;
     private CustomerType customerType;
     private LocalDateTime firstBookingAt;
+    private Boolean isDealer;
 }

@@ -65,4 +65,14 @@ public class CustomerProfileController {
             "Cập nhật avatar thành công"
         ));
     }
+
+    @PutMapping("/switch-role")
+    public ResponseEntity<ApiResponse<CustomerProfileResponse>> switchRole(
+            @AuthenticationPrincipal CustomerPrincipal principal) {
+        
+        CustomerProfile updated = customerProfileService.switchRole(principal.getCustomerId());
+        CustomerProfileResponse response = customerProfileMapper.toResponse(updated);
+        
+        return ResponseEntity.ok(ApiResponses.success(response, "Chuyển đổi tài khoản thành công"));
+    }
 }

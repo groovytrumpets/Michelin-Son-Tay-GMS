@@ -18,6 +18,8 @@ public class CustomerRankingDto {
     private Integer lifetimePoints;    // Tổng điểm toàn thời gian
     private CustomerRank currentRank;
     private String rankLabelVi;        // Nhãn tiếng Việt: Đồng, Bạc, Vàng, Bạch Kim
+    private com.g42.platform.gms.customer.domain.enums.DealerRank currentDealerRank;
+    private String dealerRankLabelVi;  // Nhãn Đại lý: Cấp 1, Cấp 2...
     private Integer pointsToNextRank;  // Điểm cần thêm để lên hạng (null nếu đã PLATINUM)
     private String nextRank;           // Hạng tiếp theo
     private LocalDateTime lastActivityAt;

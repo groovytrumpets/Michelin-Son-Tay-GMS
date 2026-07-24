@@ -51,4 +51,7 @@ public class CustomerProfileJpa {
 
     @Column(name = "referrer_id")
     private Integer referrerId;
+
+    @Column(name = "is_dealer")
+    private Boolean isDealer = false;
 }

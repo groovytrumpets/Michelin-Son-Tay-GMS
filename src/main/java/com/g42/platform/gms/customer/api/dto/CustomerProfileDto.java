@@ -26,4 +26,5 @@ public class CustomerProfileDto {
     private LocalDateTime createdAt;
     private CustomerType customerType;
     private CustomerStatus status;
+    private Boolean isDealer;
 }

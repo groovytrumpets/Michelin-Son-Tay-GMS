@@ -27,6 +27,10 @@ public class CustomerPointsJpa {
     @Column(name = "current_rank", length = 20)
     private CustomerRank currentRank = CustomerRank.BRONZE;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "current_dealer_rank", length = 20)
+    private com.g42.platform.gms.customer.domain.enums.DealerRank currentDealerRank = com.g42.platform.gms.customer.domain.enums.DealerRank.LEVEL_1;
+
     @Column(name = "last_activity_at")
     private LocalDateTime lastActivityAt;
 

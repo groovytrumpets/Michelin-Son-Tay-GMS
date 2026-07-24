@@ -101,4 +101,30 @@ public class CustomerProfileService {
             log.warn("Failed to delete old avatar: {}", oldAvatar, e);
         }
     }
+
+    /**
+     * Switch customer role between INDIVIDUAL and DEALER
+     * Only allowed if isDealer is true
+     */
+    @Transactional
+    public CustomerProfile switchRole(Integer customerId) {
+        CustomerProfile profile = findCustomerById(customerId);
+        
+        // If they are not a dealer, they cannot switch
+        if (profile.getIsDealer() == null || !profile.getIsDealer()) {
+            throw new AuthException("Tài khoản chưa được cấp phép đại lý");
+        }
+        
+        // Toggle the role
+        if (com.g42.platform.gms.customer.domain.enums.CustomerType.DEALER.equals(profile.getCustomerType())) {
+            profile.setCustomerType(com.g42.platform.gms.customer.domain.enums.CustomerType.INDIVIDUAL);
+        } else {
+            profile.setCustomerType(com.g42.platform.gms.customer.domain.enums.CustomerType.DEALER);
+        }
+        
+        CustomerProfile updated = customerProfileRepository.save(profile);
+        log.info("Customer role switched: customerId={}, newRole={}", customerId, updated.getCustomerType());
+        
+        return updated;
+    }
 }
