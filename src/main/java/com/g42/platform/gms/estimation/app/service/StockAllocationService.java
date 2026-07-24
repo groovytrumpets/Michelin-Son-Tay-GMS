@@ -12,6 +12,11 @@ import com.g42.platform.gms.estimation.domain.repository.StockAllocationReposito
 import com.g42.platform.gms.warehouse.api.internal.WarehouseInternalApi;
 import com.g42.platform.gms.warehouse.app.service.inventory.InventoryService;
 import lombok.RequiredArgsConstructor;
+import com.g42.platform.gms.marketing.service_combo.infrastructure.entity.ComboItemJpa;
+import com.g42.platform.gms.marketing.service_combo.infrastructure.repository.ComboItemRepoJpa;
+import com.g42.platform.gms.warehouse.domain.enums.CatalogItemType;
+import com.g42.platform.gms.warehouse.infrastructure.entity.CatalogItemJpa;
+import com.g42.platform.gms.warehouse.infrastructure.repository.CatalogItemJpaRepo;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +34,8 @@ public class StockAllocationService {
     private final StockAllocationDtoMapper stockAllocationDtoMapper;
     private final WarehouseInternalApi warehouseInternalApi;
     private final InventoryService inventoryService;
+    private final ComboItemRepoJpa comboItemRepoJpa;
+    private final CatalogItemJpaRepo catalogItemJpaRepo;
 
     @Transactional
     public List<StockAllocationDto> createStockAllocation(Integer estimateId, Integer staffId) {
@@ -89,26 +96,60 @@ public class StockAllocationService {
                 }
 
                 if (!hasAllocationInChain) {
-                System.out.println("Đây là món đồ mới tinh: " + newItem.getItemName());
-                StockAllocation stockAllocation = new StockAllocation();
-                stockAllocation.setServiceTicketId(newEstimate.getServiceTicketId());
-                stockAllocation.setEstimateItemId(newItem.getId());
-                stockAllocation.setWarehouseId(newItem.getWarehouseId());
-                stockAllocation.setItemId(newItem.getItemId());
-                stockAllocation.setEntryItemId(newItem.getEntryItemId());
-                stockAllocation.setQuantity(newItem.getQuantity());
-                stockAllocation.setEstimateId(estimateId);
-                stockAllocation.setStatus("RESERVED");
-                stockAllocation.setCreatedBy(staffId);
-                stockAllocation.setCreatedAt(Instant.now());
-                StockAllocation savedStockAllocation = stockAllocationRepository.createNewAllocation(stockAllocation);
-                stockAllocations.add(savedStockAllocation);
+                    System.out.println("Đây là món đồ mới tinh: " + newItem.getItemName());
 
-                    inventoryService.increaseReservedQuantity(
-                            savedStockAllocation.getItemId(),
-                            savedStockAllocation.getWarehouseId(),
-                            savedStockAllocation.getQuantity()
-                    );
+                    List<ComboItemJpa> comboSubItems = newItem.getItemId() != null ? comboItemRepoJpa.findAllByComboId(newItem.getItemId()) : null;
+                    if (comboSubItems != null && !comboSubItems.isEmpty()) {
+                        Integer warehouseId = newItem.getWarehouseId() != null ? newItem.getWarehouseId() : 1;
+                        int parentQty = newItem.getQuantity() != null ? newItem.getQuantity() : 1;
+
+                        for (ComboItemJpa subItem : comboSubItems) {
+                            if (subItem.getIncludedItemId() == null) continue;
+                            CatalogItemJpa catalogItem = catalogItemJpaRepo.findById(subItem.getIncludedItemId()).orElse(null);
+                            if (catalogItem != null && catalogItem.getItemType() == CatalogItemType.SERVICE) continue;
+
+                            StockAllocation stockAllocation = new StockAllocation();
+                            stockAllocation.setServiceTicketId(newEstimate.getServiceTicketId());
+                            stockAllocation.setEstimateItemId(newItem.getId());
+                            stockAllocation.setWarehouseId(warehouseId);
+                            stockAllocation.setItemId(subItem.getIncludedItemId());
+                            stockAllocation.setEntryItemId(subItem.getEntryItemId() != null ? subItem.getEntryItemId() : newItem.getEntryItemId());
+                            stockAllocation.setQuantity((subItem.getQuantity() != null ? subItem.getQuantity() : 1) * parentQty);
+                            stockAllocation.setEstimateId(estimateId);
+                            stockAllocation.setStatus("RESERVED");
+                            stockAllocation.setCreatedBy(staffId);
+                            stockAllocation.setCreatedAt(Instant.now());
+
+                            StockAllocation savedStockAllocation = stockAllocationRepository.createNewAllocation(stockAllocation);
+                            stockAllocations.add(savedStockAllocation);
+
+                            inventoryService.increaseReservedQuantity(
+                                    savedStockAllocation.getItemId(),
+                                    savedStockAllocation.getWarehouseId(),
+                                    savedStockAllocation.getQuantity()
+                            );
+                        }
+                    } else if (newItem.getWarehouseId() != null) {
+                        StockAllocation stockAllocation = new StockAllocation();
+                        stockAllocation.setServiceTicketId(newEstimate.getServiceTicketId());
+                        stockAllocation.setEstimateItemId(newItem.getId());
+                        stockAllocation.setWarehouseId(newItem.getWarehouseId());
+                        stockAllocation.setItemId(newItem.getItemId());
+                        stockAllocation.setEntryItemId(newItem.getEntryItemId());
+                        stockAllocation.setQuantity(newItem.getQuantity());
+                        stockAllocation.setEstimateId(estimateId);
+                        stockAllocation.setStatus("RESERVED");
+                        stockAllocation.setCreatedBy(staffId);
+                        stockAllocation.setCreatedAt(Instant.now());
+                        StockAllocation savedStockAllocation = stockAllocationRepository.createNewAllocation(stockAllocation);
+                        stockAllocations.add(savedStockAllocation);
+
+                        inventoryService.increaseReservedQuantity(
+                                savedStockAllocation.getItemId(),
+                                savedStockAllocation.getWarehouseId(),
+                                savedStockAllocation.getQuantity()
+                        );
+                    }
                 }
             }
         }
@@ -118,28 +159,60 @@ public class StockAllocationService {
         else {
             List<EstimateItem> estimateItems = estimateItemRepository.findByEstimateId(estimateId);
             for (EstimateItem estimateItem : estimateItems) {
-                if (estimateItem.getItemId() != null && estimateItem.getWarehouseId() != null && estimateItem.getIsRemoved()==false) {
-                    StockAllocation stockAllocation = new StockAllocation();
-                    stockAllocation.setServiceTicketId(newEstimate.getServiceTicketId());
-                    stockAllocation.setEstimateItemId(estimateItem.getId());
-                    stockAllocation.setWarehouseId(estimateItem.getWarehouseId());
-                    stockAllocation.setItemId(estimateItem.getItemId());
-                    stockAllocation.setEntryItemId(estimateItem.getEntryItemId());
-                    stockAllocation.setQuantity(estimateItem.getQuantity());
-                    stockAllocation.setEstimateId(estimateId);
-                    stockAllocation.setStatus("RESERVED");
-                    stockAllocation.setCreatedBy(staffId);
-                    stockAllocation.setCreatedAt(Instant.now());
+                if (estimateItem.getItemId() != null && Boolean.FALSE.equals(estimateItem.getIsRemoved())) {
+                    List<ComboItemJpa> comboSubItems = comboItemRepoJpa.findAllByComboId(estimateItem.getItemId());
+                    if (comboSubItems != null && !comboSubItems.isEmpty()) {
+                        Integer warehouseId = estimateItem.getWarehouseId() != null ? estimateItem.getWarehouseId() : 1;
+                        int parentQty = estimateItem.getQuantity() != null ? estimateItem.getQuantity() : 1;
 
-                    StockAllocation savedStockAllocation = stockAllocationRepository.createNewAllocation(stockAllocation);
-                    stockAllocations.add(savedStockAllocation);
+                        for (ComboItemJpa subItem : comboSubItems) {
+                            if (subItem.getIncludedItemId() == null) continue;
+                            CatalogItemJpa catalogItem = catalogItemJpaRepo.findById(subItem.getIncludedItemId()).orElse(null);
+                            if (catalogItem != null && catalogItem.getItemType() == CatalogItemType.SERVICE) continue;
 
-                    // Vì là mới tinh nên chắc chắn phải giữ kho
-                    inventoryService.increaseReservedQuantity(
-                            savedStockAllocation.getItemId(),
-                            savedStockAllocation.getWarehouseId(),
-                            savedStockAllocation.getQuantity()
-                    );
+                            StockAllocation stockAllocation = new StockAllocation();
+                            stockAllocation.setServiceTicketId(newEstimate.getServiceTicketId());
+                            stockAllocation.setEstimateItemId(estimateItem.getId());
+                            stockAllocation.setWarehouseId(warehouseId);
+                            stockAllocation.setItemId(subItem.getIncludedItemId());
+                            stockAllocation.setEntryItemId(subItem.getEntryItemId() != null ? subItem.getEntryItemId() : estimateItem.getEntryItemId());
+                            stockAllocation.setQuantity((subItem.getQuantity() != null ? subItem.getQuantity() : 1) * parentQty);
+                            stockAllocation.setEstimateId(estimateId);
+                            stockAllocation.setStatus("RESERVED");
+                            stockAllocation.setCreatedBy(staffId);
+                            stockAllocation.setCreatedAt(Instant.now());
+
+                            StockAllocation savedStockAllocation = stockAllocationRepository.createNewAllocation(stockAllocation);
+                            stockAllocations.add(savedStockAllocation);
+
+                            inventoryService.increaseReservedQuantity(
+                                    savedStockAllocation.getItemId(),
+                                    savedStockAllocation.getWarehouseId(),
+                                    savedStockAllocation.getQuantity()
+                            );
+                        }
+                    } else if (estimateItem.getWarehouseId() != null) {
+                        StockAllocation stockAllocation = new StockAllocation();
+                        stockAllocation.setServiceTicketId(newEstimate.getServiceTicketId());
+                        stockAllocation.setEstimateItemId(estimateItem.getId());
+                        stockAllocation.setWarehouseId(estimateItem.getWarehouseId());
+                        stockAllocation.setItemId(estimateItem.getItemId());
+                        stockAllocation.setEntryItemId(estimateItem.getEntryItemId());
+                        stockAllocation.setQuantity(estimateItem.getQuantity());
+                        stockAllocation.setEstimateId(estimateId);
+                        stockAllocation.setStatus("RESERVED");
+                        stockAllocation.setCreatedBy(staffId);
+                        stockAllocation.setCreatedAt(Instant.now());
+
+                        StockAllocation savedStockAllocation = stockAllocationRepository.createNewAllocation(stockAllocation);
+                        stockAllocations.add(savedStockAllocation);
+
+                        inventoryService.increaseReservedQuantity(
+                                savedStockAllocation.getItemId(),
+                                savedStockAllocation.getWarehouseId(),
+                                savedStockAllocation.getQuantity()
+                        );
+                    }
                 }
             }
         }

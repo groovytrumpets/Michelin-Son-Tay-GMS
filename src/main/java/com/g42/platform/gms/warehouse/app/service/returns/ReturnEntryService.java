@@ -1145,8 +1145,18 @@ public class ReturnEntryService {
         }
 
         if (allocation.getItemId() == null || !allocation.getItemId().equals(itemReq.getItemId())) {
-            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
-                    "allocationId không khớp với itemId");
+            boolean isComboMatch = false;
+            if (allocation.getItemId() != null && itemReq.getItemId() != null && allocation.getEstimateItemId() != null) {
+                EstimateItem estItem = estimateItemRepository.findByEstimateItemId(allocation.getEstimateItemId());
+                if (estItem != null && itemReq.getItemId().equals(estItem.getItemId())) {
+                    itemReq.setItemId(allocation.getItemId());
+                    isComboMatch = true;
+                }
+            }
+            if (!isComboMatch) {
+                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                        "allocationId không khớp với itemId");
+            }
         }
 
         // Allocation phải ở trạng thái COMMITTED để có thể release khi trả
