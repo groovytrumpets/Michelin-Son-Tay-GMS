@@ -29,10 +29,10 @@ jobs:
         with:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.SSH_KEY }}
+          key: ${{ secrets.PASSWORD }}
           script: |
             # Thay /path/to/your/backend bằng đường dẫn thư mục chứa docker-compose.yml trên VPS của bạn
-            cd /path/to/your/backend
+            cd Michelin-Son-Tay-GMS
             
             # Kéo Image mới nhất về
             docker compose pull app
