@@ -29,7 +29,7 @@ jobs:
         with:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.PASSWORD }}
+          password: ${{ secrets.PASSWORD }}
           script: |
             # Thay /path/to/your/backend bằng đường dẫn thư mục chứa docker-compose.yml trên VPS của bạn
             cd Michelin-Son-Tay-GMS
