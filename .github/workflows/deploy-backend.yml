@@ -1,0 +1,44 @@
+name: CI/CD Deploy Backend
+on:
+push:
+  branches: [ "develop" ]
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Tải code từ GitHub về máy ảo Runner
+      - name: Checkout code
+        uses: actions/checkout@v4
+      # 2. Đăng nhập Docker Hub
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      # 3. Build Docker Image và Push lên Docker Hub (với tên groovytrumpets/mst-gms:latest)
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/mst-gms:latest
+
+      # 4. SSH vào VPS và ra lệnh Docker Compose cập nhật
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            # Thay /path/to/your/backend bằng đường dẫn thư mục chứa docker-compose.yml trên VPS của bạn
+            cd /path/to/your/backend
+            
+            # Kéo Image mới nhất về
+            docker compose pull app
+            
+            # Re-create lại duy nhất service app
+            docker compose up -d --no-deps app
+            
+            # Dọn dẹp Docker Image dư thừa để đỡ đầy đĩa VPS
+            docker image prune -f
