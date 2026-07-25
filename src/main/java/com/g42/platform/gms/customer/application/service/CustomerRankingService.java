@@ -79,7 +79,8 @@ public class CustomerRankingService {
     @Transactional
     public CustomerRankingDto getRanking(Integer customerId) {
         CustomerPointsJpa points = getOrCreate(customerId);
-        return toDto(points);
+        PointConfigJpa config = getConfig();
+        return toDto(points, config);
     }
 
     @Transactional
@@ -90,12 +91,12 @@ public class CustomerRankingService {
         int spendPoints = (int) (amountSpent / 1000 * config.getPointsPer1000Vnd());
         int delta = spendPoints + config.getBonusPointsPerService();
 
-        applyPoints(points, delta, amountSpent);
+        applyPoints(points, delta, amountSpent, config);
         saveHistory(customerId, delta, "SERVICE_PAYMENT", bookingId, amountSpent);
 
         CustomerPointsJpa saved = pointsRepo.save(points);
         log.info("Customer {} earned {} points for booking {}", customerId, delta, bookingId);
-        return toDto(saved);
+        return toDto(saved, config);
     }
 
     @Transactional
@@ -104,18 +105,19 @@ public class CustomerRankingService {
         PointConfigJpa config = getConfig();
         int delta = config.getPointsPerReferral();
         
-        applyPoints(points, delta, 0L);
+        applyPoints(points, delta, 0L, config);
         saveHistory(customerId, delta, "REFERRAL_BONUS", null, 0L);
         
-        return toDto(pointsRepo.save(points));
+        return toDto(pointsRepo.save(points), config);
     }
 
     @Transactional
     public CustomerRankingDto adjustPoints(Integer customerId, int delta, String reason) {
         CustomerPointsJpa points = getOrCreate(customerId);
-        applyPoints(points, delta, 0L);
+        PointConfigJpa config = getConfig();
+        applyPoints(points, delta, 0L, config);
         saveHistory(customerId, delta, reason, null, 0L);
-        return toDto(pointsRepo.save(points));
+        return toDto(pointsRepo.save(points), config);
     }
 
     public Page<CustomerPointsHistoryDto> getHistory(Integer customerId, int page, int size) {
@@ -150,30 +152,40 @@ public class CustomerRankingService {
         });
     }
 
-    private void applyPoints(CustomerPointsJpa points, int delta, long amountSpent) {
+    private Map<CustomerRank, Integer> getRankMinPoints(PointConfigJpa config) {
+        return Map.of(
+                CustomerRank.BRONZE,   0,
+                CustomerRank.SILVER,   config.getRankSilverPoints(),
+                CustomerRank.GOLD,     config.getRankGoldPoints(),
+                CustomerRank.PLATINUM, config.getRankPlatinumPoints(),
+                CustomerRank.DIAMOND,  config.getRankDiamondPoints()
+        );
+    }
+
+    private void applyPoints(CustomerPointsJpa points, int delta, long amountSpent, PointConfigJpa config) {
         int newTotal = Math.max(0, points.getTotalPoints() + delta);
         int newLifetime = points.getLifetimePoints() + Math.max(0, delta);
         points.setTotalPoints(newTotal);
         points.setLifetimePoints(newLifetime);
-        points.setCurrentRank(calculateRank(newTotal));
-        points.setCurrentDealerRank(calculateDealerRank(newTotal));
+        points.setCurrentRank(calculateRank(newTotal, config));
+        points.setCurrentDealerRank(calculateDealerRank(newTotal, config));
         points.setLastActivityAt(LocalDateTime.now());
         points.setPointsResetYear(Year.now().getValue());
     }
 
-    private CustomerRank calculateRank(int totalPoints) {
-        if (totalPoints >= 50000) return CustomerRank.DIAMOND;
-        if (totalPoints >= 30000) return CustomerRank.PLATINUM;
-        if (totalPoints >= 15000) return CustomerRank.GOLD;
-        if (totalPoints >= 5000)  return CustomerRank.SILVER;
+    private CustomerRank calculateRank(int totalPoints, PointConfigJpa config) {
+        if (totalPoints >= config.getRankDiamondPoints()) return CustomerRank.DIAMOND;
+        if (totalPoints >= config.getRankPlatinumPoints()) return CustomerRank.PLATINUM;
+        if (totalPoints >= config.getRankGoldPoints()) return CustomerRank.GOLD;
+        if (totalPoints >= config.getRankSilverPoints())  return CustomerRank.SILVER;
         return CustomerRank.BRONZE;
     }
 
-    private DealerRank calculateDealerRank(int totalPoints) {
-        if (totalPoints >= 500000) return DealerRank.LEVEL_5;
-        if (totalPoints >= 300000) return DealerRank.LEVEL_4;
-        if (totalPoints >= 150000) return DealerRank.LEVEL_3;
-        if (totalPoints >= 50000)  return DealerRank.LEVEL_2;
+    private DealerRank calculateDealerRank(int totalPoints, PointConfigJpa config) {
+        if (totalPoints >= config.getDealerLevel5Points()) return DealerRank.LEVEL_5;
+        if (totalPoints >= config.getDealerLevel4Points()) return DealerRank.LEVEL_4;
+        if (totalPoints >= config.getDealerLevel3Points()) return DealerRank.LEVEL_3;
+        if (totalPoints >= config.getDealerLevel2Points())  return DealerRank.LEVEL_2;
         return DealerRank.LEVEL_1;
     }
 
@@ -188,16 +200,18 @@ public class CustomerRankingService {
         historyRepo.save(h);
     }
 
-    private CustomerRankingDto toDto(CustomerPointsJpa p) {
+    private CustomerRankingDto toDto(CustomerPointsJpa p, PointConfigJpa config) {
         CustomerRank rank = p.getCurrentRank();
         CustomerRank[] ranks = CustomerRank.values();
         int ordinal = rank.ordinal();
 
         Integer pointsToNext = null;
         String nextRankName = null;
+        Map<CustomerRank, Integer> rankMinPoints = getRankMinPoints(config);
+
         if (ordinal < ranks.length - 1) {
             CustomerRank next = ranks[ordinal + 1];
-            pointsToNext = RANK_MIN_POINTS.get(next) - p.getTotalPoints();
+            pointsToNext = rankMinPoints.get(next) - p.getTotalPoints();
             nextRankName = RANK_LABEL.get(next);
         }
 

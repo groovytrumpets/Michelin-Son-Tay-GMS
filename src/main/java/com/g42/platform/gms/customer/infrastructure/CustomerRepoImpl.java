@@ -48,14 +48,21 @@ public class CustomerRepoImpl implements CustomerRepo {
     private CustomerProfileMapper customerProfileMapper;
     @Autowired
     private CustomerPointsJpaRepo customerPointsJpaRepo;
+    @Autowired
+    private com.g42.platform.gms.customer.infrastructure.repository.CustomerPointsHistoryJpaRepo customerPointsHistoryJpaRepo;
 
     @Override
     public CustomerProfile createNewCustomerProfile(CustomerCreateDto customerDto) {
         if (customerDto.getPhone()==null){
             throw new CustomerException("Phone must not null!", CustomerErrorCode.INVALID_PHONE);
         }
-    //todo: create new acc based on customerDto
-        CustomerProfileJpa entity = new CustomerProfileJpa();
+        
+        // Kiểm tra xem khách hàng đã tồn tại chưa (khách vãng lai đã có profile nhưng chưa có tài khoản)
+        CustomerProfileJpa entity = customerProfileJpaRepo.findByPhone(customerDto.getPhone());
+        if (entity == null) {
+            entity = new CustomerProfileJpa();
+        }
+        
         entity.setFullName(customerDto.getFullName());
         entity.setPhone(customerDto.getPhone());
         entity.setEmail(customerDto.getEmail());
@@ -84,11 +91,16 @@ public class CustomerRepoImpl implements CustomerRepo {
     @Override
     public CustomerAuth createNewCustomerAuth(CustomerCreateDto customerCreateDto, CustomerProfile customerProfile) {
         if (customerProfile.getCustomerId()==null){throw new CustomerException("Customer Id must not null!", CustomerErrorCode.INVALID_CUSTOMER_PROFILE);}
-        CustomerAuthJpa customerAuthJpa = new CustomerAuthJpa();
+        
+        CustomerAuthJpa customerAuthJpa = customerAuthJpaRepo.findByCustomerId(customerProfile.getCustomerId());
+        if (customerAuthJpa == null) {
+            customerAuthJpa = new CustomerAuthJpa();
+            customerAuthJpa.setCustomerId(customerProfile.getCustomerId());
+            customerAuthJpa.setCreatedAt(LocalDateTime.now());
+        }
+        
         customerAuthJpa.setStatus(CustomerStatus.ACTIVE);
         customerAuthJpa.setPinHash(passwordEncoder.encode(customerCreateDto.getPin()));
-        customerAuthJpa.setCustomerId(customerProfile.getCustomerId());
-        customerAuthJpa.setCreatedAt(LocalDateTime.now());
         return customerAuthJpaMapper.toJpa(customerAuthJpaRepo.save(customerAuthJpa));
     }
 
@@ -108,10 +120,18 @@ public class CustomerRepoImpl implements CustomerRepo {
             // Default BRONZE nếu chưa có record điểm
             profile.setCurrentRank(com.g42.platform.gms.customer.domain.enums.CustomerRank.BRONZE);
             profile.setTotalPoints(0);
+            profile.setTotalBookings(0);
+            profile.setCurrentDealerRank("LEVEL_1");
             customerPointsJpaRepo.findByCustomerId(jpa.getCustomerId()).ifPresent(pts -> {
                 profile.setCurrentRank(pts.getCurrentRank());
                 profile.setTotalPoints(pts.getTotalPoints());
+                if (pts.getCurrentDealerRank() != null) {
+                    profile.setCurrentDealerRank(pts.getCurrentDealerRank().name());
+                }
             });
+            // Tính số lần đặt lịch
+            long bookings = customerPointsHistoryJpaRepo.countByCustomerIdAndReason(jpa.getCustomerId(), "SERVICE_PAYMENT");
+            profile.setTotalBookings((int) bookings);
             return profile;
         });
     }
@@ -148,10 +168,18 @@ public class CustomerRepoImpl implements CustomerRepo {
         // Default BRONZE nếu chưa có record điểm
         profile.setCurrentRank(com.g42.platform.gms.customer.domain.enums.CustomerRank.BRONZE);
         profile.setTotalPoints(0);
+        profile.setTotalBookings(0);
+        profile.setCurrentDealerRank("LEVEL_1");
         customerPointsJpaRepo.findByCustomerId(customerId).ifPresent(pts -> {
             profile.setCurrentRank(pts.getCurrentRank());
             profile.setTotalPoints(pts.getTotalPoints());
+            if (pts.getCurrentDealerRank() != null) {
+                profile.setCurrentDealerRank(pts.getCurrentDealerRank().name());
+            }
         });
+        // Tính số lần đặt lịch
+        long bookings = customerPointsHistoryJpaRepo.countByCustomerIdAndReason(customerId, "SERVICE_PAYMENT");
+        profile.setTotalBookings((int) bookings);
         return profile;
     }
 }
