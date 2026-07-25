@@ -51,7 +51,6 @@ public class PointConfigJpa {
 
     @Column(name = "dealer_level5_points")
     private Integer dealerLevel5Points = 500000;
-
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 }
