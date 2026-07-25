@@ -2,6 +2,7 @@ package com.g42.platform.gms.customer.api.dto;
 
 import com.g42.platform.gms.auth.entity.Gender;
 import com.g42.platform.gms.customer.domain.enums.CustomerType;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -21,5 +22,6 @@ public class CustomerCreateDto {
     private String avatar;
     private CustomerType customerType;
     private String referrerPhone;
+    @JsonProperty("isDealer")
     private Boolean isDealer;
 }

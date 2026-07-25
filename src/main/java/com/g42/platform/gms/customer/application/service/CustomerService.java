@@ -54,8 +54,12 @@ public class CustomerService {
         if (customerUpdateDto.getIsDealer() != null) {
             customerProfile.setIsDealer(customerUpdateDto.getIsDealer());
         }
-        customerAuth.setStatus(customerUpdateDto.getStatus());
-        customerAuth.setLastLoginAt(customerUpdateDto.getLastLoginAt());
+        if (customerUpdateDto.getStatus() != null) {
+            customerAuth.setStatus(customerUpdateDto.getStatus());
+        }
+        if (customerUpdateDto.getLastLoginAt() != null) {
+            customerAuth.setLastLoginAt(customerUpdateDto.getLastLoginAt());
+        }
         if (!customerRepo.updateCustomer(customerId,customerProfile,customerAuth)){
             throw new CustomerException("Update fail!", CustomerErrorCode.INVALID_CUSTOMER_PROFILE);
         }

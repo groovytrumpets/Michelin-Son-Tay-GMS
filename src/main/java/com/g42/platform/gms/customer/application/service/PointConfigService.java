@@ -22,13 +22,29 @@ public class PointConfigService {
             c.setPointsPer1000Vnd(1);
             c.setBonusPointsPerService(10);
             c.setPointsPerReferral(50);
+            c.setRankSilverPoints(5000);
+            c.setRankGoldPoints(15000);
+            c.setRankPlatinumPoints(30000);
+            c.setRankDiamondPoints(50000);
+            c.setDealerLevel2Points(50000);
+            c.setDealerLevel3Points(150000);
+            c.setDealerLevel4Points(300000);
+            c.setDealerLevel5Points(500000);
             return c;
         });
 
         return new PointConfigDto(
                 config.getPointsPer1000Vnd(),
                 config.getBonusPointsPerService(),
-                config.getPointsPerReferral()
+                config.getPointsPerReferral(),
+                config.getRankSilverPoints(),
+                config.getRankGoldPoints(),
+                config.getRankPlatinumPoints(),
+                config.getRankDiamondPoints(),
+                config.getDealerLevel2Points(),
+                config.getDealerLevel3Points(),
+                config.getDealerLevel4Points(),
+                config.getDealerLevel5Points()
         );
     }
 
@@ -43,6 +59,14 @@ public class PointConfigService {
         config.setPointsPer1000Vnd(dto.getPointsPer1000Vnd());
         config.setBonusPointsPerService(dto.getBonusPointsPerService());
         config.setPointsPerReferral(dto.getPointsPerReferral());
+        config.setRankSilverPoints(dto.getRankSilverPoints());
+        config.setRankGoldPoints(dto.getRankGoldPoints());
+        config.setRankPlatinumPoints(dto.getRankPlatinumPoints());
+        config.setRankDiamondPoints(dto.getRankDiamondPoints());
+        config.setDealerLevel2Points(dto.getDealerLevel2Points());
+        config.setDealerLevel3Points(dto.getDealerLevel3Points());
+        config.setDealerLevel4Points(dto.getDealerLevel4Points());
+        config.setDealerLevel5Points(dto.getDealerLevel5Points());
         config.setUpdatedAt(LocalDateTime.now());
 
         pointConfigRepo.save(config);

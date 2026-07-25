@@ -3,6 +3,7 @@ package com.g42.platform.gms.customer.api.dto;
 import com.g42.platform.gms.auth.entity.CustomerStatus;
 import com.g42.platform.gms.auth.entity.Gender;
 import com.g42.platform.gms.customer.domain.enums.CustomerType;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -26,5 +27,10 @@ public class CustomerProfileDto {
     private LocalDateTime createdAt;
     private CustomerType customerType;
     private CustomerStatus status;
+    @JsonProperty("isDealer")
     private Boolean isDealer;
+    private Integer totalBookings;
+    private Integer totalPoints;
+    private String currentRank;
+    private String currentDealerRank;
 }

@@ -4,6 +4,7 @@ import com.g42.platform.gms.auth.entity.CustomerStatus;
 import com.g42.platform.gms.auth.entity.Gender;
 import com.g42.platform.gms.customer.domain.enums.CustomerRank;
 import com.g42.platform.gms.customer.domain.enums.CustomerType;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -32,6 +33,9 @@ public class CustomerProfile {
     // Ranking fields (populated from customer_points table)
     private CustomerRank currentRank;
     private Integer totalPoints;
+    private Integer totalBookings;
+    private String currentDealerRank;
     private Integer referrerId;
+    @JsonProperty("isDealer")
     private Boolean isDealer = false;
 }
