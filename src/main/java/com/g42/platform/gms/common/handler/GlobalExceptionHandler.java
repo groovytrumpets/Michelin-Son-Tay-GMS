@@ -7,6 +7,7 @@ import com.g42.platform.gms.billing.domain.exception.BillingException;
 import com.g42.platform.gms.chat.exception.ChatException;
 import com.g42.platform.gms.booking.customer.domain.exception.BookingException;
 import com.g42.platform.gms.booking_management.domain.exception.BookingStaffException;
+import com.g42.platform.gms.bugreport.exception.BugReportException;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.auth.exception.AuthException;
@@ -38,6 +39,14 @@ public class GlobalExceptionHandler {
         System.err.println("Auth Error: " + ex.getCode() + " - " + ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponses.error(ex.getCode(), ex.getMessage()));
+    }
+
+    @ExceptionHandler(BugReportException.class)
+    public ResponseEntity<ApiResponse<?>> handleBugReportException(BugReportException ex) {
+        System.err.println("Bug Report Error: " + ex.getCode() + " - " + ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
                 .body(ApiResponses.error(ex.getCode(), ex.getMessage()));
     }
 
