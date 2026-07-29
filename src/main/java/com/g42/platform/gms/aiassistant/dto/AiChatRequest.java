@@ -10,4 +10,5 @@ public class AiChatRequest {
     @NotBlank
     private String message;
     private List<AiChatTurn> history;
+    private String model;
 }

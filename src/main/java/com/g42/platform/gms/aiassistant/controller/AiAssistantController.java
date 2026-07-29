@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/ai-assistant")
 @RequiredArgsConstructor
@@ -31,5 +33,11 @@ public class AiAssistantController {
     @GetMapping("/quota")
     public ResponseEntity<ApiResponse<AiQuotaDto>> quota() {
         return ResponseEntity.ok(ApiResponses.success(aiAssistantService.getQuota()));
+    }
+
+    /** Danh sách model hỗ trợ để người dùng/FE lựa chọn thủ công. */
+    @GetMapping("/models")
+    public ResponseEntity<ApiResponse<List<String>>> models() {
+        return ResponseEntity.ok(ApiResponses.success(aiAssistantService.getAvailableModels()));
     }
 }

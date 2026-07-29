@@ -48,6 +48,12 @@ public class PublicAiAssistantController {
         return ResponseEntity.ok(ApiResponses.success(aiAssistantService.getQuota()));
     }
 
+    /** Danh sách model hỗ trợ để người dùng/FE lựa chọn thủ công. */
+    @GetMapping("/models")
+    public ResponseEntity<ApiResponse<java.util.List<String>>> models() {
+        return ResponseEntity.ok(ApiResponses.success(aiAssistantService.getAvailableModels()));
+    }
+
     private String getClientIp(HttpServletRequest request) {
         String ip = request.getHeader("X-Forwarded-For");
         if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {

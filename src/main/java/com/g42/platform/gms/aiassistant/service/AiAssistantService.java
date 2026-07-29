@@ -194,8 +194,28 @@ public class AiAssistantService {
     @Value("${gemini.api.key:}")
     private String apiKey;
 
-    @Value("${gemini.api.model:gemini-2.0-flash}")
-    private String model;
+    @Value("${gemini.api.model:gemini-3.5-flash}")
+    private String primaryModel;
+
+    @Value("${gemini.api.fallback-models:gemini-3.6-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3-flash,gemini-2.5-flash-lite,gemini-2.0-flash,gemini-1.5-flash}")
+    private String fallbackModelsStr;
+
+    /** Lấy danh sách tất cả các model được hỗ trợ (Primary + Fallback list) để hiển thị cho FE/User chọn thủ công. */
+    public List<String> getAvailableModels() {
+        List<String> list = new ArrayList<>();
+        if (primaryModel != null && !primaryModel.isBlank()) {
+            list.add(primaryModel.trim());
+        }
+        if (fallbackModelsStr != null && !fallbackModelsStr.isBlank()) {
+            for (String m : fallbackModelsStr.split(",")) {
+                String trimmed = m.trim();
+                if (!trimmed.isEmpty() && !list.contains(trimmed)) {
+                    list.add(trimmed);
+                }
+            }
+        }
+        return list;
+    }
 
     /** Chat cho nhân viên nội bộ (đã đăng nhập) — prompt đầy đủ nghiệp vụ. */
     public AiChatResponse chat(AiChatRequest request) {
@@ -217,6 +237,8 @@ public class AiAssistantService {
             throw new AiAssistantException(AiAssistantErrorCode.NOT_CONFIGURED);
         }
 
+        List<String> candidateModels = buildCandidateModels(request.getModel());
+
         Map<String, Object> body = Map.of(
                 "contents", buildContents(request),
                 "systemInstruction", Map.of("parts", List.of(Map.of("text", systemPrompt)))
@@ -226,17 +248,48 @@ public class AiAssistantService {
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
 
-        String url = String.format(GEMINI_URL_TEMPLATE, model, apiKey);
+        JsonNode response = null;
+        String successfulModel = null;
+        Exception lastException = null;
 
-        JsonNode response;
-        try {
-            ResponseEntity<JsonNode> result = restTemplate.postForEntity(url, entity, JsonNode.class);
-            response = result.getBody();
-        } catch (HttpStatusCodeException e) {
-            System.err.println("Gemini API error: " + e.getStatusCode() + " - " + e.getResponseBodyAsString());
-            throw new AiAssistantException(AiAssistantErrorCode.UPSTREAM_ERROR);
-        } catch (RestClientException e) {
-            System.err.println("Gemini API call failed: " + e.getMessage());
+        for (String currentModel : candidateModels) {
+            String url = String.format(GEMINI_URL_TEMPLATE, currentModel, apiKey);
+            int maxRetries = 2;
+
+            for (int attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
+                    System.out.printf("[Gemini AI] Calling model '%s' (attempt %d/%d)...%n", currentModel, attempt, maxRetries);
+                    ResponseEntity<JsonNode> result = restTemplate.postForEntity(url, entity, JsonNode.class);
+                    response = result.getBody();
+                    successfulModel = currentModel;
+                    break;
+                } catch (HttpStatusCodeException e) {
+                    lastException = e;
+                    System.err.printf("[Gemini AI] Model '%s' HTTP %d: %s%n", currentModel, e.getStatusCode().value(), e.getResponseBodyAsString());
+                    if ((e.getStatusCode().value() == 503 || e.getStatusCode().value() == 429) && attempt < maxRetries) {
+                        try {
+                            Thread.sleep(800L * attempt);
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                        }
+                    } else {
+                        break;
+                    }
+                } catch (RestClientException e) {
+                    lastException = e;
+                    System.err.printf("[Gemini AI] Model '%s' call failed: %s%n", currentModel, e.getMessage());
+                    break;
+                }
+            }
+
+            if (response != null) {
+                break;
+            }
+            System.err.printf("[Gemini AI Fallback] Model '%s' unavailable/overloaded. Switching to next model in chain...%n", currentModel);
+        }
+
+        if (response == null) {
+            System.err.println("[Gemini AI Error] All model candidates failed. Last exception: " + (lastException != null ? lastException.getMessage() : "Unknown error"));
             throw new AiAssistantException(AiAssistantErrorCode.UPSTREAM_ERROR);
         }
 
@@ -248,7 +301,20 @@ public class AiAssistantService {
         AiUsageDto usage = extractUsage(response);
         quotaTracker.record(usage.getTotalTokens());
 
-        return new AiChatResponse(reply, usage, quotaTracker.snapshot());
+        return new AiChatResponse(reply, usage, quotaTracker.snapshot(), successfulModel);
+    }
+
+    private List<String> buildCandidateModels(String userSelectedModel) {
+        List<String> candidates = new ArrayList<>();
+        if (userSelectedModel != null && !userSelectedModel.isBlank()) {
+            candidates.add(userSelectedModel.trim());
+        }
+        for (String m : getAvailableModels()) {
+            if (!candidates.contains(m)) {
+                candidates.add(m);
+            }
+        }
+        return candidates;
     }
 
     private List<Map<String, Object>> buildContents(AiChatRequest request) {
