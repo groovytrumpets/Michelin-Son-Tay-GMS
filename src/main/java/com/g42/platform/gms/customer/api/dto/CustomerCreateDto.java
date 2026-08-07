@@ -16,6 +16,8 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CustomerCreateDto {
+    /** Trả về sau khi tạo để client tạo tiếp dữ liệu liên quan (xe, hợp đồng...). */
+    private Integer customerId;
     private String fullName;
     private String phone;
     private String email;

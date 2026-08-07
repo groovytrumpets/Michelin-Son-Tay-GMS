@@ -10,6 +10,7 @@ import org.mapstruct.Mappings;
 
 @Mapper(componentModel = "spring")
 public interface CustomerDtoMapper {
+    @Mapping(source = "customerProfile.customerId", target = "customerId")
     @Mapping(source = "customerProfile.fullName", target = "fullName")
     @Mapping(source = "customerProfile.phone", target = "phone")
     @Mapping(source = "customerProfile.email", target = "email")
