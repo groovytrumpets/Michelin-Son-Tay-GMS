@@ -25,6 +25,11 @@ public class BookingLookupResponse {
     private String description;
     private Integer estimateId;
 
+    // Phân công sẵn từ lúc tạo lịch; check-in dùng làm giá trị mặc định.
+    private Integer vehicleId;
+    private Integer advisorId;
+    private Integer technicianId;
+
     // Customer information
     private Integer customerId;
     private String customerName;

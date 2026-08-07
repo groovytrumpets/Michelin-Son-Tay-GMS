@@ -25,4 +25,12 @@ public class StaffDirectBookingRequest extends BaseBookingRequest {
     private Boolean isPartsSale;
 
     private String referrerPhone;
+
+    // ── Phân công sẵn (tuỳ chọn) ────────────────────────────────────────────
+    // Lễ tân có thể chọn ngay lúc tạo lịch; bỏ trống thì chọn khi check-in.
+    private Integer vehicleId;
+
+    private Integer advisorId;
+
+    private Integer technicianId;
 }

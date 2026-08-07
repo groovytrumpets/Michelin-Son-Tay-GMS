@@ -79,4 +79,7 @@ public class CompleteCheckInAllRequest {
     /** Advisor được phân công cho phiếu dịch vụ này (bắt buộc) */
     @NotNull(message = "Bạn chưa chọn Tư vấn viên, vui lòng thử lại")
     private Integer advisorId;
+
+    /** Kỹ thuật viên phân công sớm (tuỳ chọn) — bỏ trống thì cố vấn phân công sau. */
+    private Integer technicianId;
 }

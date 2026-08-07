@@ -306,6 +306,17 @@ public class CheckInService {
         ticketAssignmentService.assignStaff(savedTicketAll.getServiceTicketId(), advisorDto);
         log.info("Advisor {} assigned to ticket {}", request.getAdvisorId(), savedTicketAll.getTicketCode());
 
+        // 9b. Assign technician (tuỳ chọn — lễ tân có thể phân công sớm ngay khi
+        // check-in; bỏ trống thì cố vấn dịch vụ phân công sau).
+        if (request.getTechnicianId() != null) {
+            AssignStaffDto technicianDto = new AssignStaffDto();
+            technicianDto.setStaffId(request.getTechnicianId());
+            technicianDto.setRoleInTicket("TECHNICIAN");
+            technicianDto.setIsPrimary(true);
+            ticketAssignmentService.assignStaff(savedTicketAll.getServiceTicketId(), technicianDto);
+            log.info("Technician {} assigned to ticket {}", request.getTechnicianId(), savedTicketAll.getTicketCode());
+        }
+
         // 9. Build warnings
         List<ServiceTicketResponse.Warning> warnings = new ArrayList<>();
 

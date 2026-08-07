@@ -75,6 +75,16 @@ public class CheckInController {
      * Lấy danh sách advisor để hiển thị popup phân công khi check-in.
      * GET /api/receptionist/check-in/advisors
      */
+    /**
+     * Lấy danh sách kỹ thuật viên để lễ tân phân công sớm ngay khi check-in.
+     * GET /api/receptionist/check-in/technicians
+     */
+    @GetMapping("/technicians")
+    public ResponseEntity<ApiResponse<List<AvailableStaffDto>>> getTechnicians() {
+        List<AvailableStaffDto> technicians = ticketAssignmentService.getAvailableStaff(0, "TECHNICIAN");
+        return ResponseEntity.ok(ApiResponses.success(technicians));
+    }
+
     @GetMapping("/advisors")
     public ResponseEntity<ApiResponse<List<AvailableStaffDto>>> getAdvisors() {
         List<AvailableStaffDto> advisors = ticketAssignmentService.getAvailableStaff(0, "ADVISOR");

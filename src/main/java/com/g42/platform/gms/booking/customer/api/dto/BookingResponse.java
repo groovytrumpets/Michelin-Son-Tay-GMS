@@ -25,6 +25,9 @@ public class BookingResponse {
     private Integer totalEstimatedTime;
     private Integer queueOrder;
     private Integer estimateId;
+    private Integer vehicleId;
+    private Integer advisorId;
+    private Integer technicianId;
 
     // Progress tracking
     private List<ProgressStep> progressSteps;

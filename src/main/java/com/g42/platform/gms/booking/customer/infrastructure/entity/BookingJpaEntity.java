@@ -52,6 +52,17 @@ public class BookingJpaEntity {
     @Column(name = "is_parts_sale", nullable = false)
     private Boolean isPartsSale = false;
 
+    // ── Phân công sẵn khi tạo lịch (đều không bắt buộc) ─────────────────────
+    // Để trống thì lễ tân chọn lúc check-in như trước.
+    @Column(name = "vehicle_id")
+    private Integer vehicleId;
+
+    @Column(name = "advisor_id")
+    private Integer advisorId;
+
+    @Column(name = "technician_id")
+    private Integer technicianId;
+
     @ManyToMany
     @JoinTable(
             name = "booking_details",

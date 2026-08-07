@@ -25,6 +25,10 @@ public class Booking {
     private Integer estimateId;
     private List<Integer> catalogItemIds = new ArrayList<>();
     private Boolean isPartsSale = false;
+    /** Xe + nhân sự phân công sẵn từ lúc tạo lịch; null nghĩa là chọn khi check-in. */
+    private Integer vehicleId;
+    private Integer advisorId;
+    private Integer technicianId;
     
     public void initializeDefaults() {
         if (createdAt == null) {

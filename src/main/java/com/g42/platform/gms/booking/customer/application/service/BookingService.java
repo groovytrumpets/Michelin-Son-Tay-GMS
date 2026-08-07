@@ -352,6 +352,10 @@ public class BookingService {
         booking.setStatus(BookingStatus.CONFIRMED);
         booking.setEstimateId(request.getEstimateId());
         booking.setIsPartsSale(request.getIsPartsSale() != null ? request.getIsPartsSale() : false);
+        // Phân công sẵn (tuỳ chọn) — check-in sẽ dùng làm giá trị mặc định.
+        booking.setVehicleId(request.getVehicleId());
+        booking.setAdvisorId(request.getAdvisorId());
+        booking.setTechnicianId(request.getTechnicianId());
 
         if (request.getSelectedServiceIds() != null && !request.getSelectedServiceIds().isEmpty()) {
             booking.setCatalogItemIds(request.getSelectedServiceIds());
