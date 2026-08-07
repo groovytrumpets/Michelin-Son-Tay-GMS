@@ -9,6 +9,7 @@ import org.mapstruct.Mapping;
 
 @Mapper(componentModel = "spring")
 public interface StaffProfileDtoMapper {
+    @Mapping(source = "employeeNo", target = "employeeCode")
     StaffProfileDto toStaffProfileDto(StaffProfile staffProfile);
     StaffProfile toStaffProfile(StaffProfileDto staffProfileDto);
     @Mapping(source = "id", target = "roleId")

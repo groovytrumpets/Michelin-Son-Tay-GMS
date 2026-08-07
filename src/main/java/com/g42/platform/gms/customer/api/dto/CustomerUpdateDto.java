@@ -9,6 +9,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 @Getter
@@ -29,4 +30,36 @@ public class CustomerUpdateDto {
     private LocalDateTime firstBookingAt;
     @JsonProperty("isDealer")
     private Boolean isDealer;
+
+    // ── Danh bạ đối tác: thông tin chung ────────────────────────────────────
+    private String customerCode;
+    private String taxCode;
+    private String provinceId;
+    private String provinceName;
+    private String districtId;
+    private String districtName;
+    private String wardId;
+    private String wardName;
+    private String address;
+    private String identityCard;
+    private LocalDate idIssueDate;
+    private String idIssuePlace;
+    private Integer customerGroupId;
+    private String note;
+
+    // ── Danh bạ đối tác: pháp nhân ──────────────────────────────────────────
+    private String representativeName;
+    private String repIdentityCard;
+    private String position;
+    private String contractNumber;
+    private LocalDate contractDate;
+    private String bankAccountInfo;
+    private BigDecimal latitude;
+    private BigDecimal longitude;
+
+    // ── Danh bạ đối tác: liên hệ khác ───────────────────────────────────────
+    private String contactName;
+    private String contactPhone;
+    private String contactEmail;
+    private String contactAddress;
 }

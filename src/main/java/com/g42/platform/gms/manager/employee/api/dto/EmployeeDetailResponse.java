@@ -19,6 +19,31 @@ public class EmployeeDetailResponse {
     private String gender;
     private Date dob;
     private String avatar;
+    private String employeeNo;
+    private String employeeCode;
+    private Date startDate;
+    private Boolean isResigned;
+    private String permanentAddress;
+    private String placeOfBirth;
+    private String address;
+    private String representative;
+    private String ethnicity;
+    private String religion;
+    private String nationality;
+    private String identityCard;
+    private String idIssuePlace;
+    private Date idIssueDate;
+    private String pitCode;
+    private String pitIssuePlace;
+    private Date pitIssueDate;
+    private String socialInsuranceCode;
+    private String siIssuePlace;
+    private Date siIssueDate;
+    private String siPaidPeriod;
+    private String uiPaidPeriod;
+    private String educationLevel;
+    private String profession;
+    private String department;
 
     // Hiệu năng (tháng hiện tại)
     private PerformanceSummary performance;

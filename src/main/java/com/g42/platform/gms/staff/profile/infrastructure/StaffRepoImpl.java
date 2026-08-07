@@ -74,17 +74,52 @@ public class StaffRepoImpl implements StaffRepo {
         staffProfileJpa.setPosition(staffCreateDto.getPosition());
         staffProfileJpa.setAvatar(staffCreateDto.getAvatar());
         staffProfileJpa.setDob(staffCreateDto.getDob());
+        staffProfileJpa.setGender(staffCreateDto.getGender());
+        staffProfileJpa.setStartDate(staffCreateDto.getStartDate());
+        staffProfileJpa.setIsResigned(staffCreateDto.getIsResigned() != null ? staffCreateDto.getIsResigned() : false);
+        staffProfileJpa.setPermanentAddress(staffCreateDto.getPermanentAddress());
+        staffProfileJpa.setPlaceOfBirth(staffCreateDto.getPlaceOfBirth());
+        staffProfileJpa.setAddress(staffCreateDto.getAddress());
+        staffProfileJpa.setRepresentative(staffCreateDto.getRepresentative());
+        staffProfileJpa.setEthnicity(staffCreateDto.getEthnicity());
+        staffProfileJpa.setReligion(staffCreateDto.getReligion());
+        staffProfileJpa.setNationality(staffCreateDto.getNationality());
+        staffProfileJpa.setIdentityCard(staffCreateDto.getIdentityCard());
+        staffProfileJpa.setIdIssuePlace(staffCreateDto.getIdIssuePlace());
+        staffProfileJpa.setIdIssueDate(staffCreateDto.getIdIssueDate());
+        staffProfileJpa.setPitCode(staffCreateDto.getPitCode());
+        staffProfileJpa.setPitIssuePlace(staffCreateDto.getPitIssuePlace());
+        staffProfileJpa.setPitIssueDate(staffCreateDto.getPitIssueDate());
+        staffProfileJpa.setSocialInsuranceCode(staffCreateDto.getSocialInsuranceCode());
+        staffProfileJpa.setSiIssuePlace(staffCreateDto.getSiIssuePlace());
+        staffProfileJpa.setSiIssueDate(staffCreateDto.getSiIssueDate());
+        staffProfileJpa.setSiPaidPeriod(staffCreateDto.getSiPaidPeriod());
+        staffProfileJpa.setUiPaidPeriod(staffCreateDto.getUiPaidPeriod());
+        staffProfileJpa.setEducationLevel(staffCreateDto.getEducationLevel());
+        staffProfileJpa.setProfession(staffCreateDto.getProfession());
+        staffProfileJpa.setDepartment(staffCreateDto.getDepartment());
+
+        String customEmpNo = staffCreateDto.getEmployeeCode() != null && !staffCreateDto.getEmployeeCode().isBlank()
+                ? staffCreateDto.getEmployeeCode().trim()
+                : (staffCreateDto.getEmployeeNo() != null ? staffCreateDto.getEmployeeNo().trim() : null);
+        if (customEmpNo != null && !customEmpNo.isBlank()) {
+            staffProfileJpa.setEmployeeNo(customEmpNo);
+        }
+
         //todo: assign roles for new staff
         if (staffCreateDto.getRoles() != null && !staffCreateDto.getRoles().isEmpty()) {
             List<Integer> roleIds = staffCreateDto.getRoles().stream().map(RoleDto::getRoleId).toList();
             List<RoleJpa> roles = roleJpaRepo.findAllById(roleIds);
             staffProfileJpa.setRoles(roles);
-
         }
+
         StaffProfileJpa savedProfile = staffProfileJpaRepo.save(staffProfileJpa);
-        // Auto-generate employeeNo = staffId (no manual input needed)
-        savedProfile.setEmployeeNo(String.valueOf(savedProfile.getStaffId()));
-        savedProfile = staffProfileJpaRepo.save(savedProfile);
+        // Fallback auto-generate employeeNo = staffId if custom employeeNo not provided
+        if (savedProfile.getEmployeeNo() == null || savedProfile.getEmployeeNo().isBlank()) {
+            savedProfile.setEmployeeNo(String.valueOf(savedProfile.getStaffId()));
+            savedProfile = staffProfileJpaRepo.save(savedProfile);
+        }
+
         //todo: create new staff auth by staffProfileId
         StaffAuthJpa staffAuthJpa = new StaffAuthJpa();
         staffAuthJpa.setStaffProfile(savedProfile);
@@ -106,6 +141,30 @@ public class StaffRepoImpl implements StaffRepo {
         if (dto.getPosition() != null) profile.setPosition(dto.getPosition());
         if (dto.getAvatar() != null) profile.setAvatar(dto.getAvatar());
         if (dto.getDob() != null) profile.setDob(dto.getDob());
+        if (dto.getGender() != null) profile.setGender(dto.getGender());
+        if (dto.getStartDate() != null) profile.setStartDate(dto.getStartDate());
+        if (dto.getIsResigned() != null) profile.setIsResigned(dto.getIsResigned());
+        if (dto.getPermanentAddress() != null) profile.setPermanentAddress(dto.getPermanentAddress());
+        if (dto.getPlaceOfBirth() != null) profile.setPlaceOfBirth(dto.getPlaceOfBirth());
+        if (dto.getAddress() != null) profile.setAddress(dto.getAddress());
+        if (dto.getRepresentative() != null) profile.setRepresentative(dto.getRepresentative());
+        if (dto.getEthnicity() != null) profile.setEthnicity(dto.getEthnicity());
+        if (dto.getReligion() != null) profile.setReligion(dto.getReligion());
+        if (dto.getNationality() != null) profile.setNationality(dto.getNationality());
+        if (dto.getIdentityCard() != null) profile.setIdentityCard(dto.getIdentityCard());
+        if (dto.getIdIssuePlace() != null) profile.setIdIssuePlace(dto.getIdIssuePlace());
+        if (dto.getIdIssueDate() != null) profile.setIdIssueDate(dto.getIdIssueDate());
+        if (dto.getPitCode() != null) profile.setPitCode(dto.getPitCode());
+        if (dto.getPitIssuePlace() != null) profile.setPitIssuePlace(dto.getPitIssuePlace());
+        if (dto.getPitIssueDate() != null) profile.setPitIssueDate(dto.getPitIssueDate());
+        if (dto.getSocialInsuranceCode() != null) profile.setSocialInsuranceCode(dto.getSocialInsuranceCode());
+        if (dto.getSiIssuePlace() != null) profile.setSiIssuePlace(dto.getSiIssuePlace());
+        if (dto.getSiIssueDate() != null) profile.setSiIssueDate(dto.getSiIssueDate());
+        if (dto.getSiPaidPeriod() != null) profile.setSiPaidPeriod(dto.getSiPaidPeriod());
+        if (dto.getUiPaidPeriod() != null) profile.setUiPaidPeriod(dto.getUiPaidPeriod());
+        if (dto.getEducationLevel() != null) profile.setEducationLevel(dto.getEducationLevel());
+        if (dto.getProfession() != null) profile.setProfession(dto.getProfession());
+        if (dto.getDepartment() != null) profile.setDepartment(dto.getDepartment());
 
         if (dto.getRoles() != null && !dto.getRoles().isEmpty()) {
             List<Integer> roleIds = dto.getRoles().stream().map(RoleDto::getRoleId).toList();

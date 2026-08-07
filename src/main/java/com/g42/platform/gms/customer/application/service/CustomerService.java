@@ -60,10 +60,57 @@ public class CustomerService {
         if (customerUpdateDto.getLastLoginAt() != null) {
             customerAuth.setLastLoginAt(customerUpdateDto.getLastLoginAt());
         }
+        applyPartnerFields(customerProfile, customerUpdateDto, customerId);
         if (!customerRepo.updateCustomer(customerId,customerProfile,customerAuth)){
             throw new CustomerException("Update fail!", CustomerErrorCode.INVALID_CUSTOMER_PROFILE);
         }
         return customerDtoMapper.toCusCreateDto(customerProfile,customerAuth);
+    }
+
+    /**
+     * Cập nhật các trường mở rộng của Danh bạ đối tác.
+     * Chỉ ghi đè khi client thực sự gửi giá trị (null = giữ nguyên) để các màn
+     * hình cũ chỉ gửi vài trường không xoá mất dữ liệu đối tác.
+     */
+    private void applyPartnerFields(CustomerProfile profile, CustomerUpdateDto dto, Integer customerId) {
+        if (dto.getCustomerCode() != null) {
+            String code = dto.getCustomerCode().trim();
+            if (!code.isEmpty()) {
+                customerRepo.ensureCustomerCodeAvailable(code, customerId);
+                profile.setCustomerCode(code);
+            }
+        }
+        if (dto.getTaxCode() != null) profile.setTaxCode(dto.getTaxCode());
+        if (dto.getProvinceId() != null) profile.setProvinceId(emptyToNull(dto.getProvinceId()));
+        if (dto.getProvinceName() != null) profile.setProvinceName(emptyToNull(dto.getProvinceName()));
+        if (dto.getDistrictId() != null) profile.setDistrictId(emptyToNull(dto.getDistrictId()));
+        if (dto.getDistrictName() != null) profile.setDistrictName(emptyToNull(dto.getDistrictName()));
+        if (dto.getWardId() != null) profile.setWardId(emptyToNull(dto.getWardId()));
+        if (dto.getWardName() != null) profile.setWardName(emptyToNull(dto.getWardName()));
+        if (dto.getAddress() != null) profile.setAddress(dto.getAddress());
+        if (dto.getIdentityCard() != null) profile.setIdentityCard(dto.getIdentityCard());
+        if (dto.getIdIssueDate() != null) profile.setIdIssueDate(dto.getIdIssueDate());
+        if (dto.getIdIssuePlace() != null) profile.setIdIssuePlace(dto.getIdIssuePlace());
+        if (dto.getCustomerGroupId() != null) profile.setCustomerGroupId(dto.getCustomerGroupId());
+        if (dto.getNote() != null) profile.setNote(dto.getNote());
+
+        if (dto.getRepresentativeName() != null) profile.setRepresentativeName(dto.getRepresentativeName());
+        if (dto.getRepIdentityCard() != null) profile.setRepIdentityCard(dto.getRepIdentityCard());
+        if (dto.getPosition() != null) profile.setPosition(dto.getPosition());
+        if (dto.getContractNumber() != null) profile.setContractNumber(dto.getContractNumber());
+        if (dto.getContractDate() != null) profile.setContractDate(dto.getContractDate());
+        if (dto.getBankAccountInfo() != null) profile.setBankAccountInfo(dto.getBankAccountInfo());
+        if (dto.getLatitude() != null) profile.setLatitude(dto.getLatitude());
+        if (dto.getLongitude() != null) profile.setLongitude(dto.getLongitude());
+
+        if (dto.getContactName() != null) profile.setContactName(dto.getContactName());
+        if (dto.getContactPhone() != null) profile.setContactPhone(dto.getContactPhone());
+        if (dto.getContactEmail() != null) profile.setContactEmail(dto.getContactEmail());
+        if (dto.getContactAddress() != null) profile.setContactAddress(dto.getContactAddress());
+    }
+
+    private String emptyToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 
     public CustomerProfile findByCustomerId(Integer customerId) {

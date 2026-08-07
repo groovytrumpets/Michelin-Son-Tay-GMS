@@ -50,6 +50,8 @@ public class CustomerRepoImpl implements CustomerRepo {
     private CustomerPointsJpaRepo customerPointsJpaRepo;
     @Autowired
     private com.g42.platform.gms.customer.infrastructure.repository.CustomerPointsHistoryJpaRepo customerPointsHistoryJpaRepo;
+    @Autowired
+    private com.g42.platform.gms.customer.infrastructure.repository.CustomerGroupJpaRepo customerGroupJpaRepo;
 
     @Override
     public CustomerProfile createNewCustomerProfile(CustomerCreateDto customerDto) {
@@ -85,7 +87,71 @@ public class CustomerRepoImpl implements CustomerRepo {
         if (customerDto.getDob() != null && !customerDto.getDob().isBlank()) {
             entity.setDob(LocalDate.parse(customerDto.getDob()));
         }
-        return customerJpaMapper.toDomain(customerProfileJpaRepo.save(entity));
+
+        applyPartnerFields(entity, customerDto);
+
+        CustomerProfileJpa saved = customerProfileJpaRepo.save(entity);
+        // Mã khách hàng để trống thì sinh tự động theo id (KH00001, KH00002, ...)
+        if (saved.getCustomerCode() == null || saved.getCustomerCode().isBlank()) {
+            saved.setCustomerCode(String.format("KH%05d", saved.getCustomerId()));
+            saved = customerProfileJpaRepo.save(saved);
+        }
+        return customerJpaMapper.toDomain(saved);
+    }
+
+    /** Gán các trường mở rộng của Danh bạ đối tác từ DTO tạo mới. */
+    private void applyPartnerFields(CustomerProfileJpa entity, CustomerCreateDto dto) {
+        String code = dto.getCustomerCode() == null ? null : dto.getCustomerCode().trim();
+        if (code != null && !code.isEmpty()) {
+            ensureCustomerCodeAvailable(code, entity.getCustomerId());
+            entity.setCustomerCode(code);
+        }
+
+        entity.setTaxCode(dto.getTaxCode());
+        entity.setProvinceId(dto.getProvinceId());
+        entity.setProvinceName(dto.getProvinceName());
+        entity.setDistrictId(dto.getDistrictId());
+        entity.setDistrictName(dto.getDistrictName());
+        entity.setWardId(dto.getWardId());
+        entity.setWardName(dto.getWardName());
+        entity.setAddress(dto.getAddress());
+        entity.setIdentityCard(dto.getIdentityCard());
+        entity.setIdIssueDate(dto.getIdIssueDate());
+        entity.setIdIssuePlace(dto.getIdIssuePlace());
+        entity.setCustomerGroupId(dto.getCustomerGroupId());
+        entity.setNote(dto.getNote());
+
+        entity.setRepresentativeName(dto.getRepresentativeName());
+        entity.setRepIdentityCard(dto.getRepIdentityCard());
+        entity.setPosition(dto.getPosition());
+        entity.setContractNumber(dto.getContractNumber());
+        entity.setContractDate(dto.getContractDate());
+        entity.setBankAccountInfo(dto.getBankAccountInfo());
+        entity.setLatitude(dto.getLatitude());
+        entity.setLongitude(dto.getLongitude());
+
+        entity.setContactName(dto.getContactName());
+        entity.setContactPhone(dto.getContactPhone());
+        entity.setContactEmail(dto.getContactEmail());
+        entity.setContactAddress(dto.getContactAddress());
+    }
+
+    @Override
+    public void ensureCustomerCodeAvailable(String customerCode, Integer selfCustomerId) {
+        if (customerCode == null || customerCode.isBlank()) return;
+        customerProfileJpaRepo.findByCustomerCodeIgnoreCase(customerCode.trim()).ifPresent(other -> {
+            if (!other.getCustomerId().equals(selfCustomerId)) {
+                throw new CustomerException("Mã khách hàng đã tồn tại: " + customerCode,
+                        CustomerErrorCode.INVALID_CUSTOMER_PROFILE);
+            }
+        });
+    }
+
+    /** Nạp tên nhóm khách hàng để hiển thị trên danh bạ. */
+    private void fillGroupName(CustomerProfile profile) {
+        if (profile == null || profile.getCustomerGroupId() == null) return;
+        customerGroupJpaRepo.findById(profile.getCustomerGroupId())
+                .ifPresent(group -> profile.setCustomerGroupName(group.getName()));
     }
 
     @Override
@@ -113,8 +179,16 @@ public class CustomerRepoImpl implements CustomerRepo {
             specification = specification.and(CustomerProfileSpecification.searchProfiles(search));
         }
         Page<CustomerProfileJpa> customerProfileJpas = customerProfileJpaRepo.findAll(specification, pageable);
+        // Nạp sẵn nhóm khách hàng một lần để tránh truy vấn lặp trên từng dòng.
+        java.util.Map<Integer, String> groupNames = customerGroupJpaRepo.findAll().stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        com.g42.platform.gms.customer.infrastructure.entity.CustomerGroupJpa::getGroupId,
+                        com.g42.platform.gms.customer.infrastructure.entity.CustomerGroupJpa::getName));
         return customerProfileJpas.map(jpa -> {
             CustomerProfile profile = customerJpaMapper.toDomain(jpa);
+            if (profile.getCustomerGroupId() != null) {
+                profile.setCustomerGroupName(groupNames.get(profile.getCustomerGroupId()));
+            }
             CustomerAuthJpa auth = customerAuthJpaRepo.findByCustomerId(jpa.getCustomerId());
             if (auth != null) profile.setStatus(auth.getStatus());
             // Default BRONZE nếu chưa có record điểm
@@ -163,6 +237,7 @@ public class CustomerRepoImpl implements CustomerRepo {
     public CustomerProfile findCustomerById(Integer customerId) {
         CustomerProfileJpa jpa = customerProfileJpaRepo.findByCustomerId(customerId);
         CustomerProfile profile = customerJpaMapper.toDomain(jpa);
+        fillGroupName(profile);
         CustomerAuthJpa auth = customerAuthJpaRepo.findByCustomerId(customerId);
         if (auth != null) profile.setStatus(auth.getStatus());
         // Default BRONZE nếu chưa có record điểm

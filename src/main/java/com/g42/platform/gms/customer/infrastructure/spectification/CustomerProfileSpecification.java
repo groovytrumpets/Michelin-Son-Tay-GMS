@@ -51,6 +51,13 @@ public class CustomerProfileSpecification {
             predicates.add(cb.like(root.get("phone").as(String.class), like));
             predicates.add(cb.like(root.get("email").as(String.class), like));
             predicates.add(cb.like(root.get("dob").as(String.class), like));
+            // Danh bạ đối tác: tìm theo mã khách hàng, mã số thuế, người liên hệ
+            predicates.add(cb.like(cb.lower(root.get("customerCode")), like));
+            predicates.add(cb.like(cb.lower(root.get("taxCode")), like));
+            predicates.add(cb.like(cb.lower(root.get("address")), like));
+            predicates.add(cb.like(cb.lower(root.get("contactName")), like));
+            predicates.add(cb.like(cb.lower(root.get("contactPhone")), like));
+            predicates.add(cb.like(cb.lower(root.get("representativeName")), like));
 
             Subquery<Integer> vehicleSubquery = query.subquery(Integer.class);
             Root<Vehicle> vehicleRoot = vehicleSubquery.from(Vehicle.class);

@@ -10,4 +10,6 @@ public interface CustomerProfileJpaRepo extends JpaRepository<CustomerProfileJpa
     CustomerProfileJpa findByCustomerId(Integer customerId);
     
     CustomerProfileJpa findByPhone(String phone);
+
+    java.util.Optional<CustomerProfileJpa> findByCustomerCodeIgnoreCase(String customerCode);
 }

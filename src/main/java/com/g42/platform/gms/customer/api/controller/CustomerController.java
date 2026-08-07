@@ -5,7 +5,9 @@ import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.customer.api.dto.CustomerCreateDto;
 import com.g42.platform.gms.customer.api.dto.CustomerUpdateDto;
+import com.g42.platform.gms.customer.api.dto.TaxLookupDto;
 import com.g42.platform.gms.customer.application.service.CustomerService;
+import com.g42.platform.gms.customer.application.service.TaxLookupService;
 import com.g42.platform.gms.customer.domain.entity.CustomerProfile;
 import com.g42.platform.gms.systemlog.annotation.Auditable;
 import lombok.AllArgsConstructor;
@@ -22,6 +24,15 @@ import java.time.LocalDate;
 public class CustomerController {
     @Autowired
     CustomerService customerService;
+    @Autowired
+    TaxLookupService taxLookupService;
+
+    /** Tra cứu doanh nghiệp theo mã số thuế để tự động điền hồ sơ đối tác. */
+    @GetMapping("tax-lookup")
+    public ResponseEntity<ApiResponse<TaxLookupDto>> lookupByTaxCode(@RequestParam String taxCode) {
+        return ResponseEntity.ok(ApiResponses.success(taxLookupService.lookup(taxCode)));
+    }
+
     @PostMapping("create")
     @Auditable(action = "CREATE", module = "CUSTOMER", description = "Tạo hồ sơ khách hàng", targetType = "CUSTOMER")
     public ResponseEntity<ApiResponse<CustomerCreateDto>> createCustomer(@RequestBody CustomerCreateDto customerDto) {

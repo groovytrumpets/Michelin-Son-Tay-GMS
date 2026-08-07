@@ -24,4 +24,7 @@ public interface CustomerRepo {
     boolean updateCustomer(Integer customerId, CustomerProfile customerProfile, CustomerAuth customerAuth);
 
     CustomerProfile findCustomerById(Integer customerId);
+
+    /** Ném lỗi nếu mã khách hàng đã được hồ sơ khác sử dụng. */
+    void ensureCustomerCodeAvailable(String customerCode, Integer selfCustomerId);
 }
