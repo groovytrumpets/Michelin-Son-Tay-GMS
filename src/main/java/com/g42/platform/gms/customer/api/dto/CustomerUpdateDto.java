@@ -30,6 +30,9 @@ public class CustomerUpdateDto {
     private LocalDateTime firstBookingAt;
     @JsonProperty("isDealer")
     private Boolean isDealer;
+    @JsonProperty("isCompany")
+    private Boolean isCompany;
+    private String companyName;
 
     // ── Danh bạ đối tác: thông tin chung ────────────────────────────────────
     private String customerCode;

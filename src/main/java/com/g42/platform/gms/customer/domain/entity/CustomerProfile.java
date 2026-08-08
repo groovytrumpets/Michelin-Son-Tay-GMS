@@ -39,6 +39,10 @@ public class CustomerProfile {
     private Integer referrerId;
     @JsonProperty("isDealer")
     private Boolean isDealer = false;
+    @JsonProperty("isCompany")
+    private Boolean isCompany = false;
+    @JsonProperty("companyName")
+    private String companyName = "";
 
     // ── Danh bạ đối tác: thông tin chung ────────────────────────────────────
     private String customerCode;
