@@ -34,6 +34,9 @@ public class CustomerProfileDto {
     private Integer totalPoints;
     private String currentRank;
     private String currentDealerRank;
+    @JsonProperty("isCompany")
+    private Boolean isCompany;
+    private String companyName;
 
     // ── Danh bạ đối tác ─────────────────────────────────────────────────────
     private String customerCode;

@@ -56,6 +56,12 @@ public class CustomerProfileJpa {
     @Column(name = "is_dealer")
     private Boolean isDealer = false;
 
+    @Column(name = "is_company")
+    private Boolean isCompany = false;
+
+    @Column(name = "company_name", length = 255)
+    private String companyName;
+
     // ── Danh bạ đối tác: thông tin chung ────────────────────────────────────
     @Column(name = "customer_code", length = 50)
     private String customerCode;

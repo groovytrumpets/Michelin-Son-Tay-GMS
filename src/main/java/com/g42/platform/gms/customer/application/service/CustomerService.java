@@ -30,10 +30,21 @@ public class CustomerService {
     
     @Transactional
     public CustomerCreateDto createNewCustomer(CustomerCreateDto customerDto) {
-        CustomerProfile customerProfile = customerRepo.createNewCustomerProfile(customerDto);
-        CustomerAuth customerAuth = customerRepo.createNewCustomerAuth(customerDto,customerProfile);
-        
-        return customerDtoMapper.toCusCreateDto(customerProfile,customerAuth);
+        try {
+            System.out.println("[DEBUG_CREATE] Step 1: Creating profile for phone=" + customerDto.getPhone());
+            CustomerProfile customerProfile = customerRepo.createNewCustomerProfile(customerDto);
+            System.out.println("[DEBUG_CREATE] Step 2: Profile created, customerId=" + customerProfile.getCustomerId());
+            CustomerAuth customerAuth = customerRepo.createNewCustomerAuth(customerDto, customerProfile);
+            System.out.println("[DEBUG_CREATE] Step 3: Auth created, returning DTO");
+            return customerDtoMapper.toCusCreateDto(customerProfile, customerAuth);
+        } catch (Exception e) {
+            System.err.println("[DEBUG_CREATE] FAILED at: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+            if (e.getCause() != null) {
+                System.err.println("[DEBUG_CREATE] Cause: " + e.getCause().getClass().getSimpleName() + ": " + e.getCause().getMessage());
+            }
+            e.printStackTrace();
+            throw e;
+        }
     }
 
     public Page<CustomerProfile> getListOfAllCustomerProfile(int page, int size, LocalDate date, Boolean isGuest, String search, String status) {
@@ -43,11 +54,11 @@ public class CustomerService {
     public CustomerCreateDto updateCustomer(Integer customerId, CustomerUpdateDto customerUpdateDto) {
         CustomerProfile customerProfile = customerRepo.findProflieById(customerId);
         CustomerAuth customerAuth = customerRepo.findAuthById(customerId);
-        customerProfile.setFullName(customerUpdateDto.getFullName());
-        customerProfile.setPhone(customerUpdateDto.getPhone());
-        customerProfile.setEmail(customerUpdateDto.getEmail());
-        customerProfile.setGender(customerUpdateDto.getGender());
-        customerProfile.setAvatar(customerUpdateDto.getAvatar());
+        if (customerUpdateDto.getFullName() != null) customerProfile.setFullName(customerUpdateDto.getFullName());
+        if (customerUpdateDto.getPhone() != null) customerProfile.setPhone(customerUpdateDto.getPhone());
+        if (customerUpdateDto.getEmail() != null) customerProfile.setEmail(customerUpdateDto.getEmail());
+        if (customerUpdateDto.getGender() != null) customerProfile.setGender(customerUpdateDto.getGender());
+        if (customerUpdateDto.getAvatar() != null) customerProfile.setAvatar(customerUpdateDto.getAvatar());
         if (customerUpdateDto.getCustomerType() != null) {
             customerProfile.setCustomerType(customerUpdateDto.getCustomerType());
         }
@@ -80,6 +91,16 @@ public class CustomerService {
                 profile.setCustomerCode(code);
             }
         }
+        
+        if (dto.getIsCompany() != null) {
+            profile.setIsCompany(dto.getIsCompany());
+        }
+        if (Boolean.TRUE.equals(profile.getIsCompany()) && dto.getCompanyName() != null) {
+            profile.setCompanyName(dto.getCompanyName());
+        } else if (Boolean.FALSE.equals(profile.getIsCompany())) {
+            profile.setCompanyName(null);
+        }
+
         if (dto.getTaxCode() != null) profile.setTaxCode(dto.getTaxCode());
         if (dto.getProvinceId() != null) profile.setProvinceId(emptyToNull(dto.getProvinceId()));
         if (dto.getProvinceName() != null) profile.setProvinceName(emptyToNull(dto.getProvinceName()));

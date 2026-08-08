@@ -52,4 +52,10 @@ public class CustomerProfile {
 
     @Column(name = "is_dealer")
     private Boolean isDealer;
+
+    @Column(name = "is_company")
+    private Boolean isCompany;
+
+    @Column(name = "company_name")
+    private String companyName;
 }

@@ -55,12 +55,14 @@ public class CustomerRepoImpl implements CustomerRepo {
 
     @Override
     public CustomerProfile createNewCustomerProfile(CustomerCreateDto customerDto) {
+        System.out.println("[DEBUG_PROFILE] phone=" + customerDto.getPhone());
         if (customerDto.getPhone()==null){
             throw new CustomerException("Phone must not null!", CustomerErrorCode.INVALID_PHONE);
         }
         
         // Kiểm tra xem khách hàng đã tồn tại chưa (khách vãng lai đã có profile nhưng chưa có tài khoản)
         CustomerProfileJpa entity = customerProfileJpaRepo.findByPhone(customerDto.getPhone());
+        System.out.println("[DEBUG_PROFILE] found existing entity=" + (entity != null ? entity.getCustomerId() : "null"));
         if (entity == null) {
             entity = new CustomerProfileJpa();
         }
@@ -88,15 +90,22 @@ public class CustomerRepoImpl implements CustomerRepo {
             entity.setDob(LocalDate.parse(customerDto.getDob()));
         }
 
+        System.out.println("[DEBUG_PROFILE] calling applyPartnerFields");
         applyPartnerFields(entity, customerDto);
 
+        System.out.println("[DEBUG_PROFILE] calling save");
         CustomerProfileJpa saved = customerProfileJpaRepo.save(entity);
+        System.out.println("[DEBUG_PROFILE] saved customerId=" + saved.getCustomerId());
         // Mã khách hàng để trống thì sinh tự động theo id (KH00001, KH00002, ...)
         if (saved.getCustomerCode() == null || saved.getCustomerCode().isBlank()) {
             saved.setCustomerCode(String.format("KH%05d", saved.getCustomerId()));
             saved = customerProfileJpaRepo.save(saved);
         }
-        return customerJpaMapper.toDomain(saved);
+        System.out.println("[DEBUG_PROFILE] customerCode=" + saved.getCustomerCode() + ", isCompany=" + saved.getIsCompany());
+        CustomerProfile domain = customerJpaMapper.toDomain(saved);
+        copyPartnerFieldsToDomain(saved, domain);
+        System.out.println("[DEBUG_PROFILE] done, domain.isCompany=" + domain.getIsCompany());
+        return domain;
     }
 
     /** Gán các trường mở rộng của Danh bạ đối tác từ DTO tạo mới. */
@@ -105,6 +114,18 @@ public class CustomerRepoImpl implements CustomerRepo {
         if (code != null && !code.isEmpty()) {
             ensureCustomerCodeAvailable(code, entity.getCustomerId());
             entity.setCustomerCode(code);
+        }
+
+        if (dto.getIsCompany() != null) {
+            entity.setIsCompany(dto.getIsCompany());
+        } else {
+            entity.setIsCompany(false);
+        }
+        
+        if (Boolean.TRUE.equals(entity.getIsCompany())) {
+            entity.setCompanyName(dto.getCompanyName());
+        } else {
+            entity.setCompanyName(null);
         }
 
         entity.setTaxCode(dto.getTaxCode());
@@ -171,6 +192,7 @@ public class CustomerRepoImpl implements CustomerRepo {
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public Page<CustomerProfile> getListOfCustomers(int page,int size, LocalDate date, Boolean isGuest, String search, String status) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         Specification<CustomerProfileJpa> specification = Specification.unrestricted();
@@ -185,7 +207,9 @@ public class CustomerRepoImpl implements CustomerRepo {
                         com.g42.platform.gms.customer.infrastructure.entity.CustomerGroupJpa::getGroupId,
                         com.g42.platform.gms.customer.infrastructure.entity.CustomerGroupJpa::getName));
         return customerProfileJpas.map(jpa -> {
+            System.out.println("[DEBUG_JAVA_LIST] ID=" + jpa.getCustomerId() + " Name=" + jpa.getFullName() + " jpaIsCompany=" + jpa.getIsCompany() + " jpaCompanyName=" + jpa.getCompanyName());
             CustomerProfile profile = customerJpaMapper.toDomain(jpa);
+            copyPartnerFieldsToDomain(jpa, profile);
             if (profile.getCustomerGroupId() != null) {
                 profile.setCustomerGroupName(groupNames.get(profile.getCustomerGroupId()));
             }
@@ -216,7 +240,9 @@ public class CustomerRepoImpl implements CustomerRepo {
         CustomerAuthJpa customerAuthJpa = customerAuthJpaRepo.findByCustomerId(customerId);
         if (customerProfileJpa==null||customerAuthJpa==null) throw new CustomerException("Customer not found!", CustomerErrorCode.INVALID_CUSTOMER_PROFILE);
 
-        return customerJpaMapper.toDomain(customerProfileJpa);
+        CustomerProfile profile = customerJpaMapper.toDomain(customerProfileJpa);
+        copyPartnerFieldsToDomain(customerProfileJpa, profile);
+        return profile;
     }
 
     @Override
@@ -227,16 +253,36 @@ public class CustomerRepoImpl implements CustomerRepo {
 
     @Override
     public boolean updateCustomer(Integer customerId, CustomerProfile customerProfile, CustomerAuth customerAuth) {
-        CustomerProfileJpa customerProfileJpa = customerProfileJpaRepo.save(customerJpaMapper.toJpa(customerProfile));
-        CustomerAuthJpa customerAuthJpa = customerAuthJpaRepo.save(customerAuthJpaMapper.toDomain(customerAuth));
-        return (customerAuthJpa!=null && customerProfileJpa!=null);
+        CustomerProfileJpa jpa = customerProfileJpaRepo.findByCustomerId(customerId);
+        if (jpa == null) return false;
+        
+        jpa.setFullName(customerProfile.getFullName());
+        jpa.setPhone(customerProfile.getPhone());
+        jpa.setEmail(customerProfile.getEmail());
+        jpa.setDob(customerProfile.getDob());
+        jpa.setGender(customerProfile.getGender());
+        jpa.setAvatar(customerProfile.getAvatar());
+        jpa.setCustomerType(customerProfile.getCustomerType());
+        jpa.setIsDealer(customerProfile.getIsDealer());
+        copyPartnerFieldsToJpa(customerProfile, jpa);
+        
+        CustomerProfileJpa savedProfile = customerProfileJpaRepo.save(jpa);
 
+        CustomerAuthJpa authJpa = customerAuthJpaRepo.findByCustomerId(customerId);
+        if (authJpa != null && customerAuth != null) {
+            if (customerAuth.getStatus() != null) authJpa.setStatus(customerAuth.getStatus());
+            if (customerAuth.getLastLoginAt() != null) authJpa.setLastLoginAt(customerAuth.getLastLoginAt());
+            customerAuthJpaRepo.save(authJpa);
+        }
+        return savedProfile != null;
     }
 
     @Override
     public CustomerProfile findCustomerById(Integer customerId) {
         CustomerProfileJpa jpa = customerProfileJpaRepo.findByCustomerId(customerId);
+        System.out.println("[DEBUG_JAVA_DETAIL] ID=" + customerId + " jpaIsCompany=" + (jpa != null ? jpa.getIsCompany() : "NULL_JPA") + " jpaCompanyName=" + (jpa != null ? jpa.getCompanyName() : "NULL_JPA"));
         CustomerProfile profile = customerJpaMapper.toDomain(jpa);
+        copyPartnerFieldsToDomain(jpa, profile);
         fillGroupName(profile);
         CustomerAuthJpa auth = customerAuthJpaRepo.findByCustomerId(customerId);
         if (auth != null) profile.setStatus(auth.getStatus());
@@ -256,5 +302,71 @@ public class CustomerRepoImpl implements CustomerRepo {
         long bookings = customerPointsHistoryJpaRepo.countByCustomerIdAndReason(customerId, "SERVICE_PAYMENT");
         profile.setTotalBookings((int) bookings);
         return profile;
+    }
+
+    private void copyPartnerFieldsToDomain(CustomerProfileJpa jpa, CustomerProfile domain) {
+        if (jpa == null || domain == null) return;
+        boolean isComp = Boolean.TRUE.equals(jpa.getIsCompany()) || (jpa.getCompanyName() != null && !jpa.getCompanyName().isBlank());
+        domain.setIsCompany(isComp);
+        domain.setCompanyName(jpa.getCompanyName() != null ? jpa.getCompanyName() : "");
+        domain.setCustomerCode(jpa.getCustomerCode());
+        domain.setTaxCode(jpa.getTaxCode());
+        domain.setProvinceId(jpa.getProvinceId());
+        domain.setProvinceName(jpa.getProvinceName());
+        domain.setDistrictId(jpa.getDistrictId());
+        domain.setDistrictName(jpa.getDistrictName());
+        domain.setWardId(jpa.getWardId());
+        domain.setWardName(jpa.getWardName());
+        domain.setAddress(jpa.getAddress());
+        domain.setIdentityCard(jpa.getIdentityCard());
+        domain.setIdIssueDate(jpa.getIdIssueDate());
+        domain.setIdIssuePlace(jpa.getIdIssuePlace());
+        domain.setCustomerGroupId(jpa.getCustomerGroupId());
+        domain.setNote(jpa.getNote());
+        domain.setRepresentativeName(jpa.getRepresentativeName());
+        domain.setRepIdentityCard(jpa.getRepIdentityCard());
+        domain.setPosition(jpa.getPosition());
+        domain.setContractNumber(jpa.getContractNumber());
+        domain.setContractDate(jpa.getContractDate());
+        domain.setBankAccountInfo(jpa.getBankAccountInfo());
+        domain.setLatitude(jpa.getLatitude());
+        domain.setLongitude(jpa.getLongitude());
+        domain.setContactName(jpa.getContactName());
+        domain.setContactPhone(jpa.getContactPhone());
+        domain.setContactEmail(jpa.getContactEmail());
+        domain.setContactAddress(jpa.getContactAddress());
+    }
+
+    private void copyPartnerFieldsToJpa(CustomerProfile domain, CustomerProfileJpa jpa) {
+        if (domain == null || jpa == null) return;
+        boolean isComp = Boolean.TRUE.equals(domain.getIsCompany()) || (domain.getCompanyName() != null && !domain.getCompanyName().isBlank());
+        jpa.setIsCompany(isComp);
+        jpa.setCompanyName(domain.getCompanyName());
+        jpa.setCustomerCode(domain.getCustomerCode());
+        jpa.setTaxCode(domain.getTaxCode());
+        jpa.setProvinceId(domain.getProvinceId());
+        jpa.setProvinceName(domain.getProvinceName());
+        jpa.setDistrictId(domain.getDistrictId());
+        jpa.setDistrictName(domain.getDistrictName());
+        jpa.setWardId(domain.getWardId());
+        jpa.setWardName(domain.getWardName());
+        jpa.setAddress(domain.getAddress());
+        jpa.setIdentityCard(domain.getIdentityCard());
+        jpa.setIdIssueDate(domain.getIdIssueDate());
+        jpa.setIdIssuePlace(domain.getIdIssuePlace());
+        jpa.setCustomerGroupId(domain.getCustomerGroupId());
+        jpa.setNote(domain.getNote());
+        jpa.setRepresentativeName(domain.getRepresentativeName());
+        jpa.setRepIdentityCard(domain.getRepIdentityCard());
+        jpa.setPosition(domain.getPosition());
+        jpa.setContractNumber(domain.getContractNumber());
+        jpa.setContractDate(domain.getContractDate());
+        jpa.setBankAccountInfo(domain.getBankAccountInfo());
+        jpa.setLatitude(domain.getLatitude());
+        jpa.setLongitude(domain.getLongitude());
+        jpa.setContactName(domain.getContactName());
+        jpa.setContactPhone(domain.getContactPhone());
+        jpa.setContactEmail(domain.getContactEmail());
+        jpa.setContactAddress(domain.getContactAddress());
     }
 }

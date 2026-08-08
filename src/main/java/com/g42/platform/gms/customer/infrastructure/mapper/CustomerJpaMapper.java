@@ -12,4 +12,5 @@ public interface CustomerJpaMapper{
     CustomerProfile toDomain (CustomerProfileJpa customerProfileJpa);
     List<CustomerProfile> toDomainList (List<CustomerProfileJpa> customerProfileJpaList);
     CustomerProfileJpa toJpa (CustomerProfile customerProfile);
+    // Force MapStruct recompilation
 }
