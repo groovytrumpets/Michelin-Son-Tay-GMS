@@ -27,6 +27,9 @@ public interface InventoryRepo {
 
     List<Inventory> findByWarehouse(Integer warehouseId);
 
+    /** Lấy toàn bộ inventory của tất cả kho — dùng cho xuất Excel tổng hợp. */
+    List<Inventory> findAll();
+
     List<Inventory> findLowStock(Integer warehouseId);
 
     Inventory save(Inventory inventory);
