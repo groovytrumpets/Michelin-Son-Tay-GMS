@@ -120,6 +120,8 @@ public class StockIssueService {
     private final ObjectMapper objectMapper;
     private final BillingRepository billingRepository;
 
+    private final com.g42.platform.gms.customer.infrastructure.repository.CustomerProfileJpaRepo customerProfileJpaRepo;
+    private final com.g42.platform.gms.vehicle.repository.VehicleRepository vehicleRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final StaffNotifyService staffNotifyService;
 
@@ -144,6 +146,37 @@ public class StockIssueService {
             }
         }
 
+        String receiverName = request.getReceiverName();
+        String receiverPhone = request.getReceiverPhone();
+        String licensePlate = request.getLicensePlate();
+
+        if (request.getServiceTicketId() != null) {
+            ServiceTicket ticket = serviceTicketRepo.findByServiceTicketId(request.getServiceTicketId());
+            if (ticket != null) {
+                if ((receiverName == null || receiverName.trim().isEmpty()) && ticket.getCustomerId() != null) {
+                    com.g42.platform.gms.customer.infrastructure.entity.CustomerProfileJpa cust =
+                            customerProfileJpaRepo.findByCustomerId(ticket.getCustomerId());
+                    if (cust != null) {
+                        receiverName = cust.getFullName();
+                        receiverPhone = cust.getPhone();
+                    }
+                }
+                if ((licensePlate == null || licensePlate.trim().isEmpty()) && ticket.getVehicleId() != null) {
+                    var vOpt = vehicleRepository.findById(ticket.getVehicleId());
+                    if (vOpt.isPresent()) {
+                        var v = vOpt.get();
+                        licensePlate = v.getLicensePlate();
+                        if (receiverName == null || receiverName.trim().isEmpty()) {
+                            if (v.getCustomer() != null) {
+                                receiverName = v.getCustomer().getFullName();
+                                receiverPhone = v.getCustomer().getPhone();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Tạo phiếu DRAFT
         StockIssue saved = stockIssueRepo.save(StockIssue.builder()
                 .issueCode(generateIssueCode())
@@ -151,9 +184,9 @@ public class StockIssueService {
                 .issueType(request.getIssueType())
                 .issueReason(request.getIssueReason())
                 .serviceTicketId(request.getServiceTicketId())
-                .receiverName(request.getReceiverName())
-                .receiverPhone(request.getReceiverPhone())
-                .licensePlate(request.getLicensePlate())
+                .receiverName(receiverName)
+                .receiverPhone(receiverPhone)
+                .licensePlate(licensePlate)
                 .discountRate(BigDecimal.ZERO)
                 .status(StockIssueStatus.DRAFT)
                 .createdBy(staffId)
@@ -1092,6 +1125,27 @@ public class StockIssueService {
             ServiceTicket ticket = serviceTicketRepo.findByServiceTicketId(e.getServiceTicketId());
             if (ticket != null) {
                 r.setServiceTicketCode(ticket.getTicketCode());
+
+                if ((r.getReceiverName() == null || r.getReceiverName().trim().isEmpty()) && ticket.getCustomerId() != null) {
+                    com.g42.platform.gms.customer.infrastructure.entity.CustomerProfileJpa cust =
+                            customerProfileJpaRepo.findByCustomerId(ticket.getCustomerId());
+                    if (cust != null) {
+                        r.setReceiverName(cust.getFullName());
+                        r.setReceiverPhone(cust.getPhone());
+                    }
+                }
+
+                if ((r.getLicensePlate() == null || r.getLicensePlate().trim().isEmpty()) && ticket.getVehicleId() != null) {
+                    vehicleRepository.findById(ticket.getVehicleId()).ifPresent(v -> {
+                        r.setLicensePlate(v.getLicensePlate());
+                        if (r.getReceiverName() == null || r.getReceiverName().trim().isEmpty()) {
+                            if (v.getCustomer() != null) {
+                                r.setReceiverName(v.getCustomer().getFullName());
+                                r.setReceiverPhone(v.getCustomer().getPhone());
+                            }
+                        }
+                    });
+                }
             }
         }
 

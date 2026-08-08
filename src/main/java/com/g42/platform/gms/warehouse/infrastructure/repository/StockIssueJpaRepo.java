@@ -21,7 +21,8 @@ public interface StockIssueJpaRepo extends JpaRepository<StockIssueJpa, Integer>
     List<StockIssueJpa> findByWarehouseIdOrderByCreatedAtDesc(Integer warehouseId);
 
         @Query("""
-        select i from StockIssueJpa i
+        select distinct i from StockIssueJpa i
+        left join i.items item
         where (:warehouseId is null or i.warehouseId = :warehouseId)
             and (:status is null or i.status = :status)
             and (:issueType is null or i.issueType = :issueType)
@@ -32,6 +33,11 @@ public interface StockIssueJpaRepo extends JpaRepository<StockIssueJpa, Integer>
                 or lower(i.issueCode) like lower(concat('%', :search, '%'))
                 or lower(i.issueReason) like lower(concat('%', :search, '%'))
                 or cast(i.serviceTicketId as string) like concat('%', :search, '%')
+                or lower(i.receiverName) like lower(concat('%', :search, '%'))
+                or lower(i.receiverPhone) like lower(concat('%', :search, '%'))
+                or lower(i.licensePlate) like lower(concat('%', :search, '%'))
+                or lower(item.catalogItem.itemName) like lower(concat('%', :search, '%'))
+                or lower(item.catalogItem.sku) like lower(concat('%', :search, '%'))
             )
         """)
         Page<StockIssueJpa> search(

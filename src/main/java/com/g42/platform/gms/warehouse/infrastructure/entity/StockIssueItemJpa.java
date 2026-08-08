@@ -21,6 +21,10 @@ public class StockIssueItemJpa {
     @Column(name = "item_id", nullable = false)
     private Integer itemId;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "item_id", insertable = false, updatable = false)
+    private CatalogItemJpa catalogItem;
+
     /** Lô nhập kho tương ứng (FIFO) — ref đến stock_entry_item */
     @Column(name = "entry_item_id", nullable = false)
     private Integer entryItemId;
