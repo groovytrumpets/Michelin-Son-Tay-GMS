@@ -19,7 +19,8 @@ public interface ReturnEntryJpaRepo extends JpaRepository<ReturnEntryJpa, Intege
     List<ReturnEntryJpa> findByWarehouseIdOrderByCreatedAtDesc(Integer warehouseId);
 
     @Query("""
-        select r from ReturnEntryJpa r
+        select distinct r from ReturnEntryJpa r
+        left join r.items i
         where (:warehouseId is null or r.warehouseId = :warehouseId)
             and (:status is null or r.status = :status)
             and (:returnType is null or r.returnType = :returnType)
@@ -30,6 +31,8 @@ public interface ReturnEntryJpaRepo extends JpaRepository<ReturnEntryJpa, Intege
                 or lower(r.returnCode) like lower(concat('%', :search, '%'))
                 or lower(r.returnReason) like lower(concat('%', :search, '%'))
                 or str(r.sourceIssueId) like concat('%', :search, '%')
+                or lower(i.catalogItem.itemName) like lower(concat('%', :search, '%'))
+                or lower(i.catalogItem.sku) like lower(concat('%', :search, '%'))
             )
         """)
     Page<ReturnEntryJpa> search(

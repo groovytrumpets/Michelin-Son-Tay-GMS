@@ -30,6 +30,10 @@ public class ReturnEntryItemJpa {
     @Column(name = "item_id", nullable = false)
     private Integer itemId;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "item_id", insertable = false, updatable = false)
+    private CatalogItemJpa catalogItem;
+
     @Column(name = "allocation_id")
     private Integer allocationId;
 

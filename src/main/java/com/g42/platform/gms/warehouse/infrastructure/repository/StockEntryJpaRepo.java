@@ -24,7 +24,8 @@ public interface StockEntryJpaRepo extends JpaRepository<StockEntryJpa, Integer>
     List<StockEntryJpa> findByWarehouseIdAndStatusOrderByCreatedAtDesc(Integer warehouseId, StockEntryStatus status);
 
         @Query("""
-        select e from StockEntryJpa e
+        select distinct e from StockEntryJpa e
+        left join e.items i
         where (:warehouseId is null or e.warehouseId = :warehouseId)
             and (:status is null or e.status = :status)
             and (:fromDate is null or e.entryDate >= :fromDate)
@@ -33,6 +34,8 @@ public interface StockEntryJpaRepo extends JpaRepository<StockEntryJpa, Integer>
                 :search is null
                 or lower(e.entryCode) like lower(concat('%', :search, '%'))
                 or lower(e.supplierName) like lower(concat('%', :search, '%'))
+                or lower(i.catalogItem.itemName) like lower(concat('%', :search, '%'))
+                or lower(i.catalogItem.sku) like lower(concat('%', :search, '%'))
             )
         """)
         Page<StockEntryJpa> search(

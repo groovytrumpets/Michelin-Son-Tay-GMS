@@ -25,6 +25,10 @@ public class StockEntryItemJpa {
     @Column(name = "item_id", nullable = false)
     private Integer itemId;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "item_id", insertable = false, updatable = false)
+    private CatalogItemJpa catalogItem;
+
     @Column(name = "quantity", nullable = false)
     private Integer quantity;
 
