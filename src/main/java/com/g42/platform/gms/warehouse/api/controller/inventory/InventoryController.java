@@ -87,8 +87,44 @@ public class InventoryController {
     }
 
     /**
+     * Xuất tồn kho tổng hợp từ TẤT CẢ kho ra Excel.
+     * GET /api/warehouse/inventory/export-all
+     * Không cần warehouseId — số lượng được cộng dồn từ tất cả các kho.
+     * Lưu ý: phải khai báo TRƯỚC /{warehouseId}/export để Spring không nhầm route.
+     */
+    @GetMapping("/export-all")
+    @PreAuthorize("hasAnyRole('WAREHOUSE_KEEPER','MANAGER','ADMIN','ACCOUNTANT')")
+    public ResponseEntity<byte[]> exportInventoryAllWarehouses(
+            @AuthenticationPrincipal StaffPrincipal principal) {
+
+        List<InventoryResponse> data = inventoryService.listAllWarehouses();
+
+        String[] headers = {"STT", "Item ID", "Tên phụ tùng", "SKU", "Đơn vị",
+                "Tổng tồn kho (tất cả kho)", "Đang giữ", "Khả dụng"};
+        int[] stt = {1};
+        byte[] bytes = com.g42.platform.gms.common.service.ExcelService.exportToExcel(data, headers, inv -> new Object[]{
+                stt[0]++,
+                inv.getItemId(),
+                inv.getItemName() != null ? inv.getItemName() : "",
+                inv.getSku() != null ? inv.getSku() : "",
+                inv.getUnit() != null ? inv.getUnit() : "",
+                inv.getQuantity(),
+                inv.getReservedQuantity(),
+                inv.getAvailableQuantity()
+        });
+
+        return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"inventory-all-warehouses.xlsx\"")
+                .contentType(org.springframework.http.MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(bytes);
+    }
+
+    /**
      * Xuất tồn kho ra Excel.
      * GET /api/warehouse/inventory/{warehouseId}/export
+     * Xuất TẤT CẢ phụ tùng trong catalog — sản phẩm chưa có trong kho sẽ có số lượng = 0.
      */
     @GetMapping("/{warehouseId}/export")
     @PreAuthorize("hasAnyRole('WAREHOUSE_KEEPER','MANAGER','ADMIN','ACCOUNTANT')")
@@ -98,7 +134,13 @@ public class InventoryController {
         boolean showImportPrice = hasAnyRole(principal, "ACCOUNTANT", "MANAGER", "ADMIN");
         boolean showSellingPrice = hasAnyRole(principal, "ADVISOR", "ACCOUNTANT", "MANAGER", "ADMIN", "WAREHOUSE_KEEPER");
 
-        List<InventoryResponse> data = inventoryService.listByWarehouse(warehouseId, showImportPrice, showSellingPrice);
+        // Lấy TẤT CẢ phụ tùng, kể cả item chưa có tồn kho trong kho này (quantity = 0)
+        List<InventoryResponse> data = inventoryService.listAllPartsWithInventory(warehouseId, showImportPrice);
+
+        // Bổ sung giá bán nếu được phép xem
+        if (showSellingPrice) {
+            data = inventoryService.enrichSellingPrice(data, warehouseId);
+        }
 
         String[] headers = {"STT", "Item ID", "Tên phụ tùng", "SKU", "Đơn vị",
                 "Tồn kho", "Đang giữ", "Khả dụng", "Giá bán", "Giá nhập"};
@@ -123,6 +165,7 @@ public class InventoryController {
                         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                 .body(bytes);
     }
+
 
     /**
      * Export tồn kho ra Excel để chỉnh sửa rồi import lại (sync mode).

@@ -93,6 +93,16 @@ public class InventoryRepoImpl implements InventoryRepo {
     }
 
     /**
+     * Lấy toàn bộ inventory của tất cả kho.
+     * SQL: SELECT * FROM inventory
+     * Dùng cho: xuất Excel tổng hợp tồn kho tất cả kho.
+     */
+    @Override
+    public List<Inventory> findAll() {
+        return jpaRepo.findAll().stream().map(this::toDomain).toList();
+    }
+
+    /**
      * Lấy danh sách sản phẩm sắp hết hàng.
      * SQL (JPQL):
      *   SELECT * FROM inventory

@@ -93,6 +93,29 @@ public class PartCatalogRepoImpl implements PartCatalogRepo {
                 .toList();
     }
 
+    /**
+     * Lấy TẤT CẢ item (PART, SERVICE, COMBO...) trong catalog.
+     */
+    @Override
+    public List<CatalogItem> findAllItems() {
+        return jpaRepo.findAll().stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
+    /**
+     * Lấy danh sách TẤT CẢ item theo list ID (không giới hạn PART).
+     */
+    @Override
+    public List<CatalogItem> findAllItemsByIds(List<Integer> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        return jpaRepo.findAllById(ids).stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
     /** SQL: SELECT COUNT(*) > 0 FROM catalog_item WHERE sku = ? */
     @Override
     public boolean existsBySku(String sku) {

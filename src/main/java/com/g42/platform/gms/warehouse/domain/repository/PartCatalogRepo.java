@@ -17,6 +17,12 @@ public interface PartCatalogRepo {
 
     List<CatalogItem> findAllPartsByIds(List<Integer> ids);
 
+    /** Lấy TẤT CẢ các loại sản phẩm (PART, SERVICE, COMBO...) */
+    List<CatalogItem> findAllItems();
+
+    /** Lấy các loại sản phẩm (PART, SERVICE, COMBO...) theo list ids */
+    List<CatalogItem> findAllItemsByIds(List<Integer> ids);
+
     boolean existsBySku(String sku);
 
     CatalogItem save(CatalogItem item);

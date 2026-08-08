@@ -43,6 +43,15 @@ public class ExcelService {
                 }
             }
         }
+
+        // Auto-fit column widths based on content
+        for (int i = 0; i < headers.length; i++) {
+            sheet.autoSizeColumn(i);
+            // Add a small padding (256 units = 1 character width in POI)
+            int currentWidth = sheet.getColumnWidth(i);
+            sheet.setColumnWidth(i, Math.min(currentWidth + 512, 20000));
+        }
+
         workbook.write(outputStream);
         return outputStream.toByteArray();
 

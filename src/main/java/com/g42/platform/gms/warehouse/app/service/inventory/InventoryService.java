@@ -158,9 +158,48 @@ public class InventoryService {
                     return r;
                 }).collect(Collectors.toList());
     }
+
+    /**
+     * Tổng hợp tồn kho từ TẤT CẢ kho — dùng cho xuất Excel toàn hệ thống.
+     * Số lượng được cộng dồn theo itemId từ tất cả các kho.
+     * Giá bán/giá nhập không được tổng hợp vì mỗi kho có thể có giá khác nhau.
+     */
+    @Transactional(readOnly = true)
+    public List<InventoryResponse> listAllWarehouses() {
+        List<Inventory> allInventory = inventoryRepo.findAll();
+
+        // Group by itemId → tính tổng quantity và reservedQuantity
+        Map<Integer, Integer> totalQtyByItem = new java.util.LinkedHashMap<>();
+        Map<Integer, Integer> totalReservedByItem = new java.util.LinkedHashMap<>();
+        for (Inventory inv : allInventory) {
+            totalQtyByItem.merge(inv.getItemId(), inv.getQuantity() != null ? inv.getQuantity() : 0, Integer::sum);
+            totalReservedByItem.merge(inv.getItemId(), inv.getReservedQuantity() != null ? inv.getReservedQuantity() : 0, Integer::sum);
+        }
+
+        // Lấy tất cả catalog items (Part, Service, v.v)
+        List<CatalogItem> allItems = partCatalogRepo.findAllItems();
+
+        List<InventoryResponse> result = new java.util.ArrayList<>();
+        for (CatalogItem catalog : allItems) {
+            int qty = totalQtyByItem.getOrDefault(catalog.getItemId(), 0);
+            int reserved = totalReservedByItem.getOrDefault(catalog.getItemId(), 0);
+
+            InventoryResponse r = new InventoryResponse();
+            r.setItemId(catalog.getItemId());
+            r.setItemName(catalog.getItemName());
+            r.setSku(catalog.getSku());
+            r.setUnit(catalog.getUnit());
+            r.setQuantity(qty);
+            r.setReservedQuantity(reserved);
+            r.setAvailableQuantity(Math.max(0, qty - reserved));
+            result.add(r);
+        }
+        return result;
+    }
+
     @Transactional(readOnly = true)
     public List<InventoryResponse> listAllPartsWithInventory(Integer warehouseId, boolean showImportPrice) {
-        return buildInventoryResponseFromCatalog(warehouseId, partCatalogRepo.findAllParts(), showImportPrice);
+        return buildInventoryResponseFromCatalog(warehouseId, partCatalogRepo.findAllItems(), showImportPrice);
     }
     @Transactional(readOnly = true)
     public List<InventoryResponse> searchByWarehouse(Integer warehouseId, String keyword,
@@ -197,5 +236,30 @@ public class InventoryService {
             }
             return r;
         }).collect(Collectors.toList());
+    }
+
+    /**
+     * Bổ sung sellingPrice vào danh sách InventoryResponse đã build.
+     * Ưu tiên: WarehousePricing → FIFO lot importPrice * markup.
+     * Dùng khi cần tách sellingPrice khỏi buildInventoryResponseFromCatalog.
+     */
+    @Transactional(readOnly = true)
+    public List<InventoryResponse> enrichSellingPrice(List<InventoryResponse> list, Integer warehouseId) {
+        list.forEach(r -> {
+            BigDecimal selling = pricingRepo
+                    .findActiveByWarehouseAndItem(warehouseId, r.getItemId())
+                    .map(WarehousePricing::getSellingPrice)
+                    .orElse(null);
+            if (selling == null) {
+                selling = stockEntryRepo.findFifoLots(warehouseId, r.getItemId()).stream()
+                        .findFirst()
+                        .map(lot -> lot.getImportPrice()
+                                .multiply(lot.getMarkupMultiplier())
+                                .setScale(2, RoundingMode.HALF_UP))
+                        .orElse(null);
+            }
+            r.setSellingPrice(selling);
+        });
+        return list;
     }
 }
