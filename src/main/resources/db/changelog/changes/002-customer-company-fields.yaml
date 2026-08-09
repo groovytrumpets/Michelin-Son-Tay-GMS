@@ -1,0 +1,50 @@
+# Đánh dấu khách hàng là pháp nhân (doanh nghiệp) và tên công ty.
+# Entity CustomerProfileJpa đã khai báo is_company / company_name, changeset này
+# bảo đảm DB nào cũng có đủ 2 cột đó.
+databaseChangeLog:
+  - changeSet:
+      id: 002-1-customer-profile-add-is-company
+      author: gms
+      comment: Thêm cột is_company vào customer_profile
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: customer_profile
+                columnName: is_company
+      changes:
+        - addColumn:
+            tableName: customer_profile
+            columns:
+              - column:
+                  name: is_company
+                  type: TINYINT(1)
+                  defaultValueBoolean: false
+                  remarks: Khách hàng là pháp nhân/doanh nghiệp
+      rollback:
+        - dropColumn:
+            tableName: customer_profile
+            columnName: is_company
+
+  - changeSet:
+      id: 002-2-customer-profile-add-company-name
+      author: gms
+      comment: Thêm cột company_name vào customer_profile
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: customer_profile
+                columnName: company_name
+      changes:
+        - addColumn:
+            tableName: customer_profile
+            columns:
+              - column:
+                  name: company_name
+                  type: VARCHAR(255)
+                  remarks: Tên doanh nghiệp, chỉ dùng khi is_company = 1
+      rollback:
+        - dropColumn:
+            tableName: customer_profile
+            columnName: company_name

@@ -1,0 +1,83 @@
+# Phân công sẵn tư vấn viên / kỹ thuật viên ngay khi tạo lịch.
+# Thay thế cho docs/legacy-manual-migrations/migration_booking_preassign.sql.
+#
+# preConditions onFail: MARK_RAN — nếu cột đã tồn tại (do trước đây chạy SQL tay)
+# thì Liquibase đánh dấu changeset là đã chạy thay vì báo lỗi. Nhờ vậy áp dụng
+# được lên cả DB đã sửa tay lẫn DB sạch.
+databaseChangeLog:
+  - changeSet:
+      id: 001-1-booking-add-advisor-id
+      author: gms
+      comment: Thêm cột advisor_id vào bảng booking
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: booking
+                columnName: advisor_id
+      changes:
+        - addColumn:
+            tableName: booking
+            columns:
+              - column:
+                  name: advisor_id
+                  type: INT
+                  remarks: Tư vấn viên phân công sẵn khi tạo lịch
+      rollback:
+        - dropColumn:
+            tableName: booking
+            columnName: advisor_id
+
+  - changeSet:
+      id: 001-2-booking-add-technician-id
+      author: gms
+      comment: Thêm cột technician_id vào bảng booking
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: booking
+                columnName: technician_id
+      changes:
+        - addColumn:
+            tableName: booking
+            columns:
+              - column:
+                  name: technician_id
+                  type: INT
+                  remarks: Kỹ thuật viên phân công sẵn khi tạo lịch
+      rollback:
+        - dropColumn:
+            tableName: booking
+            columnName: technician_id
+
+  - changeSet:
+      id: 001-3-booking-preassign-indexes
+      author: gms
+      comment: Index tra cứu lịch theo nhân sự được phân công
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - indexExists:
+                tableName: booking
+                indexName: idx_booking_advisor
+      changes:
+        - createIndex:
+            tableName: booking
+            indexName: idx_booking_advisor
+            columns:
+              - column:
+                  name: advisor_id
+        - createIndex:
+            tableName: booking
+            indexName: idx_booking_technician
+            columns:
+              - column:
+                  name: technician_id
+      rollback:
+        - dropIndex:
+            tableName: booking
+            indexName: idx_booking_advisor
+        - dropIndex:
+            tableName: booking
+            indexName: idx_booking_technician

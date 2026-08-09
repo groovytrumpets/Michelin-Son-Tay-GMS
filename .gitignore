@@ -34,3 +34,7 @@ build/
 src/main/resources/application.properties
 
 .env
+
+### Liquibase ###
+# Chứa mật khẩu DB, chỉ dùng cho lệnh rollback thủ công
+liquibase.properties

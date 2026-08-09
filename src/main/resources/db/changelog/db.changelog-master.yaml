@@ -1,0 +1,18 @@
+# ============================================================================
+# Changelog gốc — Liquibase đọc file này lúc ứng dụng khởi động.
+#
+# Quy ước: mỗi thay đổi schema là MỘT file trong changes/, đánh số tăng dần.
+# Thêm file mới thì khai báo thêm một dòng include ở cuối danh sách bên dưới.
+# TUYỆT ĐỐI không sửa nội dung changeset đã chạy trên môi trường khác —
+# Liquibase lưu checksum, sửa file cũ sẽ làm ứng dụng không khởi động được.
+# Cần đổi thì viết changeset mới.
+#
+# Hướng dẫn đầy đủ: docs/DATABASE_MIGRATION.md
+# ============================================================================
+databaseChangeLog:
+  - include:
+      file: changes/001-booking-preassign.yaml
+      relativeToChangelogFile: true
+  - include:
+      file: changes/002-customer-company-fields.yaml
+      relativeToChangelogFile: true

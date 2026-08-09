@@ -1,0 +1,13 @@
+# Cấu hình cho liquibase-maven-plugin (chỉ dùng khi chạy lệnh thủ công như
+# rollback / status). Ứng dụng Spring Boot KHÔNG đọc file này — nó dùng
+# spring.datasource.* trong application.properties.
+#
+# Cách dùng: copy thành liquibase.properties rồi điền thông tin thật.
+#   cp liquibase.properties.example liquibase.properties
+# File liquibase.properties đã được .gitignore vì chứa mật khẩu.
+
+changeLogFile=src/main/resources/db/changelog/db.changelog-master.yaml
+url=jdbc:mysql://localhost:3306/TEN_DATABASE
+username=root
+password=MAT_KHAU
+driver=com.mysql.cj.jdbc.Driver
