@@ -30,4 +30,10 @@ public class EstimateItemReqDto {
     private BigDecimal discountAmount;
 //    private BigDecimal finalPrice;
     private Integer entryItemId;
+    private Boolean isOutsource;
+    private Integer outsourcePartnerId;
+    private String outsourceWorkContent;
+    private BigDecimal laborCost;
+    private String note;
+    private BigDecimal discountPercent;
 }

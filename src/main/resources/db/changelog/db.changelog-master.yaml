@@ -16,3 +16,9 @@ databaseChangeLog:
   - include:
       file: changes/002-customer-company-fields.yaml
       relativeToChangelogFile: true
+  - include:
+      file: changes/003-quotation-commission-outsource.yaml
+      relativeToChangelogFile: true
+  - include:
+      file: changes/004-stock-selection-config.yaml
+      relativeToChangelogFile: true

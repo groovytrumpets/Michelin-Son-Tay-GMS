@@ -41,6 +41,13 @@ public class CatalogCreateDto {
     private String compatibleCars;
     private Boolean isActive;
     private String origin;
+    private String technicalSpecs;
+    private String userGuide;
+    /** Bảo hành cho đại lý; warrantyDurationMonths là bảo hành khách lẻ. */
+    private Integer dealerWarrantyMonths;
+    private BigDecimal costPrice;
+    /** Danh sách xe tương thích; gửi lên là thay thế toàn bộ danh sách cũ. */
+    private java.util.List<CatalogItemCompatDto> compatibilities;
     private java.util.List<WarehouseUpdateDto> warehouseDetails;
 
 }

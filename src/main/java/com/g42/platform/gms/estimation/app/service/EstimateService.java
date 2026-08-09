@@ -1,5 +1,7 @@
 package com.g42.platform.gms.estimation.app.service;
 
+import com.g42.platform.gms.auth.api.internal.CustomerInternalApi;
+import com.g42.platform.gms.auth.entity.CustomerProfile;
 import com.g42.platform.gms.booking_management.api.internal.BookingManageInternalApi;
 import org.apache.commons.lang3.tuple.Pair;
 import com.g42.platform.gms.common.enums.EstimateEnum;
@@ -58,6 +60,7 @@ public class EstimateService {
 
     private final FallbackPricingConfigJpaRepo fallbackPricingConfigJpaRepo;
     private final StockEntryItemJpaRepo stockEntryItemJpaRepo;
+    private final CustomerInternalApi customerInternalApi;
 
 
     public List<EstimateRespondDto> getEstimateByCode(Integer serviceTicketId) {
@@ -276,6 +279,7 @@ public class EstimateService {
                 existing.setIsGift(req.getIsGift());
                 existing.setTriggeredByItemId(req.getTriggeredByItemId());
                 existing.setDiscountAmount(req.getDiscountAmount());
+                applyOutsourceAndNote(existing, req);
                 WorkCategory wc = null;
                 if (req.getWorkCategoryId() != null) {
                     wc = workCategoryRepo.findById(req.getWorkCategoryId());
@@ -336,6 +340,21 @@ public class EstimateService {
 
         return getEstimateRespondDto(estimateId);
     }
+    /**
+     * Chép phần thuê ngoài, ghi chú và chiết khấu phần trăm từ request sang dòng báo giá.
+     * Dùng chung cho cả nhánh tạo mới và nhánh cập nhật để hai nhánh không lệch nhau.
+     */
+    private void applyOutsourceAndNote(EstimateItem item, EstimateItemReqDto req) {
+        boolean isOutsource = Boolean.TRUE.equals(req.getIsOutsource());
+        item.setIsOutsource(isOutsource);
+        // Bỏ chọn thuê ngoài thì dọn luôn dữ liệu đi kèm, tránh còn sót đối tác cũ
+        item.setOutsourcePartnerId(isOutsource ? req.getOutsourcePartnerId() : null);
+        item.setOutsourceWorkContent(isOutsource ? req.getOutsourceWorkContent() : null);
+        item.setLaborCost(isOutsource ? req.getLaborCost() : null);
+        item.setNote(req.getNote());
+        item.setDiscountPercent(req.getDiscountPercent());
+    }
+
     private List<EstimateItem> resolveItems(List<EstimateItemReqDto> itemRequests,
                                             Integer estimateId,
                                             Integer fallbackPricingConfigId,
@@ -344,25 +363,30 @@ public class EstimateService {
             Integer categoryId = req.getWorkCategoryId();
             WorkCategory workCategory = null;
 
-            if (categoryId == null && req.getNewCategoryName() != null) {
-            System.out.println("DEBUG CREATING CATA: ");
-                WorkCategory newCategory = new WorkCategory();
-                newCategory.setCategoryName(req.getNewCategoryName());
-                newCategory.setCategoryCode(
-                        req.getNewCategoryName().toUpperCase().replace(" ", "_")
-                );
-                newCategory.setIsDefault(false);
-                newCategory.setIsActive(true);
-                Integer finalTaxId = req.getTaxRuleId();
-                if (finalTaxId == null) {
-                    finalTaxId = taxRuleInternalApi.getTaxCodeFreeId("FREE");
-                    if (finalTaxId==-1) finalTaxId=taxRuleInternalApi.createNewFreeTax();
-                }
-                newCategory.setTaxRuleId(finalTaxId);
+            if (categoryId == null && req.getNewCategoryName() != null && !req.getNewCategoryName().isBlank()) {
+                // Ưu tiên dùng lại hạng mục đã có cùng tên; trước đây mỗi lần gõ lại
+                // cùng một tên đều sinh thêm một bản ghi work_category mới.
+                workCategory = workCategoryRepo.findByCategoryName(req.getNewCategoryName());
 
-                int nextOrder = workCategoryRepo.findMaxDisplayOrder()+1;
-                newCategory.setDisplayOrder(nextOrder);
-                workCategory= workCategoryRepo.save(newCategory);
+                if (workCategory == null) {
+                    WorkCategory newCategory = new WorkCategory();
+                    newCategory.setCategoryName(req.getNewCategoryName().trim());
+                    newCategory.setCategoryCode(
+                            req.getNewCategoryName().trim().toUpperCase().replace(" ", "_")
+                    );
+                    newCategory.setIsDefault(false);
+                    newCategory.setIsActive(true);
+                    Integer finalTaxId = req.getTaxRuleId();
+                    if (finalTaxId == null) {
+                        finalTaxId = taxRuleInternalApi.getTaxCodeFreeId("FREE");
+                        if (finalTaxId == -1) finalTaxId = taxRuleInternalApi.createNewFreeTax();
+                    }
+                    newCategory.setTaxRuleId(finalTaxId);
+
+                    int nextOrder = workCategoryRepo.findMaxDisplayOrder() + 1;
+                    newCategory.setDisplayOrder(nextOrder);
+                    workCategory = workCategoryRepo.save(newCategory);
+                }
                 categoryId = workCategory.getId();
             }else if (categoryId != null) {
                 // Nếu có categoryId, bốc từ DB lên để tý lấy ID thuế của nó
@@ -395,6 +419,7 @@ public class EstimateService {
             item.setEntryItemId(req.getEntryItemId());
 
             item.setIsGift(req.getIsGift() != null ? req.getIsGift() : false);
+            applyOutsourceAndNote(item, req);
 //            System.out.println("DEBUG RESOLVING ITEM: "+req.getIsGift()+", Tiggerd by: "+req.getRevisedFromItemId());
             TaxRule taxRule = null;
             Integer ruleId = null;
@@ -428,6 +453,30 @@ public class EstimateService {
             return item;
         }).toList();
     }
+    /**
+     * Tra tên các đối tác thuê ngoài đang được dùng trong danh sách dòng báo giá.
+     * Gom một lượt để tránh gọi lặp lại theo từng dòng.
+     */
+    private Map<Integer, String> resolveOutsourcePartnerNames(List<EstimateItem> items) {
+        List<Integer> partnerIds = items.stream()
+                .map(EstimateItem::getOutsourcePartnerId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (partnerIds.isEmpty()) return Map.of();
+
+        List<CustomerProfile> partners = customerInternalApi.findAllByIds(partnerIds);
+        if (partners == null) return Map.of();
+
+        Map<Integer, String> result = new HashMap<>();
+        for (CustomerProfile partner : partners) {
+            if (partner != null && partner.getCustomerId() != null) {
+                result.put(partner.getCustomerId(), partner.getFullName());
+            }
+        }
+        return result;
+    }
+
     private EstimateRespondDto getEstimateRespondDto(Integer estimateId) {
         Estimate estimate = estimateRepository.findEstimateById(estimateId);
         if (estimate == null) {
@@ -446,6 +495,7 @@ public class EstimateService {
                 .findAllById(categoryIds).stream()
                 .collect(Collectors.toMap(WorkCategory::getId, wc -> wc));
 
+        Map<Integer, String> outsourcePartnerNames = resolveOutsourcePartnerNames(items);
 
         EstimateRespondDto dto = estimateDtoMapper.toEstimateDto(estimate);
         BigDecimal totalTax = BigDecimal.ZERO;
@@ -482,6 +532,10 @@ public class EstimateService {
             WorkCategory wc = categoryMap.get(item.getWorkCategoryId());
             if (wc != null) {
                 itemDto.setWorkCategory(estimateDtoMapper.toWorkCateDto(wc));
+            }
+
+            if (item.getOutsourcePartnerId() != null) {
+                itemDto.setOutsourcePartnerName(outsourcePartnerNames.get(item.getOutsourcePartnerId()));
             }
 
             // Cộng dồn tiền thuế

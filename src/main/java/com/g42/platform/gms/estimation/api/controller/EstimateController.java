@@ -5,12 +5,14 @@ import com.g42.platform.gms.auth.entity.StaffPrincipal;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.common.enums.EstimateEnum;
+import com.g42.platform.gms.estimation.api.dto.CommissionAllocationDto;
 import com.g42.platform.gms.estimation.api.dto.EstimateRespondDto;
 import com.g42.platform.gms.estimation.api.dto.EstimateViaAllocationDto;
 import com.g42.platform.gms.estimation.api.dto.StockAllocationDto;
 import com.g42.platform.gms.estimation.api.dto.WorkCataDto;
 import com.g42.platform.gms.estimation.api.dto.request.EstimateItemReqDto;
 import com.g42.platform.gms.estimation.api.dto.request.EstimateRequestDto;
+import com.g42.platform.gms.estimation.app.service.CommissionAllocationService;
 import com.g42.platform.gms.estimation.app.service.EstimateService;
 import com.g42.platform.gms.estimation.app.service.StockAllocationService;
 import lombok.AllArgsConstructor;
@@ -27,6 +29,7 @@ import java.util.List;
 public class EstimateController {
     private final EstimateService estimateService;
     private final StockAllocationService stockAllocationService;
+    private final CommissionAllocationService commissionAllocationService;
 
     @GetMapping("/{serviceTicketId}")
     public ResponseEntity<ApiResponse<List<EstimateRespondDto>>> getEstimateTicketByCode(@PathVariable Integer serviceTicketId){
@@ -95,6 +98,25 @@ public class EstimateController {
     public ResponseEntity<ApiResponse<EstimateRespondDto>> unapplyPromotion(@PathVariable Integer promotionId,@PathVariable Integer estimateId,@RequestParam(required = false) String promotionCode){
         EstimateRespondDto estimate = estimateService.unapplyPromotionToEstimate(promotionId,estimateId,promotionCode);
         return ResponseEntity.ok(ApiResponses.success(estimate));
+    }
+
+    @GetMapping("/{estimateId}/commissions")
+    public ResponseEntity<ApiResponse<List<CommissionAllocationDto>>> getCommissions(@PathVariable Integer estimateId) {
+        return ResponseEntity.ok(
+                ApiResponses.success(commissionAllocationService.getByEstimateId(estimateId))
+        );
+    }
+
+    /** Ghi đè toàn bộ hoa hồng của phiếu; gửi danh sách rỗng để xóa hết. */
+    @PutMapping("/{estimateId}/commissions")
+    public ResponseEntity<ApiResponse<List<CommissionAllocationDto>>> replaceCommissions(
+            @PathVariable Integer estimateId,
+            @RequestBody List<CommissionAllocationDto> request,
+            @AuthenticationPrincipal StaffPrincipal principal) {
+        Integer staffId = principal != null ? principal.getStaffId() : null;
+        return ResponseEntity.ok(
+                ApiResponses.success(commissionAllocationService.replaceForEstimate(estimateId, request, staffId))
+        );
     }
 
     @PutMapping("/{estimateId}/apply-fallback-pricing")

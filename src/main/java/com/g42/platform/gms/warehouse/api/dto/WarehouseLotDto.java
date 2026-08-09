@@ -20,6 +20,8 @@ public class WarehouseLotDto {
     private BigDecimal markupMultiplier;
     private BigDecimal markupMultiplierWholesale;
     private java.time.LocalDate entryDate;
+    /** Hạn dùng của lô; null nghĩa là không theo dõi hạn. Dùng cho chiến lược FEFO. */
+    private java.time.LocalDate expiryDate;
     /** Giá bán — được tính và set sau khi query, không lấy từ DB trực tiếp */
     private BigDecimal sellingPrice;
     private BigDecimal sellingPriceWholesale;
@@ -34,8 +36,10 @@ public class WarehouseLotDto {
             BigDecimal markupMultiplier,
             BigDecimal markupMultiplierWholesale,
             java.time.LocalDate entryDate,
+            java.time.LocalDate expiryDate,
             BigDecimal sellingPrice,
             BigDecimal sellingPriceWholesale) {
+        this.expiryDate        = expiryDate;
         this.entryItemId       = entryItemId;
         this.entryId           = entryId;
         this.entryCode         = entryCode;

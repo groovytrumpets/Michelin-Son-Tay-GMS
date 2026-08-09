@@ -1,0 +1,131 @@
+# Cấu hình chọn kho và lô tự động khi thêm vật tư vào bảng báo giá.
+#
+# 1. stock_entry_item.expiry_date : hạn dùng của lô. Không có cột này thì
+#    chiến lược FEFO (hết hạn trước, xuất trước) không thể tính được.
+# 2. stock_selection_config       : kho mặc định + chiến lược chọn lô dùng chung
+#    toàn hệ thống. Chỉ dòng is_active mới nhất có hiệu lực.
+databaseChangeLog:
+  - changeSet:
+      id: 004-1-stock-entry-item-expiry-date
+      author: gms
+      comment: Hạn dùng của lô nhập, phục vụ chiến lược FEFO
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: stock_entry_item
+                columnName: expiry_date
+      changes:
+        - addColumn:
+            tableName: stock_entry_item
+            columns:
+              - column:
+                  name: expiry_date
+                  type: DATE
+                  remarks: Hạn dùng của lô; để trống nghĩa là không theo dõi hạn
+      rollback:
+        - dropColumn:
+            tableName: stock_entry_item
+            columnName: expiry_date
+
+  - changeSet:
+      id: 004-2-create-stock-selection-config
+      author: gms
+      comment: Kho mặc định và chiến lược chọn lô khi thêm vật tư vào báo giá
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: stock_selection_config
+      changes:
+        - createTable:
+            tableName: stock_selection_config
+            remarks: Cấu hình chọn kho / lô tự động, dùng chung toàn hệ thống
+            columns:
+              - column:
+                  name: config_id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: default_warehouse_id
+                  type: INT
+                  remarks: Kho ưu tiên khi thêm vật tư; để trống thì chọn kho còn nhiều hàng nhất
+              - column:
+                  name: allocation_method
+                  type: VARCHAR(20)
+                  defaultValue: FIFO
+                  constraints:
+                    nullable: false
+                  remarks: FIFO | LIFO | FEFO | MANUAL
+              - column:
+                  name: fallback_to_any_warehouse
+                  type: TINYINT(1)
+                  defaultValueBoolean: true
+                  remarks: Kho mặc định hết hàng thì có được tự tìm kho khác không
+              - column:
+                  name: is_active
+                  type: TINYINT(1)
+                  defaultValueBoolean: true
+              - column:
+                  name: updated_by
+                  type: INT
+              - column:
+                  name: updated_at
+                  type: DATETIME
+                  defaultValueComputed: CURRENT_TIMESTAMP
+      rollback:
+        - dropTable:
+            tableName: stock_selection_config
+
+  - changeSet:
+      id: 004-3-stock-selection-config-fk
+      author: gms
+      comment: Khóa ngoại kho mặc định
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - foreignKeyConstraintExists:
+                foreignKeyName: fk_stock_selection_config_warehouse
+                foreignKeyTableName: stock_selection_config
+      changes:
+        - addForeignKeyConstraint:
+            baseTableName: stock_selection_config
+            baseColumnNames: default_warehouse_id
+            constraintName: fk_stock_selection_config_warehouse
+            referencedTableName: warehouse
+            referencedColumnNames: warehouse_id
+      rollback:
+        - dropForeignKeyConstraint:
+            baseTableName: stock_selection_config
+            constraintName: fk_stock_selection_config_warehouse
+
+  - changeSet:
+      id: 004-4-seed-stock-selection-config
+      author: gms
+      comment: Tạo sẵn một dòng cấu hình mặc định FIFO để hệ thống luôn có cấu hình để đọc
+      preConditions:
+        - onFail: MARK_RAN
+        - changeSetExecuted:
+            id: 004-2-create-stock-selection-config
+            author: gms
+            changeLogFile: db/changelog/changes/004-stock-selection-config.yaml
+      changes:
+        - insert:
+            tableName: stock_selection_config
+            columns:
+              - column:
+                  name: allocation_method
+                  value: FIFO
+              - column:
+                  name: fallback_to_any_warehouse
+                  valueBoolean: true
+              - column:
+                  name: is_active
+                  valueBoolean: true
+      rollback:
+        - delete:
+            tableName: stock_selection_config
+            where: allocation_method = 'FIFO' AND default_warehouse_id IS NULL

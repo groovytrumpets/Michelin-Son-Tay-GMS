@@ -37,4 +37,12 @@ public class EstimateItemDto {
     private StockAllocationDto stockAllocation;
     private Integer entryItemId;
     private BigDecimal importPrice;
+    private Boolean isOutsource;
+    private Integer outsourcePartnerId;
+    /** Tên đối tác thuê ngoài, tra từ danh bạ để hiển thị thẳng trên bảng báo giá. */
+    private String outsourcePartnerName;
+    private String outsourceWorkContent;
+    private BigDecimal laborCost;
+    private String note;
+    private BigDecimal discountPercent;
 }

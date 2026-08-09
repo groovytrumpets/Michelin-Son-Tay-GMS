@@ -32,4 +32,13 @@ public class CatalogItemDto {
     private Integer productLineId;
     private Integer workCategoryId;
     private String compatibleCars;
+    private String technicalSpecs;
+    private String userGuide;
+    /** Bảo hành cho đại lý; warrantyDurationMonths là bảo hành khách lẻ. */
+    private Integer dealerWarrantyMonths;
+    private BigDecimal costPrice;
+    private String partNumber;
+    private String barcode;
+    private String color;
+    private String madeIn;
 }

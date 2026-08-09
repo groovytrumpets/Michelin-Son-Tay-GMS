@@ -41,10 +41,36 @@ public class WorkCategoryRepositoryImpl implements WorkCategoryRepository {
         return workCategoryJpaMapper.toDomain(workCategoryJpa);
     }
 
+    /**
+     * Trả về mọi hạng mục đang hoạt động, không chỉ hạng mục mặc định.
+     * Bảng báo giá dùng danh sách này để tra ngược hạng mục của sản phẩm, nên
+     * nếu lọc theo is_default thì hạng mục do người dùng tạo sẽ không tra được
+     * và dòng báo giá bị báo thiếu hạng mục.
+     */
     @Override
     public List<WorkCategory> findAll() {
-        List<WorkCategoryJpa> workCategoryJpas = workCategoryRepositoryJpa.findAllByIsDefault(true);
+        List<WorkCategoryJpa> workCategoryJpas =
+                workCategoryRepositoryJpa.findAllByIsActiveTrueOrderByDisplayOrderAscCategoryNameAsc();
         return workCategoryJpas.stream().map(workCategoryJpaMapper::toDomain).toList();
+    }
+
+    @Override
+    public WorkCategory findByCategoryName(String categoryName) {
+        if (categoryName == null || categoryName.isBlank()) return null;
+        return workCategoryRepositoryJpa.findByCategoryNameIgnoreCase(categoryName).stream()
+                .findFirst()
+                .map(workCategoryJpaMapper::toDomain)
+                .orElse(null);
+    }
+
+    @Override
+    public List<WorkCategory> findAllIncludingInactive() {
+        return workCategoryRepositoryJpa.findAll().stream().map(workCategoryJpaMapper::toDomain).toList();
+    }
+
+    @Override
+    public void deleteById(Integer categoryId) {
+        workCategoryRepositoryJpa.deleteById(categoryId);
     }
 }
 

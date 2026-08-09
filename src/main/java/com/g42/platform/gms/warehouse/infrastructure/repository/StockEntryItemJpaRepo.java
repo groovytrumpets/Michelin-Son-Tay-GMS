@@ -156,6 +156,7 @@ public interface StockEntryItemJpaRepo extends JpaRepository<StockEntryItemJpa, 
         sei.markupMultiplier,
         sei.markupMultiplierWholesale,
         se.entryDate,
+        sei.expiryDate,
         null,
         null
     )

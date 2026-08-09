@@ -87,4 +87,19 @@ public class CatalogItemJpa {
     @Column(name = "search_key", length = 2000)
     private String searchKey;
 
+    @Lob
+    @Column(name = "technical_specs")
+    private String technicalSpecs;
+
+    @Lob
+    @Column(name = "user_guide")
+    private String userGuide;
+
+    /** Bảo hành cho đại lý; warrantyDurationMonths là bảo hành khách lẻ. */
+    @Column(name = "dealer_warranty_months")
+    private Integer dealerWarrantyMonths;
+
+    @Column(name = "cost_price", precision = 12, scale = 2)
+    private BigDecimal costPrice;
+
 }

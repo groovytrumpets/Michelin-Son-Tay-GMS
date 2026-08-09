@@ -87,4 +87,25 @@ public class EstimateItemJpa {
     private BigDecimal grossProfit;
     @Column(name = "entry_item_id")
     private Integer entryItemId;
+
+    @ColumnDefault("0")
+    @Column(name = "is_outsource")
+    private Boolean isOutsource;
+
+    @Column(name = "outsource_partner_id")
+    private Integer outsourcePartnerId;
+
+    @Size(max = 500)
+    @Column(name = "outsource_work_content", length = 500)
+    private String outsourceWorkContent;
+
+    @Column(name = "labor_cost", precision = 12, scale = 2)
+    private BigDecimal laborCost;
+
+    @Size(max = 500)
+    @Column(name = "note", length = 500)
+    private String note;
+
+    @Column(name = "discount_percent", precision = 5, scale = 2)
+    private BigDecimal discountPercent;
 }

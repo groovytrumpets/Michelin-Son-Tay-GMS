@@ -41,6 +41,12 @@ public class CatalogDetailDto {
     private String barcode;
     private String color;
     private String compatibleCars;
+    private String technicalSpecs;
+    private String userGuide;
+    /** Bảo hành cho đại lý; warrantyDurationMonths là bảo hành khách lẻ. */
+    private Integer dealerWarrantyMonths;
+    private BigDecimal costPrice;
+    private List<CatalogItemCompatDto> compatibilities;
     private List<SpecificationRespondDto> specifications;
     private List<WarehouseDetailDto> warehouseDetails;
 }

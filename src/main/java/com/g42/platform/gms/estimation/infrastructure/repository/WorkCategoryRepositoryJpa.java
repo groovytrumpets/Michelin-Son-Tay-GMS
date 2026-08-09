@@ -17,4 +17,13 @@ public interface WorkCategoryRepositoryJpa extends JpaRepository<WorkCategoryJpa
     WorkCategoryJpa findByIdWork(Integer categoryId);
 
     List<WorkCategoryJpa> findAllByIsDefault(Boolean isDefault);
+
+    List<WorkCategoryJpa> findAllByIsActiveTrueOrderByDisplayOrderAscCategoryNameAsc();
+
+    /** Tra hạng mục theo tên, không phân biệt hoa thường, để tái sử dụng thay vì tạo trùng. */
+    @Query("""
+    select wc from WorkCategoryJpa wc
+    where lower(trim(wc.categoryName)) = lower(trim(:categoryName))
+        """)
+    List<WorkCategoryJpa> findByCategoryNameIgnoreCase(String categoryName);
 }

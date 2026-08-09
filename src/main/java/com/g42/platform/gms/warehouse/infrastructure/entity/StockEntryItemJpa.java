@@ -51,4 +51,8 @@ public class StockEntryItemJpa {
 
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
+
+    /** Hạn dùng của lô; null nghĩa là không theo dõi hạn. Dùng cho chiến lược FEFO. */
+    @Column(name = "expiry_date")
+    private java.time.LocalDate expiryDate;
 }

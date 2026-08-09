@@ -47,6 +47,13 @@ public class EstimateItem {
     private BigDecimal grossProfit;
     private Integer entryItemId;
     private BigDecimal importPrice;
+    private Boolean isOutsource;
+    private Integer outsourcePartnerId;
+    private String outsourceWorkContent;
+    private BigDecimal laborCost;
+    private String note;
+    private BigDecimal discountPercent;
+
     public BigDecimal getSubTotal() {
         if (unitPrice == null || quantity == null) return BigDecimal.ZERO;
         return unitPrice.multiply(BigDecimal.valueOf(quantity));

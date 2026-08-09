@@ -9,6 +9,8 @@ import com.g42.platform.gms.warehouse.app.service.pricing.PricingService;
 import com.g42.platform.gms.warehouse.domain.entity.*;
 import com.g42.platform.gms.warehouse.domain.exception.WarehouseErrorCode;
 import com.g42.platform.gms.warehouse.domain.exception.WarehouseException;
+import com.g42.platform.gms.vehicle.entity.VehicleBrand;
+import com.g42.platform.gms.vehicle.entity.VehicleModel;
 import com.g42.platform.gms.warehouse.domain.repository.CatalogItemRepo;
 import com.g42.platform.gms.warehouse.domain.repository.WarehouseRepo;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,6 +51,12 @@ public class CatalogItemService {
     private WorkCategoryJpaEntityRepo itemCategoryJpaRepo;
     @Autowired
     private ProductUnitJpaRepo productUnitJpaRepo;
+    @Autowired
+    private CatalogItemCompatJpaRepo catalogItemCompatJpaRepo;
+    @Autowired
+    private com.g42.platform.gms.vehicle.repository.VehicleBrandRepository vehicleBrandRepository;
+    @Autowired
+    private com.g42.platform.gms.vehicle.repository.VehicleModelRepository vehicleModelRepository;
 
     @Autowired
     private CatalogItemRepo catalogItemRepo;
@@ -126,7 +134,70 @@ public class CatalogItemService {
         }
         catalogItem.setTaxRuleId(finalTaxId);
         CatalogItem saveCatalogItem = catalogItemRepo.saveCatalogItem(catalogItem);
+        replaceCompatibilities(saveCatalogItem.getItemId(), createDto.getCompatibilities());
         return catalogDtoMapper.toDto(saveCatalogItem);
+    }
+
+    /**
+     * Ghi đè toàn bộ danh sách xe tương thích của một vật tư.
+     * Truyền null nghĩa là không đụng tới danh sách hiện có; truyền list rỗng là xóa hết.
+     */
+    private void replaceCompatibilities(Integer itemId, List<CatalogItemCompatDto> compatibilities) {
+        if (itemId == null || compatibilities == null) return;
+
+        catalogItemCompatJpaRepo.deleteByItemId(itemId);
+        if (compatibilities.isEmpty()) return;
+
+        List<CatalogItemCompatJpa> rows = new ArrayList<>();
+        for (CatalogItemCompatDto dto : compatibilities) {
+            if (dto == null) continue;
+            // Dòng trống hoàn toàn thì bỏ qua, tránh rác trong bảng
+            if (dto.getBrandId() == null && dto.getModelId() == null
+                    && dto.getYearFrom() == null && dto.getYearTo() == null) {
+                continue;
+            }
+            CatalogItemCompatJpa row = new CatalogItemCompatJpa();
+            row.setItemId(itemId);
+            row.setBrandId(dto.getBrandId());
+            row.setModelId(dto.getModelId());
+            row.setYearFrom(dto.getYearFrom());
+            row.setYearTo(dto.getYearTo());
+            rows.add(row);
+        }
+        if (!rows.isEmpty()) {
+            catalogItemCompatJpaRepo.saveAll(rows);
+        }
+    }
+
+    /** Đọc danh sách xe tương thích kèm tên hãng / dòng để hiển thị. */
+    private List<CatalogItemCompatDto> loadCompatibilities(Integer itemId) {
+        if (itemId == null) return List.of();
+        List<CatalogItemCompatJpa> rows = catalogItemCompatJpaRepo.findByItemId(itemId);
+        if (rows.isEmpty()) return List.of();
+
+        // Gom id rồi tra một lượt, tránh truy vấn lặp theo từng dòng
+        List<Integer> brandIds = rows.stream().map(CatalogItemCompatJpa::getBrandId)
+                .filter(java.util.Objects::nonNull).distinct().toList();
+        List<Integer> modelIds = rows.stream().map(CatalogItemCompatJpa::getModelId)
+                .filter(java.util.Objects::nonNull).distinct().toList();
+
+        java.util.Map<Integer, String> brandNames = brandIds.isEmpty() ? java.util.Map.of()
+                : vehicleBrandRepository.findAllById(brandIds).stream()
+                        .collect(java.util.stream.Collectors.toMap(VehicleBrand::getBrandId, VehicleBrand::getName));
+        java.util.Map<Integer, String> modelNames = modelIds.isEmpty() ? java.util.Map.of()
+                : vehicleModelRepository.findAllById(modelIds).stream()
+                        .collect(java.util.stream.Collectors.toMap(VehicleModel::getModelId, VehicleModel::getName));
+
+        return rows.stream()
+                .map(row -> new CatalogItemCompatDto(
+                        row.getCompatId(),
+                        row.getBrandId(),
+                        row.getBrandId() == null ? null : brandNames.get(row.getBrandId()),
+                        row.getModelId(),
+                        row.getModelId() == null ? null : modelNames.get(row.getModelId()),
+                        row.getYearFrom(),
+                        row.getYearTo()))
+                .toList();
     }
 
     private void validateCatalogItemDto(CatalogCreateDto createDto) {
@@ -294,6 +365,7 @@ public class CatalogItemService {
         CatalogItem catalogItem = catalogItemRepo.getCatalogItemById(catalogItemId);
         CatalogDetailDto catalogDetailDto = catalogDtoMapper.toDetailDto(catalogItem);
         catalogDetailDto.setSpecifications(catalogItemRepo.getAllSpecsByItemId(catalogItemId));
+        catalogDetailDto.setCompatibilities(loadCompatibilities(catalogItemId));
         if (catalogItem.getBrandId() != null && catalogItem.getBrandId() != 0) {
             System.out.println(catalogItem.getBrandId()+" DEBUG");
         catalogDetailDto.setBrandId(catalogItemRepo.getBrandById(catalogItem.getBrandId()).getBrandName());
@@ -417,6 +489,19 @@ public class CatalogItemService {
         } else if (updateDto.getOrigin() != null) {
             catalogItem.setMadeIn(updateDto.getOrigin());
         }
+        if (updateDto.getTechnicalSpecs() != null) {
+            catalogItem.setTechnicalSpecs(updateDto.getTechnicalSpecs());
+        }
+        if (updateDto.getUserGuide() != null) {
+            catalogItem.setUserGuide(updateDto.getUserGuide());
+        }
+        if (updateDto.getDealerWarrantyMonths() != null) {
+            catalogItem.setDealerWarrantyMonths(updateDto.getDealerWarrantyMonths());
+        }
+        if (updateDto.getCostPrice() != null) {
+            catalogItem.setCostPrice(updateDto.getCostPrice());
+        }
+        replaceCompatibilities(itemId, updateDto.getCompatibilities());
 
         // Brand/productLine/workCategory ids on catalogItem are already the final (updated) values at this point.
         Brand brandForSearch = catalogItem.getBrandId() != null ? catalogItemRepo.getBrandById(catalogItem.getBrandId()) : null;

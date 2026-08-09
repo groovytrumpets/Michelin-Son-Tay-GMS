@@ -13,5 +13,6 @@ public class WorkCataDto {
     private String categoryName;
     private Integer displayOrder;
     private Boolean isDefault;
+    private Boolean isActive;
     private Integer taxRuleId;
 }

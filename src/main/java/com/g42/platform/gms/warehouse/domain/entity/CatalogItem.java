@@ -38,6 +38,11 @@ public class CatalogItem {
     private String color;
     private String compatibleCars;
     private String searchKey;
+    private String technicalSpecs;
+    private String userGuide;
+    /** Bảo hành cho đại lý; warrantyDurationMonths là bảo hành khách lẻ. */
+    private Integer dealerWarrantyMonths;
+    private BigDecimal costPrice;
 
     public Integer getBrandId() {
         return brandId;

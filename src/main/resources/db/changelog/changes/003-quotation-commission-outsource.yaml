@@ -1,0 +1,367 @@
+# Bảng báo giá: hoa hồng 4 bên, thuê ngoài, và mở rộng hồ sơ vật tư - hàng hóa.
+#
+# 1. commission_allocation : phân bổ hoa hồng cho 4 bên (KH / CP điều chỉnh /
+#    giám định viên / môi giới). Gắn với estimate, tùy chọn gắn thêm
+#    estimate_item khi hoa hồng tính theo từng dòng.
+# 2. estimate_item        : cờ thuê ngoài + đối tác nhận việc + tiền công,
+#                           kèm ghi chú và chiết khấu % theo dòng.
+# 3. catalog_item         : thông số kỹ thuật, HDSD, bảo hành đại lý, giá mua.
+# 4. catalog_item_compat  : tương thích xe theo hãng / dòng / đời (thay cho
+#                           chuỗi tự do compatible_cars, cột cũ vẫn giữ nguyên).
+#
+# customer_type là VARCHAR(20) nên các giá trị mới ASSESSOR / BROKER / VENDOR
+# chỉ cần khai báo ở enum Java, không cần đổi schema.
+databaseChangeLog:
+  - changeSet:
+      id: 003-1-create-commission-allocation
+      author: gms
+      comment: Bảng phân bổ hoa hồng 4 bên cho phiếu báo giá
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: commission_allocation
+      changes:
+        - createTable:
+            tableName: commission_allocation
+            remarks: Phân bổ hoa hồng theo phiếu báo giá cho KH / CP điều chỉnh / GĐV / môi giới
+            columns:
+              - column:
+                  name: allocation_id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: estimate_id
+                  type: INT
+                  constraints:
+                    nullable: false
+                  remarks: Phiếu báo giá được phân bổ hoa hồng
+              - column:
+                  name: estimate_item_id
+                  type: INT
+                  remarks: Dòng báo giá, để trống nếu hoa hồng tính trên toàn phiếu
+              - column:
+                  name: party_type
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+                  remarks: CUSTOMER | ADJUSTMENT | ASSESSOR | BROKER
+              - column:
+                  name: partner_id
+                  type: INT
+                  remarks: Bên nhận hoa hồng trong danh bạ đối tác (customer_profile)
+              - column:
+                  name: staff_id
+                  type: INT
+                  remarks: Bên nhận hoa hồng là nhân viên nội bộ, nếu có
+              - column:
+                  name: base_amount
+                  type: DECIMAL(12,2)
+                  remarks: Căn cứ tính hoa hồng tại thời điểm chốt
+              - column:
+                  name: rate_percent
+                  type: DECIMAL(5,2)
+                  remarks: Tỷ lệ phần trăm, để trống nếu nhập thẳng số tiền
+              - column:
+                  name: amount
+                  type: DECIMAL(12,2)
+                  defaultValueNumeric: 0
+                  remarks: Số tiền hoa hồng thực tế
+              - column:
+                  name: note
+                  type: VARCHAR(255)
+              - column:
+                  name: created_by
+                  type: INT
+              - column:
+                  name: created_at
+                  type: DATETIME
+                  defaultValueComputed: CURRENT_TIMESTAMP
+      rollback:
+        - dropTable:
+            tableName: commission_allocation
+
+  - changeSet:
+      id: 003-2-commission-allocation-constraints
+      author: gms
+      comment: Khóa ngoại và chỉ mục cho commission_allocation
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - foreignKeyConstraintExists:
+                foreignKeyName: fk_commission_allocation_estimate
+                foreignKeyTableName: commission_allocation
+      changes:
+        - addForeignKeyConstraint:
+            baseTableName: commission_allocation
+            baseColumnNames: estimate_id
+            constraintName: fk_commission_allocation_estimate
+            referencedTableName: estimate
+            referencedColumnNames: estimate_id
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: commission_allocation
+            baseColumnNames: estimate_item_id
+            constraintName: fk_commission_allocation_item
+            referencedTableName: estimate_item
+            referencedColumnNames: estimate_item_id
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: commission_allocation
+            baseColumnNames: partner_id
+            constraintName: fk_commission_allocation_partner
+            referencedTableName: customer_profile
+            referencedColumnNames: customer_id
+        - addForeignKeyConstraint:
+            baseTableName: commission_allocation
+            baseColumnNames: staff_id
+            constraintName: fk_commission_allocation_staff
+            referencedTableName: staff_profile
+            referencedColumnNames: staff_id
+        - createIndex:
+            tableName: commission_allocation
+            indexName: idx_commission_allocation_estimate_party
+            columns:
+              - column:
+                  name: estimate_id
+              - column:
+                  name: party_type
+      rollback:
+        - dropIndex:
+            tableName: commission_allocation
+            indexName: idx_commission_allocation_estimate_party
+        - dropForeignKeyConstraint:
+            baseTableName: commission_allocation
+            constraintName: fk_commission_allocation_staff
+        - dropForeignKeyConstraint:
+            baseTableName: commission_allocation
+            constraintName: fk_commission_allocation_partner
+        - dropForeignKeyConstraint:
+            baseTableName: commission_allocation
+            constraintName: fk_commission_allocation_item
+        - dropForeignKeyConstraint:
+            baseTableName: commission_allocation
+            constraintName: fk_commission_allocation_estimate
+
+  - changeSet:
+      id: 003-3-estimate-item-outsource
+      author: gms
+      comment: Thuê ngoài, tiền công, ghi chú và chiết khấu phần trăm theo dòng báo giá
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: estimate_item
+                columnName: is_outsource
+      changes:
+        - addColumn:
+            tableName: estimate_item
+            columns:
+              - column:
+                  name: is_outsource
+                  type: TINYINT(1)
+                  defaultValueBoolean: false
+                  remarks: Dòng này giao cho đối tác bên ngoài thực hiện
+              - column:
+                  name: outsource_partner_id
+                  type: INT
+                  remarks: Đối tượng thuê ngoài, trỏ về danh bạ đối tác (customer_profile)
+              - column:
+                  name: outsource_work_content
+                  type: VARCHAR(500)
+                  remarks: Nội dung công việc giao cho đối tác
+              - column:
+                  name: labor_cost
+                  type: DECIMAL(12,2)
+                  remarks: Tiền công trả cho đối tác thuê ngoài
+              - column:
+                  name: note
+                  type: VARCHAR(500)
+                  remarks: Ghi chú nghiệp vụ của dòng báo giá
+              - column:
+                  name: discount_percent
+                  type: DECIMAL(5,2)
+                  remarks: Chiết khấu phần trăm nhập tay cho dòng
+      rollback:
+        - dropColumn:
+            tableName: estimate_item
+            columnName: discount_percent
+        - dropColumn:
+            tableName: estimate_item
+            columnName: note
+        - dropColumn:
+            tableName: estimate_item
+            columnName: labor_cost
+        - dropColumn:
+            tableName: estimate_item
+            columnName: outsource_work_content
+        - dropColumn:
+            tableName: estimate_item
+            columnName: outsource_partner_id
+        - dropColumn:
+            tableName: estimate_item
+            columnName: is_outsource
+
+  - changeSet:
+      id: 003-4-estimate-item-outsource-fk
+      author: gms
+      comment: Khóa ngoại đối tác thuê ngoài
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - foreignKeyConstraintExists:
+                foreignKeyName: fk_estimate_item_outsource_partner
+                foreignKeyTableName: estimate_item
+      changes:
+        - addForeignKeyConstraint:
+            baseTableName: estimate_item
+            baseColumnNames: outsource_partner_id
+            constraintName: fk_estimate_item_outsource_partner
+            referencedTableName: customer_profile
+            referencedColumnNames: customer_id
+      rollback:
+        - dropForeignKeyConstraint:
+            baseTableName: estimate_item
+            constraintName: fk_estimate_item_outsource_partner
+
+  - changeSet:
+      id: 003-5-catalog-item-extra-fields
+      author: gms
+      comment: Thông số kỹ thuật, HDSD, bảo hành đại lý và giá mua cho vật tư - hàng hóa
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: catalog_item
+                columnName: technical_specs
+      changes:
+        - addColumn:
+            tableName: catalog_item
+            columns:
+              - column:
+                  name: technical_specs
+                  type: TEXT
+                  remarks: Thông số kỹ thuật
+              - column:
+                  name: user_guide
+                  type: TEXT
+                  remarks: Hướng dẫn sử dụng
+              - column:
+                  name: dealer_warranty_months
+                  type: INT
+                  remarks: Bảo hành cho đại lý (tháng); warranty_duration_months là bảo hành khách lẻ
+              - column:
+                  name: cost_price
+                  type: DECIMAL(12,2)
+                  remarks: Giá mua vào
+      rollback:
+        - dropColumn:
+            tableName: catalog_item
+            columnName: cost_price
+        - dropColumn:
+            tableName: catalog_item
+            columnName: dealer_warranty_months
+        - dropColumn:
+            tableName: catalog_item
+            columnName: user_guide
+        - dropColumn:
+            tableName: catalog_item
+            columnName: technical_specs
+
+  - changeSet:
+      id: 003-6-create-catalog-item-compat
+      author: gms
+      comment: Tương thích xe của vật tư theo hãng / dòng / đời
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: catalog_item_compat
+      changes:
+        - createTable:
+            tableName: catalog_item_compat
+            remarks: Danh sách xe tương thích của một vật tư - hàng hóa
+            columns:
+              - column:
+                  name: compat_id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: item_id
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: brand_id
+                  type: INT
+                  remarks: Hãng xe; để trống nghĩa là áp dụng mọi hãng
+              - column:
+                  name: model_id
+                  type: INT
+                  remarks: Dòng xe; để trống nghĩa là mọi dòng của hãng
+              - column:
+                  name: year_from
+                  type: INT
+                  remarks: Đời xe từ năm
+              - column:
+                  name: year_to
+                  type: INT
+                  remarks: Đời xe đến năm
+      rollback:
+        - dropTable:
+            tableName: catalog_item_compat
+
+  - changeSet:
+      id: 003-7-catalog-item-compat-constraints
+      author: gms
+      comment: Khóa ngoại và chỉ mục cho catalog_item_compat
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - foreignKeyConstraintExists:
+                foreignKeyName: fk_catalog_item_compat_item
+      changes:
+        - addForeignKeyConstraint:
+            baseTableName: catalog_item_compat
+            baseColumnNames: item_id
+            constraintName: fk_catalog_item_compat_item
+            referencedTableName: catalog_item
+            referencedColumnNames: item_id
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: catalog_item_compat
+            baseColumnNames: brand_id
+            constraintName: fk_catalog_item_compat_brand
+            referencedTableName: vehicle_brand
+            referencedColumnNames: brand_id
+        - addForeignKeyConstraint:
+            baseTableName: catalog_item_compat
+            baseColumnNames: model_id
+            constraintName: fk_catalog_item_compat_model
+            referencedTableName: vehicle_model
+            referencedColumnNames: model_id
+        - createIndex:
+            tableName: catalog_item_compat
+            indexName: idx_catalog_item_compat_item
+            columns:
+              - column:
+                  name: item_id
+      rollback:
+        - dropIndex:
+            tableName: catalog_item_compat
+            indexName: idx_catalog_item_compat_item
+        - dropForeignKeyConstraint:
+            baseTableName: catalog_item_compat
+            constraintName: fk_catalog_item_compat_model
+        - dropForeignKeyConstraint:
+            baseTableName: catalog_item_compat
+            constraintName: fk_catalog_item_compat_brand
+        - dropForeignKeyConstraint:
+            baseTableName: catalog_item_compat
+            constraintName: fk_catalog_item_compat_item

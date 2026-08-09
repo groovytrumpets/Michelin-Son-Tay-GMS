@@ -52,6 +52,9 @@ public interface InventoryJpaRepo extends JpaRepository<InventoryJpa, Integer> {
 
     List<InventoryJpa> findByWarehouseId(Integer warehouseId);
 
+    /** Tồn của một vật tư ở mọi kho, nhiều hàng nhất trước — dùng khi phải tự tìm kho. */
+    List<InventoryJpa> findByItemIdOrderByQuantityDesc(Integer itemId);
+
     @Query("SELECT i FROM InventoryJpa i WHERE i.warehouseId = :warehouseId AND (i.quantity - i.reservedQuantity) <= i.minStockLevel")
     List<InventoryJpa> findLowStockByWarehouse(@Param("warehouseId") Integer warehouseId);
 
