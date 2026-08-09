@@ -16,6 +16,8 @@ public class EstimateRequestDto {
     private Integer serviceTicketId;
     private EstimateTypeEnum estimateType;
     private Integer fallbackPricingConfigId;
+    /** Hệ số markup gõ tay cho phiếu; có giá trị thì ưu tiên hơn fallbackPricingConfigId. */
+    private java.math.BigDecimal manualMarkupMultiplier;
     private List<EstimateItemReqDto> items;
 
 }

@@ -1,0 +1,28 @@
+# Hệ số markup nhập tay cho từng phiếu báo giá.
+#
+# Trước đây phiếu chỉ chọn được một cấu hình markup có sẵn
+# (estimate.fallback_pricing_config_id). Cột này cho phép cố vấn gõ thẳng một
+# hệ số riêng cho phiếu; khi có giá trị thì nó được ưu tiên hơn cấu hình.
+databaseChangeLog:
+  - changeSet:
+      id: 005-1-estimate-manual-markup-multiplier
+      author: gms
+      comment: Hệ số markup nhập tay áp cho toàn phiếu báo giá
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: estimate
+                columnName: manual_markup_multiplier
+      changes:
+        - addColumn:
+            tableName: estimate
+            columns:
+              - column:
+                  name: manual_markup_multiplier
+                  type: DECIMAL(6,4)
+                  remarks: Hệ số markup gõ tay cho phiếu; có giá trị thì ưu tiên hơn fallback_pricing_config_id
+      rollback:
+        - dropColumn:
+            tableName: estimate
+            columnName: manual_markup_multiplier

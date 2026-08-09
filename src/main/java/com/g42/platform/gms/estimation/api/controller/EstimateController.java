@@ -119,12 +119,18 @@ public class EstimateController {
         );
     }
 
+    /**
+     * Áp lại markup cho toàn phiếu. Gửi configId để dùng cấu hình có sẵn,
+     * hoặc manualMarkupMultiplier để dùng hệ số gõ tay.
+     */
     @PutMapping("/{estimateId}/apply-fallback-pricing")
     public ResponseEntity<ApiResponse<EstimateRespondDto>> applyFallbackPricing(
             @PathVariable Integer estimateId,
-            @RequestParam(required = false) Integer configId) {
+            @RequestParam(required = false) Integer configId,
+            @RequestParam(required = false) java.math.BigDecimal manualMarkupMultiplier) {
         return ResponseEntity.ok(
-                ApiResponses.success(estimateService.applyFallbackPricingToEstimate(estimateId, configId))
+                ApiResponses.success(estimateService.applyFallbackPricingToEstimate(
+                        estimateId, configId, manualMarkupMultiplier))
         );
     }
 }

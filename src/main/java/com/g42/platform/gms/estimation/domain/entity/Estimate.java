@@ -32,6 +32,8 @@ public class Estimate {
     private Integer fallbackPricingConfigId;
     private BigDecimal totalPrice;
     private BigDecimal grossProfit;
+    /** Hệ số markup gõ tay cho phiếu; có giá trị thì ưu tiên hơn fallbackPricingConfigId. */
+    private BigDecimal manualMarkupMultiplier;
     private List<EstimateItem> items;
 
 //    public BigDecimal getTotalPrices() {

@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -55,7 +56,7 @@ public class FallbackPricingConfigService {
         config.setName(request.getName());
         config.setItemType(request.getItemType());
         config.setMarkupMultiplier(request.getMarkupMultiplier());
-        config.setMarkupMultiplierWholesale(request.getMarkupMultiplierWholesale());
+        config.setMarkupMultiplierWholesale(resolveWholesaleMultiplier(request));
         config.setDescription(request.getDescription());
         config.setIsActive(true);
         config.setCreatedAt(Instant.now());
@@ -92,7 +93,7 @@ public class FallbackPricingConfigService {
         config.setName(request.getName());
         config.setItemType(request.getItemType());
         config.setMarkupMultiplier(request.getMarkupMultiplier());
-        config.setMarkupMultiplierWholesale(request.getMarkupMultiplierWholesale());
+        config.setMarkupMultiplierWholesale(resolveWholesaleMultiplier(request));
         config.setDescription(request.getDescription());
 
         return toResponse(fallbackRepo.save(config));
@@ -130,6 +131,17 @@ public class FallbackPricingConfigService {
 
         config.setIsActive(true);
         fallbackRepo.save(config);
+    }
+
+    /**
+     * Cấu hình fallback chỉ dùng một hệ số markup chung.
+     * Cột markup_multiplier_wholesale vẫn được ghi cùng giá trị để các luồng cũ
+     * đọc cột này (ví dụ định giá lúc nhập kho) không bị lệch giá.
+     */
+    private BigDecimal resolveWholesaleMultiplier(UpsertFallbackPricingRequest request) {
+        return request.getMarkupMultiplierWholesale() != null
+                ? request.getMarkupMultiplierWholesale()
+                : request.getMarkupMultiplier();
     }
 
     private FallbackPricingResponse toResponse(FallbackPricingConfigJpa config) {

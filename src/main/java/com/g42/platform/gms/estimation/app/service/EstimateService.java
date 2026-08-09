@@ -222,9 +222,10 @@ public class EstimateService {
         estimate.setTotalPrice(BigDecimal.ZERO);
         estimate.setRevisedFromId(revisedEstimateId);
         estimate.setFallbackPricingConfigId(request.getFallbackPricingConfigId());
+        estimate.setManualMarkupMultiplier(request.getManualMarkupMultiplier());
         Estimate saved = estimateRepository.save(estimate);
 
-        List<EstimateItem> items = resolveItems(request.getItems(), saved.getId(), request.getFallbackPricingConfigId(), request.getEstimateType());
+        List<EstimateItem> items = resolveItems(request.getItems(), saved.getId(), request.getFallbackPricingConfigId(), request.getManualMarkupMultiplier(), request.getEstimateType());
         estimateItemRepository.saveAll(items);
 
         //todo: update total_price
@@ -245,6 +246,7 @@ public class EstimateService {
         Estimate estimate = estimateRepository.findEstimateById(estimateId);
         if (estimate == null) throw new RuntimeException("Estimate not found");
         estimate.setFallbackPricingConfigId(request.getFallbackPricingConfigId());
+        estimate.setManualMarkupMultiplier(request.getManualMarkupMultiplier());
 
         List<EstimateItem> estimateItems = estimateItemRepository.findByEstimateId(estimateId);
         Map<Integer, EstimateItem> existingMap = estimateItems.stream()
@@ -266,6 +268,7 @@ public class EstimateService {
                     existing.getItemId(),
                     req.getWarehouseId(),
                     request.getFallbackPricingConfigId(),
+                    request.getManualMarkupMultiplier(),
                     request.getEstimateType(),
                     req.getUnitPrice()
                 );
@@ -317,7 +320,7 @@ public class EstimateService {
                 toSave.add(existing);
                 incomingIds.add(req.getEstimateItemId());
             } else {
-                toSave.addAll(resolveItems(List.of(req), estimateId, request.getFallbackPricingConfigId(), request.getEstimateType()));
+                toSave.addAll(resolveItems(List.of(req), estimateId, request.getFallbackPricingConfigId(), request.getManualMarkupMultiplier(), request.getEstimateType()));
             }
         }
         estimateItems.stream()
@@ -358,6 +361,7 @@ public class EstimateService {
     private List<EstimateItem> resolveItems(List<EstimateItemReqDto> itemRequests,
                                             Integer estimateId,
                                             Integer fallbackPricingConfigId,
+                                            BigDecimal manualMarkupMultiplier,
                                             EstimateTypeEnum estimateType) {
         return itemRequests.stream().map(req -> {
             Integer categoryId = req.getWorkCategoryId();
@@ -405,6 +409,7 @@ public class EstimateService {
                 req.getItemId(),
                 req.getWarehouseId(),
                 fallbackPricingConfigId,
+                manualMarkupMultiplier,
                 estimateType,
                 req.getUnitPrice()
             );
@@ -1106,15 +1111,35 @@ public class EstimateService {
     }
 
     private BigDecimal calculateMarkupUnitPrice(Integer itemId, Integer warehouseId, Integer configId, EstimateTypeEnum type, BigDecimal defaultPrice) {
-        if (configId == null || itemId == null) {
+        return calculateMarkupUnitPrice(itemId, warehouseId, configId, null, type, defaultPrice);
+    }
+
+    /**
+     * Đơn giá = giá vốn × hệ số markup.
+     *
+     * Hệ số lấy theo thứ tự: hệ số gõ tay của phiếu → cấu hình markup được chọn.
+     * Không có hệ số nào, hoặc không tra được giá vốn, thì giữ nguyên đơn giá gửi lên.
+     */
+    private BigDecimal calculateMarkupUnitPrice(Integer itemId,
+                                                Integer warehouseId,
+                                                Integer configId,
+                                                BigDecimal manualMarkupMultiplier,
+                                                EstimateTypeEnum type,
+                                                BigDecimal defaultPrice) {
+        boolean hasManualMarkup = manualMarkupMultiplier != null
+                && manualMarkupMultiplier.compareTo(BigDecimal.ZERO) > 0;
+        if (itemId == null || (configId == null && !hasManualMarkup)) {
             return defaultPrice != null ? defaultPrice : BigDecimal.ZERO;
         }
         try {
-            Optional<FallbackPricingConfigJpa> configOpt = fallbackPricingConfigJpaRepo.findById(configId);
-            if (configOpt.isEmpty() || !Boolean.TRUE.equals(configOpt.get().getIsActive())) {
-                return defaultPrice != null ? defaultPrice : BigDecimal.ZERO;
+            FallbackPricingConfigJpa config = null;
+            if (!hasManualMarkup) {
+                Optional<FallbackPricingConfigJpa> configOpt = fallbackPricingConfigJpaRepo.findById(configId);
+                if (configOpt.isEmpty() || !Boolean.TRUE.equals(configOpt.get().getIsActive())) {
+                    return defaultPrice != null ? defaultPrice : BigDecimal.ZERO;
+                }
+                config = configOpt.get();
             }
-            FallbackPricingConfigJpa config = configOpt.get();
 
             // Find cost (importPrice)
             BigDecimal cost = null;
@@ -1134,8 +1159,7 @@ public class EstimateService {
                 return defaultPrice != null ? defaultPrice : BigDecimal.ZERO;
             }
 
-            boolean isWholesale = false;
-            BigDecimal multiplier = isWholesale ? config.getMarkupMultiplierWholesale() : config.getMarkupMultiplier();
+            BigDecimal multiplier = hasManualMarkup ? manualMarkupMultiplier : config.getMarkupMultiplier();
             if (multiplier == null) {
                 multiplier = BigDecimal.ONE;
             }
@@ -1149,11 +1173,26 @@ public class EstimateService {
 
     @Transactional
     public EstimateRespondDto applyFallbackPricingToEstimate(Integer estimateId, Integer configId) {
+        return applyFallbackPricingToEstimate(estimateId, configId, null);
+    }
+
+    /**
+     * Áp lại markup cho toàn phiếu.
+     * Truyền manualMarkupMultiplier khi cố vấn gõ thẳng hệ số thay vì chọn cấu hình;
+     * lúc đó configId được xoá để tránh hai nguồn hệ số cùng tồn tại trên một phiếu.
+     */
+    @Transactional
+    public EstimateRespondDto applyFallbackPricingToEstimate(Integer estimateId,
+                                                             Integer configId,
+                                                             BigDecimal manualMarkupMultiplier) {
         Estimate estimate = estimateRepository.findEstimateById(estimateId);
         if (estimate == null) {
             throw new RuntimeException("Estimate not found");
         }
-        estimate.setFallbackPricingConfigId(configId);
+        boolean hasManualMarkup = manualMarkupMultiplier != null
+                && manualMarkupMultiplier.compareTo(BigDecimal.ZERO) > 0;
+        estimate.setFallbackPricingConfigId(hasManualMarkup ? null : configId);
+        estimate.setManualMarkupMultiplier(hasManualMarkup ? manualMarkupMultiplier : null);
         estimateRepository.save(estimate);
 
         List<EstimateItem> items = estimateItemRepository.findByEstimateId(estimateId);
@@ -1163,7 +1202,13 @@ public class EstimateService {
             }
             if (item.getItemId() != null) {
                 BigDecimal originalPrice = item.getUnitPrice();
-                BigDecimal nextPrice = calculateMarkupUnitPrice(item.getItemId(), item.getWarehouseId(), configId, estimate.getEstimateType(), originalPrice);
+                BigDecimal nextPrice = calculateMarkupUnitPrice(
+                        item.getItemId(),
+                        item.getWarehouseId(),
+                        estimate.getFallbackPricingConfigId(),
+                        estimate.getManualMarkupMultiplier(),
+                        estimate.getEstimateType(),
+                        originalPrice);
                 item.setUnitPrice(nextPrice);
                 
                 // Recalculate subtotal and tax based on existing appliedTaxRate

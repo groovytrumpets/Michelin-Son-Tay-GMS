@@ -25,6 +25,8 @@ public class EstimateRespondDto {
     private Integer version;
     private Integer revisedFromId;
     private Integer fallbackPricingConfigId;
+    /** Hệ số markup gõ tay cho phiếu; có giá trị thì ưu tiên hơn fallbackPricingConfigId. */
+    private BigDecimal manualMarkupMultiplier;
     private BigDecimal subTotal;
     private BigDecimal totalTaxAmount;
     private BigDecimal totalPrice;

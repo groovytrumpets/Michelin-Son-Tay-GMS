@@ -58,5 +58,9 @@
         @Column(name = "gross_profit", precision = 12, scale = 2)
         private BigDecimal grossProfit;
 
+        /** Hệ số markup gõ tay cho phiếu; có giá trị thì ưu tiên hơn fallbackPricingConfigId. */
+        @Column(name = "manual_markup_multiplier", precision = 6, scale = 4)
+        private BigDecimal manualMarkupMultiplier;
+
 
     }
