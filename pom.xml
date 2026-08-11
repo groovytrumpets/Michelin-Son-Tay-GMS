@@ -133,6 +133,14 @@
             <version>0.4.20</version>
         </dependency>
 
+        <!-- Làm sạch HTML bài viết do biên tập nhập vào (chống XSS lưu trữ).
+             Dùng thư viện chuyên dụng thay vì tự lọc bằng regex. -->
+        <dependency>
+            <groupId>org.jsoup</groupId>
+            <artifactId>jsoup</artifactId>
+            <version>1.18.3</version>
+        </dependency>
+
         <dependency>
             <groupId>com.cloudinary</groupId>
             <artifactId>cloudinary-http44</artifactId>

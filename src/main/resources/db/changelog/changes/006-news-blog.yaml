@@ -1,0 +1,560 @@
+# Phân hệ Tin tức / Blog.
+#
+# Bài viết tin tức là thực thể ĐỘC LẬP, khác hẳn bảng `service` sẵn có (blog của
+# `service` luôn phải treo dưới một `catalog_item`). Ở đây bài viết có slug riêng
+# để làm URL, có tác giả, danh mục, tag, lịch đăng, lượt xem và trường SEO —
+# phục vụ mục tiêu chia sẻ link ra Facebook/Zalo và cho Google index.
+#
+# Thiết kế đầy đủ: docs/NEWS_BLOG_DESIGN.md
+databaseChangeLog:
+  - changeSet:
+      id: 006-1-post-category
+      author: gms
+      comment: Danh mục tin tức
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: post_category
+      changes:
+        - createTable:
+            tableName: post_category
+            remarks: Danh mục bài viết tin tức
+            columns:
+              - column:
+                  name: category_id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: name
+                  type: VARCHAR(120)
+                  constraints:
+                    nullable: false
+                  remarks: Tên hiển thị của danh mục
+              - column:
+                  name: slug
+                  type: VARCHAR(160)
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uk_post_category_slug
+                  remarks: Đoạn định danh dùng trong URL /tin-tuc/danh-muc/{slug}
+              - column:
+                  name: description
+                  type: VARCHAR(500)
+              - column:
+                  name: display_order
+                  type: INT
+                  defaultValueNumeric: 0
+              - column:
+                  name: is_active
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+              - column:
+                  name: seo_title
+                  type: VARCHAR(200)
+              - column:
+                  name: seo_description
+                  type: VARCHAR(320)
+              - column:
+                  name: created_at
+                  type: DATETIME(6)
+              - column:
+                  name: updated_at
+                  type: DATETIME(6)
+      rollback:
+        - dropTable:
+            tableName: post_category
+
+  - changeSet:
+      id: 006-2-post
+      author: gms
+      comment: Bài viết tin tức
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: post
+      changes:
+        - createTable:
+            tableName: post
+            remarks: Bài viết tin tức / blog
+            columns:
+              - column:
+                  name: post_id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: slug
+                  type: VARCHAR(200)
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uk_post_slug
+                  remarks: Khoá của URL /tin-tuc/{slug}; không chứa id để URL sạch
+              - column:
+                  name: title
+                  type: VARCHAR(250)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: excerpt
+                  type: VARCHAR(500)
+                  remarks: Tóm tắt, dùng làm og:description khi seo_description trống
+              - column:
+                  name: content_html
+                  type: LONGTEXT
+                  remarks: Nội dung HTML đã được backend làm sạch trước khi lưu
+              - column:
+                  name: thumbnail_url
+                  type: VARCHAR(500)
+              - column:
+                  name: cover_url
+                  type: VARCHAR(500)
+              - column:
+                  name: category_id
+                  type: INT
+              - column:
+                  name: status
+                  type: VARCHAR(20)
+                  defaultValue: DRAFT
+                  constraints:
+                    nullable: false
+                  remarks: DRAFT / PENDING / SCHEDULED / PUBLISHED / ARCHIVED
+              - column:
+                  name: is_featured
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+              - column:
+                  name: pinned_order
+                  type: INT
+                  remarks: Có giá trị nghĩa là bài được ghim, sắp xếp tăng dần
+              - column:
+                  name: published_at
+                  type: DATETIME(6)
+              - column:
+                  name: scheduled_at
+                  type: DATETIME(6)
+                  remarks: Thời điểm hẹn đăng; job nền chuyển sang PUBLISHED khi tới hạn
+              - column:
+                  name: author_staff_id
+                  type: INT
+              - column:
+                  name: reviewer_staff_id
+                  type: INT
+              - column:
+                  name: review_note
+                  type: VARCHAR(500)
+              - column:
+                  name: view_count
+                  type: BIGINT
+                  defaultValueNumeric: 0
+              - column:
+                  name: share_count
+                  type: BIGINT
+                  defaultValueNumeric: 0
+              - column:
+                  name: reading_minutes
+                  type: INT
+              - column:
+                  name: seo_title
+                  type: VARCHAR(200)
+              - column:
+                  name: seo_description
+                  type: VARCHAR(320)
+              - column:
+                  name: seo_keywords
+                  type: VARCHAR(500)
+              - column:
+                  name: og_image_url
+                  type: VARCHAR(500)
+              - column:
+                  name: canonical_url
+                  type: VARCHAR(500)
+              - column:
+                  name: allow_index
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  remarks: Tắt để gắn noindex cho bài nội bộ
+              - column:
+                  name: created_at
+                  type: DATETIME(6)
+              - column:
+                  name: updated_at
+                  type: DATETIME(6)
+              - column:
+                  name: deleted_at
+                  type: DATETIME(6)
+                  remarks: Xoá mềm — bài đã xoá vẫn giữ để không chết link cũ
+        - addForeignKeyConstraint:
+            constraintName: fk_post_category
+            baseTableName: post
+            baseColumnNames: category_id
+            referencedTableName: post_category
+            referencedColumnNames: category_id
+            onDelete: SET NULL
+        - addForeignKeyConstraint:
+            constraintName: fk_post_author_staff
+            baseTableName: post
+            baseColumnNames: author_staff_id
+            referencedTableName: staff_profile
+            referencedColumnNames: staff_id
+            onDelete: SET NULL
+        - addForeignKeyConstraint:
+            constraintName: fk_post_reviewer_staff
+            baseTableName: post
+            baseColumnNames: reviewer_staff_id
+            referencedTableName: staff_profile
+            referencedColumnNames: staff_id
+            onDelete: SET NULL
+        - createIndex:
+            indexName: idx_post_status_published
+            tableName: post
+            columns:
+              - column:
+                  name: status
+              - column:
+                  name: published_at
+        - createIndex:
+            indexName: idx_post_deleted_at
+            tableName: post
+            columns:
+              - column:
+                  name: deleted_at
+      rollback:
+        - dropTable:
+            tableName: post
+
+  - changeSet:
+      id: 006-3-post-tag
+      author: gms
+      comment: Tag bài viết và bảng nối
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: post_tag
+      changes:
+        - createTable:
+            tableName: post_tag
+            remarks: Tag tự do gắn cho bài viết
+            columns:
+              - column:
+                  name: tag_id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: name
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: slug
+                  type: VARCHAR(120)
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uk_post_tag_slug
+              - column:
+                  name: usage_count
+                  type: INT
+                  defaultValueNumeric: 0
+              - column:
+                  name: created_at
+                  type: DATETIME(6)
+        - createTable:
+            tableName: post_tag_map
+            remarks: Bảng nối bài viết với tag
+            columns:
+              - column:
+                  name: post_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: tag_id
+                  type: INT
+                  constraints:
+                    nullable: false
+        - addPrimaryKey:
+            tableName: post_tag_map
+            columnNames: post_id, tag_id
+            constraintName: pk_post_tag_map
+        - addForeignKeyConstraint:
+            constraintName: fk_post_tag_map_post
+            baseTableName: post_tag_map
+            baseColumnNames: post_id
+            referencedTableName: post
+            referencedColumnNames: post_id
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            constraintName: fk_post_tag_map_tag
+            baseTableName: post_tag_map
+            baseColumnNames: tag_id
+            referencedTableName: post_tag
+            referencedColumnNames: tag_id
+            onDelete: CASCADE
+      rollback:
+        - dropTable:
+            tableName: post_tag_map
+        - dropTable:
+            tableName: post_tag
+
+  - changeSet:
+      id: 006-4-post-cta
+      author: gms
+      comment: Khối kêu gọi hành động chèn trong bài viết
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: post_cta
+      changes:
+        - createTable:
+            tableName: post_cta
+            remarks: Khối CTA nối bài viết sang đặt lịch hoặc sản phẩm/dịch vụ
+            columns:
+              - column:
+                  name: cta_id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: post_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: cta_type
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+                  remarks: BOOKING / CATALOG_ITEM / COMBO / PHONE / EXTERNAL
+              - column:
+                  name: label
+                  type: VARCHAR(150)
+              - column:
+                  name: sub_label
+                  type: VARCHAR(250)
+              - column:
+                  name: target_url
+                  type: VARCHAR(500)
+              - column:
+                  name: catalog_item_id
+                  type: INT
+                  remarks: Trỏ thẳng sang mặt hàng để lấy tên/ảnh/giá đang bán
+              - column:
+                  name: position
+                  type: VARCHAR(20)
+                  defaultValue: BOTTOM
+                  remarks: TOP / MIDDLE / BOTTOM
+              - column:
+                  name: display_order
+                  type: INT
+                  defaultValueNumeric: 0
+              - column:
+                  name: is_active
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+        - addForeignKeyConstraint:
+            constraintName: fk_post_cta_post
+            baseTableName: post_cta
+            baseColumnNames: post_id
+            referencedTableName: post
+            referencedColumnNames: post_id
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            constraintName: fk_post_cta_catalog_item
+            baseTableName: post_cta
+            baseColumnNames: catalog_item_id
+            referencedTableName: catalog_item
+            referencedColumnNames: item_id
+            onDelete: SET NULL
+      rollback:
+        - dropTable:
+            tableName: post_cta
+
+  - changeSet:
+      id: 006-5-post-view-log
+      author: gms
+      comment: Nhật ký lượt xem bài viết kèm nguồn UTM
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: post_view_log
+      changes:
+        - createTable:
+            tableName: post_view_log
+            remarks: Mỗi dòng là một lượt xem đã qua khử trùng lặp 30 phút
+            columns:
+              - column:
+                  name: view_id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: post_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: visitor_hash
+                  type: VARCHAR(64)
+                  remarks: SHA-256 của IP + User-Agent + muối, không lưu IP thô
+              - column:
+                  name: session_key
+                  type: VARCHAR(64)
+              - column:
+                  name: viewed_at
+                  type: DATETIME(6)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: referrer
+                  type: VARCHAR(500)
+              - column:
+                  name: utm_source
+                  type: VARCHAR(120)
+              - column:
+                  name: utm_medium
+                  type: VARCHAR(120)
+              - column:
+                  name: utm_campaign
+                  type: VARCHAR(120)
+              - column:
+                  name: utm_content
+                  type: VARCHAR(120)
+              - column:
+                  name: device
+                  type: VARCHAR(20)
+        - addForeignKeyConstraint:
+            constraintName: fk_post_view_log_post
+            baseTableName: post_view_log
+            baseColumnNames: post_id
+            referencedTableName: post
+            referencedColumnNames: post_id
+            onDelete: CASCADE
+        - createIndex:
+            indexName: idx_post_view_dedupe
+            tableName: post_view_log
+            columns:
+              - column:
+                  name: post_id
+              - column:
+                  name: visitor_hash
+              - column:
+                  name: viewed_at
+      rollback:
+        - dropTable:
+            tableName: post_view_log
+
+  - changeSet:
+      id: 006-6-post-slug-history
+      author: gms
+      comment: Lưu slug cũ để chuyển hướng 301 khi biên tập đổi đường dẫn
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: post_slug_history
+      changes:
+        - createTable:
+            tableName: post_slug_history
+            remarks: Giữ link đã chia sẻ còn sống sau khi đổi slug
+            columns:
+              - column:
+                  name: history_id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: post_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: old_slug
+                  type: VARCHAR(200)
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uk_post_slug_history_old_slug
+              - column:
+                  name: created_at
+                  type: DATETIME(6)
+        - addForeignKeyConstraint:
+            constraintName: fk_post_slug_history_post
+            baseTableName: post_slug_history
+            baseColumnNames: post_id
+            referencedTableName: post
+            referencedColumnNames: post_id
+            onDelete: CASCADE
+      rollback:
+        - dropTable:
+            tableName: post_slug_history
+
+  - changeSet:
+      id: 006-7-seed-post-categories
+      author: gms
+      comment: Bốn danh mục khởi tạo để biên tập có chỗ đăng bài ngay
+      preConditions:
+        - onFail: MARK_RAN
+        - and:
+            - tableExists:
+                tableName: post_category
+            - sqlCheck:
+                expectedResult: "0"
+                sql: SELECT COUNT(*) FROM post_category
+      changes:
+        - insert:
+            tableName: post_category
+            columns:
+              - column: {name: name, value: "Tin khuyến mãi"}
+              - column: {name: slug, value: "tin-khuyen-mai"}
+              - column: {name: description, value: "Chương trình ưu đãi, giảm giá đang chạy tại garage"}
+              - column: {name: display_order, valueNumeric: 1}
+              - column: {name: is_active, valueBoolean: true}
+        - insert:
+            tableName: post_category
+            columns:
+              - column: {name: name, value: "Kiến thức chăm xe"}
+              - column: {name: slug, value: "kien-thuc-cham-xe"}
+              - column: {name: description, value: "Hướng dẫn bảo dưỡng, chọn lốp, chăm sóc xe đúng cách"}
+              - column: {name: display_order, valueNumeric: 2}
+              - column: {name: is_active, valueBoolean: true}
+        - insert:
+            tableName: post_category
+            columns:
+              - column: {name: name, value: "Tin garage"}
+              - column: {name: slug, value: "tin-garage"}
+              - column: {name: description, value: "Hoạt động, dịch vụ mới và thông báo từ Michelin Sơn Tây"}
+              - column: {name: display_order, valueNumeric: 3}
+              - column: {name: is_active, valueBoolean: true}
+        - insert:
+            tableName: post_category
+            columns:
+              - column: {name: name, value: "Đánh giá sản phẩm"}
+              - column: {name: slug, value: "danh-gia-san-pham"}
+              - column: {name: description, value: "Trải nghiệm thực tế lốp, dầu, ắc quy và phụ tùng"}
+              - column: {name: display_order, valueNumeric: 4}
+              - column: {name: is_active, valueBoolean: true}
+      rollback:
+        - delete:
+            tableName: post_category
+            where: slug IN ('tin-khuyen-mai','kien-thuc-cham-xe','tin-garage','danh-gia-san-pham')

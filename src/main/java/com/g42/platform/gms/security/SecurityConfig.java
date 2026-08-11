@@ -69,7 +69,13 @@ public class SecurityConfig {
                                 "/error",
                                 "/ws-notifications/**",
                                 "/ws-chat/**",
-                                "/api/public/sliders/**"
+                                "/api/public/sliders/**",
+                                // Tin tức: trang bài viết phải đọc được khi chưa đăng nhập,
+                                // và /seo/** là nơi bot Facebook/Zalo/Google lấy thẻ meta.
+                                "/api/public/posts/**",
+                                "/api/public/post-categories/**",
+                                "/api/public/post-tags/**",
+                                "/seo/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )

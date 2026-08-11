@@ -25,3 +25,6 @@ databaseChangeLog:
   - include:
       file: changes/005-estimate-manual-markup.yaml
       relativeToChangelogFile: true
+  - include:
+      file: changes/006-news-blog.yaml
+      relativeToChangelogFile: true
