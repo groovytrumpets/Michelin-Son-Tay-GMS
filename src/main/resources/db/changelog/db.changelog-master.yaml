@@ -28,3 +28,9 @@ databaseChangeLog:
   - include:
       file: changes/006-news-blog.yaml
       relativeToChangelogFile: true
+  - include:
+      file: changes/007-nav-menu.yaml
+      relativeToChangelogFile: true
+  - include:
+      file: changes/008-nav-menu-dropdown.yaml
+      relativeToChangelogFile: true

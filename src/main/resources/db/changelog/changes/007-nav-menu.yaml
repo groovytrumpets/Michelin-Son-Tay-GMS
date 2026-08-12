@@ -1,0 +1,176 @@
+# Menu điều hướng (header trang khách) tuỳ chỉnh được từ trang quản trị.
+#
+# Trước đây danh sách "Trang chủ / Giới thiệu / Dịch vụ / ..." nằm cứng trong
+# Header.jsx. Bảng này cho phép quản lý đổi tên, ẩn/hiện, sắp xếp lại thứ tự
+# bằng kéo thả — không phải sửa code mỗi lần đổi cấu trúc menu.
+#
+# Các mục dạng "menu sổ xuống" (Dịch vụ, Phụ tùng, Tin tức...) vẫn lấy dữ liệu
+# con từ nghiệp vụ tương ứng (catalog, danh mục tin tức) — bảng này chỉ quyết
+# định NHÃN, THỨ TỰ và ẨN/HIỆN của mục cha, không lưu danh sách con.
+#
+# Thiết kế đầy đủ: docs/NAV_MENU_DESIGN.md
+databaseChangeLog:
+  - changeSet:
+      id: 007-1-nav-menu-item
+      author: gms
+      comment: Mục điều hướng trên thanh menu, sắp xếp được bằng kéo thả
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: nav_menu_item
+      changes:
+        - createTable:
+            tableName: nav_menu_item
+            remarks: Mục trên thanh điều hướng (header) trang khách
+            columns:
+              - column:
+                  name: nav_item_id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: location_code
+                  type: VARCHAR(50)
+                  defaultValue: HEADER_MAIN
+                  constraints:
+                    nullable: false
+                  remarks: Vị trí đặt menu — hiện chỉ có HEADER_MAIN, để ngỏ cho footer sau này
+              - column:
+                  name: item_type
+                  type: VARCHAR(30)
+                  constraints:
+                    nullable: false
+                  remarks: >-
+                    LINK / EXTERNAL / SCROLL_CONTACT / SERVICES_MENU / PARTS_MENU /
+                    PARTS_BY_VEHICLE_MENU / NEWS_MENU — các loại *_MENU lấy danh sách
+                    con từ nghiệp vụ tương ứng, không lưu ở bảng này
+              - column:
+                  name: label
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: target_path
+                  type: VARCHAR(500)
+                  remarks: Đường dẫn nội bộ (bắt đầu bằng /) hoặc URL ngoài đầy đủ; NULL với SCROLL_CONTACT
+              - column:
+                  name: open_in_new_tab
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+              - column:
+                  name: display_order
+                  type: INT
+                  defaultValueNumeric: 0
+              - column:
+                  name: is_active
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+              - column:
+                  name: created_at
+                  type: DATETIME(6)
+              - column:
+                  name: updated_at
+                  type: DATETIME(6)
+        - createIndex:
+            indexName: idx_nav_menu_item_location_order
+            tableName: nav_menu_item
+            columns:
+              - column:
+                  name: location_code
+              - column:
+                  name: display_order
+      rollback:
+        - dropTable:
+            tableName: nav_menu_item
+
+  - changeSet:
+      id: 007-2-seed-header-nav
+      author: gms
+      comment: Chuyển 8 mục menu đang cứng trong Header.jsx thành dữ liệu, giữ nguyên hành vi cũ
+      preConditions:
+        - onFail: MARK_RAN
+        - and:
+            - tableExists:
+                tableName: nav_menu_item
+            - sqlCheck:
+                expectedResult: "0"
+                sql: SELECT COUNT(*) FROM nav_menu_item WHERE location_code = 'HEADER_MAIN'
+      changes:
+        - insert:
+            tableName: nav_menu_item
+            columns:
+              - column: {name: location_code, value: "HEADER_MAIN"}
+              - column: {name: item_type, value: "LINK"}
+              - column: {name: label, value: "Trang chủ"}
+              - column: {name: target_path, value: "/"}
+              - column: {name: display_order, valueNumeric: 1}
+              - column: {name: is_active, valueBoolean: true}
+        - insert:
+            tableName: nav_menu_item
+            columns:
+              - column: {name: location_code, value: "HEADER_MAIN"}
+              - column: {name: item_type, value: "LINK"}
+              - column: {name: label, value: "Giới thiệu"}
+              - column: {name: target_path, value: "/about"}
+              - column: {name: display_order, valueNumeric: 2}
+              - column: {name: is_active, valueBoolean: true}
+        - insert:
+            tableName: nav_menu_item
+            columns:
+              - column: {name: location_code, value: "HEADER_MAIN"}
+              - column: {name: item_type, value: "SERVICES_MENU"}
+              - column: {name: label, value: "Dịch vụ"}
+              - column: {name: target_path, value: "/services"}
+              - column: {name: display_order, valueNumeric: 3}
+              - column: {name: is_active, valueBoolean: true}
+        - insert:
+            tableName: nav_menu_item
+            columns:
+              - column: {name: location_code, value: "HEADER_MAIN"}
+              - column: {name: item_type, value: "PARTS_MENU"}
+              - column: {name: label, value: "Phụ tùng"}
+              - column: {name: target_path, value: "/parts"}
+              - column: {name: display_order, valueNumeric: 4}
+              - column: {name: is_active, valueBoolean: true}
+        - insert:
+            tableName: nav_menu_item
+            columns:
+              - column: {name: location_code, value: "HEADER_MAIN"}
+              - column: {name: item_type, value: "PARTS_BY_VEHICLE_MENU"}
+              - column: {name: label, value: "Phụ tùng theo xe"}
+              - column: {name: target_path, value: "/parts"}
+              - column: {name: display_order, valueNumeric: 5}
+              - column: {name: is_active, valueBoolean: true}
+        - insert:
+            tableName: nav_menu_item
+            columns:
+              - column: {name: location_code, value: "HEADER_MAIN"}
+              - column: {name: item_type, value: "LINK"}
+              - column: {name: label, value: "Tra cứu"}
+              - column: {name: target_path, value: "/car-parts-lookup"}
+              - column: {name: display_order, valueNumeric: 6}
+              - column: {name: is_active, valueBoolean: true}
+        - insert:
+            tableName: nav_menu_item
+            columns:
+              - column: {name: location_code, value: "HEADER_MAIN"}
+              - column: {name: item_type, value: "NEWS_MENU"}
+              - column: {name: label, value: "Tin tức"}
+              - column: {name: target_path, value: "/tin-tuc"}
+              - column: {name: display_order, valueNumeric: 7}
+              - column: {name: is_active, valueBoolean: true}
+        - insert:
+            tableName: nav_menu_item
+            columns:
+              - column: {name: location_code, value: "HEADER_MAIN"}
+              - column: {name: item_type, value: "SCROLL_CONTACT"}
+              - column: {name: label, value: "Vị trí Cửa Hàng"}
+              - column: {name: display_order, valueNumeric: 8}
+              - column: {name: is_active, valueBoolean: true}
+      rollback:
+        - delete:
+            tableName: nav_menu_item
+            where: location_code = 'HEADER_MAIN'

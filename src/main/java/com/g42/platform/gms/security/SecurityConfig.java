@@ -75,6 +75,8 @@ public class SecurityConfig {
                                 "/api/public/posts/**",
                                 "/api/public/post-categories/**",
                                 "/api/public/post-tags/**",
+                                // Thanh menu phải dựng được trước khi khách đăng nhập.
+                                "/api/public/nav-menu/**",
                                 "/seo/**"
                         ).permitAll()
                         .anyRequest().authenticated()

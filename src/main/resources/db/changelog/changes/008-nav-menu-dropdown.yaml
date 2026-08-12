@@ -1,0 +1,162 @@
+# Mở rộng menu điều hướng: dropdown tự đặt, nhiều kiểu trình bày, kèm ảnh.
+#
+# Changeset 007 mới chỉ cho sửa nhãn/thứ tự của các mục cấp 1, còn nội dung
+# dropdown vẫn sinh tự động từ nghiệp vụ (catalog, danh mục tin). Đợt này bổ sung
+# khả năng tự dựng dropdown: thêm mục con tuỳ ý (cột parent_id trỏ về chính
+# bảng), chọn kiểu trình bày, và gắn ảnh cho từng mục để làm mega-menu.
+#
+# Vì sao dùng cây tự tham chiếu thay vì bảng con riêng: mục con và mục cha có
+# đúng cùng bộ thuộc tính (nhãn, đường dẫn, ảnh, thứ tự, ẩn/hiện), tách bảng sẽ
+# phải nhân đôi mọi cột và nhân đôi luôn cả code CRUD.
+#
+# Thiết kế đầy đủ: docs/NAV_MENU_DESIGN.md
+databaseChangeLog:
+  - changeSet:
+      id: 008-1-nav-menu-tree-and-media
+      author: gms
+      comment: Thêm quan hệ cha-con, kiểu dropdown, ảnh và mô tả cho mục menu
+      preConditions:
+        - onFail: MARK_RAN
+        - and:
+            - tableExists:
+                tableName: nav_menu_item
+            - not:
+                - columnExists:
+                    tableName: nav_menu_item
+                    columnName: parent_id
+      changes:
+        - addColumn:
+            tableName: nav_menu_item
+            columns:
+              - column:
+                  name: parent_id
+                  type: INT
+                  remarks: NULL là mục cấp 1 trên thanh menu; có giá trị là mục nằm trong dropdown của mục cha
+              - column:
+                  name: dropdown_layout
+                  type: VARCHAR(20)
+                  defaultValue: LIST
+                  remarks: Kiểu trình bày dropdown của mục cấp 1 — LIST / COLUMNS / CARDS
+              - column:
+                  name: description
+                  type: VARCHAR(255)
+                  remarks: Dòng mô tả phụ, hiện ở kiểu CARDS
+              - column:
+                  name: image_url
+                  type: VARCHAR(500)
+                  remarks: Ảnh minh hoạ cho mục, dùng ở kiểu CARDS
+              - column:
+                  name: badge_text
+                  type: VARCHAR(30)
+                  remarks: Nhãn nhỏ cạnh tên, ví dụ "Mới" hoặc "Hot"
+              - column:
+                  name: column_index
+                  type: INT
+                  defaultValueNumeric: 0
+                  remarks: Số thứ tự cột khi dropdown dùng kiểu COLUMNS
+        - addForeignKeyConstraint:
+            constraintName: fk_nav_menu_item_parent
+            baseTableName: nav_menu_item
+            baseColumnNames: parent_id
+            referencedTableName: nav_menu_item
+            referencedColumnNames: nav_item_id
+            onDelete: CASCADE
+        - createIndex:
+            indexName: idx_nav_menu_item_parent
+            tableName: nav_menu_item
+            columns:
+              - column:
+                  name: parent_id
+              - column:
+                  name: display_order
+      rollback:
+        - dropForeignKeyConstraint:
+            baseTableName: nav_menu_item
+            constraintName: fk_nav_menu_item_parent
+        - dropColumn:
+            tableName: nav_menu_item
+            columns:
+              - column: {name: parent_id}
+              - column: {name: dropdown_layout}
+              - column: {name: description}
+              - column: {name: image_url}
+              - column: {name: badge_text}
+              - column: {name: column_index}
+
+  - changeSet:
+      id: 008-2-nav-menu-services-children
+      author: gms
+      comment: Đổi tên loại menu cho rõ nghĩa và chuyển dropdown "Dịch vụ" thành dữ liệu sửa được
+      preConditions:
+        - onFail: MARK_RAN
+        - and:
+            - columnExists:
+                tableName: nav_menu_item
+                columnName: parent_id
+            - sqlCheck:
+                expectedResult: "0"
+                sql: SELECT COUNT(*) FROM nav_menu_item WHERE parent_id IS NOT NULL
+      changes:
+        # Đổi tên loại menu: tiền tố AUTO_ nói rõ đây là dropdown sinh từ nghiệp
+        # vụ, phân biệt với CUSTOM_MENU do người quản trị tự dựng. Tên hằng số
+        # trong enum NavItemType phải khớp đúng những giá trị này.
+        - update:
+            tableName: nav_menu_item
+            columns:
+              - column: {name: item_type, value: "AUTO_PARTS_CATEGORIES"}
+            where: item_type = 'PARTS_MENU'
+        - update:
+            tableName: nav_menu_item
+            columns:
+              - column: {name: item_type, value: "AUTO_PARTS_BY_VEHICLE"}
+            where: item_type = 'PARTS_BY_VEHICLE_MENU'
+        - update:
+            tableName: nav_menu_item
+            columns:
+              - column: {name: item_type, value: "AUTO_NEWS_CATEGORIES"}
+            where: item_type = 'NEWS_MENU'
+        # Mục "Dịch vụ" đổi sang loại tự đặt vì ba mục con của nó vốn là danh sách
+        # cố định trong Header.jsx chứ không sinh ra từ nghiệp vụ nào.
+        - update:
+            tableName: nav_menu_item
+            columns:
+              - column: {name: item_type, value: "CUSTOM_MENU"}
+              - column: {name: dropdown_layout, value: "LIST"}
+            where: location_code = 'HEADER_MAIN' AND item_type = 'SERVICES_MENU'
+        - sql:
+            comment: Ba mục con của Dịch vụ, giữ nguyên thứ tự cũ trong Header.jsx
+            sql: >-
+              INSERT INTO nav_menu_item
+                (location_code, parent_id, item_type, label, target_path, display_order, is_active, column_index)
+              SELECT 'HEADER_MAIN', p.nav_item_id, 'LINK', v.label, v.target_path, v.display_order, TRUE, 0
+              FROM nav_menu_item p
+              JOIN (
+                SELECT 'Dịch vụ' AS label, '/services' AS target_path, 1 AS display_order
+                UNION ALL SELECT 'Combo', '/combos', 2
+                UNION ALL SELECT 'Máy móc & Thiết bị', '/equipments', 3
+              ) v
+              WHERE p.location_code = 'HEADER_MAIN' AND p.item_type = 'CUSTOM_MENU' AND p.parent_id IS NULL
+      rollback:
+        - delete:
+            tableName: nav_menu_item
+            where: parent_id IS NOT NULL
+        - update:
+            tableName: nav_menu_item
+            columns:
+              - column: {name: item_type, value: "SERVICES_MENU"}
+            where: location_code = 'HEADER_MAIN' AND item_type = 'CUSTOM_MENU'
+        - update:
+            tableName: nav_menu_item
+            columns:
+              - column: {name: item_type, value: "PARTS_MENU"}
+            where: item_type = 'AUTO_PARTS_CATEGORIES'
+        - update:
+            tableName: nav_menu_item
+            columns:
+              - column: {name: item_type, value: "PARTS_BY_VEHICLE_MENU"}
+            where: item_type = 'AUTO_PARTS_BY_VEHICLE'
+        - update:
+            tableName: nav_menu_item
+            columns:
+              - column: {name: item_type, value: "NEWS_MENU"}
+            where: item_type = 'AUTO_NEWS_CATEGORIES'
