@@ -77,6 +77,8 @@ public class SecurityConfig {
                                 "/api/public/post-tags/**",
                                 // Thanh menu phải dựng được trước khi khách đăng nhập.
                                 "/api/public/nav-menu/**",
+                                // Bố cục thanh đầu trang (logo, ô tìm kiếm, nút) — cùng lý do.
+                                "/api/public/site-header",
                                 "/seo/**"
                         ).permitAll()
                         .anyRequest().authenticated()

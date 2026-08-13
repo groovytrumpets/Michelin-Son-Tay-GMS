@@ -34,3 +34,6 @@ databaseChangeLog:
   - include:
       file: changes/008-nav-menu-dropdown.yaml
       relativeToChangelogFile: true
+  - include:
+      file: changes/009-site-header.yaml
+      relativeToChangelogFile: true

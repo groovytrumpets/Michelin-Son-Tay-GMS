@@ -1,0 +1,59 @@
+# Bố cục thanh đầu trang khách (logo, ô tìm kiếm, hotline, giỏ hàng, nút tự đặt).
+#
+# Vì sao lưu cả bố cục thành MỘT chuỗi JSON thay vì mỗi widget một dòng:
+# widget của thanh đầu trang không có bộ thuộc tính chung — logo cần chiều cao và
+# ảnh, hotline cần số điện thoại, nút tự đặt cần nhãn/kiểu/biểu tượng. Tách thành
+# bảng quan hệ sẽ thành một rừng cột NULL, mà thêm loại widget mới lại phải chạy
+# migration. Cả bố cục luôn được đọc và ghi trọn gói nên không cần truy vấn vào
+# từng widget. Cách này giống hệt staff_dashboard_config.layout_config đang dùng
+# cho bố cục widget của trang tổng quan.
+#
+# Mỗi vị trí (location_code) chỉ có đúng một dòng, khớp location_code của
+# nav_menu_item để sau này thêm thanh chân trang không phải đổi thiết kế.
+databaseChangeLog:
+  - changeSet:
+      id: 009-1-create-site-header-config
+      author: gms
+      comment: Bảng chứa bố cục widget của thanh đầu trang khách
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: site_header_config
+      changes:
+        - createTable:
+            tableName: site_header_config
+            remarks: Bố cục thanh đầu trang khách, đặt ở màn /nav-menu-config
+            columns:
+              - column:
+                  name: config_id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: location_code
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uk_site_header_config_location
+                  remarks: HEADER_MAIN — khớp location_code của nav_menu_item
+              - column:
+                  name: config_json
+                  type: TEXT
+                  constraints:
+                    nullable: false
+                  remarks: "JSON { style, widgets[] } — cấu trúc do FE siteHeaderService.js định nghĩa"
+              - column:
+                  name: updated_by
+                  type: INT
+                  remarks: Nhân viên lưu lần gần nhất
+              - column:
+                  name: updated_at
+                  type: DATETIME
+                  defaultValueComputed: CURRENT_TIMESTAMP
+      rollback:
+        - dropTable:
+            tableName: site_header_config
