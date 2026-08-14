@@ -42,7 +42,7 @@ public class SecurityConfig {
                     CorsConfiguration config = new CorsConfiguration();
                     config.setAllowedOrigins(List.of("http://localhost:5173","http://staff.localhost:5173",
                             "https://sontaygarage.vn","https://api.sontaygarage.vn","https://staff.sontaygarage.vn","http://127.0.0.1:5500",
-                            "https://demo.sontaygarage.vn","https://demoapi.sontaygarage.vn"));
+                            "https://demo.sontaygarage.vn","https://demoapi.sontaygarage.vn","https://staff.demo.sontaygarage.vn"));
                     config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
                     config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept"));
                     config.setAllowCredentials(true);
