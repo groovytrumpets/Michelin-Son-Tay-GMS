@@ -1,8 +1,32 @@
 services:
+  mysql:
+    image: mysql:8.0
+    restart: always
+    environment:
+      MYSQL_DATABASE: michelin_garage
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_USER: ${USERNAME_DB}
+      MYSQL_PASSWORD: ${PASSWORD_DB}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    # Không map port ra host — chỉ backend (cùng network Docker này) mới cần
+    # thấy MySQL, không cần mở ra ngoài VPS.
+
   app:
     image: groovytrumpets/mst-gms:latest
     ports:
       - "8080:8080"
     env_file:
       - .env
+    depends_on:
+      mysql:
+        condition: service_healthy
     restart: always
+
+volumes:
+  mysql-data:

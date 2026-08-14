@@ -41,13 +41,15 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws-notifications").setAllowedOrigins("http://localhost:5173","http://staff.localhost:5173",
                 "https://sontaygarage.vn",
-                "https://api.sontaygarage.vn","https://staff.sontaygarage.vn","http://127.0.0.1:5500").withSockJS();
+                "https://api.sontaygarage.vn","https://staff.sontaygarage.vn","http://127.0.0.1:5500",
+                "https://demo.sontaygarage.vn","https://demoapi.sontaygarage.vn").withSockJS();
 
         // Chat nội bộ nhân viên — dùng chung ChannelInterceptor xác thực JWT bên dưới
         // (áp dụng cho toàn bộ broker, không theo từng endpoint) nên không cần cấu hình thêm.
         registry.addEndpoint("/ws-chat").setAllowedOrigins("http://localhost:5173","http://staff.localhost:5173",
                 "https://sontaygarage.vn",
-                "https://api.sontaygarage.vn","https://staff.sontaygarage.vn","http://127.0.0.1:5500").withSockJS();
+                "https://api.sontaygarage.vn","https://staff.sontaygarage.vn","http://127.0.0.1:5500",
+                "https://demo.sontaygarage.vn","https://demoapi.sontaygarage.vn").withSockJS();
     }
 
     @Override
