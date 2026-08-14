@@ -37,3 +37,6 @@ databaseChangeLog:
   - include:
       file: changes/009-site-header.yaml
       relativeToChangelogFile: true
+  - include:
+      file: changes/010-mwb-schema-gaps.yaml
+      relativeToChangelogFile: true

@@ -1,0 +1,582 @@
+# Bổ sung các bảng/cột có trong thiết kế MySQL Workbench (MST-GMS.mwb, schema
+# michelin_garage) nhưng chưa được Liquibase hay entity JPA nào biết tới.
+#
+# Nguồn: so sánh document.mwb.xml (98 bảng) với toàn bộ @Entity trong repo và
+# changeset 001-009. 7 bảng dưới đây không có entity/Liquibase nào tham chiếu,
+# và time_slot.reservation_id là cột duy nhất bị thiếu trên một bảng đã có entity.
+# (service_item cũng thiếu nhưng không đưa vào vì không còn dùng ở đâu trong code.)
+databaseChangeLog:
+  - changeSet:
+      id: 010-1-create-booking-code-sequence
+      author: gms
+      comment: Sequence sinh mã booking theo ngày + tiền tố, tránh trùng mã khi tạo đồng thời
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: booking_code_sequence
+      changes:
+        - createTable:
+            tableName: booking_code_sequence
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: sequence_date
+                  type: DATE
+                  constraints:
+                    nullable: false
+              - column:
+                  name: code_prefix
+                  type: VARCHAR(10)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: current_sequence
+                  type: INT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: version
+                  type: INT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: DATETIME
+                  defaultValueComputed: CURRENT_TIMESTAMP
+              - column:
+                  name: updated_at
+                  type: DATETIME
+                  defaultValueComputed: CURRENT_TIMESTAMP
+      rollback:
+        - dropTable:
+            tableName: booking_code_sequence
+
+  - changeSet:
+      id: 010-2-booking-code-sequence-indexes
+      author: gms
+      comment: Ràng buộc unique + index tra cứu cho booking_code_sequence
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - indexExists:
+                tableName: booking_code_sequence
+                indexName: uk_sequence_date_prefix
+      changes:
+        - addUniqueConstraint:
+            tableName: booking_code_sequence
+            columnNames: sequence_date, code_prefix
+            constraintName: uk_sequence_date_prefix
+        - createIndex:
+            tableName: booking_code_sequence
+            indexName: idx_sequence_date
+            columns:
+              - column:
+                  name: sequence_date
+        - createIndex:
+            tableName: booking_code_sequence
+            indexName: idx_code_prefix
+            columns:
+              - column:
+                  name: code_prefix
+      rollback:
+        - dropUniqueConstraint:
+            tableName: booking_code_sequence
+            constraintName: uk_sequence_date_prefix
+        - dropIndex:
+            tableName: booking_code_sequence
+            indexName: idx_sequence_date
+        - dropIndex:
+            tableName: booking_code_sequence
+            indexName: idx_code_prefix
+
+  - changeSet:
+      id: 010-3-create-customer-rank-config
+      author: gms
+      comment: Cấu hình hạng khách hàng theo điểm tích lũy, thay cho hard-code trong service
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: customer_rank_config
+      changes:
+        - createTable:
+            tableName: customer_rank_config
+            columns:
+              - column:
+                  name: rank_name
+                  type: VARCHAR(20)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: min_points
+                  type: INT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: spend_multiplier
+                  type: DOUBLE
+                  defaultValueNumeric: 1
+                  constraints:
+                    nullable: false
+              - column:
+                  name: visit_bonus
+                  type: INT
+                  defaultValueNumeric: 10
+                  constraints:
+                    nullable: false
+              - column:
+                  name: label_vi
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+      rollback:
+        - dropTable:
+            tableName: customer_rank_config
+
+  - changeSet:
+      id: 010-4-create-part-warranty
+      author: gms
+      comment: Bảo hành theo từng phụ tùng đã lắp cho xe, khác warranty mặc định ở catalog_item
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: part_warranty
+      changes:
+        - createTable:
+            tableName: part_warranty
+            columns:
+              - column:
+                  name: warranty_id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: estimate_item_id
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: vehicle_id
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: customer_id
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: warranty_start_date
+                  type: DATE
+              - column:
+                  name: warranty_end_date
+                  type: DATE
+              - column:
+                  name: status
+                  type: ENUM('ACTIVE','EXPIRED','CLAIMED','VOID')
+                  defaultValue: ACTIVE
+                  constraints:
+                    nullable: false
+      rollback:
+        - dropTable:
+            tableName: part_warranty
+
+  - changeSet:
+      id: 010-5-part-warranty-fk
+      author: gms
+      comment: Khóa ngoại part_warranty tới estimate_item / vehicle / customer_profile
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - foreignKeyConstraintExists:
+                foreignKeyName: fk_warranty_item
+                foreignKeyTableName: part_warranty
+      changes:
+        - addForeignKeyConstraint:
+            baseTableName: part_warranty
+            baseColumnNames: estimate_item_id
+            constraintName: fk_warranty_item
+            referencedTableName: estimate_item
+            referencedColumnNames: estimate_item_id
+        - addForeignKeyConstraint:
+            baseTableName: part_warranty
+            baseColumnNames: vehicle_id
+            constraintName: fk_warranty_vehicle
+            referencedTableName: vehicle
+            referencedColumnNames: vehicle_id
+        - addForeignKeyConstraint:
+            baseTableName: part_warranty
+            baseColumnNames: customer_id
+            constraintName: fk_warranty_customer
+            referencedTableName: customer_profile
+            referencedColumnNames: customer_id
+      rollback:
+        - dropForeignKeyConstraint:
+            baseTableName: part_warranty
+            constraintName: fk_warranty_item
+        - dropForeignKeyConstraint:
+            baseTableName: part_warranty
+            constraintName: fk_warranty_vehicle
+        - dropForeignKeyConstraint:
+            baseTableName: part_warranty
+            constraintName: fk_warranty_customer
+
+  - changeSet:
+      id: 010-6-create-service-ticket-status-history
+      author: gms
+      comment: Lịch sử đổi trạng thái service_ticket, hiện chưa nơi nào ghi lại
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: service_ticket_status_history
+      changes:
+        - createTable:
+            tableName: service_ticket_status_history
+            columns:
+              - column:
+                  name: history_id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: service_ticket_id
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: old_status
+                  type: VARCHAR(50)
+              - column:
+                  name: new_status
+                  type: VARCHAR(50)
+              - column:
+                  name: changed_by
+                  type: INT
+              - column:
+                  name: changed_at
+                  type: DATETIME
+                  defaultValueComputed: CURRENT_TIMESTAMP
+      rollback:
+        - dropTable:
+            tableName: service_ticket_status_history
+
+  - changeSet:
+      id: 010-7-service-ticket-status-history-fk
+      author: gms
+      comment: Khóa ngoại service_ticket_status_history tới service_ticket / staff_profile
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - foreignKeyConstraintExists:
+                foreignKeyName: fk_status_history_ticket
+                foreignKeyTableName: service_ticket_status_history
+      changes:
+        - addForeignKeyConstraint:
+            baseTableName: service_ticket_status_history
+            baseColumnNames: service_ticket_id
+            constraintName: fk_status_history_ticket
+            referencedTableName: service_ticket
+            referencedColumnNames: service_ticket_id
+        - addForeignKeyConstraint:
+            baseTableName: service_ticket_status_history
+            baseColumnNames: changed_by
+            constraintName: fk_status_history_staff
+            referencedTableName: staff_profile
+            referencedColumnNames: staff_id
+      rollback:
+        - dropForeignKeyConstraint:
+            baseTableName: service_ticket_status_history
+            constraintName: fk_status_history_ticket
+        - dropForeignKeyConstraint:
+            baseTableName: service_ticket_status_history
+            constraintName: fk_status_history_staff
+
+  - changeSet:
+      id: 010-8-create-service-ticket-log
+      author: gms
+      comment: Audit trail chi tiết cho service_ticket (khác system_log dùng chung toàn hệ thống)
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: service_ticket_log
+      changes:
+        - createTable:
+            tableName: service_ticket_log
+            columns:
+              - column:
+                  name: log_id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: service_ticket_id
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: action
+                  type: VARCHAR(50)
+              - column:
+                  name: old_value
+                  type: TEXT
+              - column:
+                  name: new_value
+                  type: TEXT
+              - column:
+                  name: changed_by
+                  type: INT
+              - column:
+                  name: changed_at
+                  type: DATETIME
+                  defaultValueComputed: CURRENT_TIMESTAMP
+      rollback:
+        - dropTable:
+            tableName: service_ticket_log
+
+  - changeSet:
+      id: 010-9-service-ticket-log-fk
+      author: gms
+      comment: Khóa ngoại service_ticket_log tới service_ticket (theo đúng mẫu của service_ticket_status_history)
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - foreignKeyConstraintExists:
+                foreignKeyName: fk_ticket_log_ticket
+                foreignKeyTableName: service_ticket_log
+      changes:
+        - addForeignKeyConstraint:
+            baseTableName: service_ticket_log
+            baseColumnNames: service_ticket_id
+            constraintName: fk_ticket_log_ticket
+            referencedTableName: service_ticket
+            referencedColumnNames: service_ticket_id
+      rollback:
+        - dropForeignKeyConstraint:
+            baseTableName: service_ticket_log
+            constraintName: fk_ticket_log_ticket
+
+  - changeSet:
+      id: 010-10-create-stock-transfer-details
+      author: gms
+      comment: Chi tiết dòng hàng cho phiếu chuyển kho stock_transfer, hiện chưa có bảng nào lưu
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: stock_transfer_details
+      changes:
+        - createTable:
+            tableName: stock_transfer_details
+            columns:
+              - column:
+                  name: transfer_detail_id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: transfer_id
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: item_id
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: quantity
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: unit_price
+                  type: DECIMAL(12,2)
+              - column:
+                  name: notes
+                  type: VARCHAR(255)
+      rollback:
+        - dropTable:
+            tableName: stock_transfer_details
+
+  - changeSet:
+      id: 010-11-stock-transfer-details-fk
+      author: gms
+      comment: Khóa ngoại stock_transfer_details tới stock_transfer / catalog_item
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - foreignKeyConstraintExists:
+                foreignKeyName: fk_stock_transfer_details_transfer
+                foreignKeyTableName: stock_transfer_details
+      changes:
+        - addForeignKeyConstraint:
+            baseTableName: stock_transfer_details
+            baseColumnNames: transfer_id
+            constraintName: fk_stock_transfer_details_transfer
+            referencedTableName: stock_transfer
+            referencedColumnNames: transfer_id
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: stock_transfer_details
+            baseColumnNames: item_id
+            constraintName: fk_stock_transfer_details_item
+            referencedTableName: catalog_item
+            referencedColumnNames: item_id
+        - createIndex:
+            tableName: stock_transfer_details
+            indexName: idx_transfer
+            columns:
+              - column:
+                  name: transfer_id
+        - createIndex:
+            tableName: stock_transfer_details
+            indexName: idx_item
+            columns:
+              - column:
+                  name: item_id
+      rollback:
+        - dropForeignKeyConstraint:
+            baseTableName: stock_transfer_details
+            constraintName: fk_stock_transfer_details_transfer
+        - dropForeignKeyConstraint:
+            baseTableName: stock_transfer_details
+            constraintName: fk_stock_transfer_details_item
+        - dropIndex:
+            tableName: stock_transfer_details
+            indexName: idx_transfer
+        - dropIndex:
+            tableName: stock_transfer_details
+            indexName: idx_item
+
+  - changeSet:
+      id: 010-12-create-vehicle-specification
+      author: gms
+      comment: Thông số kỹ thuật xe dạng key/value, chưa có entity nào quản lý
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: vehicle_specification
+      changes:
+        - createTable:
+            tableName: vehicle_specification
+            columns:
+              - column:
+                  name: spec_id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: vehicle_id
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: spec_type
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: spec_value
+                  type: VARCHAR(100)
+              - column:
+                  name: updated_at
+                  type: DATETIME
+                  defaultValueComputed: CURRENT_TIMESTAMP
+              - column:
+                  name: updated_by
+                  type: INT
+      rollback:
+        - dropTable:
+            tableName: vehicle_specification
+
+  - changeSet:
+      id: 010-13-vehicle-specification-fk
+      author: gms
+      comment: Khóa ngoại vehicle_specification tới vehicle
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - foreignKeyConstraintExists:
+                foreignKeyName: fk_spec_vehicle
+                foreignKeyTableName: vehicle_specification
+      changes:
+        - addForeignKeyConstraint:
+            baseTableName: vehicle_specification
+            baseColumnNames: vehicle_id
+            constraintName: fk_spec_vehicle
+            referencedTableName: vehicle
+            referencedColumnNames: vehicle_id
+      rollback:
+        - dropForeignKeyConstraint:
+            baseTableName: vehicle_specification
+            constraintName: fk_spec_vehicle
+
+  - changeSet:
+      id: 010-14-time-slot-add-reservation-id
+      author: gms
+      comment: Thêm cột reservation_id vào time_slot, nối về booking_slot_reservation (gap xác nhận qua diff với .mwb)
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: time_slot
+                columnName: reservation_id
+      changes:
+        - addColumn:
+            tableName: time_slot
+            columns:
+              - column:
+                  name: reservation_id
+                  type: INT
+                  remarks: Liên kết tới booking_slot_reservation khi slot này đã được giữ chỗ
+      rollback:
+        - dropColumn:
+            tableName: time_slot
+            columnName: reservation_id
+
+  - changeSet:
+      id: 010-15-time-slot-reservation-fk
+      author: gms
+      comment: Khóa ngoại time_slot.reservation_id tới booking_slot_reservation
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - foreignKeyConstraintExists:
+                foreignKeyName: fk_time_slot_reservation
+                foreignKeyTableName: time_slot
+      changes:
+        - addForeignKeyConstraint:
+            baseTableName: time_slot
+            baseColumnNames: reservation_id
+            constraintName: fk_time_slot_reservation
+            referencedTableName: booking_slot_reservation
+            referencedColumnNames: reservation_id
+      rollback:
+        - dropForeignKeyConstraint:
+            baseTableName: time_slot
+            constraintName: fk_time_slot_reservation
