@@ -199,6 +199,7 @@ databaseChangeLog:
       id: 010-5-part-warranty-fk
       author: gms
       comment: Khóa ngoại part_warranty tới estimate_item / vehicle / customer_profile
+      failOnError: false
       preConditions:
         - onFail: MARK_RAN
         - not:
@@ -281,6 +282,7 @@ databaseChangeLog:
       id: 010-7-service-ticket-status-history-fk
       author: gms
       comment: Khóa ngoại service_ticket_status_history tới service_ticket / staff_profile
+      failOnError: false
       preConditions:
         - onFail: MARK_RAN
         - not:
@@ -357,6 +359,7 @@ databaseChangeLog:
       id: 010-9-service-ticket-log-fk
       author: gms
       comment: Khóa ngoại service_ticket_log tới service_ticket (theo đúng mẫu của service_ticket_status_history)
+      failOnError: false
       preConditions:
         - onFail: MARK_RAN
         - not:
@@ -424,6 +427,7 @@ databaseChangeLog:
       id: 010-11-stock-transfer-details-fk
       author: gms
       comment: Khóa ngoại stock_transfer_details tới stock_transfer / catalog_item
+      failOnError: false
       preConditions:
         - onFail: MARK_RAN
         - not:
@@ -518,6 +522,7 @@ databaseChangeLog:
       id: 010-13-vehicle-specification-fk
       author: gms
       comment: Khóa ngoại vehicle_specification tới vehicle
+      failOnError: false
       preConditions:
         - onFail: MARK_RAN
         - not:
@@ -563,6 +568,7 @@ databaseChangeLog:
       id: 010-15-time-slot-reservation-fk
       author: gms
       comment: Khóa ngoại time_slot.reservation_id tới booking_slot_reservation
+      failOnError: false
       preConditions:
         - onFail: MARK_RAN
         - not:
