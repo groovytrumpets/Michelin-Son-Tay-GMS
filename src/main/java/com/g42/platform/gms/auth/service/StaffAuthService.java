@@ -9,6 +9,9 @@ import com.g42.platform.gms.auth.repository.StaffAuthRepo;
 import com.g42.platform.gms.auth.repository.StaffProfileRepo;
 import com.g42.platform.gms.auth.repository.StaffRoleRepository;
 import com.g42.platform.gms.common.service.OtpService;
+import com.g42.platform.gms.common.util.ContactMasking;
+import com.g42.platform.gms.notification.domain.NotificationChannel;
+import com.g42.platform.gms.notification.domain.NotificationRecipient;
 import com.g42.platform.gms.systemlog.service.AuditRecord;
 import com.g42.platform.gms.systemlog.service.AuditService;
 import lombok.AllArgsConstructor;
@@ -133,37 +136,36 @@ public class StaffAuthService {
             throw new AuthException(AuthErrorCode.USER_NOT_FOUND.name(), "Sai thông tin đăng nhập, tài khoản có thể bị khóa sau 10 lần thử");
     }
 
-@Transactional
-    public void requestOtpPhone(String phone) {
-        StaffAuth staffAuth = null;
-        StaffProfile staffProfile = null;
-        if (phone.contains("@")) {
-            System.out.println("DEBUG Email: " + phone);
-            staffAuth = staffAuthRepo.findByEmail(phone);
-            if (staffAuth != null) staffProfile = staffProfileRepo.
-                    getStaffProfileByStaffauth_StaffAuthId(staffAuth.getStaffAuthId());
-        }else {
-            System.out.println("DEBUG PHONE: " + phone);
-            staffProfile = staffProfileRepo.findByPhone(phone);
-            if (staffProfile != null){
+    /**
+     * Gửi mã OTP khôi phục mật khẩu cho nhân viên.
+     *
+     * @param requestedChannel kênh nhân viên tự chọn ("ZALO"/"EMAIL"); null thì hệ thống tự quyết
+     *                         (nhập bằng email → gửi email, nhập bằng SĐT → gửi Zalo)
+     * @return kênh đã gửi thành công, null nếu không gửi được qua kênh nào
+     */
+    @Transactional
+    public NotificationChannel requestOtpPhone(String identifier, NotificationChannel requestedChannel) {
+        StaffAccount account = resolveStaff(identifier);
+        if ("LOCKED".equals(account.auth().getStatus())) {
+            throw new AuthException("Staff Account Locked", "STAFF_LOCKED");
+        }
+        return otpService.generateAndSendOtp(otpKeyOf(account), otpRecipient(account, identifier, requestedChannel));
+    }
 
-            System.out.println("DEBUG PHONE: " + staffProfile.getFullName()+", "+staffProfile.getPhone());
-            staffAuth = staffAuthRepo.findByStaffProfile(staffProfile);
-            }
-        }
-        if (staffAuth == null||staffProfile == null) {
-            throw new AuthException("Staff Not Found","STAFF404");
-        }
-        if (staffAuth.getStatus().equals("LOCKED")){
-            throw new AuthException("Staff Account Locked","STAFF_LOCKED");
-        }
-        otpService.generateAndSendOtp(staffProfile.getPhone());
-
+    /** Kênh liên hệ khả dụng của nhân viên, cho màn quên mật khẩu hiển thị lựa chọn. */
+    @Transactional(readOnly = true)
+    public ContactChannelsResponse getContactChannels(String identifier) {
+        StaffAccount account = resolveStaff(identifier);
+        return ContactChannelsResponse.of(account.profile().getPhone(), account.auth().getEmail());
     }
 
     public AuthResponse verifyOtp(VerifyOtpRequest request) {
+        // Phải tra lại nhân viên để lấy đúng khoá OTP: nhân viên có thể yêu cầu mã bằng email
+        // rồi xác thực bằng SĐT (hoặc ngược lại), khoá phải gắn với tài khoản chứ không gắn
+        // với chuỗi vừa nhập.
+        StaffAccount account = resolveStaff(request.getPhone());
         try {
-            otpService.validateOtp(request.getPhone(), request.getOtp());
+            otpService.validateOtp(otpKeyOf(account), request.getOtp());
         } catch (RuntimeException e) {
             throw new AuthException(AuthErrorCode.INVALID_OTP.name(), "Mã OTP không chính xác hoặc đã hết hạn");
         }
@@ -174,17 +176,86 @@ public class StaffAuthService {
         if (!request.getPin().equals(request.getConfirmPin())) {
             throw new AuthException(AuthErrorCode.PIN_MISMATCH.name(), "PIN xác nhận không khớp");
         }
-        StaffProfile staffProfile = staffProfileRepo.findByPhone(request.getPhone());
-        if (staffProfile == null) {
-            throw new AuthException(AuthErrorCode.USER_NOT_FOUND.name(), "STAFF_NOT_FOUND");
-        }
-        StaffAuth staffAuth = staffAuthRepo.findByStaffProfile(staffProfile);
-        if (staffAuth == null) {
-            throw new AuthException(AuthErrorCode.USER_NOT_FOUND.name(), "STAFF_NOT_FOUND");
-        }
+        StaffAuth staffAuth = resolveStaff(request.getPhone()).auth();
         staffAuth.setPasswordHash(passwordEncoder.encode(request.getPin()));
         staffAuth.setStatus("ACTIVE");
         staffAuth.setFailedLoginCount(0);
         staffAuthRepo.save(staffAuth);
+    }
+
+    /* ================= Định danh nhân viên: SĐT hoặc email ================= */
+
+    /**
+     * Email nằm ở bảng staff_auth, số điện thoại nằm ở staff_profile — nên tra theo định danh
+     * nào cũng phải lấy đủ cả hai bản ghi.
+     */
+    private record StaffAccount(StaffAuth auth, StaffProfile profile) {
+    }
+
+    /**
+     * Tra nhân viên theo định danh: có "@" thì tìm theo email, còn lại tìm theo số điện thoại.
+     * Dùng biến cục bộ (không phải field của bean singleton như StaffAuthDetailsService)
+     * để nhiều người khôi phục mật khẩu cùng lúc không lẫn tài khoản của nhau.
+     */
+    private StaffAccount resolveStaff(String identifier) {
+        if (identifier == null || identifier.isBlank()) {
+            throw new AuthException("Staff Not Found", "STAFF404");
+        }
+        String value = identifier.trim();
+        StaffAuth staffAuth = null;
+        StaffProfile staffProfile = null;
+
+        if (value.contains("@")) {
+            staffAuth = staffAuthRepo.findByEmail(value);
+            if (staffAuth != null) {
+                staffProfile = staffProfileRepo.getStaffProfileByStaffauth_StaffAuthId(staffAuth.getStaffAuthId());
+            }
+        } else {
+            staffProfile = staffProfileRepo.findByPhone(value);
+            if (staffProfile != null) {
+                staffAuth = staffAuthRepo.findByStaffProfile(staffProfile);
+            }
+        }
+
+        if (staffAuth == null || staffProfile == null) {
+            throw new AuthException("Staff Not Found", "STAFF404");
+        }
+        return new StaffAccount(staffAuth, staffProfile);
+    }
+
+    /** Khoá lưu OTP gắn với nhân viên, không phụ thuộc chuỗi định danh vừa nhập. */
+    private String otpKeyOf(StaffAccount account) {
+        return "staff:" + account.profile().getStaffId();
+    }
+
+    /**
+     * Kênh gửi OTP cho nhân viên. Nhân viên không có thiết lập kênh mặc định như khách hàng,
+     * nên: ưu tiên kênh vừa chọn, không chọn thì suy từ kiểu định danh đã nhập.
+     * Kênh chính lỗi thì dispatcher tự chuyển sang kênh còn lại.
+     */
+    private NotificationRecipient otpRecipient(StaffAccount account, String identifier,
+                                               NotificationChannel requestedChannel) {
+        String phone = account.profile().getPhone();
+        String email = account.auth().getEmail();
+
+        NotificationChannel channel;
+        if (requestedChannel != null) {
+            requireChannelUsable(requestedChannel, phone, email);
+            channel = requestedChannel;
+        } else {
+            channel = identifier.contains("@") ? NotificationChannel.EMAIL : NotificationChannel.ZALO;
+        }
+        return NotificationRecipient.of(phone, email, channel);
+    }
+
+    private void requireChannelUsable(NotificationChannel channel, String phone, String email) {
+        if (channel == NotificationChannel.EMAIL && !ContactMasking.hasText(email)) {
+            throw new AuthException(AuthErrorCode.BAD_REQUEST.name(),
+                    "Tài khoản chưa có email. Vui lòng chọn nhận mã qua Zalo.");
+        }
+        if (channel == NotificationChannel.ZALO && !ContactMasking.hasText(phone)) {
+            throw new AuthException(AuthErrorCode.BAD_REQUEST.name(),
+                    "Tài khoản chưa có số điện thoại. Vui lòng chọn nhận mã qua Email.");
+        }
     }
 }

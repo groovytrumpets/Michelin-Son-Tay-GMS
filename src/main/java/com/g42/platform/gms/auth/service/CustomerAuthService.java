@@ -10,6 +10,7 @@ import com.g42.platform.gms.auth.exception.AuthException;
 import com.g42.platform.gms.auth.repository.CustomerAuthRepository;
 import com.g42.platform.gms.auth.repository.CustomerProfileRepository;
 import com.g42.platform.gms.common.service.OtpService;
+import com.g42.platform.gms.common.util.ContactMasking;
 import com.g42.platform.gms.notification.domain.NotificationChannel;
 import com.g42.platform.gms.notification.domain.NotificationRecipient;
 import lombok.RequiredArgsConstructor;
@@ -72,8 +73,8 @@ public class CustomerAuthService {
         // Cho màn quên mật khẩu biết được phép chọn kênh nào, kèm giá trị đã che bớt để hiển thị
         response.setHasEmail(hasText(profile.getEmail()));
         response.setHasPhone(hasText(profile.getPhone()));
-        response.setMaskedEmail(maskEmail(profile.getEmail()));
-        response.setMaskedPhone(maskPhone(profile.getPhone()));
+        response.setMaskedEmail(ContactMasking.maskEmail(profile.getEmail()));
+        response.setMaskedPhone(ContactMasking.maskPhone(profile.getPhone()));
         return response;
     }
 
@@ -263,35 +264,6 @@ public class CustomerAuthService {
     }
 
     private boolean hasText(String value) {
-        return value != null && !value.isBlank();
-    }
-
-    /** Che bớt email để hiển thị: nguyenvana@gmail.com -> ng******a@gmail.com */
-    private String maskEmail(String email) {
-        if (!hasText(email)) {
-            return null;
-        }
-        int at = email.indexOf('@');
-        if (at <= 0) {
-            return "***";
-        }
-        String local = email.substring(0, at);
-        String domain = email.substring(at);
-        if (local.length() <= 2) {
-            return local.charAt(0) + "***" + domain;
-        }
-        return local.charAt(0) + String.valueOf(local.charAt(1)) + "***" + local.charAt(local.length() - 1) + domain;
-    }
-
-    /** Che bớt số điện thoại để hiển thị: 0912345678 -> 091****678 */
-    private String maskPhone(String phone) {
-        if (!hasText(phone)) {
-            return null;
-        }
-        String value = phone.trim();
-        if (value.length() <= 6) {
-            return "***" + value.substring(value.length() - Math.min(2, value.length()));
-        }
-        return value.substring(0, 3) + "****" + value.substring(value.length() - 3);
+        return ContactMasking.hasText(value);
     }
 }
