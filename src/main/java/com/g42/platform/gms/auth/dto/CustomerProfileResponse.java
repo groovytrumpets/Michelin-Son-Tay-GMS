@@ -19,4 +19,5 @@ public class CustomerProfileResponse {
     private LocalDateTime createdAt;
     private com.g42.platform.gms.customer.domain.enums.CustomerType customerType;
     private Boolean isDealer;
+    private com.g42.platform.gms.notification.domain.NotificationChannel notificationChannel;
 }

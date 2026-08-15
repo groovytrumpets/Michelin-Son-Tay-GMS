@@ -27,4 +27,7 @@ public interface CustomerRepo {
 
     /** Ném lỗi nếu mã khách hàng đã được hồ sơ khác sử dụng. */
     void ensureCustomerCodeAvailable(String customerCode, Integer selfCustomerId);
+
+    /** Ném lỗi nếu email đã được hồ sơ khác sử dụng — email là định danh đăng nhập nên phải duy nhất. */
+    void ensureEmailAvailable(String email, Integer selfCustomerId);
 }

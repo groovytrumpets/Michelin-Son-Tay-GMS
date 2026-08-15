@@ -23,7 +23,9 @@ import com.g42.platform.gms.booking_management.domain.repository.BookingManageRe
 import com.g42.platform.gms.booking_management.infrastructure.entity.BookingJpa;
 import com.g42.platform.gms.booking_management.infrastructure.mapper.TimeSlotMMapper;
 import com.g42.platform.gms.marketing.service_catalog.domain.exception.ServiceException;
-import com.g42.platform.gms.notification.infrastructure.ZaloNotificationSender;
+import com.g42.platform.gms.notification.application.service.CustomerNotificationDispatcher;
+import com.g42.platform.gms.notification.domain.NotificationRecipient;
+import com.g42.platform.gms.auth.repository.CustomerProfileRepository;
 import lombok.AllArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
@@ -43,7 +45,8 @@ public class BookingManageService {
     private final BookingManageDtoMapper bookingManageDtoMapper;
     private final BookingMDetailDtoMapper  bookingMDetailDtoMapper;
     private final BookingMRequestDtoMapper  bookingMRequestDtoMapper;
-    private final ZaloNotificationSender zaloNotificationSender;
+    private final CustomerNotificationDispatcher notificationDispatcher;
+    private final CustomerProfileRepository customerProfileRepository;
     private final SlotService slotService;
 
     public Page<BookedRespond> getListBooked(int page, int size, LocalDate date, Boolean isGuest, BookingEnum status, String search) {
@@ -110,9 +113,12 @@ public class BookingManageService {
         boolean confirmed = request.confirm();
         bookingRepository.setConfirmStatus(request);
 
-        // Gửi thông báo Zalo
-        zaloNotificationSender.sendBookingConfirm(
-                request.getPhone(),
+        // Gửi thông báo xác nhận (Zalo hoặc Email tuỳ lựa chọn của khách)
+        NotificationRecipient recipient = customerProfileRepository.findById(customerId)
+                .map(c -> NotificationRecipient.of(c.getPhone(), c.getEmail(), c.getNotificationChannel()))
+                .orElse(NotificationRecipient.phoneOnly(request.getPhone()));
+        notificationDispatcher.sendBookingConfirm(
+                recipient,
                 request.getFullName(),
                 request.getServices().stream().map(CatalogItem::getItemName).toList(),
                 request.getRequestCode(),

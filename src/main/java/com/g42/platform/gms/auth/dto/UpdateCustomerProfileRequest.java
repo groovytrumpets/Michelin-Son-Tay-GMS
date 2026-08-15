@@ -16,4 +16,7 @@ public class UpdateCustomerProfileRequest {
     
     @Size(max = 255, message = "URL avatar không được quá 255 ký tự")
     private String avatar;
+
+    /** Kênh nhận thông báo — ZALO hoặc EMAIL. Chọn EMAIL mà chưa có email thì BE fallback về ZALO. */
+    private com.g42.platform.gms.notification.domain.NotificationChannel notificationChannel;
 }

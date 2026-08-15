@@ -21,6 +21,7 @@ public interface CustomerDtoMapper {
     @Mapping(source = "customerProfile.isDealer", target = "isDealer")
     @Mapping(source = "customerProfile.isCompany", target = "isCompany")
     @Mapping(source = "customerProfile.companyName", target = "companyName")
+    @Mapping(source = "customerProfile.notificationChannel", target = "notificationChannel")
     @Mapping(source = "customerProfile.customerCode", target = "customerCode")
     @Mapping(source = "customerProfile.taxCode", target = "taxCode")
     @Mapping(source = "customerProfile.provinceId", target = "provinceId")

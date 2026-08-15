@@ -1,10 +1,12 @@
 package com.g42.platform.gms.notification.infrastructure;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.g42.platform.gms.notification.domain.NotificationSender;
 import com.g42.platform.gms.notification.infrastructure.entity.ZaloToken;
 import com.g42.platform.gms.notification.infrastructure.repository.ZaloTokenRepo;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -19,30 +21,30 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Gửi thông báo qua Zalo ZNS.
+ *
+ * Mọi hàm send* trả về true khi Zalo xác nhận gửi thành công (body có "error": 0),
+ * false khi thiếu access token, lỗi mạng, hoặc Zalo trả về mã lỗi — nhờ đó
+ * CustomerNotificationDispatcher biết để chuyển sang gửi email thay thế.
+ */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class ZaloNotificationSender implements NotificationSender {
+
+    private static final String ZNS_URL = "https://business.openapi.zalo.me/message/template";
+
     private final ZaloTokenRepo zaloTokenRepo;
-    public void sendBookingRequested(String phone, String customerName, List<String> productName, String orderCode, String bookingStatus, String bookingTime, String garageLocation) {
-        String template_id = "546766";
-        String url = "https://business.openapi.zalo.me/message/template";
+    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final RestTemplate restTemplate = new RestTemplate();
+
+    public boolean sendBookingRequested(String phone, String customerName, List<String> productName, String orderCode, String bookingStatus, String bookingTime, String garageLocation) {
         ZaloToken zaloToken = zaloTokenRepo.getZaloTokensByStateEqualsIgnoreCase("active");
-//        String accessToken = zaloToken.getAccessToken();
-
-        String templateId = "546766";
-
-        RestTemplate restTemplate = new RestTemplate();
-
-        // Header
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("access_token", zaloToken.getAccessToken());
-
-        // Body
-        Map<String, Object> body = new HashMap<>();
-
-        body.put("phone", phone);
-        body.put("template_id", templateId);
+        String accessToken = extractAccessToken(zaloToken, "booking requested " + orderCode);
+        if (accessToken == null) {
+            return false;
+        }
 
         Map<String, Object> templateData = new HashMap<>();
         templateData.put("customer_name", customerName);
@@ -52,53 +54,27 @@ public class ZaloNotificationSender implements NotificationSender {
         templateData.put("booking_time", bookingTime);
         templateData.put("garage_location", garageLocation);
 
-        body.put("template_data", templateData);
-
-        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
-
-        ResponseEntity<String> response = restTemplate.postForEntity(
-                url,
-                request,
-                String.class
-        );
-
-        System.out.println(response.getBody());
+        return post(accessToken, "546766", phone, templateData, null, "booking requested " + orderCode);
     }
+
     @Transactional
-    public void sendBookingConfirm(String phone, String customerName, List<String> productName, String orderCode, LocalDateTime bookingTime, String garageLocation) {
-        System.out.println("Sending confirmation...");
-        String url = "https://business.openapi.zalo.me/message/template";
+    @Override
+    public boolean sendBookingConfirm(String phone, String customerName, List<String> productName, String orderCode, LocalDateTime bookingTime, String garageLocation) {
         ZaloToken zaloToken = zaloTokenRepo.getZaloTokensByState("active");
-        if (zaloToken == null||zaloToken.getAccessToken()==null||zaloToken.getAccessToken().isEmpty()) {
-            System.err.println("ZaloToken is null, tried send Confirm Booking: "+orderCode);
-            return;
+        String accessToken = extractAccessToken(zaloToken, "confirm booking " + orderCode);
+        if (accessToken == null) {
+            return false;
         }
-//        String accessToken = zaloToken.getAccessToken();
 
-        String templateId = "562453";
-
-        RestTemplate restTemplate = new RestTemplate();
-
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("access_token", zaloToken.getAccessToken());
-
-
-        Map<String, Object> body = new HashMap<>();
-        body.put("phone", convertPhone(phone));
-        body.put("template_id", templateId);
-
-        DateTimeFormatter formatter =
-                DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy");
-
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy");
         String formattedTime = bookingTime.format(formatter);
         String serviceNames;
         if (productName == null || productName.isEmpty()) {
-            serviceNames = "Không có dịch vụ cụ thể"; // Đổi text này tùy theo nghiệp vụ của bạn, nhưng KHÔNG ĐƯỢC ĐỂ TRỐNG
+            serviceNames = "Không có dịch vụ cụ thể"; // Zalo không cho phép để trống trường template
         } else {
             serviceNames = String.join(", ", productName);
         }
+
         Map<String, Object> templateData = new HashMap<>();
         templateData.put("customer_name", customerName);
         templateData.put("service", serviceNames);
@@ -106,131 +82,45 @@ public class ZaloNotificationSender implements NotificationSender {
         templateData.put("booking_time", formattedTime);
         templateData.put("location", garageLocation);
 
-        body.put("template_data", templateData);
-
-        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
-
-        ResponseEntity<String> response = restTemplate.postForEntity(
-                url,
-                request,
-                String.class
-        );
-
-        System.out.println(response.getBody());
+        return post(accessToken, "562453", convertPhone(phone), templateData, null, "confirm booking " + orderCode);
     }
 
     @Override
-    public void sendOtpVerify(String number, String otp) {
-        String url = "https://business.openapi.zalo.me/message/template";
+    public boolean sendOtpVerify(String number, String otp) {
         ZaloToken zaloToken = zaloTokenRepo.getZaloTokenByState("active");
-        if (zaloToken == null||zaloToken.getAccessToken()==null||zaloToken.getAccessToken().isEmpty()) {
-            System.err.println("ZaloToken is null, tried send otp: "+otp);
-            return;
+        String accessToken = extractAccessToken(zaloToken, "otp");
+        if (accessToken == null) {
+            return false;
         }
-//        String accessToken = zaloToken.getAccessToken();
-
-        String templateId = "547094";
-
-        RestTemplate restTemplate = new RestTemplate();
-
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("access_token", zaloToken.getAccessToken());
-
-
-        Map<String, Object> body = new HashMap<>();
-        body.put("phone", convertPhone(number));
-        body.put("template_id", templateId);
 
         Map<String, Object> templateData = new HashMap<>();
         templateData.put("otp", otp);
-        body.put("template_data", templateData);
 
-        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
-
-        ResponseEntity<String> response = restTemplate.postForEntity(
-                url,
-                request,
-                String.class
-        );
-
-        System.out.println(response.getBody());
+        return post(accessToken, "547094", convertPhone(number), templateData, null, "otp");
     }
 
     @Override
-    public void sendFeedback(String number, String name, String code) {
-        String url = "https://business.openapi.zalo.me/message/template";
+    public boolean sendFeedback(String number, String name, String code) {
         ZaloToken zaloToken = zaloTokenRepo.getZaloTokenByState("active");
-//        String accessToken = zaloToken.getAccessToken();
-        if (zaloToken == null||zaloToken.getAccessToken()==null||zaloToken.getAccessToken().isEmpty()) {
-            System.err.println("ZaloToken is null, tried send feedback: "+code);
-            return;
+        String accessToken = extractAccessToken(zaloToken, "feedback " + code);
+        if (accessToken == null) {
+            return false;
         }
-        String templateId = "547146";
-
-        RestTemplate restTemplate = new RestTemplate();
-
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("access_token", zaloToken.getAccessToken());
-
-
-        Map<String, Object> body = new HashMap<>();
-        body.put("phone", convertPhone(number));
-        body.put("template_id", templateId);
-        body.put("tracking_id", code);
 
         Map<String, Object> templateData = new HashMap<>();
         templateData.put("customer_name", name);
-        templateData.put("service_code",code);
-        body.put("template_data", templateData);
+        templateData.put("service_code", code);
 
-        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
-
-        ResponseEntity<String> response = restTemplate.postForEntity(
-                url,
-                request,
-                String.class
-        );
-
-        System.out.println(response.getBody());
+        return post(accessToken, "547146", convertPhone(number), templateData, code, "feedback " + code);
     }
 
     @Override
-    public void sendBookingCf(String s, String nguyenVanA, String s1) {
-
-    }
-    public static String convertPhone(String phone) {
-        if (phone.startsWith("0")) {
-            return "84" + phone.substring(1);
-        }
-        return phone;
-    }
-    @Override
-    public void sendEstimate(String number, String customerName,List<String> productName, String orderCode, LocalDateTime createAt, String garageLocation,String totalPrice) {
-        String url = "https://business.openapi.zalo.me/message/template";
+    public boolean sendEstimate(String number, String customerName, List<String> productName, String orderCode, LocalDateTime createAt, String garageLocation, String totalPrice) {
         ZaloToken zaloToken = zaloTokenRepo.getZaloTokenByState("active");
-        if (zaloToken == null||zaloToken.getAccessToken()==null||zaloToken.getAccessToken().isEmpty()) {
-            System.err.println("ZaloToken is null, tried send to Booking: "+orderCode);
-            return;
+        String accessToken = extractAccessToken(zaloToken, "estimate " + orderCode);
+        if (accessToken == null) {
+            return false;
         }
-//        String accessToken = zaloToken.getAccessToken();
-
-        String templateId = "574006";
-
-        RestTemplate restTemplate = new RestTemplate();
-
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("access_token", zaloToken.getAccessToken());
-
-
-        Map<String, Object> body = new HashMap<>();
-        body.put("phone", convertPhone(number));
-        body.put("template_id", templateId);
 
         Map<String, Object> templateData = new HashMap<>();
         templateData.put("customer_name", customerName);
@@ -239,16 +129,81 @@ public class ZaloNotificationSender implements NotificationSender {
         templateData.put("service_price", productName);
         templateData.put("price", totalPrice);
         templateData.put("location", garageLocation);
+
+        return post(accessToken, "574006", convertPhone(number), templateData, null, "estimate " + orderCode);
+    }
+
+    @Override
+    public boolean sendBookingCf(String s, String nguyenVanA, String s1) {
+        return false;
+    }
+
+    public static String convertPhone(String phone) {
+        if (phone.startsWith("0")) {
+            return "84" + phone.substring(1);
+        }
+        return phone;
+    }
+
+    /** Lấy access token đang hoạt động; trả null (kèm log) nếu chưa có token nào dùng được. */
+    private String extractAccessToken(ZaloToken zaloToken, String context) {
+        if (zaloToken == null || zaloToken.getAccessToken() == null || zaloToken.getAccessToken().isEmpty()) {
+            log.warn("Zalo: chưa có access token hoạt động, không gửi được [{}]", context);
+            return null;
+        }
+        return zaloToken.getAccessToken();
+    }
+
+    /**
+     * Gọi API ZNS và đọc mã lỗi trong body.
+     * Zalo trả HTTP 200 kể cả khi thất bại, phân biệt bằng trường "error" (0 = thành công).
+     */
+    private boolean post(String accessToken, String templateId, String phone,
+                         Map<String, Object> templateData, String trackingId, String context) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("access_token", accessToken);
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("phone", phone);
+        body.put("template_id", templateId);
         body.put("template_data", templateData);
+        if (trackingId != null) {
+            body.put("tracking_id", trackingId);
+        }
 
-        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+        try {
+            ResponseEntity<String> response = restTemplate.postForEntity(
+                    ZNS_URL, new HttpEntity<>(body, headers), String.class);
+            return isSuccess(response.getBody(), context);
+        } catch (Exception e) {
+            log.warn("Zalo: gửi [{}] thất bại: {}", context, e.getMessage());
+            return false;
+        }
+    }
 
-        ResponseEntity<String> response = restTemplate.postForEntity(
-                url,
-                request,
-                String.class
-        );
-
-        System.out.println(response.getBody());
+    private boolean isSuccess(String responseBody, String context) {
+        if (responseBody == null || responseBody.isBlank()) {
+            log.warn("Zalo: gửi [{}] không nhận được phản hồi", context);
+            return false;
+        }
+        try {
+            JsonNode root = objectMapper.readTree(responseBody);
+            JsonNode errorNode = root.get("error");
+            if (errorNode == null) {
+                log.warn("Zalo: phản hồi [{}] không có trường error: {}", context, responseBody);
+                return false;
+            }
+            if (errorNode.asInt(-1) == 0) {
+                log.debug("Zalo: gửi [{}] thành công", context);
+                return true;
+            }
+            log.warn("Zalo: gửi [{}] bị từ chối, error={}, message={}",
+                    context, errorNode.asInt(-1), root.path("message").asText(""));
+            return false;
+        } catch (Exception e) {
+            log.warn("Zalo: không đọc được phản hồi [{}]: {}", context, e.getMessage());
+            return false;
+        }
     }
 }

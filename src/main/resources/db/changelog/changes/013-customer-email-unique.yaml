@@ -1,0 +1,63 @@
+# Email trở thành định danh đăng nhập thứ hai của khách hàng (bên cạnh số điện thoại),
+# nên cần đảm bảo không có 2 khách dùng chung một email.
+#
+# AN TOÀN VỚI DỮ LIỆU CŨ: changeset thêm ràng buộc chỉ chạy khi kiểm tra thấy KHÔNG có
+# email trùng. Nếu đang trùng, Liquibase bỏ qua (onFail: CONTINUE) — ứng dụng vẫn khởi
+# động bình thường và sẽ TỰ THỬ LẠI ở lần khởi động sau, nên chỉ cần dọn dữ liệu trùng
+# là ràng buộc tự được áp dụng. Trong lúc chưa có ràng buộc DB, tầng ứng dụng
+# (CustomerProfileService / CustomerService) vẫn chặn nhập email trùng.
+#
+# Tìm email đang bị trùng bằng câu lệnh:
+#   SELECT email, COUNT(*) FROM customer_profile
+#   WHERE email IS NOT NULL AND email <> '' GROUP BY email HAVING COUNT(*) > 1;
+databaseChangeLog:
+  - changeSet:
+      id: 013-1-customer-profile-blank-email-to-null
+      author: gms
+      comment: Chuyển email rỗng thành NULL để không vướng ràng buộc duy nhất (chuỗi rỗng không mang thông tin gì)
+      preConditions:
+        - onFail: MARK_RAN
+        - columnExists:
+            tableName: customer_profile
+            columnName: email
+      changes:
+        - update:
+            tableName: customer_profile
+            columns:
+              - column:
+                  name: email
+                  value: null
+            where: email = ''
+      rollback:
+        - empty
+
+  - changeSet:
+      id: 013-2-customer-profile-email-unique
+      author: gms
+      comment: Email là duy nhất để dùng làm định danh đăng nhập. Bỏ qua và thử lại lần khởi động sau nếu dữ liệu đang có email trùng.
+      preConditions:
+        - onFail: CONTINUE
+        - onFailMessage: >-
+            Bỏ qua ràng buộc duy nhất cho customer_profile.email vì đang tồn tại email trùng
+            (hoặc ràng buộc đã có sẵn). Dọn email trùng rồi khởi động lại để áp dụng.
+        - not:
+            - indexExists:
+                tableName: customer_profile
+                indexName: uk_customer_profile_email
+        - sqlCheck:
+            expectedResult: 0
+            sql: >-
+              SELECT COUNT(*) FROM (
+                SELECT email FROM customer_profile
+                WHERE email IS NOT NULL AND email <> ''
+                GROUP BY email HAVING COUNT(*) > 1
+              ) duplicated_emails
+      changes:
+        - addUniqueConstraint:
+            tableName: customer_profile
+            columnNames: email
+            constraintName: uk_customer_profile_email
+      rollback:
+        - dropUniqueConstraint:
+            tableName: customer_profile
+            constraintName: uk_customer_profile_email

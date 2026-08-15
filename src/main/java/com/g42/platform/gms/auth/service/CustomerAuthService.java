@@ -1,15 +1,17 @@
 package com.g42.platform.gms.auth.service;
 
 import com.g42.platform.gms.auth.constant.AuthErrorCode;
-import com.g42.platform.gms.auth.entity.CustomerStatus; // Import Enum Status của Customer
+import com.g42.platform.gms.auth.entity.CustomerStatus;
 import com.g42.platform.gms.auth.dto.*;
-import com.g42.platform.gms.auth.dto.CheckPhoneResponse.Status; // Import Enum Status của Response
+import com.g42.platform.gms.auth.dto.CheckPhoneResponse.Status;
 import com.g42.platform.gms.auth.entity.CustomerAuth;
 import com.g42.platform.gms.auth.entity.CustomerProfile;
 import com.g42.platform.gms.auth.exception.AuthException;
 import com.g42.platform.gms.auth.repository.CustomerAuthRepository;
 import com.g42.platform.gms.auth.repository.CustomerProfileRepository;
 import com.g42.platform.gms.common.service.OtpService;
+import com.g42.platform.gms.notification.domain.NotificationChannel;
+import com.g42.platform.gms.notification.domain.NotificationRecipient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -18,7 +20,16 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.Optional;
 
+/**
+ * Đăng nhập khách hàng bằng SỐ ĐIỆN THOẠI HOẶC EMAIL.
+ *
+ * Định danh người dùng nhập được đưa qua {@link #resolveProfile(String)}: chứa "@" thì tra theo
+ * email, còn lại tra theo số điện thoại — cùng cách làm với đăng nhập nhân viên
+ * (StaffAuthDetailsService), nhưng dùng biến cục bộ để không dính lỗi tranh chấp giữa các
+ * phiên đăng nhập đồng thời.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -32,173 +43,255 @@ public class CustomerAuthService {
 
     private static final int MAX_PIN_ATTEMPTS = 5;
 
-    /* ================= 1. CHECK STATUS (CHO FRONTEND ĐIỀU HƯỚNG) ================= */
+    /* ================= 1. CHECK STATUS ================= */
     @Transactional(readOnly = true)
-    public CheckPhoneResponse checkPhoneStatus(String phone) {
-        var profileOpt = profileRepo.findByPhone(phone);
-
-        // Case 1: Chưa có hồ sơ (Chưa từng đến Garage)
+    public CheckPhoneResponse checkPhoneStatus(String identifier) {
+        var profileOpt = findProfile(identifier);
         if (profileOpt.isEmpty()) {
             return new CheckPhoneResponse(Status.NOT_REGISTERED, false);
         }
+        CustomerProfile profile = profileOpt.get();
+        var authOpt = authRepo.findByCustomerId(profile.getCustomerId());
 
-        var authOpt = authRepo.findByCustomerId(profileOpt.get().getCustomerId());
-
-        // Case 2: Đã bị khóa
+        Status status;
+        boolean hasPin;
         if (authOpt.isPresent() && authOpt.get().getStatus() == CustomerStatus.LOCKED) {
-            return new CheckPhoneResponse(Status.LOCKED, true);
-        }
-
-        // Case 3: Chưa kích hoạt (Có hồ sơ nhưng chưa có Auth record HOẶC chưa có PIN HOẶC status là INACTIVE)
-        if (authOpt.isEmpty()
+            status = Status.LOCKED;
+            hasPin = true;
+        } else if (authOpt.isEmpty()
                 || authOpt.get().getStatus() == CustomerStatus.INACTIVE
                 || authOpt.get().getPinHash() == null) {
-            return new CheckPhoneResponse(Status.UNVERIFIED, false);
+            status = Status.UNVERIFIED;
+            hasPin = false;
+        } else {
+            status = Status.ACTIVE;
+            hasPin = true;
         }
 
-        // Case 4: Hoạt động bình thường
-        return new CheckPhoneResponse(Status.ACTIVE, true);
+        CheckPhoneResponse response = new CheckPhoneResponse(status, hasPin);
+        // Cho màn quên mật khẩu biết được phép chọn kênh nào, kèm giá trị đã che bớt để hiển thị
+        response.setHasEmail(hasText(profile.getEmail()));
+        response.setHasPhone(hasText(profile.getPhone()));
+        response.setMaskedEmail(maskEmail(profile.getEmail()));
+        response.setMaskedPhone(maskPhone(profile.getPhone()));
+        return response;
     }
 
-    /* ================= 2. REQUEST OTP (KÍCH HOẠT / QUÊN PIN) ================= */
-    @Transactional
-    public void requestOtp(String phone) {
-        // 1. Kiểm tra Profile (Phải có do Lễ tân nhập trước)
-        CustomerProfile profile = profileRepo.findByPhone(phone)
-                .orElseThrow(() -> new AuthException(
-                        AuthErrorCode.USER_NOT_FOUND.name(),
-                        "Số điện thoại chưa đăng ký dịch vụ. Vui lòng liên hệ quầy lễ tân!"
-                ));
+    /* ================= 2. REQUEST OTP ================= */
 
-        // 2. Kiểm tra/Tạo Auth
-        // Nếu chưa có Auth -> Tạo mới với trạng thái INACTIVE
+    /**
+     * Gửi mã OTP cho khách.
+     *
+     * @param requestedChannel kênh khách tự chọn ở màn quên mật khẩu; để null thì hệ thống
+     *                         tự quyết (nhập bằng email → gửi email, còn lại theo kênh trong hồ sơ)
+     * @return kênh đã gửi thành công, null nếu không gửi được qua kênh nào
+     */
+    @Transactional
+    public NotificationChannel requestOtp(String identifier, NotificationChannel requestedChannel) {
+        CustomerProfile profile = resolveProfile(identifier,
+                "Số điện thoại hoặc email chưa đăng ký dịch vụ. Vui lòng liên hệ quầy lễ tân!");
+
         CustomerAuth auth = authRepo.findByCustomerId(profile.getCustomerId())
                 .orElseGet(() -> {
                     CustomerAuth newAuth = new CustomerAuth();
                     newAuth.setCustomerId(profile.getCustomerId());
-                    newAuth.setStatus(CustomerStatus.INACTIVE); // Mặc định là chưa kích hoạt
+                    newAuth.setStatus(CustomerStatus.INACTIVE);
                     newAuth.setFailedAttemptCount(0);
                     newAuth.setCreatedAt(LocalDateTime.now());
                     return authRepo.save(newAuth);
                 });
 
-        // 3. Nếu tài khoản bị KHÓA thì chặn
         if (auth.getStatus() == CustomerStatus.LOCKED) {
-            throw new AuthException(
-                    AuthErrorCode.ACCOUNT_LOCKED.name(),
-                    "Tài khoản đã bị khóa. Vui lòng liên hệ Admin."
-            );
+            throw new AuthException(AuthErrorCode.ACCOUNT_LOCKED.name(),
+                    "Tài khoản đã bị khóa. Vui lòng liên hệ Admin.");
         }
 
-        // 4. Sinh OTP và gửi qua OtpService
-        otpService.generateAndSendOtp(phone);
+        NotificationRecipient recipient = otpRecipient(profile, identifier, requestedChannel);
+        return otpService.generateAndSendOtp(otpKeyOf(profile), recipient);
     }
 
     /* ================= 3. VERIFY OTP ================= */
     @Transactional
     public AuthResponse verifyOtp(VerifyOtpRequest req) {
-        // 1. Gọi Common Service để check OTP
+        CustomerProfile profile = resolveProfile(req.getPhone(), "Không tìm thấy thông tin khách hàng");
+
         try {
-            otpService.validateOtp(req.getPhone(), req.getOtp());
+            otpService.validateOtp(otpKeyOf(profile), req.getOtp());
         } catch (RuntimeException e) {
-            // Map lỗi Runtime sang AuthException để thống nhất response trả về
             throw new AuthException(AuthErrorCode.INVALID_OTP.name(), "Mã OTP không chính xác hoặc đã hết hạn");
         }
-
-        // 2. Lấy thông tin user để reset số lần sai (nếu có)
-        CustomerProfile profile = profileRepo.findByPhone(req.getPhone())
-                .orElseThrow(() -> new AuthException(AuthErrorCode.USER_NOT_FOUND.name(), "Không tìm thấy thông tin khách hàng"));
 
         CustomerAuth auth = authRepo.findByCustomerId(profile.getCustomerId())
                 .orElseThrow(() -> new AuthException(AuthErrorCode.SYSTEM_ERROR.name(), "Lỗi dữ liệu: Chưa khởi tạo bảo mật"));
 
-        // 3. Reset số lần đăng nhập sai (nếu trước đó bị đếm nhưng chưa bị khóa)
         if (auth.getStatus() != CustomerStatus.LOCKED) {
             auth.setFailedAttemptCount(0);
             authRepo.save(auth);
         } else {
             throw new AuthException(AuthErrorCode.ACCOUNT_LOCKED.name(), "Tài khoản đang bị khóa, không thể xác thực OTP.");
         }
-
-        // Trả về thành công, Frontend sẽ chuyển sang màn hình "Tạo PIN"
         return new AuthResponse("OTP_VERIFIED", "CUSTOMER", null);
     }
 
     /* ================= 4. SETUP PIN ================= */
     @Transactional
     public void setupPin(SetupPinRequest req) {
-        // 1. Validate khớp PIN
         if (!req.getPin().equals(req.getConfirmPin())) {
             throw new AuthException(AuthErrorCode.PIN_MISMATCH.name(), "PIN xác nhận không khớp");
         }
-
-        // 2. Lấy Profile & Auth
-        CustomerProfile profile = profileRepo.findByPhone(req.getPhone())
-                .orElseThrow(() -> new AuthException(AuthErrorCode.USER_NOT_FOUND.name(), "User not found"));
-
+        CustomerProfile profile = resolveProfile(req.getPhone(), "User not found");
         CustomerAuth auth = authRepo.findByCustomerId(profile.getCustomerId())
                 .orElseThrow(() -> new AuthException(AuthErrorCode.SYSTEM_ERROR.name(), "Auth record not found"));
 
-        // 3. Cập nhật PIN và kích hoạt tài khoản
         auth.setPinHash(passwordEncoder.encode(req.getPin()));
-        auth.setStatus(CustomerStatus.ACTIVE); // Chuyển trạng thái sang ACTIVE
-        auth.setFailedAttemptCount(0);         // Reset đếm lỗi
+        auth.setStatus(CustomerStatus.ACTIVE);
+        auth.setFailedAttemptCount(0);
         authRepo.save(auth);
     }
 
     /* ================= 5. LOGIN ================= */
-    @Transactional(noRollbackFor = AuthException.class) // Không rollback transaction nếu login sai pass để còn lưu số lần sai
+    @Transactional(noRollbackFor = AuthException.class)
     public AuthResponse login(LoginRequest req) {
-        // 1. Tìm Profile
-        CustomerProfile profile = profileRepo.findByPhone(req.getPhone())
-                .orElseThrow(() -> new AuthException(AuthErrorCode.USER_NOT_FOUND.name(), "Sai thông tin đăng nhập"));
+        CustomerProfile profile = resolveProfile(req.getPhone(), "Sai thông tin đăng nhập");
 
-        // 2. Tìm Auth
         CustomerAuth auth = authRepo.findByCustomerId(profile.getCustomerId())
                 .orElseThrow(() -> new AuthException(AuthErrorCode.USER_NOT_FOUND.name(), "Sai thông tin đăng nhập"));
 
-        // 3. Check Lock
         if (auth.getStatus() == CustomerStatus.LOCKED) {
             throw new AuthException(AuthErrorCode.ACCOUNT_LOCKED.name(), "Tài khoản đã bị khóa. Vui lòng liên hệ hỗ trợ.");
         }
-
-        // 4. Check PIN setup
         if (auth.getPinHash() == null) {
             throw new AuthException(AuthErrorCode.PIN_NOT_SET.name(), "Tài khoản chưa thiết lập mã PIN.");
         }
-
-        // 5. Check Password (PIN)
         if (!passwordEncoder.matches(req.getPin(), auth.getPinHash())) {
-            // Tăng số lần sai
             int newFailCount = auth.getFailedAttemptCount() + 1;
             auth.setFailedAttemptCount(newFailCount);
-
             String msg = "PIN không đúng.";
-
             if (newFailCount >= MAX_PIN_ATTEMPTS) {
                 auth.setStatus(CustomerStatus.LOCKED);
                 msg = "Tài khoản đã bị khóa do nhập sai PIN quá 5 lần.";
             } else {
                 msg += " Còn " + (MAX_PIN_ATTEMPTS - newFailCount) + " lần thử.";
             }
-
             authRepo.save(auth);
             throw new AuthException(AuthErrorCode.INVALID_PIN.name(), msg);
         }
 
-        // 6. Login thành công
         auth.setFailedAttemptCount(0);
         auth.setLastLoginAt(LocalDateTime.now());
         authRepo.save(auth);
 
-        // 7. Tạo JWT
         Map<String, Object> claims = Map.of(
                 "role", "CUSTOMER",
                 "customerId", profile.getCustomerId(),
                 "name", profile.getFullName()
         );
-        String token = jwtUtilCustomer.generateToken(req.getPhone(), claims);
+        // Subject luôn là SĐT trong hồ sơ, không phải chuỗi khách vừa nhập — nếu khách đăng nhập
+        // bằng email thì phần còn lại của hệ thống (CustomerPrincipal#getPhone) vẫn nhận đúng SĐT.
+        String token = jwtUtilCustomer.generateToken(profile.getPhone(), claims);
 
         return new AuthResponse("LOGIN_SUCCESS", "CUSTOMER", token);
+    }
+
+    /* ================= Định danh: SĐT hoặc email ================= */
+
+    /**
+     * Tra hồ sơ khách theo định danh: có "@" thì tìm theo email, còn lại tìm theo số điện thoại.
+     * Cùng quy tắc với đăng nhập nhân viên, nhưng dùng biến cục bộ nên an toàn khi nhiều
+     * người đăng nhập cùng lúc.
+     */
+    private Optional<CustomerProfile> findProfile(String identifier) {
+        if (identifier == null || identifier.isBlank()) {
+            return Optional.empty();
+        }
+        String value = identifier.trim();
+        if (isEmail(value)) {
+            return profileRepo.findByEmailIgnoreCase(value);
+        }
+        return profileRepo.findByPhone(value);
+    }
+
+    private CustomerProfile resolveProfile(String identifier, String notFoundMessage) {
+        return findProfile(identifier)
+                .orElseThrow(() -> new AuthException(AuthErrorCode.USER_NOT_FOUND.name(), notFoundMessage));
+    }
+
+    private boolean isEmail(String identifier) {
+        return identifier != null && identifier.contains("@");
+    }
+
+    /**
+     * Khoá lưu OTP gắn với khách hàng chứ không gắn với chuỗi vừa nhập — nhờ vậy khách có thể
+     * yêu cầu OTP bằng email rồi xác thực bằng số điện thoại (hoặc ngược lại) vẫn khớp.
+     */
+    private String otpKeyOf(CustomerProfile profile) {
+        return "customer:" + profile.getCustomerId();
+    }
+
+    /**
+     * Kênh gửi OTP, theo thứ tự ưu tiên:
+     * 1. Kênh khách tự chọn ở màn quên mật khẩu (nếu tài khoản thực sự dùng được kênh đó)
+     * 2. Khách nhập bằng email thì gửi thẳng vào email đó cho đúng kỳ vọng
+     * 3. Kênh khách đã chọn trong hồ sơ
+     *
+     * Kênh nào lỗi thì dispatcher vẫn tự chuyển sang kênh còn lại để mã đến được tay khách.
+     */
+    private NotificationRecipient otpRecipient(CustomerProfile profile, String identifier,
+                                               NotificationChannel requestedChannel) {
+        NotificationChannel channel;
+        if (requestedChannel != null) {
+            requireChannelUsable(profile, requestedChannel);
+            channel = requestedChannel;
+        } else if (isEmail(identifier)) {
+            channel = NotificationChannel.EMAIL;
+        } else {
+            channel = profile.getNotificationChannel();
+        }
+        return NotificationRecipient.of(profile.getPhone(), profile.getEmail(), channel);
+    }
+
+    /** Chặn trường hợp khách chọn kênh mà tài khoản chưa có thông tin liên hệ tương ứng. */
+    private void requireChannelUsable(CustomerProfile profile, NotificationChannel channel) {
+        if (channel == NotificationChannel.EMAIL && !hasText(profile.getEmail())) {
+            throw new AuthException(AuthErrorCode.BAD_REQUEST.name(),
+                    "Tài khoản chưa có email. Vui lòng chọn nhận mã qua Zalo hoặc liên hệ lễ tân để bổ sung email.");
+        }
+        if (channel == NotificationChannel.ZALO && !hasText(profile.getPhone())) {
+            throw new AuthException(AuthErrorCode.BAD_REQUEST.name(),
+                    "Tài khoản chưa có số điện thoại. Vui lòng chọn nhận mã qua Email.");
+        }
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    /** Che bớt email để hiển thị: nguyenvana@gmail.com -> ng******a@gmail.com */
+    private String maskEmail(String email) {
+        if (!hasText(email)) {
+            return null;
+        }
+        int at = email.indexOf('@');
+        if (at <= 0) {
+            return "***";
+        }
+        String local = email.substring(0, at);
+        String domain = email.substring(at);
+        if (local.length() <= 2) {
+            return local.charAt(0) + "***" + domain;
+        }
+        return local.charAt(0) + String.valueOf(local.charAt(1)) + "***" + local.charAt(local.length() - 1) + domain;
+    }
+
+    /** Che bớt số điện thoại để hiển thị: 0912345678 -> 091****678 */
+    private String maskPhone(String phone) {
+        if (!hasText(phone)) {
+            return null;
+        }
+        String value = phone.trim();
+        if (value.length() <= 6) {
+            return "***" + value.substring(value.length() - Math.min(2, value.length()));
+        }
+        return value.substring(0, 3) + "****" + value.substring(value.length() - 3);
     }
 }

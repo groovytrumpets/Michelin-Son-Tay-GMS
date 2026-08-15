@@ -38,7 +38,7 @@ public class CustomerProfileService {
         
         // Update only allowed fields
         if (request.getEmail() != null) {
-            profile.setEmail(request.getEmail());
+            profile.setEmail(normalizeEmail(request.getEmail(), customerId));
         }
         
         if (request.getGender() != null) {
@@ -48,7 +48,16 @@ public class CustomerProfileService {
         if (request.getAvatar() != null) {
             profile.setAvatar(request.getAvatar());
         }
-        
+
+        if (request.getNotificationChannel() != null) {
+            // Email đã được gán ở trên nên profile.getEmail() là giá trị sau cập nhật
+            boolean canUseEmail = profile.getEmail() != null && !profile.getEmail().isBlank();
+            if (request.getNotificationChannel() == com.g42.platform.gms.notification.domain.NotificationChannel.EMAIL && !canUseEmail) {
+                throw new AuthException("Cần có email trước khi chọn nhận thông báo qua Email");
+            }
+            profile.setNotificationChannel(request.getNotificationChannel());
+        }
+
         CustomerProfile updated = customerProfileRepository.save(profile);
         log.info("Customer profile updated: customerId={}", customerId);
         
@@ -75,6 +84,23 @@ public class CustomerProfileService {
         return newAvatarUrl;
     }
     
+    /**
+     * Chuẩn hoá email và chặn trùng — email là định danh đăng nhập thứ hai của khách hàng
+     * (bên cạnh số điện thoại) nên không được để 2 tài khoản dùng chung.
+     *
+     * @return email đã trim, hoặc null nếu khách xoá email
+     */
+    private String normalizeEmail(String rawEmail, Integer customerId) {
+        String email = rawEmail.trim();
+        if (email.isEmpty()) {
+            return null;
+        }
+        if (customerProfileRepository.existsByEmailIgnoreCaseAndCustomerIdNot(email, customerId)) {
+            throw new AuthException("Email này đã được dùng cho tài khoản khác");
+        }
+        return email;
+    }
+
     /**
      * Find customer by ID or throw exception
      * Centralized method to avoid code duplication

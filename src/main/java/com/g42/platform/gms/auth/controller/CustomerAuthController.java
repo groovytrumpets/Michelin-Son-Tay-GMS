@@ -4,6 +4,7 @@ import com.g42.platform.gms.auth.dto.*;
 import com.g42.platform.gms.auth.service.CustomerAuthService;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
+import com.g42.platform.gms.notification.domain.NotificationChannel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -24,8 +25,7 @@ public class CustomerAuthController {
      */
     @PostMapping("/check-status")
     public ResponseEntity<ApiResponse<CheckPhoneResponse>> checkStatus(@RequestBody Map<String, String> body) {
-        String phone = body.get("phone");
-        CheckPhoneResponse result = customerAuthService.checkPhoneStatus(phone);
+        CheckPhoneResponse result = customerAuthService.checkPhoneStatus(readIdentifier(body));
         return ResponseEntity.ok(ApiResponses.success(result));
     }
 
@@ -53,10 +53,34 @@ public class CustomerAuthController {
      * Gửi OTP -> Chỉ cần báo thành công -> Dùng ApiResponse<Void>
      */
     @PostMapping("/request-otp")
-    public ResponseEntity<ApiResponse<Void>> requestOtp(@RequestBody Map<String, String> body) {
-        String phone = body.get("phone");
-        customerAuthService.requestOtp(phone);
-        return ResponseEntity.ok(ApiResponses.successMessage("OTP has been sent to " + phone));
+    public ResponseEntity<ApiResponse<OtpSentResponse>> requestOtp(@RequestBody Map<String, String> body) {
+        NotificationChannel sentVia = customerAuthService.requestOtp(readIdentifier(body), readChannel(body));
+        return ResponseEntity.ok(ApiResponses.success(new OtpSentResponse(sentVia)));
+    }
+
+    /**
+     * Định danh đăng nhập là số điện thoại HOẶC email.
+     * Vẫn đọc khoá "phone" để tương thích client cũ, chấp nhận thêm "identifier".
+     */
+    private String readIdentifier(Map<String, String> body) {
+        String identifier = body.get("identifier");
+        return (identifier != null && !identifier.isBlank()) ? identifier : body.get("phone");
+    }
+
+    /**
+     * Kênh nhận mã do khách chọn ở màn quên mật khẩu ("ZALO" / "EMAIL").
+     * Không gửi hoặc gửi giá trị lạ thì trả null để hệ thống tự quyết kênh.
+     */
+    private NotificationChannel readChannel(Map<String, String> body) {
+        String channel = body.get("channel");
+        if (channel == null || channel.isBlank()) {
+            return null;
+        }
+        try {
+            return NotificationChannel.valueOf(channel.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     /**

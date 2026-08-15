@@ -62,6 +62,11 @@ public class CustomerProfileJpa {
     @Column(name = "company_name", length = 255)
     private String companyName;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "notification_channel", length = 10)
+    private com.g42.platform.gms.notification.domain.NotificationChannel notificationChannel =
+            com.g42.platform.gms.notification.domain.NotificationChannel.ZALO;
+
     // ── Danh bạ đối tác: thông tin chung ────────────────────────────────────
     @Column(name = "customer_code", length = 50)
     private String customerCode;

@@ -58,4 +58,8 @@ public class CustomerProfile {
 
     @Column(name = "company_name")
     private String companyName;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "notification_channel", length = 10)
+    private com.g42.platform.gms.notification.domain.NotificationChannel notificationChannel;
 }

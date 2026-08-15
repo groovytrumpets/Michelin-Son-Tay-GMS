@@ -69,9 +69,13 @@ public class CustomerRepoImpl implements CustomerRepo {
         
         entity.setFullName(customerDto.getFullName());
         entity.setPhone(customerDto.getPhone());
-        entity.setEmail(customerDto.getEmail());
+        ensureEmailAvailable(customerDto.getEmail(), entity.getCustomerId());
+        entity.setEmail(emptyToNull(customerDto.getEmail()));
         entity.setGender(customerDto.getGender());
         entity.setAvatar(customerDto.getAvatar());
+        if (customerDto.getNotificationChannel() != null) {
+            entity.setNotificationChannel(customerDto.getNotificationChannel());
+        }
         if (customerDto.getCustomerType() != null) {
             entity.setCustomerType(customerDto.getCustomerType());
         }
@@ -168,6 +172,22 @@ public class CustomerRepoImpl implements CustomerRepo {
         });
     }
 
+    /** Email rỗng lưu thành NULL để nhiều hồ sơ "chưa có email" không vướng ràng buộc duy nhất. */
+    private String emptyToNull(String email) {
+        return (email == null || email.isBlank()) ? null : email.trim();
+    }
+
+    @Override
+    public void ensureEmailAvailable(String email, Integer selfCustomerId) {
+        if (email == null || email.isBlank()) return;
+        customerProfileJpaRepo.findByEmailIgnoreCase(email.trim()).ifPresent(other -> {
+            if (!other.getCustomerId().equals(selfCustomerId)) {
+                throw new CustomerException("Email đã được dùng cho khách hàng khác: " + email,
+                        CustomerErrorCode.INVALID_CUSTOMER_PROFILE);
+            }
+        });
+    }
+
     /** Nạp tên nhóm khách hàng để hiển thị trên danh bạ. */
     private void fillGroupName(CustomerProfile profile) {
         if (profile == null || profile.getCustomerGroupId() == null) return;
@@ -258,12 +278,16 @@ public class CustomerRepoImpl implements CustomerRepo {
         
         jpa.setFullName(customerProfile.getFullName());
         jpa.setPhone(customerProfile.getPhone());
-        jpa.setEmail(customerProfile.getEmail());
+        ensureEmailAvailable(customerProfile.getEmail(), customerId);
+        jpa.setEmail(emptyToNull(customerProfile.getEmail()));
         jpa.setDob(customerProfile.getDob());
         jpa.setGender(customerProfile.getGender());
         jpa.setAvatar(customerProfile.getAvatar());
         jpa.setCustomerType(customerProfile.getCustomerType());
         jpa.setIsDealer(customerProfile.getIsDealer());
+        if (customerProfile.getNotificationChannel() != null) {
+            jpa.setNotificationChannel(customerProfile.getNotificationChannel());
+        }
         copyPartnerFieldsToJpa(customerProfile, jpa);
         
         CustomerProfileJpa savedProfile = customerProfileJpaRepo.save(jpa);

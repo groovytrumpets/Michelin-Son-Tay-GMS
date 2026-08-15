@@ -43,3 +43,9 @@ databaseChangeLog:
   - include:
       file: changes/011-booking-schedule-config.yaml
       relativeToChangelogFile: true
+  - include:
+      file: changes/012-customer-notification-channel.yaml
+      relativeToChangelogFile: true
+  - include:
+      file: changes/013-customer-email-unique.yaml
+      relativeToChangelogFile: true

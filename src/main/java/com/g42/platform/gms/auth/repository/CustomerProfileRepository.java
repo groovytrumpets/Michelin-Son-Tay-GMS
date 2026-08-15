@@ -13,6 +13,12 @@ public interface CustomerProfileRepository
 
     Optional<CustomerProfile> findByPhone(String phone);
 
+    /** Đăng nhập bằng email — email lưu chữ thường, xem CustomerAuthService#normalizeEmail. */
+    Optional<CustomerProfile> findByEmailIgnoreCase(String email);
+
+    /** Chặn 2 khách hàng dùng chung email (email là định danh đăng nhập). */
+    boolean existsByEmailIgnoreCaseAndCustomerIdNot(String email, Integer customerId);
+
     CustomerProfile getCustomerProfilesByCustomerId(Integer customerId);
     @Query("""
     select c from CustomerProfileJpa c 

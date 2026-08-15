@@ -43,6 +43,7 @@ public class CustomerProfile {
     private Boolean isCompany = false;
     @JsonProperty("companyName")
     private String companyName = "";
+    private com.g42.platform.gms.notification.domain.NotificationChannel notificationChannel;
 
     // ── Danh bạ đối tác: thông tin chung ────────────────────────────────────
     private String customerCode;

@@ -17,7 +17,7 @@ import com.g42.platform.gms.booking.customer.domain.repository.IpBlacklistReposi
 import com.g42.platform.gms.catalog.infrastructure.repository.CatalogItemRepository;
 import com.g42.platform.gms.estimation.api.internal.EstimateInternalApi;
 import com.g42.platform.gms.estimation.domain.entity.Estimate;
-import com.g42.platform.gms.notification.infrastructure.ZaloNotificationSender;
+import com.g42.platform.gms.notification.application.service.CustomerNotificationDispatcher;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -66,7 +66,7 @@ public class BookingService {
     /** Giới hạn số lần đặt lịch (100 lần/giờ/customer - giá trị cao để tránh block nhầm) */
     private static final int MAX_REQUESTS_PER_CUSTOMER_PER_HOUR = 100;
 
-    private final ZaloNotificationSender zaloNotificationSender;
+    private final CustomerNotificationDispatcher notificationDispatcher;
     // === DEPENDENCIES - Các dependency injection ===
     
     private final BookingRepository bookingRepository;
@@ -231,8 +231,9 @@ public class BookingService {
                     savedBooking.getScheduledTime()
             );
 
-            zaloNotificationSender.sendBookingConfirm(
-                    customer.getPhone(),
+            notificationDispatcher.sendBookingConfirm(
+                    com.g42.platform.gms.notification.domain.NotificationRecipient.of(
+                            customer.getPhone(), customer.getEmail(), customer.getNotificationChannel()),
                     customer.getFullName(),
                     serviceNames,
                     savedBooking.getBookingCode(),
@@ -241,7 +242,7 @@ public class BookingService {
             );
         } catch (Exception ex) {
             log.warn(
-                    "Zalo booking confirmation failed: bookingCode={}, reason={}",
+                    "Booking confirmation notification failed: bookingCode={}, reason={}",
                     savedBooking.getBookingCode(),
                     ex.getMessage()
             );

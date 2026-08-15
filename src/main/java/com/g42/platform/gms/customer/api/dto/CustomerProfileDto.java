@@ -37,6 +37,7 @@ public class CustomerProfileDto {
     @JsonProperty("isCompany")
     private Boolean isCompany;
     private String companyName;
+    private com.g42.platform.gms.notification.domain.NotificationChannel notificationChannel;
 
     // ── Danh bạ đối tác ─────────────────────────────────────────────────────
     private String customerCode;

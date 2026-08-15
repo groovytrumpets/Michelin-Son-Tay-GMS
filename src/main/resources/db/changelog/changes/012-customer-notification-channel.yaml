@@ -1,0 +1,27 @@
+# Cho phép khách hàng chọn kênh nhận thông báo: ZALO (mặc định, giữ hành vi cũ)
+# hoặc EMAIL (kênh mới, dùng địa chỉ email đã có sẵn ở customer_profile.email).
+databaseChangeLog:
+  - changeSet:
+      id: 012-1-customer-profile-notification-channel
+      author: gms
+      comment: Thêm cột notification_channel — khách hàng chọn Zalo hoặc Email làm kênh nhận thông báo
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: customer_profile
+                columnName: notification_channel
+      changes:
+        - addColumn:
+            tableName: customer_profile
+            columns:
+              - column:
+                  name: notification_channel
+                  type: VARCHAR(10)
+                  defaultValue: ZALO
+                  constraints:
+                    nullable: false
+      rollback:
+        - dropColumn:
+            tableName: customer_profile
+            columnName: notification_channel

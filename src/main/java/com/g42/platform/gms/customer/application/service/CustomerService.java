@@ -65,6 +65,9 @@ public class CustomerService {
         if (customerUpdateDto.getIsDealer() != null) {
             customerProfile.setIsDealer(customerUpdateDto.getIsDealer());
         }
+        if (customerUpdateDto.getNotificationChannel() != null) {
+            customerProfile.setNotificationChannel(customerUpdateDto.getNotificationChannel());
+        }
         if (customerUpdateDto.getStatus() != null) {
             customerAuth.setStatus(customerUpdateDto.getStatus());
         }

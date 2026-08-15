@@ -23,7 +23,8 @@ import com.g42.platform.gms.estimation.api.internal.EstimateInternalApi;
 import com.g42.platform.gms.estimation.app.service.EstimateService;
 import com.g42.platform.gms.estimation.domain.entity.Estimate;
 import com.g42.platform.gms.estimation.domain.repository.EstimateRepository;
-import com.g42.platform.gms.notification.infrastructure.ZaloNotificationSender;
+import com.g42.platform.gms.notification.application.service.CustomerNotificationDispatcher;
+import com.g42.platform.gms.notification.domain.NotificationRecipient;
 import com.g42.platform.gms.promotion.domain.entity.Promotion;
 import com.g42.platform.gms.promotion.domain.repository.PromotionRepo;
 import com.g42.platform.gms.service_ticket_management.api.internal.ServiceTicketInternalApi;
@@ -71,7 +72,7 @@ public class BillingService {
     @Autowired
     private CustomerInternalApi customerInternalApi;
     @Autowired
-    private ZaloNotificationSender zaloNotificationSender;
+    private CustomerNotificationDispatcher notificationDispatcher;
     @Autowired
     @Qualifier("warehouseStockAllocationService")
     private com.g42.platform.gms.warehouse.app.service.allocation.StockAllocationService warehouseStockAllocationService;
@@ -162,7 +163,12 @@ public class BillingService {
         String name = customerInternalApi.getNameByServiceTicketId(serviceBill.getServiceTicketId());
 
         if (phone!=null) {
-        zaloNotificationSender.sendFeedback(phone,name,code);
+            com.g42.platform.gms.auth.entity.CustomerProfile feedbackCustomer =
+                    customerInternalApi.findById(serviceTicketJpa.getCustomerId());
+            NotificationRecipient recipient = feedbackCustomer != null
+                    ? NotificationRecipient.of(phone, feedbackCustomer.getEmail(), feedbackCustomer.getNotificationChannel())
+                    : NotificationRecipient.phoneOnly(phone);
+            notificationDispatcher.sendFeedback(recipient, name, code);
         }
         billingRepository.save(serviceBill);
         

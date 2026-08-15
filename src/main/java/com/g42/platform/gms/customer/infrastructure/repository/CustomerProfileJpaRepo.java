@@ -12,4 +12,7 @@ public interface CustomerProfileJpaRepo extends JpaRepository<CustomerProfileJpa
     CustomerProfileJpa findByPhone(String phone);
 
     java.util.Optional<CustomerProfileJpa> findByCustomerCodeIgnoreCase(String customerCode);
+
+    /** Email là định danh đăng nhập thứ hai của khách hàng nên phải kiểm tra trùng trước khi lưu. */
+    java.util.Optional<CustomerProfileJpa> findByEmailIgnoreCase(String email);
 }
