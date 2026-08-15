@@ -40,3 +40,6 @@ databaseChangeLog:
   - include:
       file: changes/010-mwb-schema-gaps.yaml
       relativeToChangelogFile: true
+  - include:
+      file: changes/011-booking-schedule-config.yaml
+      relativeToChangelogFile: true

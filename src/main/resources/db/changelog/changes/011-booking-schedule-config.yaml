@@ -1,0 +1,235 @@
+# Cấu hình lịch làm việc của xưởng (mục Cấu hình hệ thống): giờ mở/đóng cửa theo
+# từng ngày trong tuần, nghỉ trưa, độ dài slot, thời gian đặt tối thiểu, số ngày cho
+# đặt trước, sức chứa mặc định. Thay cho các hằng số hard-code trước đây trong
+# SlotService (BASE_SLOT_MINUTES, MIN_BOOKING_LEAD_TIME_HOURS) và StepSchedule.jsx
+# (DATE_RANGE_DAYS, DURATION_MINUTES, lead-time 120 phút).
+#
+# KHÔNG đụng tới bảng time_slot hiện có ở đây — việc đồng bộ lại time_slot theo
+# giờ hoạt động mới chỉ diễn ra khi admin bấm Lưu ở trang cấu hình (xem
+# BookingScheduleConfigService#regenerateTimeSlots).
+databaseChangeLog:
+  - changeSet:
+      id: 011-1-create-booking-config
+      author: gms
+      comment: Bảng cấu hình đặt lịch (1 dòng, id cố định = 1) — độ dài slot, lead-time, số ngày cho đặt trước, sức chứa mặc định
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: booking_config
+      changes:
+        - createTable:
+            tableName: booking_config
+            columns:
+              - column:
+                  name: id
+                  type: INT
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: slot_duration_minutes
+                  type: INT
+                  defaultValueNumeric: 30
+                  constraints:
+                    nullable: false
+              - column:
+                  name: min_lead_time_hours
+                  type: INT
+                  defaultValueNumeric: 2
+                  constraints:
+                    nullable: false
+              - column:
+                  name: days_ahead_horizon
+                  type: INT
+                  defaultValueNumeric: 10
+                  constraints:
+                    nullable: false
+              - column:
+                  name: default_capacity
+                  type: INT
+                  defaultValueNumeric: 3
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: DATETIME
+      rollback:
+        - dropTable:
+            tableName: booking_config
+
+  - changeSet:
+      id: 011-2-seed-booking-config
+      author: gms
+      comment: Seed dòng cấu hình mặc định (id=1) để hệ thống luôn có cấu hình để đọc
+      preConditions:
+        - onFail: MARK_RAN
+        - changeSetExecuted:
+            id: 011-1-create-booking-config
+            author: gms
+            changeLogFile: db/changelog/changes/011-booking-schedule-config.yaml
+      changes:
+        - insert:
+            tableName: booking_config
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 1
+              - column:
+                  name: slot_duration_minutes
+                  valueNumeric: 30
+              - column:
+                  name: min_lead_time_hours
+                  valueNumeric: 2
+              - column:
+                  name: days_ahead_horizon
+                  valueNumeric: 10
+              - column:
+                  name: default_capacity
+                  valueNumeric: 3
+      rollback:
+        - delete:
+            tableName: booking_config
+            where: id = 1
+
+  - changeSet:
+      id: 011-3-create-working-hours-config
+      author: gms
+      comment: Bảng giờ hoạt động của xưởng theo từng ngày trong tuần (1-7 = Thứ 2..Chủ nhật, ISO-8601)
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: working_hours_config
+      changes:
+        - createTable:
+            tableName: working_hours_config
+            columns:
+              - column:
+                  name: id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: day_of_week
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: is_open
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+              - column:
+                  name: open_time
+                  type: TIME
+              - column:
+                  name: close_time
+                  type: TIME
+              - column:
+                  name: break_start
+                  type: TIME
+              - column:
+                  name: break_end
+                  type: TIME
+              - column:
+                  name: updated_at
+                  type: DATETIME
+      rollback:
+        - dropTable:
+            tableName: working_hours_config
+
+  - changeSet:
+      id: 011-4-working-hours-config-unique-day
+      author: gms
+      comment: Mỗi ngày trong tuần chỉ có 1 dòng cấu hình
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - indexExists:
+                tableName: working_hours_config
+                indexName: uk_working_hours_day_of_week
+      changes:
+        - addUniqueConstraint:
+            tableName: working_hours_config
+            columnNames: day_of_week
+            constraintName: uk_working_hours_day_of_week
+      rollback:
+        - dropUniqueConstraint:
+            tableName: working_hours_config
+            constraintName: uk_working_hours_day_of_week
+
+  - changeSet:
+      id: 011-5-seed-working-hours-config
+      author: gms
+      comment: Seed giờ hoạt động mặc định — Thứ 2-6 08:00-17:00 (nghỉ trưa 12:00-13:00), Thứ 7 08:00-12:00, Chủ nhật nghỉ. Admin chỉnh lại tại trang Cấu hình hệ thống.
+      preConditions:
+        - onFail: MARK_RAN
+        - changeSetExecuted:
+            id: 011-3-create-working-hours-config
+            author: gms
+            changeLogFile: db/changelog/changes/011-booking-schedule-config.yaml
+      changes:
+        - insert:
+            tableName: working_hours_config
+            columns:
+              - column: { name: day_of_week, valueNumeric: 1 }
+              - column: { name: is_open, valueBoolean: true }
+              - column: { name: open_time, value: "08:00:00" }
+              - column: { name: close_time, value: "17:00:00" }
+              - column: { name: break_start, value: "12:00:00" }
+              - column: { name: break_end, value: "13:00:00" }
+        - insert:
+            tableName: working_hours_config
+            columns:
+              - column: { name: day_of_week, valueNumeric: 2 }
+              - column: { name: is_open, valueBoolean: true }
+              - column: { name: open_time, value: "08:00:00" }
+              - column: { name: close_time, value: "17:00:00" }
+              - column: { name: break_start, value: "12:00:00" }
+              - column: { name: break_end, value: "13:00:00" }
+        - insert:
+            tableName: working_hours_config
+            columns:
+              - column: { name: day_of_week, valueNumeric: 3 }
+              - column: { name: is_open, valueBoolean: true }
+              - column: { name: open_time, value: "08:00:00" }
+              - column: { name: close_time, value: "17:00:00" }
+              - column: { name: break_start, value: "12:00:00" }
+              - column: { name: break_end, value: "13:00:00" }
+        - insert:
+            tableName: working_hours_config
+            columns:
+              - column: { name: day_of_week, valueNumeric: 4 }
+              - column: { name: is_open, valueBoolean: true }
+              - column: { name: open_time, value: "08:00:00" }
+              - column: { name: close_time, value: "17:00:00" }
+              - column: { name: break_start, value: "12:00:00" }
+              - column: { name: break_end, value: "13:00:00" }
+        - insert:
+            tableName: working_hours_config
+            columns:
+              - column: { name: day_of_week, valueNumeric: 5 }
+              - column: { name: is_open, valueBoolean: true }
+              - column: { name: open_time, value: "08:00:00" }
+              - column: { name: close_time, value: "17:00:00" }
+              - column: { name: break_start, value: "12:00:00" }
+              - column: { name: break_end, value: "13:00:00" }
+        - insert:
+            tableName: working_hours_config
+            columns:
+              - column: { name: day_of_week, valueNumeric: 6 }
+              - column: { name: is_open, valueBoolean: true }
+              - column: { name: open_time, value: "08:00:00" }
+              - column: { name: close_time, value: "12:00:00" }
+        - insert:
+            tableName: working_hours_config
+            columns:
+              - column: { name: day_of_week, valueNumeric: 7 }
+              - column: { name: is_open, valueBoolean: false }
+      rollback:
+        - delete:
+            tableName: working_hours_config
