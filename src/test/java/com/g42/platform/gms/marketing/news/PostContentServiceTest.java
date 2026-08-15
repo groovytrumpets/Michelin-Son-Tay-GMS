@@ -65,6 +65,38 @@ class PostContentServiceTest {
     }
 
     @Test
+    @DisplayName("Giữ nguyên bảng: đường kẻ, hàng tiêu đề và ô gộp")
+    void keepsTables() {
+        String result = service.sanitize(
+                "<table style=\"width:100%; border-collapse:collapse\">"
+                        + "<thead><tr><th style=\"border:1px solid #d0d7e2; background-color:#eef2f7\">Hạng mục</th>"
+                        + "<th style=\"border:1px solid #d0d7e2\">Giá</th></tr></thead>"
+                        + "<tbody><tr><td colspan=\"2\" rowspan=\"2\" style=\"border:1px solid #d0d7e2\">Thay dầu</td></tr>"
+                        + "</tbody></table>");
+
+        assertThat(result).contains("border-collapse: collapse");
+        assertThat(result).contains("<th");
+        assertThat(result).contains("background-color: #eef2f7");
+        assertThat(result).contains("colspan=\"2\"");
+        assertThat(result).contains("rowspan=\"2\"");
+        assertThat(result).contains("border: 1px solid #d0d7e2");
+    }
+
+    @Test
+    @DisplayName("Bảng bỏ đường kẻ vẫn giữ được trạng thái không kẻ")
+    void keepsBorderlessTable() {
+        // Trình duyệt tách "border: none" thành các khai báo con khi ghi vào
+        // thuộc tính style; khai báo quyết định là border-style.
+        String result = service.sanitize(
+                "<table data-rte-noborder=\"1\"><tbody><tr>"
+                        + "<td style=\"border-width: medium; border-style: none; border-color: currentcolor;"
+                        + " border-image: none; padding: 8px 10px\">Ô</td></tr></tbody></table>");
+
+        assertThat(result).contains("border-style: none");
+        assertThat(result).doesNotContain("data-rte-noborder");
+    }
+
+    @Test
     @DisplayName("Ảnh xem tạm chưa tải xong không được lưu xuống")
     void dropsBlobImages() {
         // Trình soạn thảo đã gỡ ảnh blob trước khi gửi, nhưng nếu lọt tới đây thì

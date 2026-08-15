@@ -31,7 +31,9 @@ public class PostContentService {
     /** Thẻ được phép mang thuộc tính style — căn lề, cỡ chữ, giãn dòng đều nằm ở đây. */
     private static final String[] STYLEABLE_TAGS = {
             "p", "div", "span", "h1", "h2", "h3", "h4", "li", "ul", "ol",
-            "blockquote", "figure", "figcaption", "img", "table", "td", "th", "a"
+            "blockquote", "figure", "figcaption", "img", "a",
+            // Bảng: đường kẻ, nền hàng tiêu đề và độ rộng cột đều nằm ở style nội tuyến.
+            "table", "thead", "tbody", "tfoot", "tr", "td", "th", "caption"
     };
 
     /**
@@ -44,8 +46,11 @@ public class PostContentService {
             "text-decoration", "color", "background-color",
             "margin", "margin-top", "margin-bottom", "margin-left", "margin-right",
             "padding", "padding-top", "padding-bottom", "padding-left", "padding-right",
-            "width", "height", "max-width", "display", "float", "vertical-align",
-            "border", "border-radius", "text-indent", "letter-spacing"
+            "width", "height", "max-width", "min-width", "display", "float", "vertical-align",
+            "border", "border-radius", "text-indent", "letter-spacing",
+            // Kẻ bảng: viền từng cạnh và cách gộp đường kẻ giữa các ô.
+            "border-collapse", "border-color", "border-style", "border-width",
+            "border-top", "border-right", "border-bottom", "border-left", "table-layout"
     );
 
     /** Giá trị CSS chứa những mẫu này thì loại bỏ cả khai báo. */
