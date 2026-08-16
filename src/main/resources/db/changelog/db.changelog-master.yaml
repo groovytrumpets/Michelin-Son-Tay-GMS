@@ -52,3 +52,7 @@ databaseChangeLog:
   - include:
       file: changes/014-split-item-category.yaml
       relativeToChangelogFile: true
+  - include:
+      file: changes/015-dashboard-revenue-summary.yaml
+      relativeToChangelogFile: true
+

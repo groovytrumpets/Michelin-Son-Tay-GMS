@@ -24,13 +24,14 @@ import java.util.Map;
 public class NavMenuService {
 
     /**
-     * Số cấp tối đa: thanh menu → dropdown → menu con trượt ngang.
+     * Chốt an toàn chống lồng nhau vô tận — KHÔNG phải giới hạn thiết kế.
      *
-     * <p>Ba cấp là đúng bằng độ sâu mà giao diện dựng được (như menu phụ tùng
-     * theo xe: "Theo hãng xe" → Toyota → Vios). Cho sâu hơn thì dữ liệu lưu được
-     * nhưng trang khách không có chỗ hiển thị, mục sẽ biến mất mà không rõ lý do.
+     * <p>Giao diện khách vẽ menu con bằng đệ quy nên sâu bao nhiêu cấp cũng hiện
+     * được; con số này chỉ để một thao tác kéo thả sai không tạo ra chuỗi lồng
+     * dài vô lý mà khách không tài nào rê chuột tới cuối. Phải khớp MAX_DEPTH ở
+     * NavMenuConfig.jsx, nếu không người dùng bị chặn mà không hiểu vì sao.
      */
-    private static final int MAX_DEPTH = 3;
+    private static final int MAX_DEPTH = 10;
 
     private final NavMenuItemJpaRepo navRepo;
 
@@ -134,7 +135,11 @@ public class NavMenuService {
     @Transactional
     public NavMenuItemDto.ItemDto update(Integer navItemId, NavMenuItemDto.SaveRequest request) {
         NavMenuItemJpa item = loadOrThrow(navItemId);
-        item.setParent(resolveParent(request.parentId(), navItemId));
+        NavMenuItemJpa newParent = resolveParent(request.parentId(), navItemId);
+        // Không chỉ chặn "cha là chính nó" mà cả "cha là cháu chắt của nó" — menu
+        // nhiều cấp thì vòng lặp gián tiếp mới là cái dễ lọt.
+        guardAgainstCycle(item, newParent);
+        item.setParent(newParent);
         applyEditableFields(item, request);
         return toDto(navRepo.save(item));
     }
@@ -251,12 +256,12 @@ public class NavMenuService {
         return depth;
     }
 
-    /** Mục mới đặt dưới {@code parent} không được vượt quá số cấp giao diện dựng được. */
+    /** Mục mới đặt dưới {@code parent} không được vượt quá chốt an toàn về số cấp. */
     private void guardDepth(NavMenuItemJpa parent) {
         if (parent == null) return;
         if (depthOf(parent) >= MAX_DEPTH) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Menu chỉ hiển thị được " + MAX_DEPTH + " cấp, không thể thêm mục con vào đây nữa");
+                    "Menu lồng tối đa " + MAX_DEPTH + " cấp, không thể thêm mục con vào đây nữa");
         }
     }
 
@@ -271,8 +276,8 @@ public class NavMenuService {
         int height = subtreeHeight(moving.getNavItemId(), childrenByParent, 0);
         if (parentDepth + height > MAX_DEPTH) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Không thể đặt \"" + moving.getLabel() + "\" vào đây: menu sẽ vượt quá "
-                            + MAX_DEPTH + " cấp hiển thị được");
+                    "Không thể đặt \"" + moving.getLabel() + "\" vào đây: menu sẽ lồng quá "
+                            + MAX_DEPTH + " cấp");
         }
     }
 
