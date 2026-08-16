@@ -1,0 +1,57 @@
+databaseChangeLog:
+  - changeSet:
+      id: 015-create-dashboard-revenue-summary-table
+      author: gms-team
+      comment: "Bảng tổng hợp chỉ số doanh thu cho Dashboard (mô hình Materialized View)"
+      changes:
+        - createTable:
+            tableName: dashboard_revenue_summary
+            columns:
+              - column:
+                  name: summary_id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: report_date
+                  type: DATE
+                  constraints:
+                    nullable: false
+              - column:
+                  name: total_revenue
+                  type: DECIMAL(15,2)
+                  defaultValueNumeric: 0.00
+              - column:
+                  name: paid_revenue
+                  type: DECIMAL(15,2)
+                  defaultValueNumeric: 0.00
+              - column:
+                  name: unpaid_revenue
+                  type: DECIMAL(15,2)
+                  defaultValueNumeric: 0.00
+              - column:
+                  name: overdue_revenue
+                  type: DECIMAL(15,2)
+                  defaultValueNumeric: 0.00
+              - column:
+                  name: discount_amount
+                  type: DECIMAL(15,2)
+                  defaultValueNumeric: 0.00
+              - column:
+                  name: invoice_count
+                  type: INT
+                  defaultValueNumeric: 0
+              - column:
+                  name: created_at
+                  type: DATETIME
+                  defaultValueComputed: CURRENT_TIMESTAMP
+              - column:
+                  name: updated_at
+                  type: DATETIME
+                  defaultValueComputed: CURRENT_TIMESTAMP
+        - addUniqueConstraint:
+            tableName: dashboard_revenue_summary
+            columnNames: report_date
+            constraintName: uq_dashboard_revenue_summary_date
