@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -27,11 +28,13 @@ public class SliderService {
         this.promotionRepo = promotionRepo;
     }
 
+    /**
+     * Vị trí chưa được cấu hình ảnh là chuyện bình thường (giao diện tự dùng ảnh mặc định),
+     * nên trả về Optional rỗng thay vì ném lỗi.
+     */
     @Transactional(readOnly = true)
-    public SliderDto getSliderByLocationCode(String locationCode) {
-        SliderJpa slider = sliderRepo.findByLocationCode(locationCode)
-                .orElseThrow(() -> new RuntimeException("Slider not found for location: " + locationCode));
-        return mapToDto(slider);
+    public Optional<SliderDto> findSliderByLocationCode(String locationCode) {
+        return sliderRepo.findByLocationCode(locationCode).map(this::mapToDto);
     }
 
     @Transactional(readOnly = true)

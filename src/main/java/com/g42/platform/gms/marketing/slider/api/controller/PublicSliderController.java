@@ -15,8 +15,11 @@ public class PublicSliderController {
         this.sliderService = sliderService;
     }
 
+    /** Vị trí chưa cấu hình ảnh trả về 204 để giao diện tự dùng ảnh mặc định. */
     @GetMapping("/{locationCode}")
     public ResponseEntity<SliderDto> getSliderByLocation(@PathVariable String locationCode) {
-        return ResponseEntity.ok(sliderService.getSliderByLocationCode(locationCode));
+        return sliderService.findSliderByLocationCode(locationCode)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
     }
 }
