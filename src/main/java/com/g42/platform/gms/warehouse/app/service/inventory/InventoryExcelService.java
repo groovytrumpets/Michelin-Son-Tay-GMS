@@ -35,6 +35,7 @@ public class InventoryExcelService {
     private final InventoryRepo inventoryRepo;
     private final StockEntryRepo stockEntryRepo;
     private final CatalogItemRepo catalogItemRepo;
+    private final com.g42.platform.gms.warehouse.app.service.catalog.ItemCategoryService itemCategoryService;
     private final InventoryTransactionRepo inventoryTransactionRepo;
     private final com.g42.platform.gms.estimation.api.internal.TaxRuleInternalApi taxRuleInternalApi;
     private final com.g42.platform.gms.estimation.infrastructure.repository.TaxRuleRepositoryJpa taxRuleRepositoryJpa;
@@ -97,10 +98,10 @@ public class InventoryExcelService {
                 .filter(l -> l.getProductLineId() != null)
                 .collect(Collectors.toMap(ProductLine::getProductLineId, ProductLine::getLineName, (a, b) -> a));
 
-        List<WorkCategory> categories = catalogItemRepo.getAllItemCategory();
+        List<ItemCategory> categories = catalogItemRepo.getAllItemCategory();
         Map<Integer, String> categoryMap = categories.stream()
-                .filter(c -> c.getWorkCategoryId() != null)
-                .collect(Collectors.toMap(WorkCategory::getWorkCategoryId, WorkCategory::getCategoryName, (a, b) -> a));
+                .filter(c -> c.getItemCategoryId() != null)
+                .collect(Collectors.toMap(ItemCategory::getItemCategoryId, ItemCategory::getCategoryName, (a, b) -> a));
 
         // 5. Build map entryId -> entry (lô)
         Map<Integer, StockEntry> entryMap = activeLots.stream()
@@ -120,7 +121,7 @@ public class InventoryExcelService {
             Inventory inv = inventoryMap.get(itemId);
             int totalStock = inv != null ? inv.getQuantity() : 0;
 
-            String categoryName = cat.getWorkCategoryId() != null ? categoryMap.get(cat.getWorkCategoryId()) : "";
+            String categoryName = cat.getItemCategoryId() != null ? categoryMap.get(cat.getItemCategoryId()) : "";
             String brandName = cat.getBrandId() != null ? brandMap.get(cat.getBrandId()) : "";
             String lineName = cat.getProductLineId() != null ? lineMap.get(cat.getProductLineId()) : "";
 
@@ -216,8 +217,8 @@ public class InventoryExcelService {
                         (a, b) -> a
                 ));
 
-        List<WorkCategory> categories = catalogItemRepo.getAllItemCategory();
-        Map<String, WorkCategory> nameToCategory = categories.stream()
+        List<ItemCategory> categories = catalogItemRepo.getAllItemCategory();
+        Map<String, ItemCategory> nameToCategory = categories.stream()
                 .filter(c -> c.getCategoryName() != null)
                 .collect(Collectors.toMap(
                         c -> c.getCategoryName().trim().toLowerCase(),
@@ -289,17 +290,14 @@ public class InventoryExcelService {
             Integer categoryId = null;
             if (categoryName != null && !categoryName.isBlank()) {
                 String catNorm = categoryName.trim().toLowerCase();
-                WorkCategory cat = nameToCategory.get(catNorm);
+                ItemCategory cat = nameToCategory.get(catNorm);
                 if (cat == null) {
-                    cat = new WorkCategory();
-                    cat.setCategoryName(categoryName.trim());
-                    cat.setCategoryCode(generateCategoryCode(categoryName));
-                    cat.setCategoryType("PART");
-                    cat.setIsActive(true);
-                    cat = catalogItemRepo.saveItemCate(cat);
+                    // File Excel ghi tên danh mục chứ không chọn từ danh sách, nên ở
+                    // luồng này vẫn tạo danh mục mới khi chưa có.
+                    cat = itemCategoryService.findOrCreateByName(categoryName);
                     nameToCategory.put(catNorm, cat);
                 }
-                categoryId = cat.getWorkCategoryId();
+                categoryId = cat.getItemCategoryId();
             }
 
             Integer productLineId = null;
@@ -341,7 +339,7 @@ public class InventoryExcelService {
                 catalogItem.setTaxRuleId(taxRuleId);
                 catalogItem.setIsActive(true);
                 catalogItem.setBrandId(brandId);
-                catalogItem.setWorkCategoryId(categoryId);
+                catalogItem.setItemCategoryId(categoryId);
                 catalogItem.setProductLineId(productLineId);
 
                 catalogItem = partCatalogRepo.save(catalogItem);
@@ -389,8 +387,8 @@ public class InventoryExcelService {
                     catalogItem.setBrandId(brandId);
                     needsSave = true;
                 }
-                if (categoryId != null && !categoryId.equals(catalogItem.getWorkCategoryId())) {
-                    catalogItem.setWorkCategoryId(categoryId);
+                if (categoryId != null && !categoryId.equals(catalogItem.getItemCategoryId())) {
+                    catalogItem.setItemCategoryId(categoryId);
                     needsSave = true;
                 }
                 if (productLineId != null && !productLineId.equals(catalogItem.getProductLineId())) {

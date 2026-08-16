@@ -6,11 +6,9 @@ import java.util.List;
 
 public interface WorkCategoryRepo {
 
-    List<String> findDefaultWorkCategoryNames();
+    /** Tên các đầu mục kiểm tra an toàn đang dùng, theo thứ tự hiển thị. */
+    List<String> findActiveCategoryNames();
 
-    /** Returns all active default categories as domain entities. */
-    List<WorkCategory> findDefaultCategories();
-
-    /** Returns all active categories as domain entities. */
+    /** Các đầu mục kiểm tra an toàn đang dùng. */
     List<WorkCategory> findActiveCategories();
 }

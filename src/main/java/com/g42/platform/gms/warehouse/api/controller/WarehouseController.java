@@ -51,8 +51,9 @@ public class WarehouseController {
     public ResponseEntity<ApiResponse<SpecAttributeDto>> getSpecsAttributeById(@PathVariable Integer attributeId) {
         return ResponseEntity.ok(ApiResponses.success(catalogItemService.getSpecsAttributeById(attributeId)));
     }
-    @GetMapping("/item-categoy/all")
-    public ResponseEntity<ApiResponse<List<WorkCategoryHintDto>>> getAllItemCategory() {
+    /** "item-categoy" là lỗi gõ có từ đầu; giữ lại vì client cũ vẫn đang gọi đường dẫn đó. */
+    @GetMapping({"/item-category/all", "/item-categoy/all"})
+    public ResponseEntity<ApiResponse<List<ItemCategoryDto>>> getAllItemCategory() {
         return ResponseEntity.ok(ApiResponses.success(catalogItemService.getAllItemCategory()));
     }
     @PostMapping("/brand/create")
@@ -71,8 +72,8 @@ public class WarehouseController {
     public ResponseEntity<ApiResponse<ProductLine>> createProductLine(@RequestBody ProductLine productLine) {
         return ResponseEntity.ok(ApiResponses.success(catalogItemService.saveProductLine(productLine)));
     }
-    @PostMapping("/itemCategory/create")
-    public ResponseEntity<ApiResponse<WorkCategory>> createItemCategory(@RequestBody WorkCategory itemCategory) {
+    @PostMapping({"/item-category/create", "/itemCategory/create"})
+    public ResponseEntity<ApiResponse<ItemCategoryDto>> createItemCategory(@RequestBody ItemCategory itemCategory) {
         return ResponseEntity.ok(ApiResponses.success(catalogItemService.saveItemCate(itemCategory)));
     }
     @DeleteMapping("/brand/{brandId}")

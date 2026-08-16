@@ -25,7 +25,7 @@ public class ServiceSumaryRespond {
     // Thông tin bổ sung từ kho cho trang public (lọc danh mục/hãng/dòng xe + tồn kho)
     private String itemType;
     private BigDecimal price;
-    private Integer workCategoryId;
+    private Integer itemCategoryId;
     private String categoryCode;
     private String categoryName;
     private Integer brandId;

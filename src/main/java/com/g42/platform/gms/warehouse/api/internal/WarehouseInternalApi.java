@@ -22,7 +22,7 @@ public interface WarehouseInternalApi {
 
     Integer findCodeByCategoryCode(String categoryCode);
 
-    List<Warehouse> findAllById(List<Integer> workCategoryIds);
+    List<Warehouse> findAllById(List<Integer> warehouseIds);
 
     CatalogItem findCatalogById(Integer getItemId);
 

@@ -12,6 +12,10 @@ import java.util.List;
 
 @Repository
 public interface SafetyInspectionItemRepository extends JpaRepository<SafetyInspectionItemJpa, Integer> {
+
+    /** Có phiếu kiểm tra nào đang dùng đầu mục này không — quyết định ẩn hay xóa hẳn. */
+    boolean existsByWorkCategoryId(Integer workCategoryId);
+
     
     List<SafetyInspectionItemJpa> findByInspectionId(Integer inspectionId);
 

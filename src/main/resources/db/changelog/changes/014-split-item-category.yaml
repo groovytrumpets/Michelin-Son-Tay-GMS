@@ -1,0 +1,308 @@
+# Tách bảng work_category làm hai khái niệm vốn không liên quan gì đến nhau.
+#
+# TRƯỚC ĐÂY một bảng work_category gánh cả ba việc, phân biệt nhau bằng cờ is_default:
+#   - is_default = 1  → đầu mục kiểm tra an toàn của phiếu dịch vụ (SAFETY_*)
+#   - is_default = 0  → danh mục gán cho phụ tùng / dịch vụ
+#   - và cả hai loại trên bị trộn thêm hàng loạt bản ghi rác do ô "hạng mục" gõ tay
+#     trên bảng báo giá tự sinh ra mỗi lần advisor gõ một cái tên chưa có.
+# Hệ quả: màn kiểm tra an toàn lọc theo is_default = 1 nên kéo nhầm cả "Lốp ô tô",
+# "Gạt mưa", "Lọc gió" (là danh mục phụ tùng) vào danh sách hạng mục cần kiểm tra.
+#
+# TỪ NAY:
+#   - work_category  → CHỈ còn là đầu mục kiểm tra an toàn. Không còn thuế,
+#                      không còn category_type, không còn is_default.
+#   - item_category  → danh mục của phụ tùng / dịch vụ (bảng mới). Đồng thời là
+#                      nhóm hiển thị của dòng báo giá và nơi khai thuế mặc định.
+#                      catalog_item KHÔNG bắt buộc có danh mục (cột nullable).
+#   - estimate_item  → trỏ sang item_category (nullable) và có thêm category_label
+#                      để advisor gõ tên nhóm tự do mà không sinh bản ghi danh mục mới.
+#
+# LƯU Ý DỮ LIỆU — changeset này CÓ XÓA DỮ LIỆU, theo đúng phương án đã chốt:
+#   * item_category bắt đầu RỖNG, phải nhập lại danh mục từ màn cấu hình mới.
+#   * catalog_item mất liên kết danh mục cũ (cột mới để NULL hết).
+#   * Tên hạng mục của các dòng báo giá cũ KHÔNG mất: được chép sang category_label
+#     trước khi bỏ cột (changeset 014-4) nên phiếu cũ vẫn hiển thị đúng như trước.
+#   * work_category chỉ giữ lại các đầu mục an toàn. Bản ghi non-safety nào đang bị
+#     phiếu kiểm tra an toàn tham chiếu thì KHÔNG xóa mà chỉ ẩn (is_active = 0),
+#     để không phá vỡ phiếu đã lập.
+#
+# NÊN SAO LƯU DB TRƯỚC KHI CHẠY.
+databaseChangeLog:
+
+  # ---------------------------------------------------------------------------
+  # 1. Bảng danh mục phụ tùng / dịch vụ
+  # ---------------------------------------------------------------------------
+  - changeSet:
+      id: 014-1-create-item-category
+      author: gms
+      comment: Bảng danh mục riêng cho phụ tùng/dịch vụ, tách khỏi đầu mục kiểm tra an toàn
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: item_category
+      changes:
+        - createTable:
+            tableName: item_category
+            remarks: Danh mục phụ tùng/dịch vụ, đồng thời là nhóm hiển thị của dòng báo giá
+            columns:
+              - column:
+                  name: item_category_id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: category_code
+                  type: VARCHAR(50)
+              - column:
+                  name: category_name
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: category_type
+                  type: VARCHAR(20)
+                  remarks: PART hoặc SERVICE, để trống nếu dùng chung
+              - column:
+                  name: display_order
+                  type: INT
+                  defaultValueNumeric: 0
+              - column:
+                  name: is_active
+                  type: TINYINT(1)
+                  defaultValueNumeric: 1
+                  constraints:
+                    nullable: false
+              - column:
+                  name: tax_rule_id
+                  type: INT
+                  remarks: Thuế mặc định cho các dòng thuộc danh mục này, để trống là không áp thuế riêng
+      rollback:
+        - dropTable:
+            tableName: item_category
+
+  - changeSet:
+      id: 014-2-item-category-tax-rule-fk
+      author: gms
+      comment: Khóa ngoại thuế mặc định của danh mục
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - foreignKeyConstraintExists:
+                foreignKeyName: fk_item_category_tax_rule
+      changes:
+        - addForeignKeyConstraint:
+            baseTableName: item_category
+            baseColumnNames: tax_rule_id
+            constraintName: fk_item_category_tax_rule
+            referencedTableName: tax_rule
+            referencedColumnNames: idtax_rule
+        - createIndex:
+            tableName: item_category
+            indexName: idx_item_category_active_order
+            columns:
+              - column:
+                  name: is_active
+              - column:
+                  name: display_order
+      rollback:
+        - dropIndex:
+            tableName: item_category
+            indexName: idx_item_category_active_order
+        - dropForeignKeyConstraint:
+            baseTableName: item_category
+            constraintName: fk_item_category_tax_rule
+
+  # ---------------------------------------------------------------------------
+  # 2. Dòng báo giá: trỏ sang item_category + nhãn hạng mục gõ tay
+  # ---------------------------------------------------------------------------
+  - changeSet:
+      id: 014-3-estimate-item-add-category-columns
+      author: gms
+      comment: Dòng báo giá trỏ sang danh mục mới và có nhãn hạng mục gõ tay
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: estimate_item
+                columnName: item_category_id
+      changes:
+        - addColumn:
+            tableName: estimate_item
+            columns:
+              - column:
+                  name: item_category_id
+                  type: INT
+                  remarks: Danh mục của dòng báo giá, để trống nếu không xếp nhóm
+              - column:
+                  name: category_label
+                  type: VARCHAR(255)
+                  remarks: Tên hạng mục advisor gõ tay cho riêng phiếu này, không tạo bản ghi danh mục
+      rollback:
+        - dropColumn:
+            tableName: estimate_item
+            columnName: item_category_id
+        - dropColumn:
+            tableName: estimate_item
+            columnName: category_label
+
+  - changeSet:
+      id: 014-4-estimate-item-preserve-old-category-name
+      author: gms
+      comment: Giữ lại tên hạng mục của phiếu báo giá cũ dưới dạng nhãn, trước khi bỏ cột work_category
+      preConditions:
+        - onFail: MARK_RAN
+        - columnExists:
+            tableName: estimate_item
+            columnName: work_category_idwork_category
+      changes:
+        - sql:
+            comment: Chép tên hạng mục cũ sang nhãn để phiếu đã lập vẫn hiển thị y như trước
+            sql: >-
+              UPDATE estimate_item ei
+              JOIN work_category wc ON wc.idwork_category = ei.work_category_idwork_category
+              SET ei.category_label = wc.category_name
+              WHERE ei.work_category_idwork_category IS NOT NULL
+                AND (ei.category_label IS NULL OR ei.category_label = '')
+      rollback:
+        - empty
+
+  - changeSet:
+      id: 014-5-estimate-item-drop-work-category
+      author: gms
+      comment: Bỏ liên kết dòng báo giá tới work_category, hạng mục nay thuộc về item_category
+      preConditions:
+        - onFail: MARK_RAN
+        - columnExists:
+            tableName: estimate_item
+            columnName: work_category_idwork_category
+      changes:
+        - dropForeignKeyConstraint:
+            baseTableName: estimate_item
+            constraintName: fk_estimate_item_work_category1
+        - dropColumn:
+            tableName: estimate_item
+            columnName: work_category_idwork_category
+        - addForeignKeyConstraint:
+            baseTableName: estimate_item
+            baseColumnNames: item_category_id
+            constraintName: fk_estimate_item_item_category
+            referencedTableName: item_category
+            referencedColumnNames: item_category_id
+      rollback:
+        - empty
+
+  # ---------------------------------------------------------------------------
+  # 3. Phụ tùng / dịch vụ: danh mục trở thành tùy chọn
+  # ---------------------------------------------------------------------------
+  - changeSet:
+      id: 014-6-catalog-item-swap-to-item-category
+      author: gms
+      comment: catalog_item trỏ sang item_category và được phép không có danh mục
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: catalog_item
+                columnName: item_category_id
+      changes:
+        - addColumn:
+            tableName: catalog_item
+            columns:
+              - column:
+                  name: item_category_id
+                  type: INT
+                  remarks: Danh mục của phụ tùng/dịch vụ, để trống là chưa xếp danh mục
+        - dropForeignKeyConstraint:
+            baseTableName: catalog_item
+            constraintName: fk_catalog_item_work_category1
+        - dropColumn:
+            tableName: catalog_item
+            columnName: work_category_id
+        - addForeignKeyConstraint:
+            baseTableName: catalog_item
+            baseColumnNames: item_category_id
+            constraintName: fk_catalog_item_item_category
+            referencedTableName: item_category
+            referencedColumnNames: item_category_id
+      rollback:
+        - empty
+
+  # ---------------------------------------------------------------------------
+  # 4. work_category thu về đúng một vai trò: đầu mục kiểm tra an toàn
+  # ---------------------------------------------------------------------------
+  - changeSet:
+      id: 014-7-work-category-hide-referenced-non-safety
+      author: gms
+      comment: Bản ghi non-safety đang bị phiếu kiểm tra tham chiếu thì chỉ ẩn, không xóa
+      preConditions:
+        - onFail: MARK_RAN
+        - columnExists:
+            tableName: work_category
+            columnName: is_default
+      changes:
+        - sql:
+            comment: Ẩn thay vì xóa để phiếu kiểm tra an toàn đã lập không bị gãy khóa ngoại
+            sql: >-
+              UPDATE work_category
+              SET is_active = 0
+              WHERE category_code NOT LIKE 'SAFETY!_%' ESCAPE '!'
+                AND idwork_category IN (
+                  SELECT work_category_id FROM (
+                    SELECT DISTINCT work_category_id FROM safety_inspection_item
+                    WHERE work_category_id IS NOT NULL
+                  ) AS used
+                )
+      rollback:
+        - empty
+
+  - changeSet:
+      id: 014-8-work-category-delete-non-safety
+      author: gms
+      comment: Xóa các bản ghi không phải đầu mục an toàn và không còn ai tham chiếu
+      preConditions:
+        - onFail: MARK_RAN
+        - columnExists:
+            tableName: work_category
+            columnName: is_default
+      changes:
+        - sql:
+            comment: Dọn danh mục phụ tùng và bản ghi rác do ô hạng mục gõ tay sinh ra
+            sql: >-
+              DELETE FROM work_category
+              WHERE category_code NOT LIKE 'SAFETY!_%' ESCAPE '!'
+                AND idwork_category NOT IN (
+                  SELECT work_category_id FROM (
+                    SELECT DISTINCT work_category_id FROM safety_inspection_item
+                    WHERE work_category_id IS NOT NULL
+                  ) AS used
+                )
+      rollback:
+        - empty
+
+  - changeSet:
+      id: 014-9-work-category-drop-unused-columns
+      author: gms
+      comment: Bỏ cờ is_default, thuế và category_type — đầu mục kiểm tra an toàn không cần
+      preConditions:
+        - onFail: MARK_RAN
+        - columnExists:
+            tableName: work_category
+            columnName: is_default
+      changes:
+        - dropForeignKeyConstraint:
+            baseTableName: work_category
+            constraintName: fk_work_category_tax_rule1
+        - dropColumn:
+            tableName: work_category
+            columnName: tax_rule_idtax_rule
+        - dropColumn:
+            tableName: work_category
+            columnName: category_type
+        - dropColumn:
+            tableName: work_category
+            columnName: is_default
+      rollback:
+        - empty

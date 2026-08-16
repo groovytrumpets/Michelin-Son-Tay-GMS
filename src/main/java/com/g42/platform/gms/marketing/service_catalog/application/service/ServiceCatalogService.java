@@ -206,7 +206,7 @@ public class ServiceCatalogService {
             if (info == null) continue;
             dto.setItemType(info.getItemType());
             dto.setPrice(info.getPrice());
-            dto.setWorkCategoryId(info.getWorkCategoryId());
+            dto.setItemCategoryId(info.getItemCategoryId());
             dto.setCategoryCode(info.getCategoryCode());
             dto.setCategoryName(info.getCategoryName());
             dto.setBrandId(info.getBrandId());

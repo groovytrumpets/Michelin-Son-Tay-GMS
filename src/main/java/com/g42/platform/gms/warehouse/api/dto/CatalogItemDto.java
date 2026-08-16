@@ -30,7 +30,7 @@ public class CatalogItemDto {
     private Integer brandId;
     private Integer taxRuleId;
     private Integer productLineId;
-    private Integer workCategoryId;
+    private Integer itemCategoryId;
     private String compatibleCars;
     private String technicalSpecs;
     private String userGuide;

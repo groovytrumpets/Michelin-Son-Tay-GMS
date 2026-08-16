@@ -57,8 +57,8 @@ public class ServiceSpecification {
                 predicates.add(cb.equal(catalogJoin.get("productLineId"), productLineId));
             }
             if (categoryCode != null) {
-                // Đã sửa lại tên trường "workCategoryId" và dùng biến categoryCode truyền vào
-                predicates.add(cb.equal(catalogJoin.get("workCategoryId"), categoryCode));
+                // Đã sửa lại tên trường "itemCategoryId" và dùng biến categoryCode truyền vào
+                predicates.add(cb.equal(catalogJoin.get("itemCategoryId"), categoryCode));
             }
 
             // Lọc theo hãng xe / dòng xe tương thích (LIKE trên cột compatible_cars)

@@ -214,7 +214,7 @@ public class WarehouseService {
         Set<Integer> lineIds = catalogItems.stream()
                 .map(CatalogItem::getProductLineId).filter(Objects::nonNull).collect(Collectors.toSet());
         Set<Integer> categoryIds = catalogItems.stream()
-                .map(CatalogItem::getWorkCategoryId).filter(Objects::nonNull).collect(Collectors.toSet());
+                .map(CatalogItem::getItemCategoryId).filter(Objects::nonNull).collect(Collectors.toSet());
 
         Map<Integer, String> brandMap = catalogItemRepo.getAllBrandByIds(brandIds);
 
@@ -229,8 +229,8 @@ public class WarehouseService {
             if (catalogItem.getProductLineId() != null) {
                 dto.setProductLine(lineMap.get(catalogItem.getProductLineId()));
             }
-            if (catalogItem.getWorkCategoryId() != null) {
-                dto.setItemCategoryCode(cateMap.get(catalogItem.getWorkCategoryId()));
+            if (catalogItem.getItemCategoryId() != null) {
+                dto.setItemCategoryCode(cateMap.get(catalogItem.getItemCategoryId()));
             }
             return dto;
         });
@@ -247,7 +247,7 @@ public class WarehouseService {
         Set<Integer> lineIds = catalogItems.stream()
                 .map(CatalogItem::getProductLineId).filter(Objects::nonNull).collect(Collectors.toSet());
         Set<Integer> categoryIds = catalogItems.stream()
-                .map(CatalogItem::getWorkCategoryId).filter(Objects::nonNull).collect(Collectors.toSet());
+                .map(CatalogItem::getItemCategoryId).filter(Objects::nonNull).collect(Collectors.toSet());
         Set<Integer> itemIds = catalogItems.stream()
                 .map(CatalogItem::getItemId).filter(Objects::nonNull).collect(Collectors.toSet());
 
@@ -292,8 +292,8 @@ public class WarehouseService {
             if (catalogItem.getProductLineId() != null) {
                 dto.setProductLine(lineMap.get(catalogItem.getProductLineId()));
             }
-            if (catalogItem.getWorkCategoryId() != null) {
-                dto.setItemCategoryCode(cateMap.get(catalogItem.getWorkCategoryId()));
+            if (catalogItem.getItemCategoryId() != null) {
+                dto.setItemCategoryCode(cateMap.get(catalogItem.getItemCategoryId()));
             }
             List<WarehouseDetailDto> details = itemWarehouseMap.getOrDefault(catalogItem.getItemId(), new ArrayList<>());
             dto.setWarehouseDetails(details);

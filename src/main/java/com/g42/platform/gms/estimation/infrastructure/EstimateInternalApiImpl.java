@@ -4,12 +4,12 @@ import com.g42.platform.gms.estimation.api.dto.UsedEstimateItemDto;
 import com.g42.platform.gms.estimation.api.internal.EstimateInternalApi;
 import com.g42.platform.gms.estimation.domain.entity.Estimate;
 import com.g42.platform.gms.estimation.domain.entity.EstimateItem;
-import com.g42.platform.gms.estimation.domain.entity.WorkCategory;
+import com.g42.platform.gms.estimation.domain.entity.ItemCategory;
 import com.g42.platform.gms.estimation.domain.exception.EstimateErrorCode;
 import com.g42.platform.gms.estimation.domain.exception.EstimateException;
 import com.g42.platform.gms.estimation.domain.repository.EstimateItemRepository;
 import com.g42.platform.gms.estimation.domain.repository.EstimateRepository;
-import com.g42.platform.gms.estimation.domain.repository.WorkCategoryRepository;
+import com.g42.platform.gms.estimation.domain.repository.ItemCategoryRepository;
 import com.g42.platform.gms.estimation.infrastructure.entity.EstimateItemJpa;
 import com.g42.platform.gms.estimation.infrastructure.entity.EstimateJpa;
 import com.g42.platform.gms.estimation.infrastructure.entity.ServiceReminderJpa;
@@ -61,7 +61,7 @@ public class EstimateInternalApiImpl implements EstimateInternalApi {
     @Autowired
     private StockIssueJpaRepo stockIssueJpaRepo;
     @Autowired
-    private WorkCategoryRepository workCategoryRepository;
+    private ItemCategoryRepository itemCategoryRepository;
 
     @Override
     public List<Estimate> findAllByServiceTicketId(List<Integer> ticketIds) {
@@ -85,14 +85,14 @@ public class EstimateInternalApiImpl implements EstimateInternalApi {
         List<EstimateItemJpa> items = estimateItemRepositoryJpa.findByEstimateIds(new ArrayList<>(estimateIdToTicketId.keySet()));
 
         List<Integer> categoryIds = items.stream()
-                .map(EstimateItemJpa::getWorkCategoryId)
+                .map(EstimateItemJpa::getItemCategoryId)
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
-        Map<Integer, WorkCategory> categoryMap = categoryIds.isEmpty()
+        Map<Integer, ItemCategory> categoryMap = categoryIds.isEmpty()
                 ? Map.of()
-                : workCategoryRepository.findAllById(categoryIds).stream()
-                        .collect(Collectors.toMap(WorkCategory::getId, wc -> wc));
+                : itemCategoryRepository.findAllById(categoryIds).stream()
+                        .collect(Collectors.toMap(ItemCategory::getId, wc -> wc));
 
         return items.stream()
                 .filter(item -> !Boolean.TRUE.equals(item.getIsRemoved()))
@@ -100,7 +100,7 @@ public class EstimateInternalApiImpl implements EstimateInternalApi {
                     UsedEstimateItemDto dto = new UsedEstimateItemDto();
                     dto.setServiceTicketId(estimateIdToTicketId.get(item.getEstimateId()));
                     dto.setItemName(item.getItemName());
-                    WorkCategory category = categoryMap.get(item.getWorkCategoryId());
+                    ItemCategory category = categoryMap.get(item.getItemCategoryId());
                     dto.setCategoryName(category != null ? category.getCategoryName() : null);
                     dto.setQuantity(item.getQuantity());
                     dto.setUnitPrice(item.getUnitPrice());

@@ -177,7 +177,7 @@ public class PartCatalogRepoImpl implements PartCatalogRepo {
         domain.setProductLineId(jpa.getProductLineId());
         domain.setMadeIn(jpa.getMadeIn());
         domain.setTaxRuleId(jpa.getTaxRuleId());
-        domain.setWorkCategoryId(jpa.getWorkCategoryId());
+        domain.setItemCategoryId(jpa.getItemCategoryId());
         domain.setPartNumber(jpa.getPartNumber());
         domain.setBarcode(jpa.getBarcode());
         domain.setColor(jpa.getColor());
@@ -207,7 +207,7 @@ public class PartCatalogRepoImpl implements PartCatalogRepo {
         jpa.setProductLineId(domain.getProductLineId());
         jpa.setMadeIn(domain.getMadeIn());
         jpa.setTaxRuleId(domain.getTaxRuleId());
-        jpa.setWorkCategoryId(domain.getWorkCategoryId());
+        jpa.setItemCategoryId(domain.getItemCategoryId());
         jpa.setPartNumber(domain.getPartNumber());
         jpa.setBarcode(domain.getBarcode());
         jpa.setColor(domain.getColor());

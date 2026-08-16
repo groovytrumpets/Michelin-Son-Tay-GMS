@@ -29,13 +29,13 @@ public interface CatalogItemRepo {
 
     boolean exitBySku(String sku);
 
-    WorkCategory saveItemCate(WorkCategory itemCategory);
+    ItemCategory saveItemCate(ItemCategory itemCategory);
 
     ProductLine getProductLineById(Integer productLineId);
 
     List<Specification> getListOfSpecsByItem(Integer itemId);
 
-    WorkCategory getItemCategoryById(@NotNull Integer itemCategoryId);
+    ItemCategory getItemCategoryById(@NotNull Integer itemCategoryId);
 
     CatalogItem saveCatalogItem(CatalogItem catalogItem);
 
@@ -45,7 +45,7 @@ public interface CatalogItemRepo {
 
     SpecAttribute saveSpecAttribute(SpecAttribute specAttribute);
 
-    List<WorkCategory> getAllItemCategory();
+    List<ItemCategory> getAllItemCategory();
 
     SpecAttribute getSpecAttributeById(Integer attributeId);
 

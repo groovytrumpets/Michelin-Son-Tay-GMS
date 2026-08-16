@@ -13,7 +13,9 @@ import java.math.BigDecimal;
 public class EstimateItemDto {
     private Integer estimateItemId;
     private String itemName;
-    private WorkCataDto workCategory;
+    private ItemCateDto itemCategory;
+    /** Nhãn hạng mục gõ tay của riêng dòng; ưu tiên hiển thị hơn tên danh mục. */
+    private String categoryLabel;
     private Integer warehouseId;
     private Integer itemId;
     private Integer quantity;

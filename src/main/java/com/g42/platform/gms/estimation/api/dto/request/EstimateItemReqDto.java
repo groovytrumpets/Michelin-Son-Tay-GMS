@@ -12,8 +12,10 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class EstimateItemReqDto {
     private Integer estimateItemId;
-    private Integer workCategoryId;
-    private String newCategoryName;
+    /** Danh mục có sẵn; để trống là dòng không xếp nhóm — hoàn toàn hợp lệ. */
+    private Integer itemCategoryId;
+    /** Tên nhóm gõ tay, chỉ áp cho riêng dòng này và không tạo danh mục mới. */
+    private String categoryLabel;
     private Integer itemId;
     private Integer warehouseId;
     private String itemName;

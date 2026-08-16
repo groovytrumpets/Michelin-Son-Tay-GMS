@@ -48,7 +48,7 @@ public class CatalogItemService {
     @Autowired
     private ProductLineJpaRepo productLineJpaRepo;
     @Autowired
-    private WorkCategoryJpaEntityRepo itemCategoryJpaRepo;
+    private ItemCategoryJpaRepo itemCategoryJpaRepo;
     @Autowired
     private ProductUnitJpaRepo productUnitJpaRepo;
     @Autowired
@@ -71,7 +71,9 @@ public class CatalogItemService {
     @Autowired
     private CatalogDtoMapper catalogDtoMapper;
     @Autowired
-    private WorkCateDtoMapper itemCateDtoMapper;
+    private ItemCategoryDtoMapper itemCateDtoMapper;
+    @Autowired
+    private ItemCategoryService itemCategoryService;
     @Autowired
     private TaxRuleInternalApi taxRuleInternalApi;
     @Autowired
@@ -111,7 +113,7 @@ public class CatalogItemService {
         validateCatalogItemDto(createDto);
         Brand brand = catalogItemRepo.getBrandById(createDto.getBrandId());
         ProductLine productLine = catalogItemRepo.getProductLineById(createDto.getProductLineId());
-        WorkCategory itemCategory = catalogItemRepo.getItemCategoryById(createDto.getWorkCategoryId());
+        ItemCategory itemCategory = catalogItemRepo.getItemCategoryById(createDto.getItemCategoryId());
         
         CatalogItem domain = catalogDtoMapper.toDomain(createDto);
         if (domain.getIsActive() == null) {
@@ -214,11 +216,11 @@ public class CatalogItemService {
         }
         //todo:validate catalog category items
     }
-    private String builDisplayName(CatalogItem catalogItem, Brand brand, ProductLine productLine, List<Specification> specs,WorkCategory itemCategory) {
+    private String builDisplayName(CatalogItem catalogItem, Brand brand, ProductLine productLine, List<Specification> specs,ItemCategory itemCategory) {
         StringBuilder displayName = new StringBuilder();
 
-        //type
-        if (itemCategory.getCategoryName() != null && !itemCategory.getCategoryName().isBlank()) {
+        // Danh mục là tùy chọn, tên gợi ý bỏ qua phần này khi hàng chưa xếp danh mục
+        if (itemCategory != null && itemCategory.getCategoryName() != null && !itemCategory.getCategoryName().isBlank()) {
             displayName.append(itemCategory.getCategoryName()).append(" ");
         }
 
@@ -255,7 +257,7 @@ public class CatalogItemService {
      * (name, codes, brand/category/product line names, spec values, compatible cars),
      * so search can match a single column instead of joining/LIKE-ing many.
      */
-    private String buildSearchKey(CatalogItem catalogItem, Brand brand, ProductLine productLine, List<Specification> specs, WorkCategory itemCategory) {
+    private String buildSearchKey(CatalogItem catalogItem, Brand brand, ProductLine productLine, List<Specification> specs, ItemCategory itemCategory) {
         StringBuilder searchKey = new StringBuilder();
         appendSearchToken(searchKey, catalogItem.getItemName());
         appendSearchToken(searchKey, catalogItem.getSku());
@@ -295,30 +297,14 @@ public class CatalogItemService {
         }
         return catalogItemRepo.saveProductLine(productLine);
     }
+    /**
+     * Tạo danh mục từ các màn kho cũ. Loại danh mục (PART/SERVICE) và thuế nay đều
+     * không bắt buộc — hàng hóa được phép không thuộc danh mục nào, nên chặn ở đây
+     * chỉ tổ làm người dùng không tạo nổi danh mục.
+     */
     @Transactional
-    public WorkCategory saveItemCate(WorkCategory itemCategory) {
-        if (itemCategory.getCategoryType()==null) {
-            throw new WarehouseException("Category must not null!",WarehouseErrorCode.WRONG_ENUM);
-        }
-        if (!itemCategory.getCategoryType().equals("SERVICE") && !itemCategory.getCategoryType().equals("PART")) {
-            throw new WarehouseException("Category type must be PART or SERVICE!",WarehouseErrorCode.WRONG_ENUM);
-        }
-        if (catalogItemRepo.exitByCategoryCode(itemCategory.getCategoryCode()))
-            throw new WarehouseException("Category code must be UNIQUE!",WarehouseErrorCode.INVALID_CATEGORY);
-        itemCategory.setIsActive(true);
-        int nextOrder = catalogItemRepo.findCategoryMaxOrder()+1;
-        itemCategory.setDisplayOrder(nextOrder);
-
-        Integer finalTaxId = itemCategory.getTaxRuleId();
-        if (finalTaxId == null){
-            finalTaxId = taxRuleInternalApi.getTaxCodeFreeId("FREE");
-            if (finalTaxId==null) {
-                finalTaxId = taxRuleInternalApi.createNewFreeTax();
-
-            }
-        }
-        itemCategory.setTaxRuleId(finalTaxId);
-        return catalogItemRepo.saveItemCate(itemCategory);
+    public ItemCategoryDto saveItemCate(ItemCategory itemCategory) {
+        return itemCategoryService.create(itemCategory);
     }
     @Transactional
     public Specification saveSpecs(Specification specification) {
@@ -329,7 +315,7 @@ public class CatalogItemService {
         CatalogItem catalogItem = catalogItemRepo.getCatalogItemById(specification.getItemId());
         Brand brand = catalogItemRepo.getBrandById(catalogItem.getBrandId());
         ProductLine productLine = catalogItemRepo.getProductLineById(catalogItem.getProductLineId());
-        WorkCategory itemCategory = catalogItemRepo.getItemCategoryById(catalogItem.getWorkCategoryId());
+        ItemCategory itemCategory = catalogItemRepo.getItemCategoryById(catalogItem.getItemCategoryId());
         Specification savedSpec = catalogItemRepo.saveSpec(specification);
         List<Specification> specifications = catalogItemRepo.getListOfSpecsByItem(catalogItem.getItemId());
         // Only auto-fill the item name when none was ever set (e.g. left blank at creation);
@@ -348,8 +334,8 @@ public class CatalogItemService {
         return catalogItemRepo.saveSpecAttribute(specAttribute);
     }
 
-    public List<WorkCategoryHintDto> getAllItemCategory() {
-        List<WorkCategory> itemCategories = catalogItemRepo.getAllItemCategory();
+    public List<ItemCategoryDto> getAllItemCategory() {
+        List<ItemCategory> itemCategories = catalogItemRepo.getAllItemCategory();
         return itemCategories.stream().map(itemCateDtoMapper::toDto).toList();
     }
 
@@ -468,7 +454,7 @@ public class CatalogItemService {
         catalogItem.setWarrantyDurationMonths(updateDto.getWarrantyDurationMonths());
         catalogItem.setBrandId(updateDto.getBrandId());
         catalogItem.setProductLineId(updateDto.getProductLineId());
-        catalogItem.setWorkCategoryId(updateDto.getWorkCategoryId());
+        catalogItem.setItemCategoryId(updateDto.getItemCategoryId());
         if (updateDto.getIsActive() != null) {
             catalogItem.setIsActive(updateDto.getIsActive());
         }
@@ -503,16 +489,16 @@ public class CatalogItemService {
         }
         replaceCompatibilities(itemId, updateDto.getCompatibilities());
 
-        // Brand/productLine/workCategory ids on catalogItem are already the final (updated) values at this point.
+        // Brand/productLine/itemCategory ids on catalogItem are already the final (updated) values at this point.
         Brand brandForSearch = catalogItem.getBrandId() != null ? catalogItemRepo.getBrandById(catalogItem.getBrandId()) : null;
         ProductLine productLineForSearch = catalogItem.getProductLineId() != null ? catalogItemRepo.getProductLineById(catalogItem.getProductLineId()) : null;
-        WorkCategory itemCategoryForSearch = catalogItem.getWorkCategoryId() != null ? catalogItemRepo.getItemCategoryById(catalogItem.getWorkCategoryId()) : null;
+        ItemCategory itemCategoryForSearch = catalogItem.getItemCategoryId() != null ? catalogItemRepo.getItemCategoryById(catalogItem.getItemCategoryId()) : null;
         List<Specification> specificationsForSearch = catalogItemRepo.getListOfSpecsByItem(itemId);
 
         if (updateDto.getItemName() != null && !updateDto.getItemName().isBlank()) {
             catalogItem.setItemName(updateDto.getItemName());
         } else {
-            WorkCategory categoryForName = itemCategoryForSearch != null ? itemCategoryForSearch : new WorkCategory();
+            ItemCategory categoryForName = itemCategoryForSearch != null ? itemCategoryForSearch : new ItemCategory();
             String displayName = builDisplayName(catalogItem, brandForSearch, productLineForSearch, specificationsForSearch, categoryForName);
             catalogItem.setItemName(displayName);
         }
@@ -624,12 +610,12 @@ public class CatalogItemService {
 
     @Transactional
     public void deleteItemCategory(Integer categoryId) {
-        boolean hasCatalogItems = catalogItemJpaRepo.existsByWorkCategoryId(categoryId);
+        boolean hasCatalogItems = catalogItemJpaRepo.existsByItemCategoryId(categoryId);
         if (hasCatalogItems) {
-            WorkCategoryJpaEntity workCategory = itemCategoryJpaRepo.findById(categoryId)
+            ItemCategoryJpa itemCategory = itemCategoryJpaRepo.findById(categoryId)
                     .orElseThrow(() -> new WarehouseException("Category not found", WarehouseErrorCode.INVALID_CATEGORY));
-            workCategory.setIsActive(false);
-            itemCategoryJpaRepo.save(workCategory);
+            itemCategory.setIsActive(false);
+            itemCategoryJpaRepo.save(itemCategory);
         } else {
             itemCategoryJpaRepo.deleteById(categoryId);
         }

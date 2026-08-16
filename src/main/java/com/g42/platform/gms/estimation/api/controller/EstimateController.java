@@ -9,7 +9,7 @@ import com.g42.platform.gms.estimation.api.dto.CommissionAllocationDto;
 import com.g42.platform.gms.estimation.api.dto.EstimateRespondDto;
 import com.g42.platform.gms.estimation.api.dto.EstimateViaAllocationDto;
 import com.g42.platform.gms.estimation.api.dto.StockAllocationDto;
-import com.g42.platform.gms.estimation.api.dto.WorkCataDto;
+import com.g42.platform.gms.estimation.api.dto.ItemCateDto;
 import com.g42.platform.gms.estimation.api.dto.request.EstimateItemReqDto;
 import com.g42.platform.gms.estimation.api.dto.request.EstimateRequestDto;
 import com.g42.platform.gms.estimation.app.service.CommissionAllocationService;
@@ -66,10 +66,11 @@ public class EstimateController {
                 ApiResponses.success(estimateService.updateEstimateStatus(estimateId,status))
         );
     }
-    @GetMapping("/work-category/all")
-    public ResponseEntity<ApiResponse<List<WorkCataDto>>> getWorkCateList(){
-        List<WorkCataDto> workCataDtos = estimateService.getWorkCateList();
-        return ResponseEntity.ok(ApiResponses.success(workCataDtos));
+    /** "work-category" giữ lại cho client cũ; danh sách nay là danh mục phụ tùng/dịch vụ. */
+    @GetMapping({"/item-category/all", "/work-category/all"})
+    public ResponseEntity<ApiResponse<List<ItemCateDto>>> getItemCateList(){
+        List<ItemCateDto> itemCateDtos = estimateService.getItemCateList();
+        return ResponseEntity.ok(ApiResponses.success(itemCateDtos));
     }
 
     @PostMapping("/{estimateId}/stock-allocation")

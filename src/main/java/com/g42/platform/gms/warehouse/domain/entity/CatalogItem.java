@@ -32,7 +32,7 @@ public class CatalogItem {
     private Integer productLineId;
     private String madeIn;
     private Integer taxRuleId;
-    private Integer workCategoryId;
+    private Integer itemCategoryId;
     private String partNumber;
     private String barcode;
     private String color;

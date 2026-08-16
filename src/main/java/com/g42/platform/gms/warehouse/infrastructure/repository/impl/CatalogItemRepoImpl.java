@@ -40,9 +40,9 @@ public class CatalogItemRepoImpl implements CatalogItemRepo {
     @Autowired
     private ServiceJpaRepository serviceJpaRepository;
     @Autowired
-    private WorkCategoryEntityJpaMapper itemCategoryJpaMapper;
+    private ItemCategoryEntityJpaMapper itemCategoryJpaMapper;
     @Autowired
-    private WorkCategoryJpaEntityRepo itemCategoryJpaRepo;
+    private ItemCategoryJpaRepo itemCategoryJpaRepo;
 
 
     @Override
@@ -103,9 +103,9 @@ public class CatalogItemRepoImpl implements CatalogItemRepo {
     }
     @Override
     @Transactional
-    public WorkCategory saveItemCate(WorkCategory itemCategory) {
+    public ItemCategory saveItemCate(ItemCategory itemCategory) {
 
-        WorkCategoryJpaEntity itemCategoryJpa = itemCategoryJpaRepo.save(itemCategoryJpaMapper.toJpa(itemCategory));
+        ItemCategoryJpa itemCategoryJpa = itemCategoryJpaRepo.save(itemCategoryJpaMapper.toJpa(itemCategory));
         return itemCategoryJpaMapper.toDomain(itemCategoryJpa);
     }
 
@@ -125,8 +125,11 @@ public class CatalogItemRepoImpl implements CatalogItemRepo {
     }
 
     @Override
-    public WorkCategory getItemCategoryById(Integer itemCategoryId) {
-        WorkCategoryJpaEntity itemCategoryJpa = itemCategoryJpaRepo.findById(itemCategoryId).orElse(null);
+    public ItemCategory getItemCategoryById(Integer itemCategoryId) {
+        // Hàng hóa được phép không có danh mục, nên id null là trường hợp bình thường
+        // chứ không phải lỗi — findById(null) sẽ ném ngoại lệ.
+        if (itemCategoryId == null) return null;
+        ItemCategoryJpa itemCategoryJpa = itemCategoryJpaRepo.findById(itemCategoryId).orElse(null);
         return itemCategoryJpaMapper.toDomain(itemCategoryJpa);
     }
 
@@ -154,8 +157,8 @@ public class CatalogItemRepoImpl implements CatalogItemRepo {
     }
 
     @Override
-    public List<WorkCategory> getAllItemCategory() {
-        List<WorkCategoryJpaEntity> itemCategoryJpas = itemCategoryJpaRepo.findAll();
+    public List<ItemCategory> getAllItemCategory() {
+        List<ItemCategoryJpa> itemCategoryJpas = itemCategoryJpaRepo.findAll();
         return itemCategoryJpas.stream()
                 .filter(c -> c.getIsActive() == null || c.getIsActive())
                 .map(itemCategoryJpaMapper::toDomain)
@@ -175,11 +178,11 @@ public class CatalogItemRepoImpl implements CatalogItemRepo {
     }
     @Override
     public Integer findCategoryCode(String categoryCode) {
-        WorkCategoryJpaEntity workCategoryJpaEntity = itemCategoryJpaRepo.findFirstByCategoryCode(categoryCode);
-        if (workCategoryJpaEntity == null) {
+        ItemCategoryJpa itemCategoryJpaEntity = itemCategoryJpaRepo.findFirstByCategoryCode(categoryCode);
+        if (itemCategoryJpaEntity == null) {
             return null;
         }
-        return workCategoryJpaEntity.getWorkCategoryId();
+        return itemCategoryJpaEntity.getItemCategoryId();
     }
 
     @Override

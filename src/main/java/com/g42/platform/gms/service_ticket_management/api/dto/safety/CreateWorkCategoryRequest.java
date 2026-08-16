@@ -5,8 +5,10 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 /**
- * Request DTO để tạo mới một hạng mục kiểm tra an toàn (work_category).
- * Hạng mục mới sẽ có is_default = false, is_active = true.
+ * Tạo / sửa một đầu mục kiểm tra an toàn (bảng work_category).
+ *
+ * Đây KHÔNG phải danh mục phụ tùng — danh mục hàng hóa nằm ở item_category và có
+ * màn cấu hình riêng.
  */
 @Data
 public class CreateWorkCategoryRequest {
@@ -19,4 +21,7 @@ public class CreateWorkCategoryRequest {
     private String categoryCode;
 
     private Integer displayOrder;
+
+    /** Chỉ dùng khi cập nhật; tạo mới luôn đang hoạt động. */
+    private Boolean isActive;
 }

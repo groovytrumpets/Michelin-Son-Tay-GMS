@@ -50,10 +50,14 @@ public class EstimateItemJpa {
 
     @Column(name = "warehouse_id")
     private Integer warehouseId;
-    @NotNull
-    @Column(name = "work_category_idwork_category", nullable = false)
-    private Integer workCategoryId;
-    @NotNull
+    /** Danh mục là tùy chọn — dòng báo giá không bắt buộc thuộc nhóm nào. */
+    @Column(name = "item_category_id")
+    private Integer itemCategoryId;
+
+    /** Tên nhóm gõ tay của riêng dòng này, không tạo bản ghi danh mục dùng chung. */
+    @Size(max = 255)
+    @Column(name = "category_label", length = 255)
+    private String categoryLabel;
 
     @Column(name = "total_price", precision = 12, scale = 2)
     private BigDecimal totalPrice;

@@ -6,6 +6,13 @@ import lombok.NoArgsConstructor;
 
 import jakarta.persistence.*;
 
+/**
+ * Đầu mục kiểm tra an toàn của phiếu dịch vụ (bảng work_category).
+ *
+ * Từ changeset 014 bảng này CHỈ còn giữ đầu mục kiểm tra an toàn. Danh mục của
+ * phụ tùng / dịch vụ đã dọn sang bảng item_category, nên không còn cờ is_default
+ * để phân biệt hai loại — mọi bản ghi ở đây đều là đầu mục kiểm tra.
+ */
 @Entity
 @Table(name = "work_category")
 @Data
@@ -30,9 +37,5 @@ public class SafetyWorkCategoryJpa {
     @Column(name = "is_active")
     @Convert(converter = org.hibernate.type.NumericBooleanConverter.class)
     private Boolean isActive;
-    
-    @Column(name = "is_default")
-    @Convert(converter = org.hibernate.type.NumericBooleanConverter.class)
-    private Boolean isDefault;
 
 }

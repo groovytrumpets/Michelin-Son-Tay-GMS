@@ -31,8 +31,8 @@ public class CatalogItemJpa {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "service_service_id", nullable = false)
     private ServiceJpaEntity serviceService;
-    @Column(name = "work_category_id")
-    private Integer workCategoryId;
+    @Column(name = "item_category_id")
+    private Integer itemCategoryId;
 
     // Các cột đọc-thêm phục vụ lọc sản phẩm public (/home/products);
     // ghi/cập nhật các cột này do module warehouse (CatalogItemJpa bên warehouse) đảm nhiệm.

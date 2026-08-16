@@ -19,7 +19,7 @@ public class HomeCatalogItemInfoDto {
     private Integer itemId;
     private String itemType;
     private BigDecimal price;
-    private Integer workCategoryId;
+    private Integer itemCategoryId;
     private String categoryCode;
     private String categoryName;
     private Integer brandId;

@@ -95,7 +95,7 @@ public class SafetyInspectionService {
         domain.setInspectionStatus(InspectionStatus.PENDING);
         domain.initializeDefaults();
         SafetyInspection saved = inspectionRepo.save(domain);
-        List<WorkCategory> defaultCategories = workCategoryRepo.findDefaultCategories();
+        List<WorkCategory> defaultCategories = workCategoryRepo.findActiveCategories();
         for (WorkCategory cat : defaultCategories) {
             SafetyInspectionItem item = new SafetyInspectionItem();
             item.setInspectionId(saved.getInspectionId());
@@ -321,7 +321,7 @@ public class SafetyInspectionService {
 
     @Transactional(readOnly = true)
     public List<WorkCategoryResponse> getDefaultSafetyInspectionCategories() {
-        List<WorkCategory> workCategories = workCategoryRepo.findDefaultCategories();
+        List<WorkCategory> workCategories = workCategoryRepo.findActiveCategories();
         return workCategoryApiMapper.toResponseList(workCategories);
     }
 

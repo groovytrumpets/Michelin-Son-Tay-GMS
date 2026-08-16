@@ -15,7 +15,7 @@ public class PartResponse {
     private String barcode;
     private String unit;
     private String madeIn;
-    private Integer workCategoryId;
+    private Integer itemCategoryId;
     private Integer brandId;
     private Integer productLineId;
     private Boolean isActive;

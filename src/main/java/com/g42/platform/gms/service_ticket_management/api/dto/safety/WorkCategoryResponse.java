@@ -9,5 +9,4 @@ public class WorkCategoryResponse {
     private String categoryName;
     private Integer displayOrder;
     private Boolean isActive;
-    private Boolean isDefault;
 }

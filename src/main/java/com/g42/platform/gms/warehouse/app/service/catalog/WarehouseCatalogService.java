@@ -47,7 +47,9 @@ public class WarehouseCatalogService {
         item.setUnit(request.getUnit());
         item.setDescription(request.getDescription());
         item.setMadeIn(request.getMadeIn());
-        item.setWorkCategoryId(request.getWorkCategoryId() != null ? request.getWorkCategoryId() : 1);
+        // Không chọn danh mục thì để trống — ép về #1 sẽ trỏ vào một danh mục có thể
+        // không tồn tại và làm vỡ khóa ngoại.
+        item.setItemCategoryId(request.getItemCategoryId());
         item.setBrandId(request.getBrandId());
         item.setProductLineId(request.getProductLineId());
         item.setIsActive(true);
@@ -93,7 +95,7 @@ public class WarehouseCatalogService {
         r.setBarcode(e.getBarcode());
         r.setUnit(e.getUnit());
         r.setMadeIn(e.getMadeIn());
-        r.setWorkCategoryId(e.getWorkCategoryId());
+        r.setItemCategoryId(e.getItemCategoryId());
         r.setBrandId(e.getBrandId());
         r.setProductLineId(e.getProductLineId());
         r.setIsActive(e.getIsActive());

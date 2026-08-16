@@ -110,7 +110,7 @@ public class WorkHistoryService {
     }
 
     private String resolveServiceType() {
-        List<String> workCategories = workCategoryRepository.findDefaultWorkCategoryNames();
+        List<String> workCategories = workCategoryRepository.findActiveCategoryNames();
         if (workCategories == null || workCategories.isEmpty()) return "Service";
         return String.join(", ", workCategories);
     }

@@ -49,3 +49,6 @@ databaseChangeLog:
   - include:
       file: changes/013-customer-email-unique.yaml
       relativeToChangelogFile: true
+  - include:
+      file: changes/014-split-item-category.yaml
+      relativeToChangelogFile: true

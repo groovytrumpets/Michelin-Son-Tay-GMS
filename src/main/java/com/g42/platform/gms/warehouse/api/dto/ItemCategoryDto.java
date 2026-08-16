@@ -1,4 +1,4 @@
-package com.g42.platform.gms.warehouse.domain.entity;
+package com.g42.platform.gms.warehouse.api.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -9,15 +9,12 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class WorkCategory {
-
-    private Integer workCategoryId;
+public class ItemCategoryDto {
+    private Integer itemCategoryId;
     private String categoryCode;
     private String categoryName;
+    private String categoryType;
     private Integer displayOrder;
     private Boolean isActive;
-    private Integer estimateItemEstimateItem;
-    private Boolean isDefault;
     private Integer taxRuleId;
-    private String categoryType;
 }

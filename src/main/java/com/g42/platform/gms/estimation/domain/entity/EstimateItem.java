@@ -31,7 +31,13 @@ public class EstimateItem {
     private Boolean isOverridden;
     private String overrideReason;
     private Integer warehouseId;
-    private Integer workCategoryId;
+    private Integer itemCategoryId;
+    /**
+     * Tên nhóm advisor gõ tay cho riêng dòng này. Trước đây mỗi lần gõ một cái tên
+     * chưa có là hệ thống đẻ thêm một bản ghi danh mục, làm bảng danh mục ngập rác;
+     * nay chỉ lưu chữ, không đụng tới danh mục dùng chung.
+     */
+    private String categoryLabel;
     private BigDecimal totalPrice;
     private Boolean isChecked;
     private Boolean isRemoved = false;

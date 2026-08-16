@@ -36,7 +36,7 @@ public class WarehouseInternalApiImpl implements WarehouseInternalApi {
     @Autowired
     private InventoryService inventoryService;
     @Autowired
-    private WorkCategoryJpaEntityRepo itemCategoryJpaRepo;
+    private ItemCategoryJpaRepo itemCategoryJpaRepo;
     @Autowired
     private WarehouseJpaRepo warehouseJpaRepo;
     @Autowired
@@ -83,16 +83,16 @@ public class WarehouseInternalApiImpl implements WarehouseInternalApi {
 
     @Override
     public Integer findCodeByCategoryCode(String categoryCode) {
-        WorkCategoryJpaEntity workCategoryJpaEntity = itemCategoryJpaRepo.findByCategoryCode(categoryCode);
-        if (workCategoryJpaEntity == null) {
+        ItemCategoryJpa itemCategoryJpaEntity = itemCategoryJpaRepo.findByCategoryCode(categoryCode);
+        if (itemCategoryJpaEntity == null) {
             return null;
         }
-        return workCategoryJpaEntity.getWorkCategoryId();
+        return itemCategoryJpaEntity.getItemCategoryId();
     }
 
     @Override
-    public List<Warehouse> findAllById(List<Integer> workCategoryIds) {
-        List<WarehouseJpa> warehouseJpas = warehouseJpaRepo.findAllById(workCategoryIds);
+    public List<Warehouse> findAllById(List<Integer> warehouseIds) {
+        List<WarehouseJpa> warehouseJpas = warehouseJpaRepo.findAllById(warehouseIds);
         return warehouseJpas.stream().map(warehouseJpaMapper::toDomain).toList();
     }
 
@@ -170,15 +170,15 @@ public class WarehouseInternalApiImpl implements WarehouseInternalApi {
         java.util.Set<Integer> brandIds = new java.util.HashSet<>();
         java.util.Set<Integer> lineIds = new java.util.HashSet<>();
         for (CatalogItemJpa item : items) {
-            if (item.getWorkCategoryId() != null) categoryIds.add(item.getWorkCategoryId());
+            if (item.getItemCategoryId() != null) categoryIds.add(item.getItemCategoryId());
             if (item.getBrandId() != null && item.getBrandId() != 0) brandIds.add(item.getBrandId());
             if (item.getProductLineId() != null && item.getProductLineId() != 0) lineIds.add(item.getProductLineId());
         }
 
-        Map<Integer, WorkCategoryJpaEntity> categoryMap = new HashMap<>();
+        Map<Integer, ItemCategoryJpa> categoryMap = new HashMap<>();
         if (!categoryIds.isEmpty()) {
-            for (WorkCategoryJpaEntity category : itemCategoryJpaRepo.findAllById(categoryIds)) {
-                categoryMap.put(category.getWorkCategoryId(), category);
+            for (ItemCategoryJpa category : itemCategoryJpaRepo.findAllById(categoryIds)) {
+                categoryMap.put(category.getItemCategoryId(), category);
             }
         }
         Map<Integer, String> brandMap = brandJpaRepo.getBrandMapByIds(brandIds);
@@ -195,8 +195,8 @@ public class WarehouseInternalApiImpl implements WarehouseInternalApi {
             dto.setItemId(item.getItemId());
             dto.setItemType(item.getItemType() != null ? item.getItemType().name() : null);
             dto.setPrice(item.getPrice());
-            dto.setWorkCategoryId(item.getWorkCategoryId());
-            WorkCategoryJpaEntity category = item.getWorkCategoryId() != null ? categoryMap.get(item.getWorkCategoryId()) : null;
+            dto.setItemCategoryId(item.getItemCategoryId());
+            ItemCategoryJpa category = item.getItemCategoryId() != null ? categoryMap.get(item.getItemCategoryId()) : null;
             if (category != null) {
                 dto.setCategoryCode(category.getCategoryCode());
                 dto.setCategoryName(category.getCategoryName());

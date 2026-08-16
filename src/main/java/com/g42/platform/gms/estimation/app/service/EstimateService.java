@@ -45,7 +45,7 @@ import java.util.stream.Collectors;
 public class EstimateService {
     private final EstimateRepository estimateRepository;
     private final EstimateItemRepository estimateItemRepository;
-    private final WorkCategoryRepository workCategoryRepo;
+    private final ItemCategoryRepository itemCategoryRepo;
     private final EstimateDtoMapper estimateDtoMapper;
     private final TaxRuleRepository taxRuleRepository;
 
@@ -87,18 +87,18 @@ public class EstimateService {
                 .distinct()
                 .toList();
         // 4. Lấy danh sách work-catalog của estimateItem an toàn
-        List<Integer> workCategoryIds = estimateItems.stream()
-                .map(EstimateItem::getWorkCategoryId)
+        List<Integer> itemCategoryIds = estimateItems.stream()
+                .map(EstimateItem::getItemCategoryId)
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
 
-        // Khởi tạo map rỗng, chỉ query DB nếu có workCategoryIds
-        Map<Integer, WorkCategory> categoryMap;
-        if (!workCategoryIds.isEmpty()) {
-            categoryMap = workCategoryRepo.findAllById(workCategoryIds)
+        // Khởi tạo map rỗng, chỉ query DB nếu có itemCategoryIds
+        Map<Integer, ItemCategory> categoryMap;
+        if (!itemCategoryIds.isEmpty()) {
+            categoryMap = itemCategoryRepo.findAllById(itemCategoryIds)
                     .stream()
-                    .collect(Collectors.toMap(WorkCategory::getId, wc -> wc));
+                    .collect(Collectors.toMap(ItemCategory::getId, wc -> wc));
         } else {
             categoryMap = new HashMap<>();
         }
@@ -140,10 +140,10 @@ public class EstimateService {
                 EstimateItemDto itemDto = estimateDtoMapper.toEstimateItemDto(item);
 
                 // inject work category to each item
-                if (item.getWorkCategoryId() != null) {
-                    WorkCategory wc = categoryMap.get(item.getWorkCategoryId());
+                if (item.getItemCategoryId() != null) {
+                    ItemCategory wc = categoryMap.get(item.getItemCategoryId());
                     if (wc != null) {
-                        itemDto.setWorkCategory(estimateDtoMapper.toWorkCateDto(wc));
+                        itemDto.setItemCategory(estimateDtoMapper.toItemCateDto(wc));
                     }
                 }
 
@@ -274,7 +274,8 @@ public class EstimateService {
                 );
                 existing.setUnitPrice(calculatedUnitPrice);
 
-                existing.setWorkCategoryId(req.getWorkCategoryId());
+                existing.setItemCategoryId(req.getItemCategoryId());
+                existing.setCategoryLabel(normalizeCategoryLabel(req.getCategoryLabel()));
                 existing.setWarehouseId(req.getWarehouseId());
                 existing.setEntryItemId(req.getEntryItemId());
                 existing.setIsChecked(req.getIsChecked());
@@ -283,9 +284,9 @@ public class EstimateService {
                 existing.setTriggeredByItemId(req.getTriggeredByItemId());
                 existing.setDiscountAmount(req.getDiscountAmount());
                 applyOutsourceAndNote(existing, req);
-                WorkCategory wc = null;
-                if (req.getWorkCategoryId() != null) {
-                    wc = workCategoryRepo.findById(req.getWorkCategoryId());
+                ItemCategory wc = null;
+                if (req.getItemCategoryId() != null) {
+                    wc = itemCategoryRepo.findById(req.getItemCategoryId());
                 }
                 
                 BigDecimal quantity = BigDecimal.valueOf(existing.getQuantity() != null ? existing.getQuantity() : 0);
@@ -358,48 +359,28 @@ public class EstimateService {
         item.setDiscountPercent(req.getDiscountPercent());
     }
 
+    /** Nhãn hạng mục chỉ toàn khoảng trắng coi như không nhập, để không hiện ô trống trên phiếu. */
+    private String normalizeCategoryLabel(String rawLabel) {
+        if (rawLabel == null) return null;
+        String label = rawLabel.trim();
+        return label.isEmpty() ? null : label;
+    }
+
     private List<EstimateItem> resolveItems(List<EstimateItemReqDto> itemRequests,
                                             Integer estimateId,
                                             Integer fallbackPricingConfigId,
                                             BigDecimal manualMarkupMultiplier,
                                             EstimateTypeEnum estimateType) {
         return itemRequests.stream().map(req -> {
-            Integer categoryId = req.getWorkCategoryId();
-            WorkCategory workCategory = null;
-
-            if (categoryId == null && req.getNewCategoryName() != null && !req.getNewCategoryName().isBlank()) {
-                // Ưu tiên dùng lại hạng mục đã có cùng tên; trước đây mỗi lần gõ lại
-                // cùng một tên đều sinh thêm một bản ghi work_category mới.
-                workCategory = workCategoryRepo.findByCategoryName(req.getNewCategoryName());
-
-                if (workCategory == null) {
-                    WorkCategory newCategory = new WorkCategory();
-                    newCategory.setCategoryName(req.getNewCategoryName().trim());
-                    newCategory.setCategoryCode(
-                            req.getNewCategoryName().trim().toUpperCase().replace(" ", "_")
-                    );
-                    newCategory.setIsDefault(false);
-                    newCategory.setIsActive(true);
-                    Integer finalTaxId = req.getTaxRuleId();
-                    if (finalTaxId == null) {
-                        finalTaxId = taxRuleInternalApi.getTaxCodeFreeId("FREE");
-                        if (finalTaxId == -1) finalTaxId = taxRuleInternalApi.createNewFreeTax();
-                    }
-                    newCategory.setTaxRuleId(finalTaxId);
-
-                    int nextOrder = workCategoryRepo.findMaxDisplayOrder() + 1;
-                    newCategory.setDisplayOrder(nextOrder);
-                    workCategory = workCategoryRepo.save(newCategory);
-                }
-                categoryId = workCategory.getId();
-            }else if (categoryId != null) {
-                // Nếu có categoryId, bốc từ DB lên để tý lấy ID thuế của nó
-                workCategory = workCategoryRepo.findById(categoryId);
-            }
+            Integer categoryId = req.getItemCategoryId();
+            // Chỉ tra danh mục có sẵn để lấy thuế mặc định. Tên nhóm gõ tay được giữ
+            // nguyên dạng chữ trên dòng, không sinh thêm bản ghi danh mục dùng chung.
+            ItemCategory itemCategory = categoryId != null ? itemCategoryRepo.findById(categoryId) : null;
 
             EstimateItem item = new EstimateItem();
             item.setEstimateId(estimateId);
-            item.setWorkCategoryId(categoryId);
+            item.setItemCategoryId(categoryId);
+            item.setCategoryLabel(normalizeCategoryLabel(req.getCategoryLabel()));
             item.setItemId(req.getItemId());
             item.setItemName(req.getItemName());
             item.setQuantity(req.getQuantity());
@@ -437,8 +418,8 @@ public class EstimateService {
                 }
             }
             //if item tax null, check category tax
-            if (ruleId == null && workCategory != null && workCategory.getTaxRuleId() != null) {
-                ruleId = workCategory.getTaxRuleId();
+            if (ruleId == null && itemCategory != null && itemCategory.getTaxRuleId() != null) {
+                ruleId = itemCategory.getTaxRuleId();
             }
             //if category tax null, check input tax
             if (ruleId == null && req.getTaxRuleId() != null) {
@@ -492,13 +473,13 @@ public class EstimateService {
                 .toList();
 
         List<Integer> categoryIds = items.stream()
-                .map(EstimateItem::getWorkCategoryId)
+                .map(EstimateItem::getItemCategoryId)
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
-        Map<Integer, WorkCategory> categoryMap = workCategoryRepo
+        Map<Integer, ItemCategory> categoryMap = itemCategoryRepo
                 .findAllById(categoryIds).stream()
-                .collect(Collectors.toMap(WorkCategory::getId, wc -> wc));
+                .collect(Collectors.toMap(ItemCategory::getId, wc -> wc));
 
         Map<Integer, String> outsourcePartnerNames = resolveOutsourcePartnerNames(items);
 
@@ -534,9 +515,9 @@ public class EstimateService {
             itemDto.setImportPrice(itemImportPrice != null ? itemImportPrice : BigDecimal.ZERO);
 
             // Map tên hạng mục
-            WorkCategory wc = categoryMap.get(item.getWorkCategoryId());
+            ItemCategory wc = categoryMap.get(item.getItemCategoryId());
             if (wc != null) {
-                itemDto.setWorkCategory(estimateDtoMapper.toWorkCateDto(wc));
+                itemDto.setItemCategory(estimateDtoMapper.toItemCateDto(wc));
             }
 
             if (item.getOutsourcePartnerId() != null) {
@@ -566,34 +547,16 @@ public class EstimateService {
 
         Integer currentTaxRuleId = null;
 
-        if (request.getWorkCategoryId() != null) {
-            estimateItem.setWorkCategoryId(request.getWorkCategoryId());
-        } else if (request.getNewCategoryName() != null) {
-            WorkCategory newCategory = new WorkCategory();
-            newCategory.setCategoryName(request.getNewCategoryName());
-            newCategory.setCategoryCode(
-                    request.getNewCategoryName().toUpperCase().replace(" ", "_")
-            );
-            newCategory.setIsDefault(false);
-            newCategory.setIsActive(true);
-            System.out.println("DEBUG CREATING CATA");
-            Integer finalTaxId = request.getTaxRuleId();
-            if (finalTaxId == null){
-                finalTaxId = taxRuleInternalApi.getTaxCodeFreeId("FREE");
-                if (finalTaxId==null) {
-                    finalTaxId = taxRuleInternalApi.createNewFreeTax();
-
-                }
-            }
-            newCategory.setTaxRuleId(finalTaxId);
-            int nextOrder = workCategoryRepo.findMaxDisplayOrder() + 1;
-            newCategory.setDisplayOrder(nextOrder);
-            WorkCategory saved = workCategoryRepo.save(newCategory);
-
-            estimateItem.setWorkCategoryId(saved.getId());
-            currentTaxRuleId = saved.getTaxRuleId();
+        // Chọn danh mục thì gắn danh mục; bỏ chọn thì gỡ hẳn — dòng báo giá không
+        // bắt buộc thuộc nhóm nào nữa.
+        estimateItem.setItemCategoryId(request.getItemCategoryId());
+        if (request.getCategoryLabel() != null) {
+            estimateItem.setCategoryLabel(normalizeCategoryLabel(request.getCategoryLabel()));
         }
-        //todo: handle newCate
+        if (request.getItemCategoryId() != null) {
+            ItemCategory picked = itemCategoryRepo.findById(request.getItemCategoryId());
+            if (picked != null) currentTaxRuleId = picked.getTaxRuleId();
+        }
         if (request.getItemId() != null)estimateItem.setItemId(request.getItemId());
         if (request.getItemName() != null)estimateItem.setItemName(request.getItemName());
         if (request.getQuantity() != null)estimateItem.setQuantity(request.getQuantity());
@@ -618,8 +581,8 @@ public class EstimateService {
                     ruleId = itemDto.getTaxRuleId();
                 }
             }
-            if (ruleId == null && estimateItem.getWorkCategoryId() != null) {
-                WorkCategory wc = workCategoryRepo.findById(estimateItem.getWorkCategoryId());
+            if (ruleId == null && estimateItem.getItemCategoryId() != null) {
+                ItemCategory wc = itemCategoryRepo.findById(estimateItem.getItemCategoryId());
                 if (wc != null && wc.getTaxRuleId() != null) {
                     ruleId = wc.getTaxRuleId();
                 }
@@ -693,9 +656,9 @@ public class EstimateService {
         return estimateDtoMapper.toEstimateDto(saved);
     }
 
-    public List<WorkCataDto> getWorkCateList() {
-        List<WorkCategory> workCategories = workCategoryRepo.findAll();
-        return workCategories.stream().map(estimateDtoMapper::toWorkCateDto).toList();
+    public List<ItemCateDto> getItemCateList() {
+        List<ItemCategory> workCategories = itemCategoryRepo.findAll();
+        return workCategories.stream().map(estimateDtoMapper::toItemCateDto).toList();
     }
 
     public Estimate findById(Integer estimateId) {
@@ -785,10 +748,10 @@ public class EstimateService {
             giftItem.setUnit(triggerItem.getUnit());
             giftItem.setTriggeredByItemId(triggerItem.getItemId());
             //todo: find FREE workCate if Catalog have no W
-            if (catalogItem.getWorkCategoryId()==null||catalogItem.getWorkCategoryId()==0){
-                throw new EstimateException("Danh mục không được tạo với phân loại phù hợp (workCategory_404)", EstimateErrorCode.BAD_DATA);
+            if (catalogItem.getItemCategoryId()==null||catalogItem.getItemCategoryId()==0){
+                throw new EstimateException("Danh mục không được tạo với phân loại phù hợp (itemCategory_404)", EstimateErrorCode.BAD_DATA);
             }
-            giftItem.setWorkCategoryId(catalogItem.getWorkCategoryId());
+            giftItem.setItemCategoryId(catalogItem.getItemCategoryId());
             //todo: check warehouse quantity available
             Integer warehouseId = resolveGiftItemWarehouse(giftItem,triggerItem);
             giftItem.setWarehouseId(warehouseId);
@@ -1010,16 +973,16 @@ public class EstimateService {
                 .distinct()
                 .toList();
 
-        List<Integer> workCategoryIds = estimateItems.stream()
-                .map(EstimateItem::getWorkCategoryId)
+        List<Integer> itemCategoryIds = estimateItems.stream()
+                .map(EstimateItem::getItemCategoryId)
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
 
         // 4. Lấy dữ liệu Map (Dùng toán tử 3 ngôi cho gọn)
-        Map<Integer, WorkCategory> categoryMap = workCategoryIds.isEmpty() ? new HashMap<>() :
-                workCategoryRepo.findAllById(workCategoryIds).stream()
-                        .collect(Collectors.toMap(WorkCategory::getId, wc -> wc));
+        Map<Integer, ItemCategory> categoryMap = itemCategoryIds.isEmpty() ? new HashMap<>() :
+                itemCategoryRepo.findAllById(itemCategoryIds).stream()
+                        .collect(Collectors.toMap(ItemCategory::getId, wc -> wc));
 
         Map<Integer, Warehouse> warehouseMap = warehouseIds.isEmpty() ? new HashMap<>() :
                 warehouseInternalApi.findAllById(warehouseIds).stream()
@@ -1043,10 +1006,10 @@ public class EstimateService {
             EstimateItemDto itemDto = estimateDtoMapper.toEstimateItemDto(item);
 
             // Inject work category
-            if (item.getWorkCategoryId() != null) {
-                WorkCategory wc = categoryMap.get(item.getWorkCategoryId());
+            if (item.getItemCategoryId() != null) {
+                ItemCategory wc = categoryMap.get(item.getItemCategoryId());
                 if (wc != null) {
-                    itemDto.setWorkCategory(estimateDtoMapper.toWorkCateDto(wc));
+                    itemDto.setItemCategory(estimateDtoMapper.toItemCateDto(wc));
                 }
             }
 

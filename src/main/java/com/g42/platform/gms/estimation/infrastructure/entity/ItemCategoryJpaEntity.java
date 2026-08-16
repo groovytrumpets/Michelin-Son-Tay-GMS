@@ -1,4 +1,4 @@
-package com.g42.platform.gms.warehouse.infrastructure.entity;
+package com.g42.platform.gms.estimation.infrastructure.entity;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
@@ -8,23 +8,19 @@ import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
 
 /**
- * Danh mục của phụ tùng / dịch vụ.
- *
- * Trước đây dùng chung bảng work_category với các đầu mục kiểm tra an toàn và
- * phân biệt bằng cờ is_default, khiến hai danh sách lẫn vào nhau. Từ changeset
- * 014 hai khái niệm này nằm ở hai bảng riêng: work_category chỉ còn là đầu mục
- * kiểm tra an toàn, còn danh mục hàng hóa nằm ở đây.
+ * Bảng item_category nhìn từ module báo giá — chỉ đọc để nhóm dòng và tra thuế.
+ * Việc thêm/sửa/xóa danh mục do module warehouse đảm nhiệm.
  */
 @Getter
 @Setter
-@Entity
+@Entity(name = "EstimateItemCategory")
 @Table(name = "item_category")
-public class ItemCategoryJpa {
+public class ItemCategoryJpaEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "item_category_id", nullable = false)
-    private Integer itemCategoryId;
+    private Integer id;
 
     @Size(max = 50)
     @Column(name = "category_code", length = 50)
@@ -35,7 +31,6 @@ public class ItemCategoryJpa {
     @Column(name = "category_name", nullable = false, length = 100)
     private String categoryName;
 
-    /** PART hoặc SERVICE; để trống nghĩa là dùng chung cho cả hai. */
     @Size(max = 20)
     @Column(name = "category_type", length = 20)
     private String categoryType;
@@ -48,7 +43,6 @@ public class ItemCategoryJpa {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive;
 
-    /** Thuế mặc định áp cho các dòng báo giá thuộc danh mục này; để trống là không áp riêng. */
     @Column(name = "tax_rule_id")
     private Integer taxRuleId;
 }

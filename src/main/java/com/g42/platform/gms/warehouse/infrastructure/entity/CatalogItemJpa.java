@@ -1,7 +1,6 @@
 package com.g42.platform.gms.warehouse.infrastructure.entity;
 
 import com.g42.platform.gms.estimation.infrastructure.entity.TaxRuleJpa;
-import com.g42.platform.gms.estimation.infrastructure.entity.WorkCategoryJpa;
 import com.g42.platform.gms.marketing.service_catalog.infrastructure.entity.ServiceJpaEntity;
 import com.g42.platform.gms.warehouse.domain.enums.CatalogItemType;
 import jakarta.persistence.*;
@@ -67,8 +66,8 @@ public class CatalogItemJpa {
     private String madeIn;
     @Column(name = "tax_rule_id")
     private Integer taxRuleId;
-    @Column(name = "work_category_id")
-    private Integer workCategoryId;
+    @Column(name = "item_category_id")
+    private Integer itemCategoryId;
     @Size(max = 50)
     @Column(name = "part_number", length = 50)
     private String partNumber;

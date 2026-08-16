@@ -17,17 +17,8 @@ public class WorkCategoryRepoImpl implements WorkCategoryRepo {
     private final WorkCategoryInfraMapper workCategoryInfraMapper;
 
     @Override
-    public List<String> findDefaultWorkCategoryNames() {
-        return workCategoryRepository.findDefaultWorkCategoryNames();
-    }
-
-    @Override
-    public List<WorkCategory> findDefaultCategories() {
-        return workCategoryInfraMapper.toDomainList(
-            workCategoryRepository.findActiveCategories().stream()
-                .filter(c -> c.getIsDefault() != null && c.getIsDefault())
-                .toList()
-        );
+    public List<String> findActiveCategoryNames() {
+        return workCategoryRepository.findActiveSafetyInspectionCategoryNames();
     }
 
     @Override

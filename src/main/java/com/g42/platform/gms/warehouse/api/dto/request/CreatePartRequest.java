@@ -25,8 +25,12 @@ public class CreatePartRequest {
     private String description;
     private String madeIn;
     private String color;
-    /** work_category_id — mặc định 1 nếu không truyền */
-    private Integer workCategoryId = 1;
+    /**
+     * Danh mục là tùy chọn — để trống thì phụ tùng không thuộc danh mục nào.
+     * Trước đây mặc định là 1, nay không được phép vì danh mục #1 có thể không tồn tại
+     * và sẽ làm vỡ khóa ngoại.
+     */
+    private Integer itemCategoryId;
 
     private Integer brandId;
     private Integer productLineId;
