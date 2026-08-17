@@ -1,0 +1,586 @@
+# Phân hệ Tuyển dụng.
+#
+# Ba mảng nghiệp vụ, tách bảng theo đúng vòng đời của từng mảng:
+#
+# 1. job_position  : tin tuyển dụng — vừa là "vị trí" (bộ phận, số lượng, mức
+#    lương) vừa là "bài viết" (slug riêng, nội dung HTML, SEO). Gộp làm một
+#    thực thể vì trang khách luôn xem hai thứ này cùng lúc, và tách ra thì mỗi
+#    lần đăng tin phải tạo hai bản ghi khớp nhau bằng tay.
+# 2. job_benefit   : mức hỗ trợ dạng danh sách (lương cứng, phụ cấp, chỗ ở...).
+#    Để riêng thay vì nhét vào một đoạn HTML vì thẻ vị trí ngoài trang danh
+#    sách cần đọc được từng khoản để hiển thị thành chip.
+# 3. job_application : hồ sơ ứng viên gửi từ form trên trang khách, kèm trạng
+#    thái xử lý và kết quả gửi email báo về hộp thư quản lý.
+#
+# recruitment_setting là bảng cấu hình một dòng: nội dung đầu trang /tuyen-dung
+# và — quan trọng nhất — DANH SÁCH EMAIL NHẬN hồ sơ. Để trong DB chứ không để
+# ở biến môi trường vì quản lý phải tự đổi được người nhận mà không cần khởi
+# động lại ứng dụng.
+#
+# Các trường tuỳ biến của form đăng ký lưu thành MỘT chuỗi JSON
+# (job_position.form_fields_json) và câu trả lời cũng vậy
+# (job_application.answers_json) — cùng lý do với bố cục thanh đầu trang ở
+# changeset 009: thêm một loại câu hỏi mới thì không phải đụng tới schema.
+databaseChangeLog:
+  - changeSet:
+      id: 016-1-job-position
+      author: gms
+      comment: Tin tuyển dụng — vị trí kèm bài viết mô tả
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: job_position
+      changes:
+        - createTable:
+            tableName: job_position
+            remarks: Tin tuyển dụng hiển thị tại /tuyen-dung
+            columns:
+              - column:
+                  name: job_id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: slug
+                  type: VARCHAR(200)
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uk_job_position_slug
+                  remarks: Khoá của URL /tuyen-dung/{slug}
+              - column:
+                  name: title
+                  type: VARCHAR(250)
+                  constraints:
+                    nullable: false
+                  remarks: Tên vị trí, vd "Kỹ thuật viên sửa chữa chung"
+              - column:
+                  name: department
+                  type: VARCHAR(120)
+                  remarks: Bộ phận / phòng ban, dùng để lọc ngoài trang danh sách
+              - column:
+                  name: employment_type
+                  type: VARCHAR(20)
+                  defaultValue: FULL_TIME
+                  remarks: FULL_TIME / PART_TIME / INTERNSHIP / SEASONAL / CONTRACT
+              - column:
+                  name: work_location
+                  type: VARCHAR(250)
+              - column:
+                  name: headcount
+                  type: INT
+                  defaultValueNumeric: 1
+                  remarks: Số lượng cần tuyển
+              - column:
+                  name: experience_text
+                  type: VARCHAR(150)
+                  remarks: Yêu cầu kinh nghiệm dạng chữ, vd "1-2 năm" hoặc "Không yêu cầu"
+              - column:
+                  name: salary_min
+                  type: DECIMAL(14,2)
+              - column:
+                  name: salary_max
+                  type: DECIMAL(14,2)
+              - column:
+                  name: salary_period
+                  type: VARCHAR(20)
+                  defaultValue: MONTH
+                  remarks: MONTH / DAY / HOUR / PROJECT
+              - column:
+                  name: salary_text
+                  type: VARCHAR(150)
+                  remarks: Ghi đè khoảng lương khi muốn hiện "Thoả thuận"
+              - column:
+                  name: summary
+                  type: VARCHAR(500)
+                  remarks: Tóm tắt hiện trên thẻ vị trí ngoài trang danh sách
+              - column:
+                  name: content_html
+                  type: LONGTEXT
+                  remarks: Mô tả công việc, HTML đã được backend làm sạch
+              - column:
+                  name: requirement_html
+                  type: LONGTEXT
+                  remarks: Yêu cầu ứng viên
+              - column:
+                  name: benefit_html
+                  type: LONGTEXT
+                  remarks: Quyền lợi dạng văn bản, bổ sung cho danh sách job_benefit
+              - column:
+                  name: thumbnail_url
+                  type: VARCHAR(500)
+              - column:
+                  name: cover_url
+                  type: VARCHAR(500)
+              - column:
+                  name: status
+                  type: VARCHAR(20)
+                  defaultValue: DRAFT
+                  constraints:
+                    nullable: false
+                  remarks: DRAFT / PENDING / PUBLISHED / CLOSED / ARCHIVED
+              - column:
+                  name: is_featured
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+              - column:
+                  name: is_urgent
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  remarks: Gắn nhãn "Tuyển gấp" trên thẻ vị trí
+              - column:
+                  name: display_order
+                  type: INT
+                  defaultValueNumeric: 0
+              - column:
+                  name: published_at
+                  type: DATETIME(6)
+              - column:
+                  name: closing_date
+                  type: DATE
+                  remarks: Hạn nhận hồ sơ; quá hạn thì form đăng ký tự khoá
+              - column:
+                  name: author_staff_id
+                  type: INT
+              - column:
+                  name: reviewer_staff_id
+                  type: INT
+              - column:
+                  name: review_note
+                  type: VARCHAR(500)
+              - column:
+                  name: view_count
+                  type: BIGINT
+                  defaultValueNumeric: 0
+              - column:
+                  name: application_count
+                  type: INT
+                  defaultValueNumeric: 0
+                  remarks: Đếm sẵn để trang danh sách không phải COUNT bảng hồ sơ
+              - column:
+                  name: notify_emails
+                  type: VARCHAR(500)
+                  remarks: Hộp thư nhận hồ sơ riêng cho vị trí này; trống thì dùng recruitment_setting
+              - column:
+                  name: form_fields_json
+                  type: LONGTEXT
+                  remarks: "JSON [{key,label,type,required,options[]}] — câu hỏi thêm của form đăng ký"
+              - column:
+                  name: seo_title
+                  type: VARCHAR(200)
+              - column:
+                  name: seo_description
+                  type: VARCHAR(320)
+              - column:
+                  name: og_image_url
+                  type: VARCHAR(500)
+              - column:
+                  name: allow_index
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+              - column:
+                  name: created_at
+                  type: DATETIME(6)
+              - column:
+                  name: updated_at
+                  type: DATETIME(6)
+              - column:
+                  name: deleted_at
+                  type: DATETIME(6)
+                  remarks: Xoá mềm — giữ bản ghi để hồ sơ đã nộp không mất vị trí gốc
+        - addForeignKeyConstraint:
+            constraintName: fk_job_position_author_staff
+            baseTableName: job_position
+            baseColumnNames: author_staff_id
+            referencedTableName: staff_profile
+            referencedColumnNames: staff_id
+            onDelete: SET NULL
+        - addForeignKeyConstraint:
+            constraintName: fk_job_position_reviewer_staff
+            baseTableName: job_position
+            baseColumnNames: reviewer_staff_id
+            referencedTableName: staff_profile
+            referencedColumnNames: staff_id
+            onDelete: SET NULL
+        - createIndex:
+            indexName: idx_job_position_status_order
+            tableName: job_position
+            columns:
+              - column:
+                  name: status
+              - column:
+                  name: display_order
+        - createIndex:
+            indexName: idx_job_position_deleted_at
+            tableName: job_position
+            columns:
+              - column:
+                  name: deleted_at
+      rollback:
+        - dropTable:
+            tableName: job_position
+
+  - changeSet:
+      id: 016-2-job-benefit
+      author: gms
+      comment: Mức hỗ trợ của từng vị trí, hiển thị thành danh sách
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: job_benefit
+      changes:
+        - createTable:
+            tableName: job_benefit
+            remarks: Từng khoản hỗ trợ của một vị trí (lương cứng, phụ cấp, chỗ ở...)
+            columns:
+              - column:
+                  name: benefit_id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: job_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: label
+                  type: VARCHAR(150)
+                  constraints:
+                    nullable: false
+                  remarks: Tên khoản hỗ trợ, vd "Phụ cấp ăn trưa"
+              - column:
+                  name: value_text
+                  type: VARCHAR(250)
+                  remarks: Mức cụ thể, vd "30.000đ/bữa" hoặc "Theo doanh số"
+              - column:
+                  name: icon
+                  type: VARCHAR(40)
+                  remarks: Tên icon lucide do FE quy ước, vd "wallet"
+              - column:
+                  name: display_order
+                  type: INT
+                  defaultValueNumeric: 0
+        - addForeignKeyConstraint:
+            constraintName: fk_job_benefit_job
+            baseTableName: job_benefit
+            baseColumnNames: job_id
+            referencedTableName: job_position
+            referencedColumnNames: job_id
+            onDelete: CASCADE
+      rollback:
+        - dropTable:
+            tableName: job_benefit
+
+  - changeSet:
+      id: 016-3-job-application
+      author: gms
+      comment: Hồ sơ ứng tuyển gửi từ form trang khách
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: job_application
+      changes:
+        - createTable:
+            tableName: job_application
+            remarks: Một dòng là một lượt ứng viên nộp hồ sơ
+            columns:
+              - column:
+                  name: application_id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: code
+                  type: VARCHAR(30)
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uk_job_application_code
+                  remarks: Mã hồ sơ đọc được, vd UT2608-0007; dùng khi trao đổi với ứng viên
+              - column:
+                  name: job_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: full_name
+                  type: VARCHAR(150)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: phone
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: email
+                  type: VARCHAR(180)
+              - column:
+                  name: date_of_birth
+                  type: DATE
+              - column:
+                  name: gender
+                  type: VARCHAR(10)
+              - column:
+                  name: address
+                  type: VARCHAR(300)
+              - column:
+                  name: years_experience
+                  type: INT
+              - column:
+                  name: current_position
+                  type: VARCHAR(150)
+              - column:
+                  name: expected_salary
+                  type: DECIMAL(14,2)
+              - column:
+                  name: available_from
+                  type: DATE
+                  remarks: Thời điểm ứng viên có thể đi làm
+              - column:
+                  name: cover_letter
+                  type: TEXT
+              - column:
+                  name: cv_url
+                  type: VARCHAR(500)
+              - column:
+                  name: portfolio_url
+                  type: VARCHAR(500)
+              - column:
+                  name: answers_json
+                  type: TEXT
+                  remarks: "JSON {key: giá trị} cho các câu hỏi thêm của form"
+              - column:
+                  name: status
+                  type: VARCHAR(20)
+                  defaultValue: NEW
+                  constraints:
+                    nullable: false
+                  remarks: NEW / REVIEWING / INTERVIEW / OFFERED / HIRED / REJECTED
+              - column:
+                  name: rating
+                  type: INT
+                  remarks: Đánh giá nội bộ 1-5 sao
+              - column:
+                  name: internal_note
+                  type: TEXT
+                  remarks: Ghi chú của người tuyển, không bao giờ trả ra API công khai
+              - column:
+                  name: handled_by_staff_id
+                  type: INT
+              - column:
+                  name: handled_at
+                  type: DATETIME(6)
+              - column:
+                  name: notify_status
+                  type: VARCHAR(20)
+                  defaultValue: PENDING
+                  remarks: PENDING / SENT / FAILED / SKIPPED — kết quả gửi mail báo hồ sơ mới
+              - column:
+                  name: notify_error
+                  type: VARCHAR(500)
+                  remarks: Lý do gửi hỏng, để quản lý biết đường sửa cấu hình SMTP
+              - column:
+                  name: notified_at
+                  type: DATETIME(6)
+              - column:
+                  name: ack_sent
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  remarks: Đã gửi thư xác nhận cho chính ứng viên hay chưa
+              - column:
+                  name: utm_source
+                  type: VARCHAR(120)
+              - column:
+                  name: utm_campaign
+                  type: VARCHAR(120)
+              - column:
+                  name: submitter_hash
+                  type: VARCHAR(64)
+                  remarks: SHA-256 của IP + muối, dùng chặn gửi trùng liên tục; không lưu IP thô
+              - column:
+                  name: created_at
+                  type: DATETIME(6)
+              - column:
+                  name: updated_at
+                  type: DATETIME(6)
+        - addForeignKeyConstraint:
+            constraintName: fk_job_application_job
+            baseTableName: job_application
+            baseColumnNames: job_id
+            referencedTableName: job_position
+            referencedColumnNames: job_id
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            constraintName: fk_job_application_handled_staff
+            baseTableName: job_application
+            baseColumnNames: handled_by_staff_id
+            referencedTableName: staff_profile
+            referencedColumnNames: staff_id
+            onDelete: SET NULL
+        - createIndex:
+            indexName: idx_job_application_job_status
+            tableName: job_application
+            columns:
+              - column:
+                  name: job_id
+              - column:
+                  name: status
+        - createIndex:
+            indexName: idx_job_application_created_at
+            tableName: job_application
+            columns:
+              - column:
+                  name: created_at
+        - createIndex:
+            indexName: idx_job_application_dedupe
+            tableName: job_application
+            columns:
+              - column:
+                  name: phone
+              - column:
+                  name: job_id
+      rollback:
+        - dropTable:
+            tableName: job_application
+
+  - changeSet:
+      id: 016-4-recruitment-setting
+      author: gms
+      comment: Cấu hình trang tuyển dụng và hộp thư nhận hồ sơ
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: recruitment_setting
+      changes:
+        - createTable:
+            tableName: recruitment_setting
+            remarks: Bảng một dòng (setting_id = 1) — cấu hình dùng chung của phân hệ tuyển dụng
+            columns:
+              - column:
+                  name: setting_id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: is_page_enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  remarks: Tắt thì /tuyen-dung trả về trang trống, dùng khi hết đợt tuyển
+              - column:
+                  name: page_title
+                  type: VARCHAR(200)
+              - column:
+                  name: page_subtitle
+                  type: VARCHAR(500)
+              - column:
+                  name: page_intro_html
+                  type: LONGTEXT
+                  remarks: Đoạn giới thiệu đầu trang, HTML đã làm sạch
+              - column:
+                  name: banner_url
+                  type: VARCHAR(500)
+              - column:
+                  name: contact_hotline
+                  type: VARCHAR(30)
+              - column:
+                  name: contact_address
+                  type: VARCHAR(300)
+              - column:
+                  name: notify_enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+              - column:
+                  name: recipient_emails
+                  type: VARCHAR(1000)
+                  remarks: Danh sách email nhận hồ sơ, phân tách bằng dấu phẩy
+              - column:
+                  name: cc_emails
+                  type: VARCHAR(1000)
+              - column:
+                  name: subject_prefix
+                  type: VARCHAR(100)
+                  defaultValue: "[Ứng tuyển]"
+                  remarks: Tiền tố tiêu đề thư, giúp quản lý đặt bộ lọc trong hộp thư
+              - column:
+                  name: send_ack_enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  remarks: Có gửi thư cảm ơn về địa chỉ của chính ứng viên hay không
+              - column:
+                  name: ack_subject
+                  type: VARCHAR(200)
+              - column:
+                  name: ack_body_html
+                  type: LONGTEXT
+                  remarks: "Thân thư cảm ơn; hỗ trợ biến {{ten}}, {{vitri}}, {{mahoso}}"
+              - column:
+                  name: seo_title
+                  type: VARCHAR(200)
+              - column:
+                  name: seo_description
+                  type: VARCHAR(320)
+              - column:
+                  name: og_image_url
+                  type: VARCHAR(500)
+              - column:
+                  name: updated_at
+                  type: DATETIME(6)
+              - column:
+                  name: updated_by_staff_id
+                  type: INT
+        - addForeignKeyConstraint:
+            constraintName: fk_recruitment_setting_staff
+            baseTableName: recruitment_setting
+            baseColumnNames: updated_by_staff_id
+            referencedTableName: staff_profile
+            referencedColumnNames: staff_id
+            onDelete: SET NULL
+      rollback:
+        - dropTable:
+            tableName: recruitment_setting
+
+  - changeSet:
+      id: 016-5-seed-recruitment-setting
+      author: gms
+      comment: Dòng cấu hình khởi tạo để màn hình cài đặt có sẵn nội dung mẫu
+      preConditions:
+        - onFail: MARK_RAN
+        - and:
+            - tableExists:
+                tableName: recruitment_setting
+            - sqlCheck:
+                expectedResult: "0"
+                sql: SELECT COUNT(*) FROM recruitment_setting
+      changes:
+        - insert:
+            tableName: recruitment_setting
+            columns:
+              - column: {name: setting_id, valueNumeric: 1}
+              - column: {name: is_page_enabled, valueBoolean: true}
+              - column: {name: page_title, value: "Tuyển dụng tại Michelin Sơn Tây"}
+              - column: {name: page_subtitle, value: "Cùng xây dựng xưởng dịch vụ được khách hàng tin cậy nhất khu vực"}
+              - column: {name: notify_enabled, valueBoolean: true}
+              - column: {name: subject_prefix, value: "[Ứng tuyển]"}
+              - column: {name: send_ack_enabled, valueBoolean: false}
+              - column: {name: ack_subject, value: "Michelin Sơn Tây đã nhận hồ sơ của bạn"}
+              - column:
+                  name: ack_body_html
+                  value: "<p>Chào {{ten}},</p><p>Chúng tôi đã nhận hồ sơ ứng tuyển vị trí <b>{{vitri}}</b> (mã hồ sơ {{mahoso}}). Bộ phận nhân sự sẽ liên hệ lại trong vòng 5 ngày làm việc.</p><p>Trân trọng cảm ơn bạn đã quan tâm tới Michelin Sơn Tây.</p>"
+      rollback:
+        - delete:
+            tableName: recruitment_setting
+            where: setting_id = 1

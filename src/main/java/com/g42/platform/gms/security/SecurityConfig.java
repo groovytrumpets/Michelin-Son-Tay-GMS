@@ -80,6 +80,8 @@ public class SecurityConfig {
                                 "/api/public/nav-menu/**",
                                 // Bố cục thanh đầu trang (logo, ô tìm kiếm, nút) — cùng lý do.
                                 "/api/public/site-header",
+                                // Tuyển dụng: ứng viên xem tin và nộp hồ sơ mà không có tài khoản.
+                                "/api/public/recruitment/**",
                                 "/seo/**"
                         ).permitAll()
                         .anyRequest().authenticated()

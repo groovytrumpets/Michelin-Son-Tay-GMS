@@ -89,6 +89,70 @@ public class EmailNotificationSender {
         return send(to, "Báo giá dịch vụ " + orderCode, html);
     }
 
+    /**
+     * SMTP đã khai báo đủ để gửi được thư hay chưa.
+     *
+     * <p>Màn hình cấu hình của phân hệ tuyển dụng hỏi giá trị này để cảnh báo
+     * trước: nếu không, người dùng điền đủ danh sách người nhận mà thư vẫn
+     * không bao giờ tới, và trên màn hình chẳng có gì cho thấy vì sao.
+     */
+    public boolean isConfigured() {
+        return smtpHost != null && !smtpHost.isBlank()
+                && smtpPassword != null && !smtpPassword.isBlank();
+    }
+
+    /**
+     * Gửi một thư HTML tự soạn tới nhiều người nhận.
+     *
+     * <p>Các hàm {@code send*} ở trên đóng khuôn sẵn từng loại thư nghiệp vụ;
+     * hàm này để cho những nơi tự dựng lấy nội dung (vd thư báo hồ sơ ứng tuyển
+     * mới) nhưng vẫn dùng chung một chỗ cấu hình SMTP và một cách xử lý lỗi.
+     *
+     * @throws MailDeliveryException khi gửi hỏng — khác các hàm trên trả về
+     *         false, vì nơi gọi cần chính lý do hỏng để lưu lại cho người quản
+     *         lý xem, chứ không chỉ cần biết "có gửi được hay không".
+     */
+    public void sendHtmlOrThrow(List<String> to, List<String> cc, String subject, String htmlBody) {
+        List<String> recipients = clean(to);
+        if (recipients.isEmpty()) {
+            throw new MailDeliveryException("Chưa có địa chỉ người nhận");
+        }
+        if (!isConfigured()) {
+            throw new MailDeliveryException("Chưa cấu hình máy chủ SMTP (MAIL_SMTP_HOST / MAIL_SMTP_PASSWORD)");
+        }
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, false, "UTF-8");
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(recipients.toArray(String[]::new));
+            List<String> copies = clean(cc);
+            if (!copies.isEmpty()) helper.setCc(copies.toArray(String[]::new));
+            helper.setSubject(subject);
+            helper.setText(htmlBody, true);
+            mailSender.send(message);
+            log.debug("Email: gửi '{}' tới {} thành công", subject, recipients);
+        } catch (Exception e) {
+            log.error("Email: gửi '{}' tới {} thất bại: {}", subject, recipients, describeFailure(e));
+            throw new MailDeliveryException(describeFailure(e));
+        }
+    }
+
+    private List<String> clean(List<String> addresses) {
+        if (addresses == null) return List.of();
+        return addresses.stream()
+                .filter(address -> address != null && !address.isBlank())
+                .map(String::trim)
+                .distinct()
+                .toList();
+    }
+
+    /** Gửi thư hỏng kèm lý do đọc được, để nơi gọi lưu lại cho người dùng xem. */
+    public static class MailDeliveryException extends RuntimeException {
+        public MailDeliveryException(String message) {
+            super(message);
+        }
+    }
+
     /** @return true nếu email đã được gửi đi; false nếu thiếu người nhận, chưa cấu hình SMTP, hoặc gửi lỗi. */
     private boolean send(String to, String subject, String htmlBody) {
         if (to == null || to.isBlank()) {
