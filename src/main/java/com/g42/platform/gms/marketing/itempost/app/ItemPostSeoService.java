@@ -1,10 +1,10 @@
-package com.g42.platform.gms.marketing.news.app;
+package com.g42.platform.gms.marketing.itempost.app;
 
-import com.g42.platform.gms.marketing.news.infrastructure.entity.PostCategoryJpa;
-import com.g42.platform.gms.marketing.news.infrastructure.entity.PostJpa;
-import com.g42.platform.gms.marketing.news.infrastructure.entity.PostTagJpa;
-import com.g42.platform.gms.marketing.news.infrastructure.repository.PostCategoryJpaRepo;
-import com.g42.platform.gms.marketing.news.infrastructure.repository.PostJpaRepo;
+import com.g42.platform.gms.marketing.itempost.infrastructure.entity.ItemPostCategoryJpa;
+import com.g42.platform.gms.marketing.itempost.infrastructure.entity.ItemPostJpa;
+import com.g42.platform.gms.marketing.itempost.infrastructure.entity.ItemPostTagJpa;
+import com.g42.platform.gms.marketing.itempost.infrastructure.repository.ItemPostCategoryJpaRepo;
+import com.g42.platform.gms.marketing.itempost.infrastructure.repository.ItemPostJpaRepo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Sinh nội dung cho máy đọc: HTML prerender, sitemap và RSS.
+ * Sinh nội dung cho máy đọc: HTML prerender và sitemap cho bài viết phụ tùng.
  *
  * <p>Frontend là ứng dụng một trang không dựng sẵn HTML, nên bot của Facebook,
  * Zalo và Twitter tải trang về chỉ thấy khung rỗng — link chia sẻ vì thế không
@@ -29,17 +29,15 @@ import java.util.stream.Collectors;
  */
 @Service
 @RequiredArgsConstructor
-public class PostSeoService {
+public class ItemPostSeoService {
 
     private static final int SITEMAP_LIMIT = 5000;
-    private static final int RSS_LIMIT = 30;
     private static final ZoneId ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
-    private static final DateTimeFormatter RSS_DATE = DateTimeFormatter.RFC_1123_DATE_TIME;
     private static final DateTimeFormatter ISO_DATE = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
 
-    private final PostJpaRepo postRepo;
-    private final PostCategoryJpaRepo categoryRepo;
-    private final PostContentService contentService;
+    private final ItemPostJpaRepo itemPostRepo;
+    private final ItemPostCategoryJpaRepo categoryRepo;
+    private final ItemPostContentService contentService;
 
     /** Tên miền công khai của trang khách; dùng để dựng URL tuyệt đối. */
     @Value("${news.site.url:https://sontaygarage.vn}")
@@ -51,18 +49,18 @@ public class PostSeoService {
     @Value("${news.site.logo:https://sontaygarage.vn/Copy%20of%20Logo.png}")
     private String siteLogo;
 
-    /** Tên miền của chính backend — nơi đặt sitemap và RSS khai báo với Google. */
+    /** Tên miền của chính backend — nơi đặt sitemap khai báo với Google. */
     @Value("${news.api.url:https://api.sontaygarage.vn}")
     private String apiUrl;
 
     // ------------------------------------------------------------- prerender
 
     /**
-     * HTML tĩnh của một bài viết dành cho bot. Ngoài thẻ meta còn kèm cả nội
-     * dung bài để Google đọc được ngay mà không phải chạy JavaScript.
+     * HTML tĩnh của một bài viết phụ tùng dành cho bot. Ngoài thẻ meta còn kèm
+     * cả nội dung bài để Google đọc được ngay mà không phải chạy JavaScript.
      */
     @Transactional(readOnly = true)
-    public String renderPostHtml(PostJpa post) {
+    public String renderPostHtml(ItemPostJpa post) {
         String url = postUrl(post.getSlug());
         String title = firstNonBlank(post.getSeoTitle(), post.getTitle());
         String description = firstNonBlank(
@@ -75,10 +73,10 @@ public class PostSeoService {
         String published = toIso(post.getPublishedAt());
         String modified = toIso(post.getUpdatedAt() != null ? post.getUpdatedAt() : post.getPublishedAt());
         String author = post.getAuthor() == null ? siteName : post.getAuthor().getFullName();
-        String categoryName = post.getCategory() == null ? "Tin tức" : post.getCategory().getName();
+        String categoryName = post.getCategory() == null ? "Phụ tùng" : post.getCategory().getName();
         String keywords = firstNonBlank(
                 post.getSeoKeywords(),
-                post.getTags().stream().map(PostTagJpa::getName).collect(Collectors.joining(", ")));
+                post.getTags().stream().map(ItemPostTagJpa::getName).collect(Collectors.joining(", ")));
 
         return """
                 <!doctype html>
@@ -157,7 +155,7 @@ public class PostSeoService {
                 <title>Không tìm thấy bài viết - %s</title>
                 <meta name="robots" content="noindex, nofollow">
                 </head><body><h1>Không tìm thấy bài viết</h1>
-                <p><a href="%s/tin-tuc">Quay lại trang tin tức</a></p>
+                <p><a href="%s/phu-tung">Quay lại trang phụ tùng</a></p>
                 </body></html>
                 """.formatted(escape(siteName), escape(siteUrl()));
     }
@@ -165,32 +163,19 @@ public class PostSeoService {
     // --------------------------------------------------------------- sitemap
 
     @Transactional(readOnly = true)
-    public String sitemapIndex() {
-        String now = toIso(LocalDateTime.now());
-        return """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-                <sitemap><loc>%s/seo/sitemap-posts.xml</loc><lastmod>%s</lastmod></sitemap>
-                <sitemap><loc>%s/seo/news-sitemap.xml</loc><lastmod>%s</lastmod></sitemap>
-                <sitemap><loc>%s/seo/sitemap-item-posts.xml</loc><lastmod>%s</lastmod></sitemap>
-                </sitemapindex>
-                """.formatted(apiBase(), now, apiBase(), now, apiBase(), now);
-    }
-
-    @Transactional(readOnly = true)
-    public String postsSitemap() {
-        List<PostJpa> posts = postRepo.findIndexablePublished(LocalDateTime.now(), PageRequest.of(0, SITEMAP_LIMIT));
+    public String itemPostsSitemap() {
+        List<ItemPostJpa> posts = itemPostRepo.findIndexablePublished(LocalDateTime.now(), PageRequest.of(0, SITEMAP_LIMIT));
 
         StringBuilder xml = new StringBuilder();
         xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
                 .append("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n");
 
-        xml.append(urlEntry(siteUrl() + "/tin-tuc", toIso(LocalDateTime.now()), "daily", "0.9"));
-        for (PostCategoryJpa category : categoryRepo.findByIsActiveTrueOrderByDisplayOrderAscNameAsc()) {
-            xml.append(urlEntry(siteUrl() + "/tin-tuc/danh-muc/" + category.getSlug(),
+        xml.append(urlEntry(siteUrl() + "/phu-tung", toIso(LocalDateTime.now()), "daily", "0.9"));
+        for (ItemPostCategoryJpa category : categoryRepo.findByIsActiveTrueOrderByDisplayOrderAscNameAsc()) {
+            xml.append(urlEntry(siteUrl() + "/phu-tung/danh-muc/" + category.getSlug(),
                     toIso(LocalDateTime.now()), "weekly", "0.7"));
         }
-        for (PostJpa post : posts) {
+        for (ItemPostJpa post : posts) {
             String lastmod = toIso(post.getUpdatedAt() != null ? post.getUpdatedAt() : post.getPublishedAt());
             xml.append(urlEntry(postUrl(post.getSlug()), lastmod, "monthly", "0.8"));
         }
@@ -198,75 +183,12 @@ public class PostSeoService {
         return xml.append("</urlset>\n").toString();
     }
 
-    /** Sitemap riêng theo chuẩn Google News cho bài trong 48 giờ. */
-    @Transactional(readOnly = true)
-    public String newsSitemap() {
-        LocalDateTime now = LocalDateTime.now();
-        List<PostJpa> posts = postRepo.findRecentForNewsSitemap(now.minusHours(48), now);
-
-        StringBuilder xml = new StringBuilder();
-        xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
-                .append("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\" ")
-                .append("xmlns:news=\"http://www.google.com/schemas/sitemap-news/0.9\">\n");
-
-        for (PostJpa post : posts) {
-            xml.append("<url><loc>").append(escape(postUrl(post.getSlug()))).append("</loc>")
-                    .append("<news:news><news:publication>")
-                    .append("<news:name>").append(escape(siteName)).append("</news:name>")
-                    .append("<news:language>vi</news:language>")
-                    .append("</news:publication>")
-                    .append("<news:publication_date>").append(toIso(post.getPublishedAt())).append("</news:publication_date>")
-                    .append("<news:title>").append(escape(post.getTitle())).append("</news:title>")
-                    .append("</news:news></url>\n");
-        }
-
-        return xml.append("</urlset>\n").toString();
-    }
-
-    @Transactional(readOnly = true)
-    public String rssFeed() {
-        List<PostJpa> posts = postRepo.findIndexablePublished(LocalDateTime.now(), PageRequest.of(0, RSS_LIMIT));
-
-        StringBuilder xml = new StringBuilder();
-        xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
-                .append("<rss version=\"2.0\"><channel>\n")
-                .append("<title>").append(escape("Tin tức " + siteName)).append("</title>\n")
-                .append("<link>").append(escape(siteUrl() + "/tin-tuc")).append("</link>\n")
-                .append("<description>").append(escape("Tin khuyến mãi, kiến thức chăm xe và hoạt động của " + siteName))
-                .append("</description>\n")
-                .append("<language>vi</language>\n");
-
-        for (PostJpa post : posts) {
-            xml.append("<item>")
-                    .append("<title>").append(escape(post.getTitle())).append("</title>")
-                    .append("<link>").append(escape(postUrl(post.getSlug()))).append("</link>")
-                    .append("<guid isPermaLink=\"true\">").append(escape(postUrl(post.getSlug()))).append("</guid>")
-                    .append("<description>").append(escape(firstNonBlank(post.getExcerpt(), ""))).append("</description>")
-                    .append("<pubDate>").append(toRssDate(post.getPublishedAt())).append("</pubDate>")
-                    .append("</item>\n");
-        }
-
-        return xml.append("</channel></rss>\n").toString();
-    }
-
-    public String robotsTxt() {
-        return """
-                User-agent: *
-                Allow: /
-                Disallow: /login
-                Disallow: /checkout
-                Disallow: /user-profile
-
-                Sitemap: %s/seo/sitemap.xml
-                """.formatted(apiBase());
-    }
-
     // ---------------------------------------------------------------- nội bộ
 
     private String articleJsonLd(String url, String title, String description,
                                  String image, String published, String modified, String author) {
         return """
-                {"@context":"https://schema.org","@type":"NewsArticle",\
+                {"@context":"https://schema.org","@type":"Article",\
                 "headline":"%s","description":"%s","image":["%s"],\
                 "datePublished":"%s","dateModified":"%s",\
                 "author":{"@type":"Person","name":"%s"},\
@@ -278,16 +200,16 @@ public class PostSeoService {
                 json(author), json(siteName), json(siteLogo), json(url));
     }
 
-    private String breadcrumbJsonLd(PostJpa post, String url) {
-        String categoryName = post.getCategory() == null ? "Tin tức" : post.getCategory().getName();
+    private String breadcrumbJsonLd(ItemPostJpa post, String url) {
+        String categoryName = post.getCategory() == null ? "Phụ tùng" : post.getCategory().getName();
         String categoryUrl = post.getCategory() == null
-                ? siteUrl() + "/tin-tuc"
-                : siteUrl() + "/tin-tuc/danh-muc/" + post.getCategory().getSlug();
+                ? siteUrl() + "/phu-tung"
+                : siteUrl() + "/phu-tung/danh-muc/" + post.getCategory().getSlug();
 
         return """
                 {"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[\
                 {"@type":"ListItem","position":1,"name":"Trang chủ","item":"%s"},\
-                {"@type":"ListItem","position":2,"name":"Tin tức","item":"%s/tin-tuc"},\
+                {"@type":"ListItem","position":2,"name":"Phụ tùng","item":"%s/phu-tung"},\
                 {"@type":"ListItem","position":3,"name":"%s","item":"%s"},\
                 {"@type":"ListItem","position":4,"name":"%s","item":"%s"}]}\
                 """.formatted(
@@ -304,15 +226,11 @@ public class PostSeoService {
     }
 
     public String postUrl(String slug) {
-        return siteUrl() + "/tin-tuc/" + slug;
+        return siteUrl() + "/phu-tung/" + slug;
     }
 
     private String siteUrl() {
         return siteUrl == null ? "" : siteUrl.replaceAll("/+$", "");
-    }
-
-    private String apiBase() {
-        return apiUrl == null ? "" : apiUrl.replaceAll("/+$", "");
     }
 
     private String absolute(String url) {
@@ -324,11 +242,6 @@ public class PostSeoService {
     private String toIso(LocalDateTime moment) {
         LocalDateTime value = moment == null ? LocalDateTime.now() : moment;
         return ZonedDateTime.of(value, ZONE).format(ISO_DATE);
-    }
-
-    private String toRssDate(LocalDateTime moment) {
-        LocalDateTime value = moment == null ? LocalDateTime.now() : moment;
-        return ZonedDateTime.of(value, ZONE).format(RSS_DATE);
     }
 
     private static String firstNonBlank(String... values) {

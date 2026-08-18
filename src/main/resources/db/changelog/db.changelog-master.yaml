@@ -58,4 +58,7 @@ databaseChangeLog:
   - include:
       file: changes/016-recruitment.yaml
       relativeToChangelogFile: true
+  - include:
+      file: changes/017-item-post.yaml
+      relativeToChangelogFile: true
 

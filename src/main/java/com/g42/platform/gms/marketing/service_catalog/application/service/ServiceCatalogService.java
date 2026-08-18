@@ -11,6 +11,9 @@ import com.g42.platform.gms.marketing.service_catalog.domain.enums.MediaType;
 import com.g42.platform.gms.marketing.service_catalog.domain.exception.ServiceErrorCode;
 import com.g42.platform.gms.marketing.service_catalog.domain.exception.ServiceException;
 import com.g42.platform.gms.marketing.service_catalog.domain.repository.ServiceRepository;
+import com.g42.platform.gms.marketing.itempost.domain.ItemPostStatus;
+import com.g42.platform.gms.marketing.itempost.infrastructure.entity.ItemPostJpa;
+import com.g42.platform.gms.marketing.itempost.infrastructure.repository.ItemPostJpaRepo;
 import com.g42.platform.gms.warehouse.api.dto.HomeCatalogItemInfoDto;
 import com.g42.platform.gms.warehouse.api.internal.WarehouseInternalApi;
 import com.g42.platform.gms.warehouse.domain.enums.CatalogItemType;
@@ -35,10 +38,16 @@ public class ServiceCatalogService {
     private final ImageUploadService imageUploadService;
     private final WarehouseInternalApi warehouseInternalApi;
     private final CatalogItemService catalogItemService;
+    private final ItemPostJpaRepo itemPostJpaRepo;
 
     public List<ServiceSumaryRespond> getListActiveServices() {
         LocalDateTime now = LocalDateTime.now();
-        return serviceRepository.findAllActive().stream().filter(service -> service.isVisibleNow(now)).map(serviceDtoMapper::toDto).toList();
+        List<ServiceSumaryRespond> respondList = serviceRepository.findAllActive().stream()
+                .filter(service -> service.isVisibleNow(now))
+                .map(serviceDtoMapper::toDto)
+                .toList();
+        enrichWithSlugs(respondList);
+        return respondList;
     }
 
     @Transactional(noRollbackFor = ServiceException.class)
@@ -181,6 +190,7 @@ public class ServiceCatalogService {
                 serviceRepository.getListOfProductsByCatalogItem(page,size,itemType,search,sortBy,maxPrice,minPrice,resolvedCategoryId,brandId,productLineId,vehicleBrand,vehicleModel);
         Page<ServiceSumaryRespond> dtoPage = services.map(serviceDtoMapper::toDto);
         enrichWithWarehouseInfo(dtoPage.getContent());
+        enrichWithSlugs(dtoPage.getContent());
         return dtoPage;
     }
 
@@ -220,6 +230,32 @@ public class ServiceCatalogService {
             if ("PART".equalsIgnoreCase(info.getItemType())) {
                 dto.setInStock(availableQty != null && availableQty > 0);
             }
+        }
+    }
+
+    /**
+     * Gắn slug bài viết item_post PUBLISHED cho từng dòng sản phẩm công khai, tra hàng
+     * loạt theo catalogItemId để tránh N+1. Item chưa có bài viết giữ slug null — FE tự
+     * fallback về link id số.
+     */
+    private void enrichWithSlugs(List<ServiceSumaryRespond> dtos) {
+        java.util.List<Integer> itemIds = dtos.stream()
+                .map(ServiceSumaryRespond::getCatalogItemId)
+                .filter(id -> id > 0)
+                .distinct()
+                .toList();
+        if (itemIds.isEmpty()) return;
+
+        java.util.Map<Integer, String> slugByCatalogItemId = itemPostJpaRepo
+                .findByCatalogItemIdInAndStatusAndDeletedAtIsNull(itemIds, ItemPostStatus.PUBLISHED)
+                .stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        ItemPostJpa::getCatalogItemId,
+                        ItemPostJpa::getSlug,
+                        (existing, duplicate) -> existing));
+
+        for (ServiceSumaryRespond dto : dtos) {
+            dto.setSlug(slugByCatalogItemId.get(dto.getCatalogItemId()));
         }
     }
 }

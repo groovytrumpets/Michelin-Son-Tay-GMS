@@ -1,5 +1,8 @@
 package com.g42.platform.gms.marketing.news.api.controller;
 
+import com.g42.platform.gms.marketing.itempost.app.ItemPostSeoService;
+import com.g42.platform.gms.marketing.itempost.app.PublicItemPostService;
+import com.g42.platform.gms.marketing.itempost.infrastructure.entity.ItemPostJpa;
 import com.g42.platform.gms.marketing.news.app.PostSeoService;
 import com.g42.platform.gms.marketing.news.app.PublicPostService;
 import com.g42.platform.gms.marketing.news.infrastructure.entity.PostJpa;
@@ -34,6 +37,8 @@ public class SeoController {
 
     private final PostSeoService seoService;
     private final PublicPostService publicPostService;
+    private final ItemPostSeoService itemPostSeoService;
+    private final PublicItemPostService publicItemPostService;
 
     /** HTML đầy đủ thẻ meta của một bài viết, phục vụ bot chia sẻ và bot tìm kiếm. */
     @GetMapping(value = "/prerender/tin-tuc/{slug}", produces = "text/html; charset=UTF-8")
@@ -47,6 +52,18 @@ public class SeoController {
         return ResponseEntity.ok().contentType(HTML).body(seoService.renderPostHtml(post.get()));
     }
 
+    /** HTML đầy đủ thẻ meta của một bài viết phụ tùng, mirror {@link #prerenderPost}. */
+    @GetMapping(value = "/prerender/phu-tung/{slug}", produces = "text/html; charset=UTF-8")
+    public ResponseEntity<String> prerenderItemPost(@PathVariable String slug) {
+        Optional<ItemPostJpa> post = publicItemPostService.findVisibleEntity(slug);
+        if (post.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .contentType(HTML)
+                    .body(itemPostSeoService.renderNotFoundHtml());
+        }
+        return ResponseEntity.ok().contentType(HTML).body(itemPostSeoService.renderPostHtml(post.get()));
+    }
+
     @GetMapping(value = "/sitemap.xml", produces = "application/xml; charset=UTF-8")
     public ResponseEntity<String> sitemapIndex() {
         return ResponseEntity.ok().contentType(XML).body(seoService.sitemapIndex());
@@ -55,6 +72,11 @@ public class SeoController {
     @GetMapping(value = "/sitemap-posts.xml", produces = "application/xml; charset=UTF-8")
     public ResponseEntity<String> postsSitemap() {
         return ResponseEntity.ok().contentType(XML).body(seoService.postsSitemap());
+    }
+
+    @GetMapping(value = "/sitemap-item-posts.xml", produces = "application/xml; charset=UTF-8")
+    public ResponseEntity<String> itemPostsSitemap() {
+        return ResponseEntity.ok().contentType(XML).body(itemPostSeoService.itemPostsSitemap());
     }
 
     @GetMapping(value = "/news-sitemap.xml", produces = "application/xml; charset=UTF-8")
