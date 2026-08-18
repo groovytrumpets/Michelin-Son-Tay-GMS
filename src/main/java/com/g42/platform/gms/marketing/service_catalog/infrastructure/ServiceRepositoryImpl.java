@@ -7,6 +7,7 @@ import com.g42.platform.gms.marketing.service_catalog.infrastructure.entity.Serv
 import com.g42.platform.gms.marketing.service_catalog.infrastructure.mapper.ServiceMapper;
 import com.g42.platform.gms.marketing.service_catalog.infrastructure.repository.CatalogRepoJpa;
 import com.g42.platform.gms.marketing.service_catalog.infrastructure.repository.ServiceJpaRepository;
+import com.g42.platform.gms.marketing.service_catalog.infrastructure.repository.ServiceMediaJpaRepository;
 import com.g42.platform.gms.marketing.service_catalog.infrastructure.specification.ServiceSpecification;
 import com.g42.platform.gms.warehouse.domain.enums.CatalogItemType;
 import lombok.AllArgsConstructor;
@@ -26,6 +27,7 @@ public class ServiceRepositoryImpl implements ServiceRepository {
     private final ServiceJpaRepository serviceJpaRepository;
     private final CatalogRepoJpa catalogRepo;
     private final ServiceMapper serviceMapper;
+    private final ServiceMediaJpaRepository serviceMediaJpaRepository;
 
     @Override
     public List<Service> findAllActive() {
@@ -51,6 +53,15 @@ public class ServiceRepositoryImpl implements ServiceRepository {
     public Service save(Service service) {
         ServiceJpaEntity serviceJpaEntity = serviceJpaRepository.save(serviceMapper.toJpaEntity(service));
         return serviceMapper.toDomain(serviceJpaEntity);
+    }
+
+    @Override
+    public void deleteById(Long serviceId) {
+        // Bulk JPQL delete (không nạp entity vào persistence context) — findById()+
+        // remove() từng gây TransientObjectException lúc flush khi Hibernate duyệt
+        // qua ServiceJpaEntity.catalogItems (mappedBy phía booking_management.CatalogItemJpa).
+        serviceMediaJpaRepository.deleteByServiceId(serviceId);
+        serviceJpaRepository.deleteServiceById(serviceId);
     }
 
     @Override

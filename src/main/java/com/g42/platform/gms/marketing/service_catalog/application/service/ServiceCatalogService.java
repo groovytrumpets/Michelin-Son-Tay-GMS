@@ -234,6 +234,24 @@ public class ServiceCatalogService {
     }
 
     /**
+     * Xóa hẳn service (giá/media/thời gian ước tính) gắn với một catalog item — gỡ
+     * liên kết catalog_item.service_service_id trước để tránh vi phạm khoá ngoại,
+     * rồi xóa service (Hibernate cascade xóa luôn service_media theo orphanRemoval).
+     * catalog_item và item_post (bài viết) của mặt hàng không bị ảnh hưởng — sau khi
+     * xóa, nút "Sửa bài viết" ở danh sách quay lại thành "Tạo bài viết" để tạo mới.
+     */
+    @Transactional
+    public void deleteService(Long serviceId) {
+        com.g42.platform.gms.marketing.service_catalog.domain.entity.Service service =
+                serviceRepository.findServiceDetailById(serviceId);
+        if (service == null) {
+            throw new ServiceException("Service not found", ServiceErrorCode.SERVICE_NOT_FOUND);
+        }
+        warehouseInternalApi.clearCatalogService(serviceId);
+        serviceRepository.deleteById(serviceId);
+    }
+
+    /**
      * Gắn slug bài viết item_post PUBLISHED cho từng dòng sản phẩm công khai, tra hàng
      * loạt theo catalogItemId để tránh N+1. Item chưa có bài viết giữ slug null — FE tự
      * fallback về link id số.

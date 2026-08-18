@@ -22,4 +22,6 @@ public interface CatalogItemJpaRepo extends JpaRepository<CatalogItemJpa,Integer
     boolean existsByItemCategoryId(Integer itemCategoryId);
 
     boolean existsByUnit(String unit);
+
+    List<CatalogItemJpa> findByServiceId(Long serviceId);
 }

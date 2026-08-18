@@ -16,5 +16,7 @@ public interface ServiceRepository {
 
     Service save(Service service);
 
+    void deleteById(Long serviceId);
+
     Page<Service> getListOfProductsByCatalogItem(int page, int size, CatalogItemType itemType, String search, String sortBy, BigDecimal maxPrice, BigDecimal minPrice, Integer categoryCode, Integer brandId, Integer productLineId, String vehicleBrand, String vehicleModel);
 }

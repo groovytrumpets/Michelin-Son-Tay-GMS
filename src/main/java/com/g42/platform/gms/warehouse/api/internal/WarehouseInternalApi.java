@@ -18,6 +18,9 @@ public interface WarehouseInternalApi {
 
     void updateCatalogBlogService(Service serviceSaved, Integer catalogId);
 
+    /** Gỡ liên kết service khỏi mọi catalog item đang trỏ tới nó — dùng trước khi xóa service. */
+    void clearCatalogService(Long serviceId);
+
     void updateInventoryEstimateAllocation(Integer itemId, Integer warehouseId,Integer quantity);
 
     Integer findCodeByCategoryCode(String categoryCode);

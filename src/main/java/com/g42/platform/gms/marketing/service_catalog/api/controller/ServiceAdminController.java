@@ -25,4 +25,11 @@ public class ServiceAdminController {
     public ResponseEntity<ApiResponse<ServiceDetailRespond>> updateService(@ModelAttribute ServiceCreateRequest request,@PathVariable Long serviceId) throws IOException {
         return ResponseEntity.ok(ApiResponses.success(serviceCatalogService.updateService(request,serviceId)));
     }
+
+    /** Xóa hẳn service (giá/media) khỏi catalog item — để nút "Sửa bài viết" quay lại thành "Tạo bài viết". */
+    @DeleteMapping("delete/{serviceId}")
+    public ResponseEntity<ApiResponse<Void>> deleteService(@PathVariable Long serviceId) {
+        serviceCatalogService.deleteService(serviceId);
+        return ResponseEntity.ok(ApiResponses.success(null));
+    }
 }

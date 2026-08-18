@@ -6,6 +6,9 @@ import com.g42.platform.gms.marketing.service_catalog.infrastructure.entity.Serv
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
@@ -14,4 +17,14 @@ public interface ServiceJpaRepository extends JpaRepository<ServiceJpaEntity, Lo
     List<ServiceJpaEntity> findAllByStatus(ServiceStatus status);
 
     ServiceJpaEntity searchByServiceId(Long serviceId);
+
+    /**
+     * Xóa hàng loạt (bulk JPQL delete) thay vì findById()+remove() — tránh Hibernate
+     * duyệt quan hệ ServiceJpaEntity.catalogItems (mappedBy phía
+     * booking_management.CatalogItemJpa.serviceService) lúc flush, từng gây
+     * TransientObjectException dù không có cascade nào được khai báo trên quan hệ đó.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("delete from ServiceJpaEntity s where s.serviceId = :serviceId")
+    void deleteServiceById(@Param("serviceId") Long serviceId);
 }

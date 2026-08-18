@@ -77,6 +77,15 @@ public class WarehouseInternalApiImpl implements WarehouseInternalApi {
     }
 
     @Override
+    public void clearCatalogService(Long serviceId) {
+        List<CatalogItemJpa> linkedItems = catalogItemRepo.findByServiceId(serviceId);
+        for (CatalogItemJpa item : linkedItems) {
+            item.setServiceId(null);
+        }
+        catalogItemRepo.saveAll(linkedItems);
+    }
+
+    @Override
     public void updateInventoryEstimateAllocation(Integer itemId, Integer warehouseId, Integer quantity) {
         inventoryService.updateInventoryByEstimate(itemId,warehouseId,quantity);
     }
