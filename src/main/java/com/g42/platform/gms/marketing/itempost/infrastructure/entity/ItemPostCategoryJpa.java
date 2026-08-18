@@ -21,7 +21,7 @@ public class ItemPostCategoryJpa {
     @Column(name = "name", nullable = false, length = 120)
     private String name;
 
-    /** Đoạn định danh dùng trong URL /phu-tung/danh-muc/{slug}. */
+    /** Đoạn định danh dùng trong URL /danh-muc/loai/{slug}. */
     @Column(name = "slug", nullable = false, length = 160, unique = true)
     private String slug;
 

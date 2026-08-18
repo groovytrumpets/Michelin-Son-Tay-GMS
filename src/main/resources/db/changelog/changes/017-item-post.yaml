@@ -4,7 +4,7 @@
 # biệt duy nhất: item_post có thêm catalog_item_id NOT NULL — mỗi bài viết bắt
 # buộc gắn với một mặt hàng trong catalog_item. Đây là entity HOÀN TOÀN MỚI,
 # không tái dùng bảng post — namespace slug độc lập, URL công khai riêng
-# /phu-tung/{slug} (không dùng chung /tin-tuc/{slug}).
+# /danh-muc/{slug} (không dùng chung /tin-tuc/{slug}).
 #
 # Kế hoạch đầy đủ: xem plan "Bài viết phụ tùng (Item Post) — mirror cơ chế
 # post-management".

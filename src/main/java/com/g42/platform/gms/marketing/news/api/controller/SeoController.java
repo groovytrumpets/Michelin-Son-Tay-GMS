@@ -53,7 +53,7 @@ public class SeoController {
     }
 
     /** HTML đầy đủ thẻ meta của một bài viết phụ tùng, mirror {@link #prerenderPost}. */
-    @GetMapping(value = "/prerender/phu-tung/{slug}", produces = "text/html; charset=UTF-8")
+    @GetMapping(value = "/prerender/danh-muc/{slug}", produces = "text/html; charset=UTF-8")
     public ResponseEntity<String> prerenderItemPost(@PathVariable String slug) {
         Optional<ItemPostJpa> post = publicItemPostService.findVisibleEntity(slug);
         if (post.isEmpty()) {

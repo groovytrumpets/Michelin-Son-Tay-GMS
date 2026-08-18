@@ -6,7 +6,7 @@ import lombok.Setter;
 
 import java.time.LocalDateTime;
 
-/** Tag tự do gắn cho bài viết phụ tùng, dùng cho trang /phu-tung/tag/{slug} và gợi ý bài liên quan. */
+/** Tag tự do gắn cho bài viết phụ tùng, dùng cho trang /danh-muc/tag/{slug} và gợi ý bài liên quan. */
 @Getter
 @Setter
 @Entity

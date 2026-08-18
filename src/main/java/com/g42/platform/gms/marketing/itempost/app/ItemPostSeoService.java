@@ -155,7 +155,7 @@ public class ItemPostSeoService {
                 <title>Không tìm thấy bài viết - %s</title>
                 <meta name="robots" content="noindex, nofollow">
                 </head><body><h1>Không tìm thấy bài viết</h1>
-                <p><a href="%s/phu-tung">Quay lại trang phụ tùng</a></p>
+                <p><a href="%s/danh-muc">Quay lại trang phụ tùng</a></p>
                 </body></html>
                 """.formatted(escape(siteName), escape(siteUrl()));
     }
@@ -170,9 +170,9 @@ public class ItemPostSeoService {
         xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
                 .append("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n");
 
-        xml.append(urlEntry(siteUrl() + "/phu-tung", toIso(LocalDateTime.now()), "daily", "0.9"));
+        xml.append(urlEntry(siteUrl() + "/danh-muc", toIso(LocalDateTime.now()), "daily", "0.9"));
         for (ItemPostCategoryJpa category : categoryRepo.findByIsActiveTrueOrderByDisplayOrderAscNameAsc()) {
-            xml.append(urlEntry(siteUrl() + "/phu-tung/danh-muc/" + category.getSlug(),
+            xml.append(urlEntry(siteUrl() + "/danh-muc/loai/" + category.getSlug(),
                     toIso(LocalDateTime.now()), "weekly", "0.7"));
         }
         for (ItemPostJpa post : posts) {
@@ -203,13 +203,13 @@ public class ItemPostSeoService {
     private String breadcrumbJsonLd(ItemPostJpa post, String url) {
         String categoryName = post.getCategory() == null ? "Phụ tùng" : post.getCategory().getName();
         String categoryUrl = post.getCategory() == null
-                ? siteUrl() + "/phu-tung"
-                : siteUrl() + "/phu-tung/danh-muc/" + post.getCategory().getSlug();
+                ? siteUrl() + "/danh-muc"
+                : siteUrl() + "/danh-muc/loai/" + post.getCategory().getSlug();
 
         return """
                 {"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[\
                 {"@type":"ListItem","position":1,"name":"Trang chủ","item":"%s"},\
-                {"@type":"ListItem","position":2,"name":"Phụ tùng","item":"%s/phu-tung"},\
+                {"@type":"ListItem","position":2,"name":"Phụ tùng","item":"%s/danh-muc"},\
                 {"@type":"ListItem","position":3,"name":"%s","item":"%s"},\
                 {"@type":"ListItem","position":4,"name":"%s","item":"%s"}]}\
                 """.formatted(
@@ -226,7 +226,7 @@ public class ItemPostSeoService {
     }
 
     public String postUrl(String slug) {
-        return siteUrl() + "/phu-tung/" + slug;
+        return siteUrl() + "/danh-muc/" + slug;
     }
 
     private String siteUrl() {

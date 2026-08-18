@@ -14,7 +14,7 @@ import java.util.Set;
 
 /**
  * Bài viết phụ tùng — thực thể độc lập gắn bắt buộc với một mặt hàng
- * {@code catalog_item}, có đường dẫn riêng /phu-tung/{slug} để chia sẻ và cho
+ * {@code catalog_item}, có đường dẫn riêng /danh-muc/{slug} để chia sẻ và cho
  * Google index. Thay thế hoàn toàn cơ chế ghép chuỗi HTML cũ vào
  * {@code service.fullDescription}/{@code catalog_item.description}.
  */
@@ -29,7 +29,7 @@ public class ItemPostJpa {
     @Column(name = "item_post_id", nullable = false)
     private Long itemPostId;
 
-    /** Khoá của URL /phu-tung/{slug}. Không nhét id vào để đường dẫn sạch. */
+    /** Khoá của URL /danh-muc/{slug}. Không nhét id vào để đường dẫn sạch. */
     @Column(name = "slug", nullable = false, length = 200, unique = true)
     private String slug;
 
