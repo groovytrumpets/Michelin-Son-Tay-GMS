@@ -36,6 +36,7 @@ public class CatalogItem {
     private String partNumber;
     private String barcode;
     private String color;
+    private String slug;
     private String compatibleCars;
     private String searchKey;
     private String technicalSpecs;

@@ -73,6 +73,15 @@ public class ServiceController {
         return ResponseEntity.ok(ApiResponses.success(catalogItemService.getPublicPartDetail(catalogItemId)));
     }
 
+    /**
+     * Tra catalogItemId từ đường dẫn chữ tuỳ chỉnh (catalog_item.slug) — cho phép
+     * link dạng chữ ngay cả khi mặt hàng chưa có "Bài viết" (item_post) đầy đủ.
+     */
+    @GetMapping("/products/slug/{slug}")
+    public ResponseEntity<ApiResponse<Integer>> getCatalogItemIdBySlug(@PathVariable String slug) {
+        return ResponseEntity.ok(ApiResponses.success(catalogItemService.findCatalogItemIdBySlug(slug)));
+    }
+
     @GetMapping("/service/{serviceId}")
     public ResponseEntity<ApiResponse<ServiceDetailRespond>> getServiceDetail(@PathVariable Long serviceId) {
         ServiceDetailRespond serviceDetailRespond = serviceCatalogService.getServiceDetailById(serviceId);

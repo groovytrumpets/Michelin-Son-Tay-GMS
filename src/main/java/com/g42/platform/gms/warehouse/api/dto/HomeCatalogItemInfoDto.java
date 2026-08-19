@@ -28,4 +28,6 @@ public class HomeCatalogItemInfoDto {
     private String productLineName;
     private String compatibleCars;
     private Integer availableQty;
+    /** Đường dẫn chữ tuỳ chỉnh (catalog_item.slug); item_post.slug (nếu có) vẫn được ưu tiên hơn. */
+    private String slug;
 }

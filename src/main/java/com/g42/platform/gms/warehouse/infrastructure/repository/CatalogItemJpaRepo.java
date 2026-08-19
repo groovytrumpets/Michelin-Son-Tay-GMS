@@ -11,6 +11,10 @@ import java.util.List;
 public interface CatalogItemJpaRepo extends JpaRepository<CatalogItemJpa,Integer>, JpaSpecificationExecutor<CatalogItemJpa> {
     boolean existsBySku(String sku);
 
+    boolean existsBySlug(String slug);
+
+    java.util.Optional<CatalogItemJpa> findBySlug(String slug);
+
     List<CatalogItemJpa> findByItemType(CatalogItemType itemType);
 
     List<CatalogItemJpa> findByItemTypeAndItemIdIn(CatalogItemType itemType, List<Integer> ids);

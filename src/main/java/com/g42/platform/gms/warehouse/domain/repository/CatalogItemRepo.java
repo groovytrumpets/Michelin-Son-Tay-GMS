@@ -29,6 +29,10 @@ public interface CatalogItemRepo {
 
     boolean exitBySku(String sku);
 
+    boolean exitBySlug(String slug);
+
+    Integer findItemIdBySlug(String slug);
+
     ItemCategory saveItemCate(ItemCategory itemCategory);
 
     ProductLine getProductLineById(Integer productLineId);

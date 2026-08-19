@@ -41,4 +41,5 @@ public class CatalogItemDto {
     private String barcode;
     private String color;
     private String madeIn;
+    private String slug;
 }

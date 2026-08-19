@@ -215,6 +215,7 @@ public class WarehouseInternalApiImpl implements WarehouseInternalApi {
             dto.setProductLineId(item.getProductLineId());
             dto.setProductLineName(item.getProductLineId() != null ? lineMap.get(item.getProductLineId()) : null);
             dto.setCompatibleCars(item.getCompatibleCars());
+            dto.setSlug(item.getSlug());
             Long available = availableMap.get(item.getItemId());
             dto.setAvailableQty(available != null ? Math.toIntExact(Math.max(0, available)) : 0);
             result.put(item.getItemId(), dto);

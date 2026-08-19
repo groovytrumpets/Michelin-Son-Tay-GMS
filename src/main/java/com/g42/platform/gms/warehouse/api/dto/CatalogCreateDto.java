@@ -38,6 +38,8 @@ public class CatalogCreateDto {
     private String partNumber;
     private String barcode;
     private String color;
+    /** Đường dẫn chữ tuỳ chỉnh /parts|/services/{slug}; để trống thì giữ nguyên link số. */
+    private String slug;
     private String compatibleCars;
     private Boolean isActive;
     private String origin;

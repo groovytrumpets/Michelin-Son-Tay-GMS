@@ -1,0 +1,51 @@
+# Trang bán hàng của từng sản phẩm trước đây chỉ có link dạng số (/parts/13).
+# Muốn có link dạng chữ tuỳ chỉnh mà KHÔNG bắt buộc phải viết hẳn một "Bài viết"
+# (item_post, vốn cần tiêu đề + nội dung + SEO đầy đủ) thì catalog_item cần một
+# cột slug riêng, nhẹ, nhân viên tự đặt ngay ở màn sửa danh mục & tồn kho.
+# item_post.slug (nếu có bài viết) vẫn được ưu tiên hiển thị trước cột này.
+databaseChangeLog:
+  - changeSet:
+      id: 019-1-catalog-item-add-slug
+      author: gms
+      comment: Đường dẫn chữ tuỳ chỉnh cho từng phụ tùng/dịch vụ, độc lập với bài viết (item_post)
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: catalog_item
+                columnName: slug
+      changes:
+        - addColumn:
+            tableName: catalog_item
+            columns:
+              - column:
+                  name: slug
+                  type: VARCHAR(220)
+                  remarks: 'Đường dẫn /parts|/services/{slug}, để trống thì FE dùng lại link số cũ'
+      rollback:
+        - dropColumn:
+            tableName: catalog_item
+            columnName: slug
+
+  - changeSet:
+      id: 019-2-catalog-item-slug-unique-index
+      author: gms
+      comment: Slug phải duy nhất trên toàn bộ catalog_item
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - indexExists:
+                tableName: catalog_item
+                indexName: uq_catalog_item_slug
+      changes:
+        - createIndex:
+            tableName: catalog_item
+            indexName: uq_catalog_item_slug
+            unique: true
+            columns:
+              - column:
+                  name: slug
+      rollback:
+        - dropIndex:
+            tableName: catalog_item
+            indexName: uq_catalog_item_slug

@@ -40,6 +40,7 @@ public class CatalogDetailDto {
     private String partNumber;
     private String barcode;
     private String color;
+    private String slug;
     private String compatibleCars;
     private String technicalSpecs;
     private String userGuide;

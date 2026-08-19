@@ -106,6 +106,14 @@ public class CatalogItemRepoImpl implements CatalogItemRepo {
         return catalogItemJpaRepo.existsBySku(sku);
     }
     @Override
+    public boolean exitBySlug(String slug) {
+        return catalogItemJpaRepo.existsBySlug(slug);
+    }
+    @Override
+    public Integer findItemIdBySlug(String slug) {
+        return catalogItemJpaRepo.findBySlug(slug).map(CatalogItemJpa::getItemId).orElse(null);
+    }
+    @Override
     @Transactional
     public ItemCategory saveItemCate(ItemCategory itemCategory) {
 

@@ -75,6 +75,10 @@ public class CatalogItemJpa {
     @Column(name = "barcode", length = 50)
     private String barcode;
     @Size(max = 50)
+    @Size(max = 220)
+    @Column(name = "slug", length = 220)
+    private String slug;
+
     @Column(name = "color", length = 50)
     private String color;
 

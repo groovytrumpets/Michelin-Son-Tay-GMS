@@ -121,7 +121,13 @@ public class CatalogItemService {
         if (domain.getIsActive() == null) {
             domain.setIsActive(true);
         }
-        
+        String normalizedSlug = normalizeSlug(createDto.getSlug());
+        if (normalizedSlug != null && catalogItemRepo.exitBySlug(normalizedSlug)) {
+            throw new WarehouseException("Đường dẫn đã được dùng cho mặt hàng khác, hãy chọn đường dẫn khác",
+                    WarehouseErrorCode.DUPLICATE_SLUG);
+        }
+        domain.setSlug(normalizedSlug);
+
         CatalogItem catalogItem = catalogItemRepo.createCatalog(domain);
         List<Specification> specifications = catalogItemRepo.getListOfSpecsByItem(catalogItem.getItemId());
         // Respect a manually entered item name; only auto-suggest one when the caller left it blank.
@@ -332,12 +338,37 @@ public class CatalogItemService {
         return savedSpec;
     }
 
+    /**
+     * Chuẩn hoá đường dẫn chữ tuỳ chỉnh: chữ thường, bỏ dấu, chỉ còn a-z0-9 và gạch
+     * ngang. Chuỗi rỗng/blank trở thành null (không có slug) — không lưu chuỗi rỗng
+     * vì cột có unique index và MySQL chỉ coi NULL mới không đụng nhau.
+     */
+    private String normalizeSlug(String raw) {
+        if (raw == null) return null;
+        String trimmed = raw.trim();
+        if (trimmed.isEmpty()) return null;
+        String normalized = java.text.Normalizer.normalize(trimmed, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{InCombiningDiacriticalMarks}+", "")
+                .replace('đ', 'd').replace('Đ', 'D')
+                .toLowerCase()
+                .replaceAll("[^a-z0-9]+", "-")
+                .replaceAll("^-+|-+$", "");
+        if (normalized.length() > 220) normalized = normalized.substring(0, 220);
+        return normalized.isEmpty() ? null : normalized;
+    }
+
     public SpecAttribute saveSpecAttribute(SpecAttribute specAttribute) {
         return catalogItemRepo.saveSpecAttribute(specAttribute);
     }
 
     public List<ItemColorDto> getColorsByItemId(Integer itemId) {
         return catalogItemRepo.getColorsByItemId(itemId).stream().map(itemColorDtoMapper::toDto).toList();
+    }
+
+    /** Tra catalogItemId từ đường dẫn chữ tuỳ chỉnh — dùng để mở /parts|/services/{slug}. */
+    public Integer findCatalogItemIdBySlug(String slug) {
+        String normalized = normalizeSlug(slug);
+        return normalized == null ? null : catalogItemRepo.findItemIdBySlug(normalized);
     }
 
     /** Chi tiết an toàn cho trang bán hàng công khai — không lộ costPrice/tồn kho nội bộ. */
@@ -482,6 +513,16 @@ public class CatalogItemService {
                 throw new WarehouseException("Sku is duplicated! please create new sku",
                         WarehouseErrorCode.DUPLICATE_SKU);
             }
+        }
+
+        if (updateDto.getSlug() != null) {
+            String normalizedSlug = normalizeSlug(updateDto.getSlug());
+            if (normalizedSlug != null && !normalizedSlug.equals(catalogItem.getSlug())
+                    && catalogItemRepo.exitBySlug(normalizedSlug)) {
+                throw new WarehouseException("Đường dẫn đã được dùng cho mặt hàng khác, hãy chọn đường dẫn khác",
+                        WarehouseErrorCode.DUPLICATE_SLUG);
+            }
+            catalogItem.setSlug(normalizedSlug);
         }
 
         catalogItem.setSku(updateDto.getSku());

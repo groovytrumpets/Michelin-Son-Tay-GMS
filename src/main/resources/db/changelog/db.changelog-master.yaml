@@ -64,4 +64,7 @@ databaseChangeLog:
   - include:
       file: changes/018-item-color.yaml
       relativeToChangelogFile: true
+  - include:
+      file: changes/019-catalog-item-slug.yaml
+      relativeToChangelogFile: true
 

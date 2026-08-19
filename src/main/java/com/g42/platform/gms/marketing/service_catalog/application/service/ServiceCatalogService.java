@@ -46,6 +46,7 @@ public class ServiceCatalogService {
                 .filter(service -> service.isVisibleNow(now))
                 .map(serviceDtoMapper::toDto)
                 .toList();
+        enrichWithWarehouseInfo(respondList);
         enrichWithSlugs(respondList);
         return respondList;
     }
@@ -224,6 +225,7 @@ public class ServiceCatalogService {
             dto.setProductLineId(info.getProductLineId());
             dto.setProductLineName(info.getProductLineName());
             dto.setCompatibleCars(info.getCompatibleCars());
+            dto.setSlug(info.getSlug());
             Integer availableQty = info.getAvailableQty();
             dto.setAvailableQty(availableQty);
             // inStock chỉ có ý nghĩa với phụ tùng; dịch vụ không quản lý tồn kho
@@ -253,8 +255,9 @@ public class ServiceCatalogService {
 
     /**
      * Gắn slug bài viết item_post PUBLISHED cho từng dòng sản phẩm công khai, tra hàng
-     * loạt theo catalogItemId để tránh N+1. Item chưa có bài viết giữ slug null — FE tự
-     * fallback về link id số.
+     * loạt theo catalogItemId để tránh N+1. Bài viết đầy đủ (nếu có) được ưu tiên hơn
+     * đường dẫn chữ nhẹ (catalog_item.slug, đã gán ở enrichWithWarehouseInfo) — item
+     * chưa có cái nào thì giữ slug null, FE tự fallback về link id số.
      */
     private void enrichWithSlugs(List<ServiceSumaryRespond> dtos) {
         java.util.List<Integer> itemIds = dtos.stream()
@@ -273,7 +276,10 @@ public class ServiceCatalogService {
                         (existing, duplicate) -> existing));
 
         for (ServiceSumaryRespond dto : dtos) {
-            dto.setSlug(slugByCatalogItemId.get(dto.getCatalogItemId()));
+            String postSlug = slugByCatalogItemId.get(dto.getCatalogItemId());
+            if (postSlug != null) {
+                dto.setSlug(postSlug);
+            }
         }
     }
 }
