@@ -1,0 +1,81 @@
+# Một phụ tùng có thể có nhiều màu (lốp/mâm nhiều tuỳ chọn màu sắc). Trước đây
+# catalog_item.color chỉ lưu được một chuỗi tự do — không đủ để hiển thị nhiều
+# chấm màu ở trang bán hàng. Bảng item_color mới lưu danh sách mã màu (hex) cho
+# từng catalog_item; cột catalog_item.color cũ giữ nguyên (không xoá) để không
+# phá dữ liệu đang có, nhưng UI chỉnh sửa/hiển thị màu từ nay dùng bảng này.
+databaseChangeLog:
+  - changeSet:
+      id: 018-1-create-item-color
+      author: gms
+      comment: Danh sách mã màu (hex) của từng phụ tùng, một item có nhiều màu
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: item_color
+      changes:
+        - createTable:
+            tableName: item_color
+            remarks: Mã màu (hex) gán cho phụ tùng — một item_id có thể có nhiều dòng
+            columns:
+              - column:
+                  name: item_color_id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: item_id
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: color_code
+                  type: VARCHAR(20)
+                  remarks: 'Mã hex, ví dụ #FFFFFF'
+                  constraints:
+                    nullable: false
+              - column:
+                  name: color_name
+                  type: VARCHAR(100)
+                  remarks: Tên màu hiển thị, tuỳ chọn
+              - column:
+                  name: display_order
+                  type: INT
+                  defaultValueNumeric: 0
+      rollback:
+        - dropTable:
+            tableName: item_color
+
+  - changeSet:
+      id: 018-2-item-color-fk
+      author: gms
+      comment: Khóa ngoại item_color tới catalog_item, xoá theo item cha
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - foreignKeyConstraintExists:
+                foreignKeyName: fk_item_color_catalog_item
+                foreignKeyTableName: item_color
+      changes:
+        - addForeignKeyConstraint:
+            baseTableName: item_color
+            baseColumnNames: item_id
+            constraintName: fk_item_color_catalog_item
+            referencedTableName: catalog_item
+            referencedColumnNames: item_id
+            onDelete: CASCADE
+        - createIndex:
+            tableName: item_color
+            indexName: idx_item_color_item
+            columns:
+              - column:
+                  name: item_id
+      rollback:
+        - dropIndex:
+            tableName: item_color
+            indexName: idx_item_color_item
+        - dropForeignKeyConstraint:
+            baseTableName: item_color
+            constraintName: fk_item_color_catalog_item

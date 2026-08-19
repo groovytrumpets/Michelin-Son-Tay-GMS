@@ -11,6 +11,8 @@ import com.g42.platform.gms.marketing.service_catalog.application.service.Servic
 import com.g42.platform.gms.warehouse.api.dto.CatalogCreateDto;
 import com.g42.platform.gms.warehouse.api.dto.CatalogItemDto;
 import com.g42.platform.gms.warehouse.api.dto.HomeStockLocationDto;
+import com.g42.platform.gms.warehouse.api.dto.PublicPartDetailDto;
+import com.g42.platform.gms.warehouse.app.service.catalog.CatalogItemService;
 import com.g42.platform.gms.warehouse.domain.entity.CatalogItem;
 import com.g42.platform.gms.warehouse.domain.enums.CatalogItemType;
 import com.g42.platform.gms.warehouse.infrastructure.entity.CatalogItemJpa;
@@ -31,6 +33,8 @@ import java.util.List;
 public class ServiceController {
     @Autowired
     private final ServiceCatalogService serviceCatalogService;
+    @Autowired
+    private CatalogItemService catalogItemService;
     @GetMapping("/")
     public ResponseEntity<ApiResponse<List<ServiceSumaryRespond>>> getLandingServices() {
         List<ServiceSumaryRespond> respondList = serviceCatalogService.getListActiveServices();
@@ -59,6 +63,16 @@ public class ServiceController {
     public ResponseEntity<ApiResponse<List<HomeStockLocationDto>>> getProductStockLocations(@PathVariable Integer catalogItemId) {
         return ResponseEntity.ok(ApiResponses.success(serviceCatalogService.getPublicStockLocations(catalogItemId)));
     }
+    /**
+     * Chi tiết bổ sung (màu, xuất xứ, dòng sản phẩm, thông số) cho trang bán hàng công khai.
+     * Tách riêng khỏi /api/warehouse/** vì các API đó yêu cầu đăng nhập nhân viên —
+     * khách vãng lai xem /parts/:id sẽ bị 401 nếu gọi thẳng vào đó.
+     */
+    @GetMapping("/products/{catalogItemId}/detail")
+    public ResponseEntity<ApiResponse<PublicPartDetailDto>> getPublicPartDetail(@PathVariable Integer catalogItemId) {
+        return ResponseEntity.ok(ApiResponses.success(catalogItemService.getPublicPartDetail(catalogItemId)));
+    }
+
     @GetMapping("/service/{serviceId}")
     public ResponseEntity<ApiResponse<ServiceDetailRespond>> getServiceDetail(@PathVariable Long serviceId) {
         ServiceDetailRespond serviceDetailRespond = serviceCatalogService.getServiceDetailById(serviceId);

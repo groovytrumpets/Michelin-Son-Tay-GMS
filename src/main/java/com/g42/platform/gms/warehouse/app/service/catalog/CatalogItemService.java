@@ -84,6 +84,8 @@ public class CatalogItemService {
     private PricingService pricingService;
     @Autowired
     private WarehouseDtoMapper warehouseDtoMapper;
+    @Autowired
+    private ItemColorDtoMapper itemColorDtoMapper;
 
     public List<BrandHintDto> getAllBrands() {
         List<Brand> brandList = catalogItemRepo.getAllBrands();
@@ -332,6 +334,41 @@ public class CatalogItemService {
 
     public SpecAttribute saveSpecAttribute(SpecAttribute specAttribute) {
         return catalogItemRepo.saveSpecAttribute(specAttribute);
+    }
+
+    public List<ItemColorDto> getColorsByItemId(Integer itemId) {
+        return catalogItemRepo.getColorsByItemId(itemId).stream().map(itemColorDtoMapper::toDto).toList();
+    }
+
+    /** Chi tiết an toàn cho trang bán hàng công khai — không lộ costPrice/tồn kho nội bộ. */
+    public PublicPartDetailDto getPublicPartDetail(Integer catalogItemId) {
+        CatalogItem catalogItem = catalogItemRepo.getCatalogItemById(catalogItemId);
+        if (catalogItem == null) {
+            return null;
+        }
+        String productLineName = null;
+        if (catalogItem.getProductLineId() != null && catalogItem.getProductLineId() != 0) {
+            ProductLine productLine = catalogItemRepo.getProductLineById(catalogItem.getProductLineId());
+            productLineName = productLine != null ? productLine.getLineName() : null;
+        }
+        PublicPartDetailDto dto = new PublicPartDetailDto();
+        dto.setOrigin(catalogItem.getMadeIn());
+        dto.setUnit(catalogItem.getUnit());
+        dto.setProductLine(productLineName);
+        dto.setColors(getColorsByItemId(catalogItemId));
+        dto.setSpecifications(catalogItemRepo.getAllSpecsByItemId(catalogItemId));
+        return dto;
+    }
+
+    @Transactional
+    public List<ItemColorDto> replaceItemColors(Integer itemId, List<ItemColorDto> colors) {
+        if (itemId == null) {
+            throw new WarehouseException("item Catalog required!", WarehouseErrorCode.PARENT_REQUIRE);
+        }
+        List<ItemColor> domainColors = colors == null ? List.of()
+                : colors.stream().map(itemColorDtoMapper::toDomain).toList();
+        List<ItemColor> saved = catalogItemRepo.replaceItemColors(itemId, domainColors);
+        return saved.stream().map(itemColorDtoMapper::toDto).toList();
     }
 
     public List<ItemCategoryDto> getAllItemCategory() {

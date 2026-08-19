@@ -43,6 +43,10 @@ public class CatalogItemRepoImpl implements CatalogItemRepo {
     private ItemCategoryEntityJpaMapper itemCategoryJpaMapper;
     @Autowired
     private ItemCategoryJpaRepo itemCategoryJpaRepo;
+    @Autowired
+    private ItemColorJpaRepo itemColorJpaRepo;
+    @Autowired
+    private ItemColorJpaMapper itemColorJpaMapper;
 
 
     @Override
@@ -208,5 +212,25 @@ public class CatalogItemRepoImpl implements CatalogItemRepo {
     @Override
     public int findCategoryMaxOrder() {
         return itemCategoryJpaRepo.findMaxDisplayOrder();
+    }
+
+    @Override
+    public List<ItemColor> getColorsByItemId(Integer itemId) {
+        return itemColorJpaRepo.findByItemIdOrderByDisplayOrderAscItemColorIdAsc(itemId)
+                .stream().map(itemColorJpaMapper::toDomain).toList();
+    }
+
+    @Override
+    @Transactional
+    public List<ItemColor> replaceItemColors(Integer itemId, List<ItemColor> colors) {
+        itemColorJpaRepo.deleteByItemId(itemId);
+        List<ItemColorJpa> toSave = colors.stream().map(c -> {
+            ItemColorJpa jpa = itemColorJpaMapper.toJpa(c);
+            jpa.setItemColorId(null);
+            jpa.setItemId(itemId);
+            return jpa;
+        }).toList();
+        List<ItemColorJpa> saved = itemColorJpaRepo.saveAll(toSave);
+        return saved.stream().map(itemColorJpaMapper::toDomain).toList();
     }
 }

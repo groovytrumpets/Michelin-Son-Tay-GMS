@@ -43,6 +43,19 @@ public class WarehouseController {
     public ResponseEntity<ApiResponse<List<SpecificationDto>>> getAllSpecsById(@PathVariable Integer CatalogItemId) {
         return ResponseEntity.ok(ApiResponses.success(catalogItemService.getAllSpecsById(CatalogItemId)));
     }
+
+    // ─── Màu (item_color): một phụ tùng có nhiều mã màu, hiển thị chấm tròn ở trang bán hàng ───
+
+    @GetMapping("/item-color/{itemId}")
+    public ResponseEntity<ApiResponse<List<ItemColorDto>>> getItemColors(@PathVariable Integer itemId) {
+        return ResponseEntity.ok(ApiResponses.success(catalogItemService.getColorsByItemId(itemId)));
+    }
+
+    @PutMapping("/item-color/{itemId}")
+    public ResponseEntity<ApiResponse<List<ItemColorDto>>> replaceItemColors(
+            @PathVariable Integer itemId, @RequestBody List<ItemColorDto> colors) {
+        return ResponseEntity.ok(ApiResponses.success(catalogItemService.replaceItemColors(itemId, colors)));
+    }
     @GetMapping("/spec-attribute/all")
     public ResponseEntity<ApiResponse<List<SpecAttributeDto>>> getAllSpecAttributes() {
         return ResponseEntity.ok(ApiResponses.success(catalogItemService.getAllSpecAttributes()));
