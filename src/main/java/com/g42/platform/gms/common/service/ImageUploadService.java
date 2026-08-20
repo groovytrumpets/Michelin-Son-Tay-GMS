@@ -14,6 +14,7 @@ import java.io.InputStream;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Slf4j
 @Service
@@ -93,15 +94,31 @@ public class ImageUploadService {
      * Delete image from Cloudinary by public_id
      */
     public void deleteImage(String publicId) throws IOException {
+        deleteImageWithResult(publicId);
+    }
+
+    /**
+     * Delete an image, invalidate cached CDN copies and verify Cloudinary's result.
+     * "not found" is accepted to keep cleanup idempotent.
+     */
+    public String deleteImageWithResult(String publicId) throws IOException {
         if (publicId == null || publicId.isBlank()) {
-            return;
+            return "not found";
         }
-        
+
         try {
-            cloudinary.uploader().destroy(publicId, Map.of());
-            log.info("Image deleted: {}", publicId);
+            Map result = cloudinary.uploader().destroy(publicId, Map.of(
+                    "resource_type", "image",
+                    "invalidate", true));
+            String status = Objects.toString(result.get("result"), "").toLowerCase();
+            if (!"ok".equals(status) && !"not found".equals(status)) {
+                throw new IOException("Cloudinary returned unexpected delete result: " + status);
+            }
+            log.info("Image delete completed: publicId={}, result={}", publicId, status);
+            return status;
         } catch (Exception e) {
-            log.warn("Failed to delete image: {}", publicId, e);
+            if (e instanceof IOException ioException) throw ioException;
+            throw new IOException("Failed to delete Cloudinary image: " + publicId, e);
         }
     }
 
