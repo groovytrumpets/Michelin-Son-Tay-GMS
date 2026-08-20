@@ -2,6 +2,8 @@ package com.g42.platform.gms.warehouse.app.service.catalog;
 
 import com.g42.platform.gms.estimation.api.internal.TaxRuleInternalApi;
 import com.g42.platform.gms.estimation.api.mapper.TaxRuleDtoMapper;
+import com.g42.platform.gms.marketing.service_catalog.domain.enums.ServiceStatus;
+import com.g42.platform.gms.marketing.service_catalog.infrastructure.repository.ServiceJpaRepository;
 import com.g42.platform.gms.warehouse.api.dto.*;
 import com.g42.platform.gms.warehouse.api.mapper.*;
 import com.g42.platform.gms.warehouse.app.service.dto.PricingResolve;
@@ -43,6 +45,8 @@ public class CatalogItemService {
     private WarehousePricingRepo warehousePricingRepo;
     @Autowired
     private CatalogItemJpaRepo catalogItemJpaRepo;
+    @Autowired
+    private ServiceJpaRepository serviceJpaRepository;
     @Autowired
     private BrandJpaRepo brandJpaRepo;
     @Autowired
@@ -659,6 +663,48 @@ public class CatalogItemService {
         return catalogDtoMapper.toDto(saved);
     }
 
+    /**
+     * Soft-delete a catalog item so stock, lots and transaction history remain
+     * available for auditing. A linked sales article is deactivated as part of
+     * the same transaction and therefore disappears from public sales pages.
+     */
+    @Transactional
+    public void deactivateCatalogItem(Integer itemId) {
+        CatalogItemJpa catalogItem = catalogItemJpaRepo.findById(itemId)
+                .orElseThrow(() -> new WarehouseException(
+                        "Catalog item not found", WarehouseErrorCode.CATALOG_404));
+
+        catalogItem.setIsActive(false);
+        catalogItemJpaRepo.save(catalogItem);
+
+        Long serviceId = catalogItem.getServiceId();
+        if (serviceId != null) {
+            serviceJpaRepository.findById(serviceId).ifPresent(service -> {
+                service.setStatus(ServiceStatus.INACTIVE);
+                serviceJpaRepository.save(service);
+            });
+        }
+    }
+
+    /** Restore a soft-deleted catalog item and its still-linked sales article. */
+    @Transactional
+    public void activateCatalogItem(Integer itemId) {
+        CatalogItemJpa catalogItem = catalogItemJpaRepo.findById(itemId)
+                .orElseThrow(() -> new WarehouseException(
+                        "Catalog item not found", WarehouseErrorCode.CATALOG_404));
+
+        catalogItem.setIsActive(true);
+        catalogItemJpaRepo.save(catalogItem);
+
+        Long serviceId = catalogItem.getServiceId();
+        if (serviceId != null) {
+            serviceJpaRepository.findById(serviceId).ifPresent(service -> {
+                service.setStatus(ServiceStatus.ACTIVE);
+                serviceJpaRepository.save(service);
+            });
+        }
+    }
+
     @Transactional
     public void deleteBrand(Integer brandId) {
         boolean hasProductLines = productLineJpaRepo.existsByBrandId(brandId);
@@ -736,4 +782,3 @@ public class CatalogItemService {
         }
     }
 }
-

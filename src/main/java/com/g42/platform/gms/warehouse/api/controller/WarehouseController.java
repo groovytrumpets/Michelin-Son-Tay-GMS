@@ -81,6 +81,18 @@ public class WarehouseController {
     public ResponseEntity<ApiResponse<CatalogItemDto>> updateCatalog(@RequestBody CatalogCreateDto updateDto, @PathVariable Integer itemId) {
         return ResponseEntity.ok(ApiResponses.success(catalogItemService.updateCatalog(updateDto, itemId)));
     }
+    @DeleteMapping("/catalog-item/{itemId}")
+    @PreAuthorize("hasAnyRole('WAREHOUSE_MANAGER','MANAGER','ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> deactivateCatalogItem(@PathVariable Integer itemId) {
+        catalogItemService.deactivateCatalogItem(itemId);
+        return ResponseEntity.ok(ApiResponses.success(null));
+    }
+    @PostMapping("/catalog-item/{itemId}/activate")
+    @PreAuthorize("hasAnyRole('WAREHOUSE_MANAGER','MANAGER','ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> activateCatalogItem(@PathVariable Integer itemId) {
+        catalogItemService.activateCatalogItem(itemId);
+        return ResponseEntity.ok(ApiResponses.success(null));
+    }
     @PostMapping("/product-line/create")
     public ResponseEntity<ApiResponse<ProductLine>> createProductLine(@RequestBody ProductLine productLine) {
         return ResponseEntity.ok(ApiResponses.success(catalogItemService.saveProductLine(productLine)));

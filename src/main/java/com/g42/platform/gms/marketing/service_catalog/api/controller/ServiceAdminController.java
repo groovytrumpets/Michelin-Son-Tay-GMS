@@ -26,7 +26,7 @@ public class ServiceAdminController {
         return ResponseEntity.ok(ApiResponses.success(serviceCatalogService.updateService(request,serviceId)));
     }
 
-    /** Xóa hẳn service (giá/media) khỏi catalog item — để nút "Sửa bài viết" quay lại thành "Tạo bài viết". */
+    /** Soft-delete bài viết bán hàng và gỡ liên kết để có thể tạo bài mới. */
     @DeleteMapping("delete/{serviceId}")
     public ResponseEntity<ApiResponse<Void>> deleteService(@PathVariable Long serviceId) {
         serviceCatalogService.deleteService(serviceId);

@@ -8,6 +8,7 @@ import com.g42.platform.gms.marketing.service_catalog.api.dto.ServiceSumaryRespo
 import com.g42.platform.gms.marketing.service_catalog.api.mapper.ServiceDtoMapper;
 import com.g42.platform.gms.marketing.service_catalog.domain.entity.ServiceMedia;
 import com.g42.platform.gms.marketing.service_catalog.domain.enums.MediaType;
+import com.g42.platform.gms.marketing.service_catalog.domain.enums.ServiceStatus;
 import com.g42.platform.gms.marketing.service_catalog.domain.exception.ServiceErrorCode;
 import com.g42.platform.gms.marketing.service_catalog.domain.exception.ServiceException;
 import com.g42.platform.gms.marketing.service_catalog.domain.repository.ServiceRepository;
@@ -236,11 +237,8 @@ public class ServiceCatalogService {
     }
 
     /**
-     * Xóa hẳn service (giá/media/thời gian ước tính) gắn với một catalog item — gỡ
-     * liên kết catalog_item.service_service_id trước để tránh vi phạm khoá ngoại,
-     * rồi xóa service (Hibernate cascade xóa luôn service_media theo orphanRemoval).
-     * catalog_item và item_post (bài viết) của mặt hàng không bị ảnh hưởng — sau khi
-     * xóa, nút "Sửa bài viết" ở danh sách quay lại thành "Tạo bài viết" để tạo mới.
+     * Soft-delete a sales article: unlink it from the catalog item and mark the
+     * service INACTIVE. Media and pricing data remain available for auditing.
      */
     @Transactional
     public void deleteService(Long serviceId) {
@@ -250,7 +248,8 @@ public class ServiceCatalogService {
             throw new ServiceException("Service not found", ServiceErrorCode.SERVICE_NOT_FOUND);
         }
         warehouseInternalApi.clearCatalogService(serviceId);
-        serviceRepository.deleteById(serviceId);
+        service.setStatus(ServiceStatus.INACTIVE);
+        serviceRepository.save(service);
     }
 
     /**
