@@ -67,4 +67,7 @@ databaseChangeLog:
   - include:
       file: changes/019-catalog-item-slug.yaml
       relativeToChangelogFile: true
+  - include:
+      file: changes/020-staff-table-pref.yaml
+      relativeToChangelogFile: true
 

@@ -1,0 +1,58 @@
+databaseChangeLog:
+  - changeSet:
+      id: 020-1-create-staff-table-pref
+      author: gms
+      comment: Cache cấp 2 (đồng bộ đa thiết bị) cho cấu hình bảng — cột ẩn/hiện, thứ tự, độ rộng — theo từng nhân viên. Cấp 1 là localStorage ở FE.
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: staff_table_pref
+      changes:
+        - createTable:
+            tableName: staff_table_pref
+            remarks: Cấu hình bảng (cột ẩn/hiện, thứ tự, độ rộng) theo nhân viên, đồng bộ đa thiết bị
+            columns:
+              - column:
+                  name: pref_id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: staff_id
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: table_key
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: prefs_json
+                  type: TEXT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: DATETIME
+                  defaultValueComputed: CURRENT_TIMESTAMP
+      rollback:
+        - dropTable:
+            tableName: staff_table_pref
+
+  - changeSet:
+      id: 020-2-staff-table-pref-unique
+      author: gms
+      comment: Mỗi nhân viên chỉ có 1 bản ghi cấu hình cho mỗi bảng (table_key)
+      changes:
+        - addUniqueConstraint:
+            tableName: staff_table_pref
+            columnNames: staff_id, table_key
+            constraintName: uq_staff_table_pref
+      rollback:
+        - dropUniqueConstraint:
+            tableName: staff_table_pref
+            constraintName: uq_staff_table_pref
