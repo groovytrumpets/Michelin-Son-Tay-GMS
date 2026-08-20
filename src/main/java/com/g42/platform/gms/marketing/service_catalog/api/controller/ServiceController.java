@@ -8,6 +8,7 @@ import com.g42.platform.gms.marketing.service_catalog.api.dto.ServiceCreateReque
 import com.g42.platform.gms.marketing.service_catalog.api.dto.ServiceDetailRespond;
 import com.g42.platform.gms.marketing.service_catalog.api.dto.ServiceSumaryRespond;
 import com.g42.platform.gms.marketing.service_catalog.application.service.ServiceCatalogService;
+import com.g42.platform.gms.warehouse.api.dto.BrandHintDto;
 import com.g42.platform.gms.warehouse.api.dto.CatalogCreateDto;
 import com.g42.platform.gms.warehouse.api.dto.CatalogItemDto;
 import com.g42.platform.gms.warehouse.api.dto.HomeStockLocationDto;
@@ -56,6 +57,12 @@ public class ServiceController {
                    @RequestParam(required = false) String vehicleModel){
         Page<ServiceSumaryRespond> apiResponse = serviceCatalogService.getListProducts(page,size,itemType,search,sortBy,minPrice,maxPrice,categoryCode,brandId,productLineId,vehicleBrand,vehicleModel);
         return ResponseEntity.ok(ApiResponses.success(apiResponse));
+    }
+
+    /** Danh mục thương hiệu sản phẩm public, ổn định cho bộ lọc landing page. */
+    @GetMapping("/brands")
+    public ResponseEntity<ApiResponse<List<BrandHintDto>>> getProductBrands() {
+        return ResponseEntity.ok(ApiResponses.success(catalogItemService.getAllBrands()));
     }
 
     /** Danh sách kho/cửa hàng còn hàng của một phụ tùng — public cho trang chi tiết sản phẩm. */
