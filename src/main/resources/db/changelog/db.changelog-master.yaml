@@ -70,4 +70,6 @@ databaseChangeLog:
   - include:
       file: changes/020-staff-table-pref.yaml
       relativeToChangelogFile: true
-
+  - include:
+      file: changes/021-landing-page-catalog-config.yaml
+      relativeToChangelogFile: true

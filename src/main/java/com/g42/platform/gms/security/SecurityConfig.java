@@ -71,6 +71,7 @@ public class SecurityConfig {
                                 "/ws-notifications/**",
                                 "/ws-chat/**",
                                 "/api/public/sliders/**",
+                                "/api/public/landing-page-catalog",
                                 // Tin tức: trang bài viết phải đọc được khi chưa đăng nhập,
                                 // và /seo/** là nơi bot Facebook/Zalo/Google lấy thẻ meta.
                                 "/api/public/posts/**",

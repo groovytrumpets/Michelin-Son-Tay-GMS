@@ -1,0 +1,103 @@
+databaseChangeLog:
+  - changeSet:
+      id: 021-1-create-landing-page-section-config
+      author: gms
+      changes:
+        - createTable:
+            tableName: landing_page_section_config
+            columns:
+              - column:
+                  name: section_code
+                  type: varchar(30)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: is_configured
+                  type: boolean
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: datetime
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - insert:
+            tableName: landing_page_section_config
+            columns:
+              - column: { name: section_code, value: FEATURED }
+              - column: { name: is_configured, valueBoolean: false }
+        - insert:
+            tableName: landing_page_section_config
+            columns:
+              - column: { name: section_code, value: SERVICE }
+              - column: { name: is_configured, valueBoolean: false }
+        - insert:
+            tableName: landing_page_section_config
+            columns:
+              - column: { name: section_code, value: PART }
+              - column: { name: is_configured, valueBoolean: false }
+        - insert:
+            tableName: landing_page_section_config
+            columns:
+              - column: { name: section_code, value: COMBO }
+              - column: { name: is_configured, valueBoolean: false }
+        - insert:
+            tableName: landing_page_section_config
+            columns:
+              - column: { name: section_code, value: EQUIPMENT }
+              - column: { name: is_configured, valueBoolean: false }
+
+  - changeSet:
+      id: 021-2-create-landing-page-section-item
+      author: gms
+      changes:
+        - createTable:
+            tableName: landing_page_section_item
+            columns:
+              - column:
+                  name: id
+                  type: int
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: section_code
+                  type: varchar(30)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: catalog_item_id
+                  type: int
+                  constraints:
+                    nullable: false
+              - column:
+                  name: display_order
+                  type: int
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: landing_page_section_item
+            baseColumnNames: section_code
+            referencedTableName: landing_page_section_config
+            referencedColumnNames: section_code
+            constraintName: fk_landing_section_item_section
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: landing_page_section_item
+            baseColumnNames: catalog_item_id
+            referencedTableName: catalog_item
+            referencedColumnNames: item_id
+            constraintName: fk_landing_section_item_catalog
+            onDelete: CASCADE
+        - addUniqueConstraint:
+            tableName: landing_page_section_item
+            columnNames: section_code, catalog_item_id
+            constraintName: uk_landing_section_catalog_item
+        - addUniqueConstraint:
+            tableName: landing_page_section_item
+            columnNames: section_code, display_order
+            constraintName: uk_landing_section_display_order
