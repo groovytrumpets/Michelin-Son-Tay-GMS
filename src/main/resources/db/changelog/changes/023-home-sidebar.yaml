@@ -1,0 +1,169 @@
+# Thanh điều hướng dọc bên trái trang chủ khách ("Dịch vụ chính hãng",
+# "Phụ tùng chính hãng", "Cơ sở Michelin") chuyển từ hard-code sang dữ liệu.
+#
+# Không thêm bảng mới: ba nhóm này là một cây nhãn – đường dẫn – thứ tự – ẩn/hiện,
+# đúng bằng thứ nav_menu_item đã lưu cho thanh đầu trang. Chỉ khác chỗ đặt, nên
+# dùng thêm một mã vị trí HOME_SIDEBAR bên cạnh HEADER_MAIN. Nhờ vậy phần quản
+# trị (/home-sidebar-config) dùng lại nguyên API nav-menu, không phải nhân đôi
+# controller, service, repository cho cùng một hình dạng dữ liệu.
+#
+# Quy ước 3 cấp của vị trí này:
+#   cấp 1 = nhóm    — dropdown_layout quyết định kiểu hiện:
+#                     LIST = danh sách xổ xuống, CARDS = dãy nút bấm
+#   cấp 2 = mục     — có mục con thì bấm để xổ ra, không thì là link thẳng
+#   cấp 3 = mục con — luôn là link
+databaseChangeLog:
+  - changeSet:
+      id: 023-1-seed-home-sidebar
+      author: gms
+      comment: Chuyển thanh bên trang chủ đang cứng trong Services.jsx thành dữ liệu, giữ nguyên nội dung cũ
+      preConditions:
+        - onFail: MARK_RAN
+        - and:
+            - columnExists:
+                tableName: nav_menu_item
+                columnName: parent_id
+            - sqlCheck:
+                expectedResult: "0"
+                sql: SELECT COUNT(*) FROM nav_menu_item WHERE location_code = 'HOME_SIDEBAR'
+      changes:
+        - sql:
+            comment: Cấp 1 — ba nhóm ngoài cùng
+            sql: >-
+              INSERT INTO nav_menu_item
+                (location_code, item_type, dropdown_layout, label, display_order, is_active, column_index, created_at)
+              SELECT 'HOME_SIDEBAR', 'CUSTOM_MENU', v.dropdown_layout, v.label, v.display_order, TRUE, 0, NOW()
+              FROM (
+                          SELECT 'Dịch vụ chính hãng'  AS label, 'LIST'  AS dropdown_layout, 1 AS display_order
+                UNION ALL SELECT 'Phụ tùng chính hãng',        'LIST',                       2
+                UNION ALL SELECT 'Cơ sở Michelin',             'CARDS',                      3
+              ) v
+
+        # Nối theo NHÃN của nhóm cha: id là auto-increment nên chưa biết trước,
+        # còn nhãn thì duy nhất trong phạm vi vị trí này.
+        - sql:
+            comment: Cấp 2 — các mục trong từng nhóm
+            sql: >-
+              INSERT INTO nav_menu_item
+                (location_code, parent_id, item_type, dropdown_layout, label, target_path,
+                 open_in_new_tab, display_order, is_active, column_index, created_at)
+              SELECT 'HOME_SIDEBAR', p.nav_item_id, v.item_type, v.dropdown_layout, v.label,
+                     v.target_path, v.open_in_new_tab, v.display_order, TRUE, 0, NOW()
+              FROM nav_menu_item p
+              JOIN (
+                          SELECT 'Dịch vụ chính hãng' AS group_label, 'Thay lốp & cân mâm' AS label,
+                                 'CUSTOM_MENU' AS item_type, 'LIST' AS dropdown_layout,
+                                 CAST(NULL AS CHAR(500)) AS target_path, 0 AS open_in_new_tab, 1 AS display_order
+                UNION ALL SELECT 'Dịch vụ chính hãng',  'Cân chỉnh thước lái',    'CUSTOM_MENU', 'LIST', NULL, 0, 2
+                UNION ALL SELECT 'Dịch vụ chính hãng',  'Bảo dưỡng định kỳ',      'CUSTOM_MENU', 'LIST', NULL, 0, 3
+                UNION ALL SELECT 'Dịch vụ chính hãng',  'Thay dầu động cơ',       'CUSTOM_MENU', 'LIST', NULL, 0, 4
+                UNION ALL SELECT 'Dịch vụ chính hãng',  'Cân bằng động bánh xe',  'CUSTOM_MENU', 'LIST', NULL, 0, 5
+                UNION ALL SELECT 'Dịch vụ chính hãng',  'Sửa chữa hệ thống phanh','CUSTOM_MENU', 'LIST', NULL, 0, 6
+                UNION ALL SELECT 'Dịch vụ chính hãng',  'Cứu hộ ô tô 24/7',       'CUSTOM_MENU', 'LIST', NULL, 0, 7
+                UNION ALL SELECT 'Phụ tùng chính hãng', 'Lốp xe Michelin',        'CUSTOM_MENU', 'LIST', NULL, 0, 1
+                UNION ALL SELECT 'Phụ tùng chính hãng', 'Ắc quy xe hơi',          'CUSTOM_MENU', 'LIST', NULL, 0, 2
+                UNION ALL SELECT 'Phụ tùng chính hãng', 'Dầu nhớt chính hãng',    'CUSTOM_MENU', 'LIST', NULL, 0, 3
+                UNION ALL SELECT 'Phụ tùng chính hãng', 'Má phanh & đĩa phanh',   'CUSTOM_MENU', 'LIST', NULL, 0, 4
+                UNION ALL SELECT 'Phụ tùng chính hãng', 'Lọc dầu & lọc gió',      'CUSTOM_MENU', 'LIST', NULL, 0, 5
+                UNION ALL SELECT 'Phụ tùng chính hãng', 'Gạt mưa cao cấp',        'CUSTOM_MENU', 'LIST', NULL, 0, 6
+                UNION ALL SELECT 'Phụ tùng chính hãng', 'Mâm lazang thể thao',    'CUSTOM_MENU', 'LIST', NULL, 0, 7
+                UNION ALL SELECT 'Cơ sở Michelin', '📍 Cơ sở 1: QL21 Sơn Tây', 'EXTERNAL', NULL,
+                                 'https://maps.app.goo.gl/5p1HHhrirKYLRCCe9', 1, 1
+                UNION ALL SELECT 'Cơ sở Michelin', '📍 Cơ sở 2: Biên Phòng',   'EXTERNAL', NULL,
+                                 'https://maps.app.goo.gl/Y5rKFqkFBD2JUoyi6', 1, 2
+              ) v ON v.group_label = p.label
+              WHERE p.location_code = 'HOME_SIDEBAR' AND p.parent_id IS NULL
+
+        # tel: là loại trừ có chủ ý của open_in_new_tab: đặt target="_blank" cho
+        # số điện thoại thì trình duyệt bỏ lại một tab trắng sau khi bàn giao.
+        - sql:
+            comment: Cấp 3 — các link nằm trong từng mục
+            sql: >-
+              INSERT INTO nav_menu_item
+                (location_code, parent_id, item_type, label, target_path,
+                 open_in_new_tab, display_order, is_active, column_index, created_at)
+              SELECT 'HOME_SIDEBAR', p.nav_item_id, v.item_type, v.label, v.target_path,
+                     v.open_in_new_tab, v.display_order, TRUE, 0, NOW()
+              FROM nav_menu_item p
+              JOIN (
+                          SELECT 'Thay lốp & cân mâm' AS parent_label, 'Lốp du lịch chính hãng' AS label,
+                                 'LINK' AS item_type, '/services?search=lốp' AS target_path,
+                                 0 AS open_in_new_tab, 1 AS display_order
+                UNION ALL SELECT 'Thay lốp & cân mâm',      'Cân mâm bấm chì',        'LINK', '/services?search=mâm', 0, 2
+                UNION ALL SELECT 'Thay lốp & cân mâm',      'Vá lốp chuẩn Michelin',  'LINK', '/services?search=vá lốp', 0, 3
+                UNION ALL SELECT 'Cân chỉnh thước lái',     'Cân thước lái Hunter',   'LINK', '/services?search=thước lái', 0, 1
+                UNION ALL SELECT 'Cân chỉnh thước lái',     'Góc đặt bánh xe chuẩn',  'LINK', '/services?search=thước lái', 0, 2
+                UNION ALL SELECT 'Bảo dưỡng định kỳ',       'Bảo dưỡng nhanh',        'LINK', '/services?search=bảo dưỡng', 0, 1
+                UNION ALL SELECT 'Bảo dưỡng định kỳ',       'Thay nước làm mát',      'LINK', '/services?search=nước làm mát', 0, 2
+                UNION ALL SELECT 'Thay dầu động cơ',        'Thay dầu chính hãng',    'LINK', '/services?search=dầu', 0, 1
+                UNION ALL SELECT 'Thay dầu động cơ',        'Thay lọc dầu động cơ',   'LINK', '/services?search=lọc dầu', 0, 2
+                UNION ALL SELECT 'Cân bằng động bánh xe',   'Cân bằng động Hunter',   'LINK', '/services?search=cân bằng', 0, 1
+                UNION ALL SELECT 'Sửa chữa hệ thống phanh', 'Thay thế má phanh',      'LINK', '/services?search=phanh', 0, 1
+                UNION ALL SELECT 'Sửa chữa hệ thống phanh', 'Láng đĩa phanh',         'LINK', '/services?search=phanh', 0, 2
+                UNION ALL SELECT 'Cứu hộ ô tô 24/7',        'Cứu hộ lốp Sơn Tây',     'EXTERNAL', 'tel:0987545680', 0, 1
+                UNION ALL SELECT 'Cứu hộ ô tô 24/7',        'Cứu hộ ắc quy 24/7',     'EXTERNAL', 'tel:0987545680', 0, 2
+                UNION ALL SELECT 'Lốp xe Michelin',         'Michelin Primacy 4',     'LINK', '/parts?search=primacy', 0, 1
+                UNION ALL SELECT 'Lốp xe Michelin',         'Michelin Pilot Sport 5', 'LINK', '/parts?search=pilot', 0, 2
+                UNION ALL SELECT 'Lốp xe Michelin',         'Michelin Energy XM2+',   'LINK', '/parts?search=energy', 0, 3
+                UNION ALL SELECT 'Ắc quy xe hơi',           'Ắc quy Atlas BX',        'LINK', '/parts?search=atlas', 0, 1
+                UNION ALL SELECT 'Ắc quy xe hơi',           'Ắc quy Varta',           'LINK', '/parts?search=varta', 0, 2
+                UNION ALL SELECT 'Ắc quy xe hơi',           'Ắc quy GS',              'LINK', '/parts?search=gs', 0, 3
+                UNION ALL SELECT 'Dầu nhớt chính hãng',     'Dầu nhớt Mobil 1',       'LINK', '/parts?search=mobil', 0, 1
+                UNION ALL SELECT 'Dầu nhớt chính hãng',     'Dầu Castrol Magnatec',   'LINK', '/parts?search=castrol', 0, 2
+                UNION ALL SELECT 'Má phanh & đĩa phanh',    'Má phanh Bendix',        'LINK', '/parts?search=phanh', 0, 1
+                UNION ALL SELECT 'Má phanh & đĩa phanh',    'Má phanh Bosch',         'LINK', '/parts?search=phanh', 0, 2
+                UNION ALL SELECT 'Lọc dầu & lọc gió',       'Lọc gió động cơ',        'LINK', '/parts?search=lọc', 0, 1
+                UNION ALL SELECT 'Lọc dầu & lọc gió',       'Lọc gió cabin',          'LINK', '/parts?search=lọc', 0, 2
+                UNION ALL SELECT 'Gạt mưa cao cấp',         'Gạt mưa Bosch',          'LINK', '/parts?search=gạt', 0, 1
+                UNION ALL SELECT 'Gạt mưa cao cấp',         'Gạt mưa silicone',       'LINK', '/parts?search=gạt', 0, 2
+                UNION ALL SELECT 'Mâm lazang thể thao',     'Mâm đúc lazang',         'LINK', '/parts?search=mâm', 0, 1
+              ) v ON v.parent_label = p.label
+              WHERE p.location_code = 'HOME_SIDEBAR' AND p.parent_id IS NOT NULL
+      rollback:
+        - delete:
+            tableName: nav_menu_item
+            where: location_code = 'HOME_SIDEBAR'
+
+  - changeSet:
+      id: 023-2-location-code-remarks
+      author: gms
+      comment: Ghi chú cột cho đúng — mã vị trí không còn chỉ mỗi HEADER_MAIN
+      validCheckSum:
+        - 9:cf3148cc54a95aaa8b3707b11b574316
+      changes:
+        # Viết thẳng MODIFY thay vì dùng setColumnRemarks: trên MySQL, change đó
+        # sinh ra "MODIFY location_code VARCHAR(50) COMMENT ..." — tức là dựng lại
+        # cả định nghĩa cột và làm rơi mất NOT NULL lẫn DEFAULT của changeset 007.
+        # Nêu đủ định nghĩa ở đây thì đổi chú thích không kéo theo đổi ràng buộc.
+        - sql:
+            sql: >-
+              ALTER TABLE nav_menu_item
+              MODIFY location_code VARCHAR(50) NOT NULL DEFAULT 'HEADER_MAIN'
+              COMMENT 'Vị trí đặt menu — HEADER_MAIN (thanh đầu trang) hoặc HOME_SIDEBAR (thanh dọc bên trái trang chủ); danh sách mã hợp lệ ở NavMenuService.KNOWN_LOCATIONS'
+      rollback:
+        - sql:
+            sql: >-
+              ALTER TABLE nav_menu_item
+              MODIFY location_code VARCHAR(50) NOT NULL DEFAULT 'HEADER_MAIN'
+              COMMENT 'Vị trí đặt menu — hiện chỉ có HEADER_MAIN, để ngỏ cho footer sau này'
+
+  # 023-2 từng được chạy bằng setColumnRemarks rồi mới được sửa thành câu
+  # MODIFY đầy đủ. Giữ checksum cũ ở trên để các DB đã chạy không bị chặn,
+  # còn changeset mới này thực sự khôi phục NOT NULL và DEFAULT đã bị MySQL làm
+  # rơi khi setColumnRemarks dựng lại định nghĩa cột.
+  - changeSet:
+      id: 023-3-location-code-definition
+      author: gms
+      comment: Chuẩn hóa lại đầy đủ định nghĩa location_code sau changeset ghi chú cũ
+      changes:
+        - sql:
+            sql: >-
+              ALTER TABLE nav_menu_item
+              MODIFY location_code VARCHAR(50) NOT NULL DEFAULT 'HEADER_MAIN'
+              COMMENT 'Vị trí đặt menu — HEADER_MAIN (thanh đầu trang) hoặc HOME_SIDEBAR (thanh dọc bên trái trang chủ); danh sách mã hợp lệ ở NavMenuService.KNOWN_LOCATIONS'
+      rollback:
+        - sql:
+            sql: >-
+              ALTER TABLE nav_menu_item
+              MODIFY location_code VARCHAR(50) NOT NULL DEFAULT 'HEADER_MAIN'
+              COMMENT 'Vị trí đặt menu — HEADER_MAIN (thanh đầu trang) hoặc HOME_SIDEBAR (thanh dọc bên trái trang chủ); danh sách mã hợp lệ ở NavMenuService.KNOWN_LOCATIONS'

@@ -76,3 +76,6 @@ databaseChangeLog:
   - include:
       file: changes/022-legacy-visit.yaml
       relativeToChangelogFile: true
+  - include:
+      file: changes/023-home-sidebar.yaml
+      relativeToChangelogFile: true

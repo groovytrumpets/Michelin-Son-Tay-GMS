@@ -17,35 +17,76 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /** Nghiệp vụ menu điều hướng: dựng cây, sửa mục, sắp xếp lại bằng kéo thả. */
 @Service
 @RequiredArgsConstructor
 public class NavMenuService {
 
+    /** Thanh điều hướng ngang ở đầu trang khách. */
+    public static final String LOCATION_HEADER_MAIN = "HEADER_MAIN";
+
+    /** Thanh dọc bên trái trang chủ — nhóm dịch vụ, phụ tùng, cơ sở. */
+    public static final String LOCATION_HOME_SIDEBAR = "HOME_SIDEBAR";
+
+    /**
+     * Mã vị trí hợp lệ.
+     *
+     * <p>Chặn ở đây vì gõ sai một ký tự trong mã vị trí sẽ tạo ra cả một cây menu
+     * mà không màn hình nào đọc tới: API vẫn trả 200, dữ liệu vẫn nằm trong bảng,
+     * chỉ là biến mất khỏi giao diện. Thêm vị trí mới thì khai báo thêm ở đây.
+     */
+    private static final Set<String> KNOWN_LOCATIONS = Set.of(LOCATION_HEADER_MAIN, LOCATION_HOME_SIDEBAR);
+
     /**
      * Chốt an toàn chống lồng nhau vô tận — KHÔNG phải giới hạn thiết kế.
      *
-     * <p>Giao diện khách vẽ menu con bằng đệ quy nên sâu bao nhiêu cấp cũng hiện
+     * <p>Thanh đầu trang vẽ menu con bằng đệ quy nên sâu bao nhiêu cấp cũng hiện
      * được; con số này chỉ để một thao tác kéo thả sai không tạo ra chuỗi lồng
      * dài vô lý mà khách không tài nào rê chuột tới cuối. Phải khớp MAX_DEPTH ở
      * NavMenuConfig.jsx, nếu không người dùng bị chặn mà không hiểu vì sao.
+     *
+     * <p>Vị trí có ít cấp hiển thị hơn thì khai báo riêng ở {@link #MAX_DEPTH_BY_LOCATION}.
      */
-    private static final int MAX_DEPTH = 10;
+    private static final int DEFAULT_MAX_DEPTH = 10;
+
+    /**
+     * Vị trí nào vẽ được ít cấp hơn mức chung thì khai báo ở đây.
+     *
+     * <p>Thanh bên trang chủ chỉ có ba tầng để vẽ (nhóm → mục → mục con); mục ở
+     * tầng thứ tư sẽ nằm im trong bảng mà không hiện ra, nên chặn từ lúc lưu thay
+     * vì để người dùng tự hỏi mục vừa kéo đi đâu mất. Phải khớp
+     * SIDEBAR_MAX_DEPTH ở homeSidebarService.js.
+     */
+    private static final Map<String, Integer> MAX_DEPTH_BY_LOCATION = Map.of(LOCATION_HOME_SIDEBAR, 3);
 
     private final NavMenuItemJpaRepo navRepo;
+
+    private static void requireKnownLocation(String locationCode) {
+        if (!KNOWN_LOCATIONS.contains(locationCode)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Vị trí menu không hợp lệ: " + locationCode);
+        }
+    }
+
+    private static int maxDepthFor(String locationCode) {
+        return MAX_DEPTH_BY_LOCATION.getOrDefault(locationCode, DEFAULT_MAX_DEPTH);
+    }
 
     // ---------------------------------------------------------------- đọc
 
     /** Cây menu cho trang khách — bỏ hết mục đang tắt. */
     @Transactional(readOnly = true)
     public List<NavMenuItemDto.ItemDto> getPublicTree(String locationCode) {
+        requireKnownLocation(locationCode);
         return buildTree(navRepo.findAllForLocation(locationCode), true);
     }
 
     /** Cây menu cho màn quản trị — giữ cả mục đang tắt để còn bật lại được. */
     @Transactional(readOnly = true)
     public List<NavMenuItemDto.ItemDto> getAdminTree(String locationCode) {
+        requireKnownLocation(locationCode);
         return buildTree(navRepo.findAllForLocation(locationCode), false);
     }
 
@@ -121,6 +162,7 @@ public class NavMenuService {
 
     @Transactional
     public NavMenuItemDto.ItemDto create(String locationCode, NavMenuItemDto.SaveRequest request) {
+        requireKnownLocation(locationCode);
         NavMenuItemJpa item = new NavMenuItemJpa();
         item.setLocationCode(locationCode);
         item.setCreatedAt(LocalDateTime.now());
@@ -150,6 +192,7 @@ public class NavMenuService {
      */
     @Transactional
     public List<NavMenuItemDto.ItemDto> reorder(String locationCode, NavMenuItemDto.ReorderRequest request) {
+        requireKnownLocation(locationCode);
         List<NavMenuItemDto.ReorderEntry> entries = request.items();
         if (entries == null || entries.isEmpty()) return getAdminTree(locationCode);
 
@@ -259,9 +302,10 @@ public class NavMenuService {
     /** Mục mới đặt dưới {@code parent} không được vượt quá chốt an toàn về số cấp. */
     private void guardDepth(NavMenuItemJpa parent) {
         if (parent == null) return;
-        if (depthOf(parent) >= MAX_DEPTH) {
+        int maxDepth = maxDepthFor(parent.getLocationCode());
+        if (depthOf(parent) >= maxDepth) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Menu lồng tối đa " + MAX_DEPTH + " cấp, không thể thêm mục con vào đây nữa");
+                    "Menu lồng tối đa " + maxDepth + " cấp, không thể thêm mục con vào đây nữa");
         }
     }
 
@@ -274,10 +318,11 @@ public class NavMenuService {
                                    Map<Integer, List<NavMenuItemJpa>> childrenByParent) {
         int parentDepth = newParent == null ? 0 : depthOf(newParent);
         int height = subtreeHeight(moving.getNavItemId(), childrenByParent, 0);
-        if (parentDepth + height > MAX_DEPTH) {
+        int maxDepth = maxDepthFor(moving.getLocationCode());
+        if (parentDepth + height > maxDepth) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Không thể đặt \"" + moving.getLabel() + "\" vào đây: menu sẽ lồng quá "
-                            + MAX_DEPTH + " cấp");
+                            + maxDepth + " cấp");
         }
     }
 
