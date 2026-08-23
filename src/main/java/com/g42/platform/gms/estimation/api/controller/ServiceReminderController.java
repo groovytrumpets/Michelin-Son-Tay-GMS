@@ -83,10 +83,14 @@ public class ServiceReminderController {
         return ResponseEntity.ok(ApiResponses.success(apiResponse));
     }
 
+    /**
+     * Khách lâu chưa quay lại, gộp cả phiếu dịch vụ lẫn lịch sử nhập từ sổ Excel cũ.
+     * maxDays = 0 nghĩa là không giới hạn cận trên — cần cho dữ liệu cũ đã hơn một năm.
+     */
     @GetMapping("/inactive-customers")
     public ResponseEntity<ApiResponse<List<InactiveCustomerDto>>> getInactiveCustomers(
             @RequestParam(defaultValue = "30") int minDays,
-            @RequestParam(defaultValue = "60") int maxDays){
+            @RequestParam(required = false) Integer maxDays){
         List<InactiveCustomerDto> inactive = reminderService.getInactiveCustomers(minDays, maxDays);
         return ResponseEntity.ok(ApiResponses.success(inactive));
     }

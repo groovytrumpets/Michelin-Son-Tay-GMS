@@ -73,3 +73,6 @@ databaseChangeLog:
   - include:
       file: changes/021-landing-page-catalog-config.yaml
       relativeToChangelogFile: true
+  - include:
+      file: changes/022-legacy-visit.yaml
+      relativeToChangelogFile: true

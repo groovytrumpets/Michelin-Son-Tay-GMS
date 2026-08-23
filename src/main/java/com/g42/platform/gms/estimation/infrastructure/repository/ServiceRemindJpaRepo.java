@@ -106,4 +106,63 @@ public interface ServiceRemindJpaRepo extends JpaRepository<ServiceReminderJpa,I
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate
     );
+
+    /**
+     * Lần cuối đến xưởng theo phiếu dịch vụ trong phần mềm, KHÔNG lọc khoảng ngày.
+     *
+     * Việc lọc chuyển lên tầng service vì mốc cuối cùng còn phải so với lịch sử nhập từ
+     * sổ Excel cũ — lọc sớm ở đây thì một khách có phiếu cũ hơn lượt legacy sẽ bị loại
+     * nhầm trước khi kịp so.
+     */
+    @Query("""
+        select new com.g42.platform.gms.estimation.api.dto.InactiveCustomerDto(
+            c.customerId, c.fullName, c.phone, st.serviceTicketId, st.vehicleId, v.licensePlate, st.receivedAt
+        )
+        from CustomerProfileJpa c
+        join ServiceTicketManagement st on st.customerId = c.customerId
+        left join Vehicle v on st.vehicleId = v.vehicleId
+        where (st.isDeleted = false or st.isDeleted is null)
+          and st.ticketStatus in ('COMPLETED', 'PAID', 'CANCELLED')
+          and (c.doNotContact = false or c.doNotContact is null)
+          and st.receivedAt = (
+              select max(st2.receivedAt)
+              from ServiceTicketManagement st2
+              where st2.customerId = c.customerId
+                and (st2.isDeleted = false or st2.isDeleted is null)
+                and st2.ticketStatus in ('COMPLETED', 'PAID', 'CANCELLED')
+          )
+          and not exists (
+              select 1
+              from ServiceReminderJpa r
+              where r.customerId = c.customerId and r.status in ('PENDING', 'CONFIRMED')
+          )
+    """)
+    List<InactiveCustomerDto> findLatestTicketVisits();
+
+    /**
+     * Lần cuối đến xưởng theo lịch sử nhập từ sổ Excel cũ.
+     *
+     * Với khách chỉ có dữ liệu legacy thì đây là mốc duy nhất — bỏ qua nguồn này nghĩa
+     * là toàn bộ khách cũ không bao giờ xuất hiện trong danh sách cần nhắc.
+     */
+    @Query("""
+        select new com.g42.platform.gms.estimation.api.dto.InactiveCustomerDto(
+            c.customerId, c.fullName, c.phone, lv.vehicleId, v.licensePlate, lv.visitedAt
+        )
+        from CustomerProfileJpa c
+        join LegacyVisitJpa lv on lv.customerId = c.customerId
+        left join Vehicle v on lv.vehicleId = v.vehicleId
+        where (c.doNotContact = false or c.doNotContact is null)
+          and lv.visitedAt = (
+              select max(lv2.visitedAt)
+              from LegacyVisitJpa lv2
+              where lv2.customerId = c.customerId
+          )
+          and not exists (
+              select 1
+              from ServiceReminderJpa r
+              where r.customerId = c.customerId and r.status in ('PENDING', 'CONFIRMED')
+          )
+    """)
+    List<InactiveCustomerDto> findLatestLegacyVisits();
 }

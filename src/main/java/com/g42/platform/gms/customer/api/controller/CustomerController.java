@@ -62,6 +62,17 @@ public class CustomerController {
     public ResponseEntity<ApiResponse<CustomerProfile>> deleteProfile(@PathVariable Integer customerId) {
         return ResponseEntity.ok(ApiResponses.success(customerService.deleteCustomer(customerId)));
     }
+    /**
+     * Nhân viên kích hoạt hộ tài khoản khách nhập từ sổ cũ. Giữ nguyên PIN 6 số cuối
+     * số điện thoại, khách buộc phải đổi ở lần đăng nhập đầu.
+     */
+    @PatchMapping("{customerId}/activate")
+    @Auditable(action = "UPDATE", module = "CUSTOMER", severity = "WARNING",
+            description = "Kích hoạt tài khoản khách hàng", targetType = "CUSTOMER")
+    public ResponseEntity<ApiResponse<CustomerProfile>> activateProfile(@PathVariable Integer customerId) {
+        return ResponseEntity.ok(ApiResponses.success(customerService.activateCustomer(customerId)));
+    }
+
     @PutMapping("{customerId}/locked")
     @Auditable(action = "UPDATE", module = "CUSTOMER", severity = "WARNING", description = "Khóa tài khoản khách hàng", targetType = "CUSTOMER")
     public ResponseEntity<ApiResponse<CustomerProfile>> lockedProfile(@PathVariable Integer customerId) {

@@ -148,4 +148,11 @@ public class CustomerProfileJpa {
 
     @Column(name = "contact_address", length = 500)
     private String contactAddress;
+
+    /**
+     * Không gọi chăm sóc khách này nữa — số chết, chặn số, hoặc khách yêu cầu ngừng
+     * liên hệ. Sổ Excel cũ đã ghi sẵn kết quả gọi nên cờ được bật ngay lúc nhập dữ liệu.
+     */
+    @Column(name = "do_not_contact")
+    private Boolean doNotContact = false;
 }

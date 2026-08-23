@@ -38,4 +38,11 @@ public class CustomerAuthJpa {
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
+
+    /**
+     * Bắt khách đổi PIN ở lần đăng nhập đầu. Bật cho tài khoản nhập từ sổ cũ, vì PIN
+     * khởi tạo là 6 số cuối số điện thoại — ai biết số điện thoại là đoán được PIN.
+     */
+    @Column(name = "must_change_pin")
+    private Boolean mustChangePin = false;
 }

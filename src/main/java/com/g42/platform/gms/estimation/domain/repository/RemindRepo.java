@@ -26,4 +26,10 @@ public interface RemindRepo {
     Page<RemindSearchDto> searchReminders(int page, int size, LocalDateTime date, String status, String search, String phone, String sortBy);
 
     List<InactiveCustomerDto> findInactiveCustomers(LocalDateTime startDate, LocalDateTime endDate);
+
+    /** Lần cuối đến xưởng theo phiếu dịch vụ, chưa lọc khoảng ngày. */
+    List<InactiveCustomerDto> findLatestTicketVisits();
+
+    /** Lần cuối đến xưởng theo lịch sử nhập từ sổ Excel cũ, chưa lọc khoảng ngày. */
+    List<InactiveCustomerDto> findLatestLegacyVisits();
 }

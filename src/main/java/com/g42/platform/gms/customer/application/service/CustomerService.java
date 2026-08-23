@@ -150,6 +150,41 @@ public class CustomerService {
         }
         return findByCustomerId(customerId);
     }
+    /**
+     * Nhân viên kích hoạt hộ tài khoản khách.
+     *
+     * Dành cho khách nhập từ sổ Excel cũ: hồ sơ được tạo ở trạng thái INACTIVE nên
+     * chưa đăng nhập được, PIN khởi tạo là 6 số cuối số điện thoại. Kích hoạt ở đây
+     * GIỮ NGUYÊN mã PIN đó — cờ must_change_pin đã bật từ lúc nhập nên khách buộc phải
+     * đổi ở lần đăng nhập đầu, vì ai biết số điện thoại là đoán được PIN.
+     *
+     * Khách tự kích hoạt qua OTP Zalo thì đi đường khác (CustomerAuthService.setupPin)
+     * và tự đặt PIN mới, an toàn hơn — đây chỉ là lối phụ khi khách không tự làm được.
+     */
+    @Transactional
+    public CustomerProfile activateCustomer(Integer customerId) {
+        CustomerProfile customerProfile = customerRepo.findProflieById(customerId);
+        CustomerAuth customerAuth = customerRepo.findAuthById(customerId);
+        if (customerAuth == null) {
+            throw new CustomerException("Khách chưa có bản ghi bảo mật, không kích hoạt được.",
+                    CustomerErrorCode.INVALID_CUSTOMER_PROFILE);
+        }
+        if (customerAuth.getPinHash() == null || customerAuth.getPinHash().isBlank()) {
+            throw new CustomerException(
+                    "Tài khoản chưa có mã PIN. Khách cần tự đặt PIN qua xác thực OTP Zalo.",
+                    CustomerErrorCode.INVALID_CUSTOMER_PROFILE);
+        }
+        if (customerAuth.getStatus() == CustomerStatus.LOCKED) {
+            throw new CustomerException("Tài khoản đang bị khóa, mở khóa trước khi kích hoạt.",
+                    CustomerErrorCode.INVALID_CUSTOMER_PROFILE);
+        }
+        customerAuth.setStatus(CustomerStatus.ACTIVE);
+        if (!customerRepo.updateCustomer(customerId, customerProfile, customerAuth)) {
+            throw new CustomerException("Update fail!", CustomerErrorCode.INVALID_CUSTOMER_PROFILE);
+        }
+        return findByCustomerId(customerId);
+    }
+
     public CustomerProfile lockedCustomer(Integer customerId) {
         CustomerProfile customerProfile = customerRepo.findProflieById(customerId);
         CustomerAuth customerAuth = customerRepo.findAuthById(customerId);

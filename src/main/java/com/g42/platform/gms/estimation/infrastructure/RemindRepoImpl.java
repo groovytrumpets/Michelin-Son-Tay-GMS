@@ -101,4 +101,14 @@ public class RemindRepoImpl implements RemindRepo {
     public List<InactiveCustomerDto> findInactiveCustomers(LocalDateTime startDate, LocalDateTime endDate) {
         return serviceRemindJpaRepo.findInactiveCustomers(startDate, endDate);
     }
+
+    @Override
+    public List<InactiveCustomerDto> findLatestTicketVisits() {
+        return serviceRemindJpaRepo.findLatestTicketVisits();
+    }
+
+    @Override
+    public List<InactiveCustomerDto> findLatestLegacyVisits() {
+        return serviceRemindJpaRepo.findLatestLegacyVisits();
+    }
 }

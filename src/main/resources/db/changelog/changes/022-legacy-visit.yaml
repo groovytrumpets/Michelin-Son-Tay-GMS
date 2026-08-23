@@ -1,0 +1,398 @@
+# Nhập lịch sử dịch vụ từ sổ Excel cũ (dữ liệu legacy trước khi dùng phần mềm).
+#
+# VÌ SAO KHÔNG GHI THẲNG VÀO service_ticket
+# Lượt dịch vụ cũ không có báo giá, không có phân công, không có thanh toán và
+# không đi qua vòng đời phiếu. Nhét vào service_ticket thì mọi truy vấn vận hành
+# (danh sách phiếu, điều phối, hàng chờ, KPI nhân viên, báo cáo doanh thu, lịch
+# sử công việc) đều phải thêm điều kiện loại trừ — sót một chỗ là sai số liệu âm
+# thầm, và mở phiếu legacy trên màn chi tiết sẽ lỗi vì thiếu estimate. Tách bảng
+# riêng thì miền vận hành không bị đụng tới, đổi lại chỉ phải sửa MỘT truy vấn:
+# ReminderRepo.findInactiveCustomers phải gộp cả hai nguồn khi tính lần cuối
+# khách đến xưởng.
+#
+# dedupe_key — VÌ SAO KHÔNG DÙNG KHOÁ GHÉP
+# UNIQUE(customer_id, visited_at, legacy_ticket_code) trông hợp lý nhưng KHÔNG
+# chặn được trùng: MySQL cho phép lặp vô hạn khi một cột trong khoá là NULL, mà
+# mã phiếu trong sổ cũ thường bỏ trống. Nên tầng ứng dụng ghép sẵn một chuỗi
+# NOT NULL: customerId|yyyy-MM-dd|mãPhiếu|hash(các dòng dịch vụ). Nhập lại đúng
+# file lần thứ hai thì chắc chắn ra 0 dòng mới.
+#
+# has_time — SỔ CŨ KHÔNG CÓ GIỜ
+# Toàn bộ ô ngày trong file gốc là ngày trần, không ô nào có phần giờ. visited_at
+# vẫn để DATETIME cho đồng nhất với service_ticket.received_at, nhưng has_time=0
+# báo cho giao diện biết phần giờ là do hệ thống điền, đừng hiển thị như giờ thật.
+#
+# legacy_visit_item.category — HẠNG MỤC LÀ THỨ ĐỂ NHẮC ĐỊNH KỲ
+# Sổ cũ nhóm các cột theo 13 hạng mục (Lốp, Dầu động cơ, Lọc gió điều hòa...).
+# Giữ lại hạng mục vừa để đặt tên cho những dòng bỏ trống ô Diễn giải, vừa để sau
+# này trả lời được "khách nào thay dầu động cơ quá 6 tháng" — chính là mục tiêu
+# của phân hệ nhắc bảo dưỡng.
+#
+# customer_auth.must_change_pin
+# Khách nhập từ sổ cũ được đặt PIN = 6 số cuối số điện thoại và trạng thái
+# INACTIVE (chưa đăng nhập được). Khi nhân viên kích hoạt hộ, PIN đó được giữ
+# nguyên — mà ai biết số điện thoại là đoán được PIN, nên bắt buộc đổi ở lần
+# đăng nhập đầu. Khách tự kích hoạt qua OTP Zalo thì tự đặt PIN mới, cờ này
+# được xoá theo.
+#
+# customer_profile.do_not_contact
+# Sổ cũ đã ghi sẵn kết quả gọi điện chăm sóc khách: "Số chết", "Chặn số",
+# "Không nghe máy". Bật cờ này để phân hệ nhắc lịch không đẩy những khách đó vào
+# danh sách gọi lần nữa.
+databaseChangeLog:
+  - changeSet:
+      id: 022-1-import-batch
+      author: gms
+      comment: Lô nhập dữ liệu — để truy vết nguồn gốc và hoàn tác nguyên lô khi nhập sai
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: import_batch
+      changes:
+        - createTable:
+            tableName: import_batch
+            remarks: Một lần chạy nhập dữ liệu từ file Excel
+            columns:
+              - column:
+                  name: import_batch_id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: file_name
+                  type: VARCHAR(255)
+                  remarks: Tên file Excel người dùng đã chọn
+              - column:
+                  name: sheet_name
+                  type: VARCHAR(100)
+                  remarks: Sheet đã đọc, vd "Thu"
+              - column:
+                  name: imported_by
+                  type: INT
+                  remarks: Nhân viên thực hiện, tham chiếu staff_profile
+              - column:
+                  name: imported_at
+                  type: DATETIME
+                  defaultValueComputed: CURRENT_TIMESTAMP
+              - column:
+                  name: status
+                  type: VARCHAR(20)
+                  defaultValue: COMMITTED
+                  remarks: COMMITTED / ROLLED_BACK
+              - column:
+                  name: counts_json
+                  type: TEXT
+                  remarks: Thống kê kết quả (số khách tạo mới, khách hợp nhất, xe, lượt, dòng bỏ qua)
+              - column:
+                  name: note
+                  type: VARCHAR(500)
+      rollback:
+        - dropTable:
+            tableName: import_batch
+
+  - changeSet:
+      id: 022-2-legacy-visit
+      author: gms
+      comment: Một lượt khách đến xưởng theo sổ cũ — chỉ mức đầu phiếu, không có báo giá hay thanh toán
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: legacy_visit
+      changes:
+        - createTable:
+            tableName: legacy_visit
+            remarks: Lượt sử dụng dịch vụ trước khi xưởng dùng phần mềm
+            columns:
+              - column:
+                  name: legacy_visit_id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: customer_id
+                  type: INT
+                  constraints:
+                    nullable: false
+                  remarks: Khách hàng, đối chiếu chính qua số điện thoại lúc nhập
+              - column:
+                  name: vehicle_id
+                  type: INT
+                  remarks: Xe, để trống khi sổ cũ không ghi biển số
+              - column:
+                  name: visited_at
+                  type: DATETIME
+                  constraints:
+                    nullable: false
+                  remarks: Ngày giờ khách đến xưởng — nguồn tính lần cuối đến xưởng
+              - column:
+                  name: has_time
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  remarks: false = sổ cũ chỉ ghi ngày, phần giờ do hệ thống điền
+              - column:
+                  name: delivered_at
+                  type: DATETIME
+                  remarks: Ngày giao xe, sổ cũ có thì ghi
+              - column:
+                  name: legacy_ticket_code
+                  type: VARCHAR(100)
+                  remarks: Mã hoặc số thứ tự phiếu trong sổ cũ
+              - column:
+                  name: odometer
+                  type: INT
+                  remarks: Số km, sổ cũ chỉ ghi khoảng một phần ba số phiếu
+              - column:
+                  name: customer_note
+                  type: TEXT
+                  remarks: Cột "Lưu ý" trong sổ — yêu cầu hoặc tình trạng khách báo
+              - column:
+                  name: services_text
+                  type: TEXT
+                  remarks: Toàn bộ dịch vụ đã dùng gộp thành một chuỗi, để hiển thị nhanh không cần join
+              - column:
+                  name: total_amount
+                  type: DECIMAL(12,2)
+                  remarks: Tổng tiền theo sổ cũ — chỉ để tham khảo, KHÔNG đưa vào báo cáo doanh thu
+              - column:
+                  name: discount_amount
+                  type: DECIMAL(12,2)
+                  remarks: Hạng mục "Giảm giá" trong sổ, tách riêng vì không phải dịch vụ
+              - column:
+                  name: amount_mismatch
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  remarks: Tổng tiền lệch tổng các dòng — giữ nguyên trạng và đánh dấu để rà lại sau
+              - column:
+                  name: called
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  remarks: Xưởng đã gọi chăm sóc khách sau lượt này chưa
+              - column:
+                  name: call_success
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  remarks: Cuộc gọi có liên lạc được không
+              - column:
+                  name: call_note
+                  type: VARCHAR(500)
+                  remarks: Kết quả gọi, vd "Khách chưa có nhu cầu", "Chưa đến kỳ kiểm tra"
+              - column:
+                  name: import_batch_id
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: source_row_no
+                  type: INT
+                  remarks: Số dòng trong file gốc, để đối chiếu khi có sai lệch
+              - column:
+                  name: raw_json
+                  type: TEXT
+                  remarks: Nguyên văn dòng Excel, giữ lại để tra ngược khi nghi ngờ dữ liệu đã nhập sai
+              - column:
+                  name: dedupe_key
+                  type: VARCHAR(120)
+                  constraints:
+                    nullable: false
+                  remarks: Khoá chống nhập trùng, ghép ở tầng ứng dụng
+              - column:
+                  name: created_at
+                  type: DATETIME
+                  defaultValueComputed: CURRENT_TIMESTAMP
+      rollback:
+        - dropTable:
+            tableName: legacy_visit
+
+  - changeSet:
+      id: 022-3-legacy-visit-item
+      author: gms
+      comment: Dòng dịch vụ hoặc phụ tùng trong một lượt cũ — dạng chữ tự do, không nối vào catalog_item
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: legacy_visit_item
+      changes:
+        - createTable:
+            tableName: legacy_visit_item
+            remarks: Dịch vụ khách đã dùng trong một lượt, ghi theo nguyên văn sổ cũ
+            columns:
+              - column:
+                  name: legacy_visit_item_id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: legacy_visit_id
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: line_no
+                  type: SMALLINT
+                  remarks: Thứ tự dòng trong phiếu, giữ đúng thứ tự cột của sổ cũ
+              - column:
+                  name: category
+                  type: VARCHAR(64)
+                  remarks: Hạng mục gốc trong sổ (Lốp, Dầu động cơ, Phanh...), dùng để nhắc bảo dưỡng theo loại dịch vụ
+              - column:
+                  name: item_name
+                  type: VARCHAR(255)
+                  remarks: Ô "Diễn giải"; sổ cũ bỏ trống thì lấy chính tên hạng mục
+              - column:
+                  name: quantity
+                  type: DECIMAL(9,2)
+                  remarks: Số lượng, sổ cũ có ghi lẻ dạng "4,5"
+              - column:
+                  name: unit_price
+                  type: DECIMAL(12,2)
+              - column:
+                  name: amount
+                  type: DECIMAL(12,2)
+      rollback:
+        - dropTable:
+            tableName: legacy_visit_item
+
+  - changeSet:
+      id: 022-4-legacy-visit-keys
+      author: gms
+      comment: Khoá ngoại, khoá chống trùng và chỉ mục tra cứu theo khách và mốc thời gian
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - foreignKeyConstraintExists:
+                foreignKeyName: fk_legacy_visit_customer
+                foreignKeyTableName: legacy_visit
+      changes:
+        - addUniqueConstraint:
+            tableName: legacy_visit
+            columnNames: dedupe_key
+            constraintName: uk_legacy_visit_dedupe
+        - addForeignKeyConstraint:
+            baseTableName: legacy_visit
+            baseColumnNames: customer_id
+            constraintName: fk_legacy_visit_customer
+            referencedTableName: customer_profile
+            referencedColumnNames: customer_id
+        - addForeignKeyConstraint:
+            baseTableName: legacy_visit
+            baseColumnNames: vehicle_id
+            constraintName: fk_legacy_visit_vehicle
+            referencedTableName: vehicle
+            referencedColumnNames: vehicle_id
+        - addForeignKeyConstraint:
+            baseTableName: legacy_visit
+            baseColumnNames: import_batch_id
+            constraintName: fk_legacy_visit_batch
+            referencedTableName: import_batch
+            referencedColumnNames: import_batch_id
+        - addForeignKeyConstraint:
+            baseTableName: legacy_visit_item
+            baseColumnNames: legacy_visit_id
+            constraintName: fk_legacy_visit_item_visit
+            referencedTableName: legacy_visit
+            referencedColumnNames: legacy_visit_id
+            onDelete: CASCADE
+        - createIndex:
+            tableName: legacy_visit
+            indexName: idx_legacy_visit_customer_date
+            columns:
+              - column:
+                  name: customer_id
+              - column:
+                  name: visited_at
+        - createIndex:
+            tableName: legacy_visit
+            indexName: idx_legacy_visit_batch
+            columns:
+              - column:
+                  name: import_batch_id
+        - createIndex:
+            tableName: legacy_visit_item
+            indexName: idx_legacy_visit_item_category
+            columns:
+              - column:
+                  name: category
+      rollback:
+        - dropIndex:
+            tableName: legacy_visit_item
+            indexName: idx_legacy_visit_item_category
+        - dropIndex:
+            tableName: legacy_visit
+            indexName: idx_legacy_visit_batch
+        - dropIndex:
+            tableName: legacy_visit
+            indexName: idx_legacy_visit_customer_date
+        - dropForeignKeyConstraint:
+            baseTableName: legacy_visit_item
+            constraintName: fk_legacy_visit_item_visit
+        - dropForeignKeyConstraint:
+            baseTableName: legacy_visit
+            constraintName: fk_legacy_visit_batch
+        - dropForeignKeyConstraint:
+            baseTableName: legacy_visit
+            constraintName: fk_legacy_visit_vehicle
+        - dropForeignKeyConstraint:
+            baseTableName: legacy_visit
+            constraintName: fk_legacy_visit_customer
+        - dropUniqueConstraint:
+            tableName: legacy_visit
+            constraintName: uk_legacy_visit_dedupe
+
+  - changeSet:
+      id: 022-5-customer-auth-must-change-pin
+      author: gms
+      comment: Bắt khách đổi PIN ở lần đăng nhập đầu — dùng cho tài khoản nhập từ sổ cũ có PIN là 6 số cuối SĐT
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: customer_auth
+                columnName: must_change_pin
+      changes:
+        - addColumn:
+            tableName: customer_auth
+            columns:
+              - column:
+                  name: must_change_pin
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+      rollback:
+        - dropColumn:
+            tableName: customer_auth
+            columnName: must_change_pin
+
+  - changeSet:
+      id: 022-6-customer-profile-do-not-contact
+      author: gms
+      comment: Không gọi chăm sóc khách này nữa — số chết, chặn số, hoặc khách yêu cầu ngừng liên hệ
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: customer_profile
+                columnName: do_not_contact
+      changes:
+        - addColumn:
+            tableName: customer_profile
+            columns:
+              - column:
+                  name: do_not_contact
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+      rollback:
+        - dropColumn:
+            tableName: customer_profile
+            columnName: do_not_contact
