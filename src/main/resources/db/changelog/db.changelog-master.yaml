@@ -79,3 +79,6 @@ databaseChangeLog:
   - include:
       file: changes/023-home-sidebar.yaml
       relativeToChangelogFile: true
+  - include:
+      file: changes/024-catalog-draft.yaml
+      relativeToChangelogFile: true

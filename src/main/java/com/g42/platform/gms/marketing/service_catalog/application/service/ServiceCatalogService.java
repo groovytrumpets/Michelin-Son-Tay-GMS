@@ -74,10 +74,24 @@ public class ServiceCatalogService {
         if (request.getThumbnailFile() != null && !request.getThumbnailFile().isEmpty()) {
             String thumnailUrl = imageUploadService.uploadImage(request.getThumbnailFile(),"garage/services/thumbnails");
             service.setMediaThumbnail(thumnailUrl);
+        } else if (request.getThumbnailUrl() != null && !request.getThumbnailUrl().isBlank()) {
+            // Ảnh đã được tải lên kho khi lưu bản nháp: dùng lại URL để tránh tải
+            // cùng một ảnh lần thứ hai lúc xuất bản.
+            service.setMediaThumbnail(request.getThumbnailUrl().trim());
+        }
+        List<ServiceMedia> mediaList = new ArrayList<>();
+        int displayOrder = 1;
+        if (request.getExistingMediaUrls() != null) {
+            for (String mediaUrl : request.getExistingMediaUrls()) {
+                if (mediaUrl == null || mediaUrl.isBlank()) continue;
+                ServiceMedia mediaEntity = new ServiceMedia();
+                mediaEntity.setDisplayOrder(displayOrder++);
+                mediaEntity.setMediaUrl(mediaUrl.trim());
+                mediaEntity.setMediaType(MediaType.IMAGE);
+                mediaList.add(mediaEntity);
+            }
         }
         if (request.getMediaFiles() != null && !request.getMediaFiles().isEmpty()) {
-            List<ServiceMedia> mediaList = new ArrayList<>();
-            int displayOrder=1;
             for (MultipartFile file : request.getMediaFiles()) {
                 if (!file.isEmpty()) {
 
@@ -97,6 +111,8 @@ public class ServiceCatalogService {
                     mediaList.add(mediaEntity);
                 }
             }
+        }
+        if (!mediaList.isEmpty()) {
             service.setMedia(mediaList);
         }
         //todo: save catalog

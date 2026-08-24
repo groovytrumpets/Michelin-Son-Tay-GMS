@@ -1,0 +1,67 @@
+databaseChangeLog:
+  - changeSet:
+      id: 024-1-create-catalog-draft
+      author: gms
+      comment: Lưu nhiều bản nháp tạo phụ tùng, dịch vụ và combo theo từng nhân viên
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: catalog_draft
+      changes:
+        - createTable:
+            tableName: catalog_draft
+            remarks: Bản nháp biểu mẫu tạo catalog theo nhân viên
+            columns:
+              - column:
+                  name: draft_id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: staff_id
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: draft_type
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: title
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: payload_json
+                  type: LONGTEXT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: DATETIME
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: DATETIME
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: catalog_draft
+            indexName: idx_catalog_draft_staff_type_updated
+            columns:
+              - column:
+                  name: staff_id
+              - column:
+                  name: draft_type
+              - column:
+                  name: updated_at
+      rollback:
+        - dropTable:
+            tableName: catalog_draft
