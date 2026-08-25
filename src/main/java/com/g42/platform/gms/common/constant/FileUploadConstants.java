@@ -40,6 +40,9 @@ public final class FileUploadConstants {
     // Image transformation
     public static final int AVATAR_SIZE = 500; // 500x500 pixels
     public static final int IMAGE_QUALITY = 80; // 1-100, 80 = good quality
+    public static final int FULL_HD_LONG_EDGE = 1920;
+    public static final int FULL_HD_SHORT_EDGE = 1080;
+    public static final double UPLOAD_IMAGE_QUALITY = 0.85d;
     
     // Error messages
     public static final String ERROR_FILE_EMPTY = "File không được để trống";

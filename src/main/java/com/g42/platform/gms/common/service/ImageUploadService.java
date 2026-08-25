@@ -8,6 +8,9 @@ import net.coobird.thumbnailator.Thumbnails;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -31,29 +34,76 @@ public class ImageUploadService {
      */
     public String uploadImage(MultipartFile file, String folder) throws IOException {
         validateFile(file);
-        byte[] compressedImageBytes;
-        if (file.getSize() > FileUploadConstants.MAX_IMAGE_SIZE_BYTES){
-        ByteArrayOutputStream os = new ByteArrayOutputStream();
-        try (InputStream is = file.getInputStream()) {
-            Thumbnails.of(is)
-                    .size(1280, 1280) // Giới hạn kích thước tối đa (VD: HD/FullHD)
-                    .outputQuality(0.7) // Giảm chất lượng xuống 70% (mắt thường không phân biệt được)
-                    .toOutputStream(os); // Xuất ra stream
-        }
-            compressedImageBytes = os.toByteArray();
-        }else {
-            compressedImageBytes = file.getBytes();
-        }
+        byte[] compressedImageBytes = compressForUpload(file);
 
         Map<String, Object> options = new HashMap<>();
         options.put("folder", folder);
         options.put("resource_type", "image");
+        options.put("transformation", "c_limit,w_1920,h_1080,q_auto:good");
 
         Map uploadResult = cloudinary.uploader().upload(compressedImageBytes, options);
         String url = (String) uploadResult.get("secure_url");
 
         log.info("Image uploaded successfully: {}", url);
         return url;
+    }
+
+    /**
+     * Optimise every new upload. File byte size alone is not a reliable signal:
+     * a highly compressed source may still contain far more than Full-HD pixels.
+     */
+    private byte[] compressForUpload(MultipartFile file) throws IOException {
+        int[] dimensions = readImageDimensions(file);
+        boolean landscape = dimensions[0] >= dimensions[1];
+        int maxWidth = landscape
+                ? FileUploadConstants.FULL_HD_LONG_EDGE
+                : FileUploadConstants.FULL_HD_SHORT_EDGE;
+        int maxHeight = landscape
+                ? FileUploadConstants.FULL_HD_SHORT_EDGE
+                : FileUploadConstants.FULL_HD_LONG_EDGE;
+
+        try (InputStream input = file.getInputStream();
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            var thumbnail = Thumbnails.of(input);
+            if (dimensions[0] > maxWidth || dimensions[1] > maxHeight) {
+                thumbnail.size(maxWidth, maxHeight);
+            } else {
+                thumbnail.scale(1.0d);
+            }
+            thumbnail.useExifOrientation(true)
+                    .outputQuality(FileUploadConstants.UPLOAD_IMAGE_QUALITY)
+                    .toOutputStream(output);
+            byte[] optimised = output.toByteArray();
+            log.info("Image optimised before upload: originalBytes={}, optimisedBytes={}, max={}x{}",
+                    file.getSize(), optimised.length, maxWidth, maxHeight);
+            return optimised;
+        } catch (RuntimeException | IOException unsupportedFormat) {
+            // WebP support depends on ImageIO codecs available in the JVM. The
+            // Cloudinary incoming transformation remains the format-safe fallback.
+            log.warn("Local image optimisation unavailable for {}; using Cloudinary transformation",
+                    file.getOriginalFilename(), unsupportedFormat);
+            return file.getBytes();
+        }
+    }
+
+    private int[] readImageDimensions(MultipartFile file) throws IOException {
+        try (InputStream input = file.getInputStream();
+             ImageInputStream imageInput = ImageIO.createImageInputStream(input)) {
+            if (imageInput == null) {
+                return new int[]{FileUploadConstants.FULL_HD_LONG_EDGE, FileUploadConstants.FULL_HD_SHORT_EDGE};
+            }
+            var readers = ImageIO.getImageReaders(imageInput);
+            if (!readers.hasNext()) {
+                return new int[]{FileUploadConstants.FULL_HD_LONG_EDGE, FileUploadConstants.FULL_HD_SHORT_EDGE};
+            }
+            ImageReader reader = readers.next();
+            try {
+                reader.setInput(imageInput, true, true);
+                return new int[]{reader.getWidth(0), reader.getHeight(0)};
+            } finally {
+                reader.dispose();
+            }
+        }
     }
 
     /**

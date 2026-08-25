@@ -4,10 +4,10 @@ import com.g42.platform.gms.warehouse.domain.enums.CatalogItemType;
 
 public enum LandingPageSection {
     FEATURED(6),
-    SERVICE(5),
-    PART(5),
-    COMBO(5),
-    EQUIPMENT(5);
+    SERVICE(6),
+    PART(6),
+    COMBO(6),
+    EQUIPMENT(6);
 
     private final int maxItems;
 
