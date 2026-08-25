@@ -71,13 +71,13 @@ public class ServiceCatalogService {
     public ServiceDetailRespond createNewService(ServiceCreateRequest request, Integer catalogId) throws IOException {
         com.g42.platform.gms.marketing.service_catalog.domain.entity.Service
                 service = serviceDtoMapper.toEntity(request);
-        if (request.getThumbnailFile() != null && !request.getThumbnailFile().isEmpty()) {
+        if (request.getThumbnailUrl() != null && !request.getThumbnailUrl().isBlank()) {
+            // URL có sẵn luôn được ưu tiên, kể cả khi client cũ vô tình gửi kèm File.
+            // Nhờ vậy ảnh Cloudinary không thể bị upload lại thành một bản trùng lặp.
+            service.setMediaThumbnail(request.getThumbnailUrl().trim());
+        } else if (request.getThumbnailFile() != null && !request.getThumbnailFile().isEmpty()) {
             String thumnailUrl = imageUploadService.uploadImage(request.getThumbnailFile(),"garage/services/thumbnails");
             service.setMediaThumbnail(thumnailUrl);
-        } else if (request.getThumbnailUrl() != null && !request.getThumbnailUrl().isBlank()) {
-            // Ảnh đã được tải lên kho khi lưu bản nháp: dùng lại URL để tránh tải
-            // cùng một ảnh lần thứ hai lúc xuất bản.
-            service.setMediaThumbnail(request.getThumbnailUrl().trim());
         }
         List<ServiceMedia> mediaList = new ArrayList<>();
         int displayOrder = 1;
@@ -139,13 +139,15 @@ public class ServiceCatalogService {
 //        service.setEstimateTime(request.getEstimateTime());
 
         // Cập nhật ảnh đại diện (Thumbnail)
-        if (request.getThumbnailFile() != null && !request.getThumbnailFile().isEmpty()) {
+        String thumbUrl = request.getThumbnailUrl();
+        if (thumbUrl != null && !thumbUrl.isBlank()) {
+            // Ưu tiên liên kết ảnh đã có để tránh upload lại nếu request có cả URL và File.
+            service.setMediaThumbnail(thumbUrl.trim());
+        } else if (request.getThumbnailFile() != null && !request.getThumbnailFile().isEmpty()) {
             String thumnailUrl = imageUploadService.uploadImage(request.getThumbnailFile(), "garage/services/thumbnails");
             service.setMediaThumbnail(thumnailUrl);
         } else {
-            // Giữ lại URL cũ hoặc xóa (nếu gửi lên rỗng/null)
-            String thumbUrl = request.getThumbnailUrl();
-            service.setMediaThumbnail(thumbUrl != null && !thumbUrl.trim().isEmpty() ? thumbUrl.trim() : null);
+            service.setMediaThumbnail(null);
         }
 
         // Cập nhật thư viện ảnh/video (Media)
@@ -169,10 +171,21 @@ public class ServiceCatalogService {
         for (int i = 0; i < existingUrls.size(); i++) {
             final String url = existingUrls.get(i).trim();
             final int displayOrderVal = i + 1;
-            currentMedia.stream()
+            ServiceMedia existingMedia = currentMedia.stream()
                     .filter(m -> url.equals(m.getMediaUrl()))
                     .findFirst()
-                    .ifPresent(m -> m.setDisplayOrder(displayOrderVal));
+                    .orElse(null);
+            if (existingMedia != null) {
+                existingMedia.setDisplayOrder(displayOrderVal);
+            } else {
+                // URL được chọn trực tiếp từ thư viện Cloudinary: chỉ tạo liên kết media,
+                // không tải ảnh về và không upload thêm một bản trùng lặp.
+                ServiceMedia linkedMedia = new ServiceMedia();
+                linkedMedia.setDisplayOrder(displayOrderVal);
+                linkedMedia.setMediaUrl(url);
+                linkedMedia.setMediaType(MediaType.IMAGE);
+                currentMedia.add(linkedMedia);
+            }
         }
 
         // Upload thêm các ảnh/video mới
