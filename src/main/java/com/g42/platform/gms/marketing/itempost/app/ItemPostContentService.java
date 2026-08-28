@@ -61,7 +61,7 @@ public class ItemPostContentService {
         Safelist safelist = Safelist.relaxed()
                 // Cho phép nhúng video YouTube — nội dung hướng dẫn sửa xe hay dùng.
                 .addTags("figure", "figcaption", "hr", "span", "iframe")
-                .addAttributes("iframe", "src", "width", "height", "allow", "allowfullscreen", "frameborder", "title")
+                .addAttributes("iframe", "src", "width", "height", "allow", "allowfullscreen", "frameborder", "title", "loading", "referrerpolicy")
                 .addProtocols("iframe", "src", "https")
                 .addAttributes("h2", "id")
                 .addAttributes("h3", "id")
