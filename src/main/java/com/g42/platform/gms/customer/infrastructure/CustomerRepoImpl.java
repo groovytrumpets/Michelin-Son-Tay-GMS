@@ -4,6 +4,7 @@ import com.g42.platform.gms.auth.entity.CustomerStatus;
 import com.g42.platform.gms.auth.mapper.CustomerProfileMapper;
 import com.g42.platform.gms.booking_management.infrastructure.specification.BookingRequestSpecification;
 import com.g42.platform.gms.customer.api.dto.CustomerCreateDto;
+import com.g42.platform.gms.customer.api.dto.CustomerDuplicateCheckDto;
 import com.g42.platform.gms.customer.domain.entity.CustomerAuth;
 import com.g42.platform.gms.customer.domain.entity.CustomerProfile;
 import com.g42.platform.gms.customer.domain.exception.CustomerErrorCode;
@@ -60,12 +61,21 @@ public class CustomerRepoImpl implements CustomerRepo {
             throw new CustomerException("Phone must not null!", CustomerErrorCode.INVALID_PHONE);
         }
         
-        // Kiểm tra xem khách hàng đã tồn tại chưa (khách vãng lai đã có profile nhưng chưa có tài khoản)
-        CustomerProfileJpa entity = customerProfileJpaRepo.findByPhone(customerDto.getPhone());
-        System.out.println("[DEBUG_PROFILE] found existing entity=" + (entity != null ? entity.getCustomerId() : "null"));
-        if (entity == null) {
+        // Nâng cấp khách vãng lai thành tài khoản: client gửi kèm customerId của hồ sơ
+        // đang có. Không có customerId nghĩa là tạo hồ sơ hoàn toàn mới, khi đó số điện
+        // thoại phải còn trống — tuyệt đối không ghi đè lên hồ sơ khách khác.
+        CustomerProfileJpa entity;
+        if (customerDto.getCustomerId() != null) {
+            entity = customerProfileJpaRepo.findByCustomerId(customerDto.getCustomerId());
+            if (entity == null) {
+                throw new CustomerException("Không tìm thấy hồ sơ khách hàng cần nâng cấp: " + customerDto.getCustomerId(),
+                        CustomerErrorCode.INVALID_ID);
+            }
+        } else {
             entity = new CustomerProfileJpa();
         }
+        ensurePhoneAvailable(customerDto.getPhone(), customerDto.getCustomerId());
+        System.out.println("[DEBUG_PROFILE] target entity=" + (entity.getCustomerId() != null ? entity.getCustomerId() : "new"));
         
         entity.setFullName(customerDto.getFullName());
         entity.setPhone(customerDto.getPhone());
@@ -182,10 +192,57 @@ public class CustomerRepoImpl implements CustomerRepo {
         if (email == null || email.isBlank()) return;
         customerProfileJpaRepo.findByEmailIgnoreCase(email.trim()).ifPresent(other -> {
             if (!other.getCustomerId().equals(selfCustomerId)) {
-                throw new CustomerException("Email đã được dùng cho khách hàng khác: " + email,
-                        CustomerErrorCode.INVALID_CUSTOMER_PROFILE);
+                throw new CustomerException("Email đã được dùng cho khách hàng khác: " + describe(other),
+                        CustomerErrorCode.DUPLICATE_EMAIL);
             }
         });
+    }
+
+    @Override
+    public void ensurePhoneAvailable(String phone, Integer selfCustomerId) {
+        if (phone == null || phone.isBlank()) return;
+        CustomerProfileJpa other = customerProfileJpaRepo.findByPhone(phone.trim());
+        if (other != null && !other.getCustomerId().equals(selfCustomerId)) {
+            throw new CustomerException("Số điện thoại " + phone + " đã thuộc về khách hàng " + describe(other)
+                    + ". Hãy mở hồ sơ đó để cập nhật thay vì tạo hồ sơ mới.",
+                    CustomerErrorCode.DUPLICATE_PHONE);
+        }
+    }
+
+    @Override
+    public CustomerDuplicateCheckDto checkDuplicate(String phone, String email, Integer excludeCustomerId) {
+        CustomerDuplicateCheckDto result = new CustomerDuplicateCheckDto();
+
+        if (phone != null && !phone.isBlank()) {
+            CustomerProfileJpa owner = customerProfileJpaRepo.findByPhone(phone.trim());
+            if (owner != null && !owner.getCustomerId().equals(excludeCustomerId)) {
+                result.setPhoneTaken(true);
+                result.setPhoneCustomerId(owner.getCustomerId());
+                result.setPhoneCustomerName(owner.getFullName());
+                result.setPhoneCustomerCode(owner.getCustomerCode());
+            }
+        }
+
+        if (email != null && !email.isBlank()) {
+            customerProfileJpaRepo.findByEmailIgnoreCase(email.trim()).ifPresent(owner -> {
+                if (!owner.getCustomerId().equals(excludeCustomerId)) {
+                    result.setEmailTaken(true);
+                    result.setEmailCustomerId(owner.getCustomerId());
+                    result.setEmailCustomerName(owner.getFullName());
+                    result.setEmailCustomerCode(owner.getCustomerCode());
+                }
+            });
+        }
+
+        return result;
+    }
+
+    /** Mô tả ngắn hồ sơ đang giữ định danh trùng để thông báo lỗi đủ rõ cho nhân viên. */
+    private String describe(CustomerProfileJpa profile) {
+        String name = (profile.getFullName() == null || profile.getFullName().isBlank())
+                ? "chưa có tên" : profile.getFullName();
+        return profile.getCustomerCode() == null || profile.getCustomerCode().isBlank()
+                ? name : name + " (" + profile.getCustomerCode() + ")";
     }
 
     /** Nạp tên nhóm khách hàng để hiển thị trên danh bạ. */
@@ -277,6 +334,7 @@ public class CustomerRepoImpl implements CustomerRepo {
         if (jpa == null) return false;
         
         jpa.setFullName(customerProfile.getFullName());
+        ensurePhoneAvailable(customerProfile.getPhone(), customerId);
         jpa.setPhone(customerProfile.getPhone());
         ensureEmailAvailable(customerProfile.getEmail(), customerId);
         jpa.setEmail(emptyToNull(customerProfile.getEmail()));

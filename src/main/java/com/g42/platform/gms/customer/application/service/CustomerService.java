@@ -3,6 +3,7 @@ package com.g42.platform.gms.customer.application.service;
 
 import com.g42.platform.gms.auth.entity.CustomerStatus;
 import com.g42.platform.gms.customer.api.dto.CustomerCreateDto;
+import com.g42.platform.gms.customer.api.dto.CustomerDuplicateCheckDto;
 import com.g42.platform.gms.customer.api.dto.CustomerUpdateDto;
 import com.g42.platform.gms.customer.api.mapper.CustomerDtoMapper;
 import com.g42.platform.gms.customer.domain.entity.CustomerAuth;
@@ -45,6 +46,11 @@ public class CustomerService {
             e.printStackTrace();
             throw e;
         }
+    }
+
+    /** Tra trùng định danh khách trước khi tạo hồ sơ mới — SĐT và email phải là duy nhất. */
+    public CustomerDuplicateCheckDto checkDuplicate(String phone, String email, Integer excludeCustomerId) {
+        return customerRepo.checkDuplicate(phone, email, excludeCustomerId);
     }
 
     public Page<CustomerProfile> getListOfAllCustomerProfile(int page, int size, LocalDate date, Boolean isGuest, String search, String status) {

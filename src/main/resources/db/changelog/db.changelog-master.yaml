@@ -82,3 +82,6 @@ databaseChangeLog:
   - include:
       file: changes/024-catalog-draft.yaml
       relativeToChangelogFile: true
+  - include:
+      file: changes/025-import-batch-rows.yaml
+      relativeToChangelogFile: true

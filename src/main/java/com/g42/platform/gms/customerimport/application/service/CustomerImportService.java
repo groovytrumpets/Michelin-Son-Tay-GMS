@@ -66,6 +66,8 @@ public class CustomerImportService {
     @Autowired private ImportBatchRepository importBatchRepo;
     @Autowired private PasswordEncoder passwordEncoder;
     @Autowired private ObjectMapper objectMapper;
+    /** Chỉ để hiện tên người đã chạy lô nhập trên màn xem chi tiết. */
+    @Autowired private com.g42.platform.gms.staff.profile.infrastructure.repository.StaffProileJpaRepo staffProfileRepo;
 
     /* =============================== API ================================== */
 
@@ -75,10 +77,374 @@ public class CustomerImportService {
         return process(request, true, null);
     }
 
-    /** Ghi thật. Toàn bộ lô nằm trong một giao dịch: lỗi giữa chừng thì không còn dấu vết. */
+    /**
+     * Ghi thật. Toàn bộ lô nằm trong một giao dịch: lỗi giữa chừng thì không còn dấu vết.
+     *
+     * Có replaceBatchId nghĩa là người dùng mở một lô đã ghi ra sửa rồi nhập lại: gỡ lô
+     * cũ trước, ghi lô mới sau, cùng một giao dịch để không bao giờ tồn tại hai bản.
+     */
     @Transactional
     public CustomerImportReport commit(CustomerImportRequest request, Integer staffId) {
-        return process(request, false, staffId);
+        Integer replaceBatchId = request.getReplaceBatchId();
+        if (replaceBatchId == null) {
+            return process(request, false, staffId);
+        }
+
+        ImportBatchJpa previous = importBatchRepo.findById(replaceBatchId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy lô nhập số " + replaceBatchId));
+        if (!ImportBatchJpa.STATUS_ROLLED_BACK.equals(previous.getStatus())) {
+            rollback(replaceBatchId);
+        }
+
+        CustomerImportReport report = process(request, false, staffId);
+
+        previous = importBatchRepo.findById(replaceBatchId).orElse(previous);
+        previous.setReplacedByBatchId(report.getBatchId());
+        importBatchRepo.save(previous);
+        report.add(ImportIssueDto.warning(null, "batch",
+                "Đã gỡ lô #" + replaceBatchId + " và ghi lại thành lô #" + report.getBatchId() + "."));
+        return report;
+    }
+
+    /**
+     * Nội dung một lô để mở lại lên bảng mà sửa. Ưu tiên nguyên văn đã gửi lần trước;
+     * lô ghi trước khi có cột rows_json thì dựng lại từ dữ liệu đã ghi.
+     */
+    @Transactional(readOnly = true)
+    public ImportBatchRowsDto batchRows(Integer batchId) {
+        ImportBatchJpa batch = importBatchRepo.findById(batchId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy lô nhập số " + batchId));
+
+        ImportBatchRowsDto dto = new ImportBatchRowsDto();
+        dto.setBatchId(batch.getImportBatchId());
+        dto.setFileName(batch.getFileName());
+        dto.setSheetName(batch.getSheetName());
+        dto.setNote(batch.getNote());
+        dto.setStatus(batch.getStatus());
+        dto.setPlateConflictPolicy(batch.getPlateConflictPolicy());
+
+        List<ImportRowDto> stored = readStoredRows(batch);
+        if (stored != null) {
+            dto.setRows(stored);
+            return dto;
+        }
+
+        dto.setReconstructed(true);
+        dto.setRows(reconstructRows(batchId));
+        return dto;
+    }
+
+    /**
+     * Lô đó đã đưa vào hệ thống những khách nào, mỗi khách có xe gì và những lượt nào.
+     *
+     * Dựng từ dữ liệu thật đang có để bấm vào là mở đúng hồ sơ khách. Lô đã hoàn tác
+     * không còn lượt nào nên dựng lại từ nội dung file đã lưu, chỉ để xem lại.
+     */
+    @Transactional(readOnly = true)
+    public ImportBatchDetailDto batchDetail(Integer batchId) {
+        ImportBatchJpa batch = importBatchRepo.findById(batchId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy lô nhập số " + batchId));
+
+        ImportBatchDetailDto dto = new ImportBatchDetailDto();
+        dto.setBatchId(batch.getImportBatchId());
+        dto.setFileName(batch.getFileName());
+        dto.setSheetName(batch.getSheetName());
+        dto.setNote(batch.getNote());
+        dto.setStatus(batch.getStatus());
+        dto.setPlateConflictPolicy(batch.getPlateConflictPolicy());
+        dto.setImportedAt(batch.getImportedAt());
+        dto.setImportedBy(batch.getImportedBy());
+        dto.setReplacedByBatchId(batch.getReplacedByBatchId());
+        if (batch.getImportedBy() != null) {
+            staffProfileRepo.findById(batch.getImportedBy())
+                    .ifPresent(staff -> dto.setImportedByName(staff.getFullName()));
+        }
+
+        BatchCounts counts = readCounts(batch);
+        dto.setCustomersCreated(counts.customersCreated);
+        dto.setCustomersMerged(counts.customersMerged);
+        dto.setVehiclesCreated(counts.vehiclesCreated);
+        dto.setVisitsCreated(counts.visitsCreated);
+        dto.setVisitItemsCreated(counts.visitItemsCreated);
+        dto.setSkippedRows(counts.skippedRows);
+
+        List<LegacyVisitJpa> visits = new ArrayList<>(legacyVisitRepo.findByImportBatchId(batchId));
+        dto.setVisitsRemaining(visits.size());
+
+        List<ImportRowDto> storedRows = readStoredRows(batch);
+
+        if (visits.isEmpty()) {
+            // Lô đã hoàn tác: không còn gì trong hệ thống, chỉ xem lại được nội dung file
+            dto.setFromStoredRows(true);
+            if (storedRows != null) dto.setCustomers(groupStoredRows(storedRows));
+            return dto;
+        }
+
+        dto.setCustomers(groupVisits(visits, counts));
+        if (storedRows != null) dto.setRowsWithoutVisit(findRowsWithoutVisit(storedRows, visits));
+        return dto;
+    }
+
+    /** Gom lượt theo khách, kèm xe và các dòng dịch vụ của từng lượt. */
+    private List<ImportBatchDetailDto.Customer> groupVisits(List<LegacyVisitJpa> visits, BatchCounts counts) {
+        visits.sort(Comparator.comparing(
+                LegacyVisitJpa::getVisitedAt, Comparator.nullsLast(Comparator.reverseOrder())));
+
+        Map<Integer, List<LegacyVisitItemJpa>> itemsByVisit = new HashMap<>();
+        List<Integer> visitIds = visits.stream().map(LegacyVisitJpa::getLegacyVisitId).toList();
+        for (LegacyVisitItemJpa item : legacyVisitItemRepo.findByLegacyVisitIdInOrderByLineNoAsc(visitIds)) {
+            itemsByVisit.computeIfAbsent(item.getLegacyVisitId(), k -> new ArrayList<>()).add(item);
+        }
+
+        Set<Integer> createdCustomers = new HashSet<>(counts.createdCustomerIds);
+        Set<Integer> createdVehicles = new HashSet<>(counts.createdVehicleIds);
+        Map<Integer, Vehicle> vehicleCache = new HashMap<>();
+        Map<Integer, ImportBatchDetailDto.Customer> byCustomer = new LinkedHashMap<>();
+
+        for (LegacyVisitJpa visit : visits) {
+            ImportBatchDetailDto.Customer customer = byCustomer.computeIfAbsent(visit.getCustomerId(), id -> {
+                ImportBatchDetailDto.Customer created = new ImportBatchDetailDto.Customer();
+                created.setCustomerId(id);
+                created.setCreatedByBatch(createdCustomers.contains(id));
+                CustomerProfileJpa profile = customerProfileRepo.findByCustomerId(id);
+                if (profile != null) {
+                    created.setFullName(profile.getFullName());
+                    created.setPhone(profile.getPhone());
+                    created.setEmail(profile.getEmail());
+                    created.setCustomerCode(profile.getCustomerCode());
+                }
+                return created;
+            });
+
+            ImportBatchDetailDto.Visit visitDto = new ImportBatchDetailDto.Visit();
+            visitDto.setLegacyVisitId(visit.getLegacyVisitId());
+            visitDto.setSourceRowNo(visit.getSourceRowNo());
+            visitDto.setLegacyTicketCode(visit.getLegacyTicketCode());
+            visitDto.setVisitedAt(visit.getVisitedAt());
+            visitDto.setDeliveredAt(visit.getDeliveredAt());
+            visitDto.setOdometer(visit.getOdometer());
+            visitDto.setCustomerNote(visit.getCustomerNote());
+            visitDto.setServicesText(visit.getServicesText());
+            visitDto.setTotalAmount(visit.getTotalAmount());
+            visitDto.setDiscountAmount(visit.getDiscountAmount());
+            visitDto.setAmountMismatch(Boolean.TRUE.equals(visit.getAmountMismatch()));
+
+            if (visit.getVehicleId() != null) {
+                Vehicle vehicle = vehicleCache.computeIfAbsent(
+                        visit.getVehicleId(), id -> vehicleRepo.findById(id).orElse(null));
+                if (vehicle != null) {
+                    visitDto.setLicensePlate(vehicle.getLicensePlate());
+                    boolean known = customer.getVehicles().stream()
+                            .anyMatch(v -> Objects.equals(v.getVehicleId(), vehicle.getVehicleId()));
+                    if (!known) {
+                        ImportBatchDetailDto.Vehicle vehicleDto = new ImportBatchDetailDto.Vehicle();
+                        vehicleDto.setVehicleId(vehicle.getVehicleId());
+                        vehicleDto.setLicensePlate(vehicle.getLicensePlate());
+                        vehicleDto.setBrand(vehicle.getBrand());
+                        vehicleDto.setModel(vehicle.getModel());
+                        vehicleDto.setManufactureYear(vehicle.getManufactureYear());
+                        vehicleDto.setCreatedByBatch(createdVehicles.contains(vehicle.getVehicleId()));
+                        customer.getVehicles().add(vehicleDto);
+                    }
+                }
+            }
+
+            for (LegacyVisitItemJpa item : itemsByVisit.getOrDefault(visit.getLegacyVisitId(), List.of())) {
+                ImportBatchDetailDto.Item itemDto = new ImportBatchDetailDto.Item();
+                itemDto.setCategory(item.getCategory());
+                itemDto.setItemName(item.getItemName());
+                itemDto.setQuantity(item.getQuantity());
+                itemDto.setUnitPrice(item.getUnitPrice());
+                itemDto.setAmount(item.getAmount());
+                visitDto.getItems().add(itemDto);
+            }
+
+            customer.getVisits().add(visitDto);
+            customer.setVisitCount(customer.getVisits().size());
+            if (visit.getTotalAmount() != null) {
+                customer.setTotalAmount(customer.getTotalAmount() == null
+                        ? visit.getTotalAmount()
+                        : customer.getTotalAmount().add(visit.getTotalAmount()));
+            }
+            if (visit.getVisitedAt() != null
+                    && (customer.getLastVisitedAt() == null || visit.getVisitedAt().isAfter(customer.getLastVisitedAt()))) {
+                customer.setLastVisitedAt(visit.getVisitedAt());
+            }
+        }
+
+        return new ArrayList<>(byCustomer.values());
+    }
+
+    /** Lô đã hoàn tác: gom theo số điện thoại trong file, chỉ để xem lại nội dung. */
+    private List<ImportBatchDetailDto.Customer> groupStoredRows(List<ImportRowDto> rows) {
+        Map<String, ImportBatchDetailDto.Customer> byPhone = new LinkedHashMap<>();
+
+        for (ImportRowDto row : rows) {
+            String phone = ImportNormalizer.normalizePhone(row.getPhone());
+            String key = phone != null ? phone
+                    : "row:" + (row.getSourceRowNo() == null ? row.hashCode() : row.getSourceRowNo());
+
+            ImportBatchDetailDto.Customer customer = byPhone.computeIfAbsent(key, k -> {
+                ImportBatchDetailDto.Customer created = new ImportBatchDetailDto.Customer();
+                created.setFullName(ImportNormalizer.trimToNull(row.getFullName()));
+                created.setPhone(ImportNormalizer.trimToNull(row.getPhone()));
+                created.setEmail(ImportNormalizer.trimToNull(row.getEmail()));
+                return created;
+            });
+            if (customer.getFullName() == null) {
+                customer.setFullName(ImportNormalizer.trimToNull(row.getFullName()));
+            }
+
+            String plate = ImportNormalizer.trimToNull(row.getLicensePlate());
+            if (plate != null && customer.getVehicles().stream()
+                    .noneMatch(v -> plate.equalsIgnoreCase(v.getLicensePlate()))) {
+                ImportBatchDetailDto.Vehicle vehicleDto = new ImportBatchDetailDto.Vehicle();
+                vehicleDto.setLicensePlate(plate);
+                vehicleDto.setBrand(ImportNormalizer.trimToNull(row.getBrand()));
+                vehicleDto.setModel(ImportNormalizer.trimToNull(row.getModel()));
+                vehicleDto.setManufactureYear(row.getManufactureYear());
+                customer.getVehicles().add(vehicleDto);
+            }
+
+            ImportBatchDetailDto.Visit visitDto = new ImportBatchDetailDto.Visit();
+            visitDto.setSourceRowNo(row.getSourceRowNo());
+            visitDto.setLegacyTicketCode(row.getLegacyTicketCode());
+            LocalDate visitedDate = ImportNormalizer.parseDate(row.getVisitedDate());
+            if (visitedDate != null) visitDto.setVisitedAt(LocalDateTime.of(visitedDate, DEFAULT_VISIT_TIME));
+            visitDto.setLicensePlate(plate);
+            visitDto.setOdometer(row.getOdometer());
+            visitDto.setCustomerNote(row.getCustomerNote());
+            visitDto.setTotalAmount(row.getTotalAmount());
+            for (ImportItemDto item : row.getItems() == null ? List.<ImportItemDto>of() : row.getItems()) {
+                ImportBatchDetailDto.Item itemDto = new ImportBatchDetailDto.Item();
+                itemDto.setCategory(item.getCategory());
+                itemDto.setItemName(displayName(item));
+                itemDto.setQuantity(item.getQuantity());
+                itemDto.setUnitPrice(item.getUnitPrice());
+                itemDto.setAmount(item.getAmount());
+                visitDto.getItems().add(itemDto);
+            }
+
+            customer.getVisits().add(visitDto);
+            customer.setVisitCount(customer.getVisits().size());
+            if (row.getTotalAmount() != null) {
+                customer.setTotalAmount(customer.getTotalAmount() == null
+                        ? row.getTotalAmount()
+                        : customer.getTotalAmount().add(row.getTotalAmount()));
+            }
+            if (visitDto.getVisitedAt() != null
+                    && (customer.getLastVisitedAt() == null || visitDto.getVisitedAt().isAfter(customer.getLastVisitedAt()))) {
+                customer.setLastVisitedAt(visitDto.getVisitedAt());
+            }
+        }
+
+        return new ArrayList<>(byPhone.values());
+    }
+
+    /** Dòng có trong file nhưng không thành lượt nào: trùng, thiếu ngày hoặc bị loại. */
+    private List<ImportBatchDetailDto.MissingRow> findRowsWithoutVisit(List<ImportRowDto> rows,
+                                                                      List<LegacyVisitJpa> visits) {
+        Set<Integer> imported = new HashSet<>();
+        for (LegacyVisitJpa visit : visits) {
+            if (visit.getSourceRowNo() != null) imported.add(visit.getSourceRowNo());
+        }
+
+        List<ImportBatchDetailDto.MissingRow> missing = new ArrayList<>();
+        for (ImportRowDto row : rows) {
+            if (row.getSourceRowNo() == null || imported.contains(row.getSourceRowNo())) continue;
+            ImportBatchDetailDto.MissingRow item = new ImportBatchDetailDto.MissingRow();
+            item.setSourceRowNo(row.getSourceRowNo());
+            item.setFullName(ImportNormalizer.trimToNull(row.getFullName()));
+            item.setPhone(ImportNormalizer.trimToNull(row.getPhone()));
+            item.setLicensePlate(ImportNormalizer.trimToNull(row.getLicensePlate()));
+            item.setVisitedDate(ImportNormalizer.trimToNull(row.getVisitedDate()));
+            missing.add(item);
+        }
+        return missing;
+    }
+
+    private List<ImportRowDto> readStoredRows(ImportBatchJpa batch) {
+        String json = batch.getRowsJson();
+        if (json == null || json.isBlank()) return null;
+        try {
+            return objectMapper.readValue(json,
+                    new com.fasterxml.jackson.core.type.TypeReference<List<ImportRowDto>>() {});
+        } catch (Exception e) {
+            log.warn("Không đọc được nội dung gốc của lô {}: {}", batch.getImportBatchId(), e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Dựng lại các dòng từ những gì đã ghi. Chỉ khôi phục được lượt thật sự vào hệ
+     * thống — dòng bị bỏ qua vì trùng hoặc thiếu ngày thì không còn dấu vết để dựng.
+     */
+    private List<ImportRowDto> reconstructRows(Integer batchId) {
+        List<LegacyVisitJpa> visits = new ArrayList<>(legacyVisitRepo.findByImportBatchId(batchId));
+        if (visits.isEmpty()) return List.of();
+        visits.sort(Comparator.comparing(
+                LegacyVisitJpa::getSourceRowNo, Comparator.nullsLast(Comparator.naturalOrder())));
+
+        List<Integer> visitIds = visits.stream().map(LegacyVisitJpa::getLegacyVisitId).toList();
+        Map<Integer, List<LegacyVisitItemJpa>> itemsByVisit = new HashMap<>();
+        for (LegacyVisitItemJpa item : legacyVisitItemRepo.findByLegacyVisitIdInOrderByLineNoAsc(visitIds)) {
+            itemsByVisit.computeIfAbsent(item.getLegacyVisitId(), k -> new ArrayList<>()).add(item);
+        }
+
+        Map<Integer, CustomerProfileJpa> customerCache = new HashMap<>();
+        Map<Integer, Vehicle> vehicleCache = new HashMap<>();
+        List<ImportRowDto> rows = new ArrayList<>();
+
+        for (LegacyVisitJpa visit : visits) {
+            ImportRowDto row = new ImportRowDto();
+            row.setSourceRowNo(visit.getSourceRowNo());
+            row.setLegacyTicketCode(visit.getLegacyTicketCode());
+
+            CustomerProfileJpa customer = customerCache.computeIfAbsent(
+                    visit.getCustomerId(), customerProfileRepo::findByCustomerId);
+            if (customer != null) {
+                row.setFullName(customer.getFullName());
+                row.setPhone(customer.getPhone());
+                row.setEmail(customer.getEmail());
+            }
+
+            if (visit.getVehicleId() != null) {
+                Vehicle vehicle = vehicleCache.computeIfAbsent(
+                        visit.getVehicleId(), id -> vehicleRepo.findById(id).orElse(null));
+                if (vehicle != null) {
+                    row.setLicensePlate(vehicle.getLicensePlate());
+                    row.setBrand(vehicle.getBrand());
+                    row.setModel(vehicle.getModel());
+                    row.setManufactureYear(vehicle.getManufactureYear());
+                }
+            }
+
+            row.setOdometer(visit.getOdometer());
+            if (visit.getVisitedAt() != null) row.setVisitedDate(visit.getVisitedAt().toLocalDate().toString());
+            if (visit.getDeliveredAt() != null) row.setDeliveredDate(visit.getDeliveredAt().toLocalDate().toString());
+            row.setCustomerNote(visit.getCustomerNote());
+            row.setTotalAmount(visit.getTotalAmount());
+            row.setCalled(Boolean.TRUE.equals(visit.getCalled()));
+            row.setCallSuccess(Boolean.TRUE.equals(visit.getCallSuccess()));
+            row.setCallNote(visit.getCallNote());
+            row.setRawJson(visit.getRawJson());
+
+            List<ImportItemDto> items = new ArrayList<>();
+            for (LegacyVisitItemJpa item : itemsByVisit.getOrDefault(visit.getLegacyVisitId(), List.of())) {
+                items.add(new ImportItemDto(item.getCategory(), item.getItemName(),
+                        item.getQuantity(), item.getUnitPrice(), item.getAmount()));
+            }
+            // Chiết khấu lúc nhập bị tách khỏi các dòng dịch vụ, trả lại thành một dòng
+            // để lần nhập lại không đánh rơi phần giảm giá.
+            BigDecimal discount = visit.getDiscountAmount();
+            if (discount != null && discount.signum() != 0) {
+                items.add(new ImportItemDto("Giảm giá", "Giảm giá", null, null, discount));
+            }
+            row.setItems(items);
+
+            rows.add(row);
+        }
+        return rows;
     }
 
     /* ============================== Xử lý ================================= */
@@ -522,6 +888,94 @@ public class CustomerImportService {
         return declared.subtract(computed).abs().compareTo(AMOUNT_TOLERANCE) > 0;
     }
 
+    /* ========================= Sửa tay từng lượt ========================== */
+
+    /**
+     * Sửa một lượt đã nhập, ngay trên hồ sơ khách.
+     *
+     * Dùng lại đúng bộ quy tắc của luồng nhập file — tách giảm giá, dựng lại chuỗi dịch
+     * vụ, đánh dấu lệch tiền, tính lại khoá chống trùng — để một lượt sửa tay và một
+     * lượt nhập từ file không bao giờ khác chuẩn nhau.
+     */
+    @Transactional
+    public void updateLegacyVisit(Integer legacyVisitId, LegacyVisitUpdateDto dto) {
+        LegacyVisitJpa visit = legacyVisitRepo.findById(legacyVisitId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy lượt dịch vụ số " + legacyVisitId));
+
+        LocalDate visitedDate = ImportNormalizer.parseDate(dto.getVisitedDate());
+        if (visitedDate == null) {
+            throw new IllegalArgumentException("Ngày vào xưởng không hợp lệ. Nhập theo dạng yyyy-MM-dd.");
+        }
+
+        ImportRowDto probe = new ImportRowDto();
+        probe.setItems(dto.getItems());
+        VisitLines lines = splitLines(probe);
+
+        // Khoá chống trùng phải tính lại: ngày, mã phiếu và các dòng dịch vụ đều đổi được
+        CustomerProfileJpa profile = customerProfileRepo.findByCustomerId(visit.getCustomerId());
+        String phone = profile == null ? null : ImportNormalizer.normalizePhone(profile.getPhone());
+        String customerRef = phone != null ? phone : "cust:" + visit.getCustomerId();
+        String dedupeKey = ImportNormalizer.dedupeKey(customerRef, visitedDate,
+                dto.getLegacyTicketCode(), lines.itemNames);
+        if (!dedupeKey.equals(visit.getDedupeKey()) && legacyVisitRepo.existsByDedupeKey(dedupeKey)) {
+            throw new IllegalArgumentException(
+                    "Khách này đã có một lượt y hệt: cùng ngày, cùng mã phiếu và cùng các dòng dịch vụ. "
+                            + "Sửa cho khác đi, hoặc xoá bớt lượt thừa.");
+        }
+
+        // Sổ cũ chỉ ghi ngày. Lượt nào có giờ thật thì giữ nguyên giờ đó.
+        LocalTime keepTime = Boolean.TRUE.equals(visit.getHasTime()) && visit.getVisitedAt() != null
+                ? visit.getVisitedAt().toLocalTime()
+                : DEFAULT_VISIT_TIME;
+        visit.setVisitedAt(LocalDateTime.of(visitedDate, keepTime));
+
+        LocalDate delivered = ImportNormalizer.parseDate(dto.getDeliveredDate());
+        visit.setDeliveredAt(delivered == null ? null : LocalDateTime.of(delivered, DEFAULT_VISIT_TIME));
+
+        visit.setLegacyTicketCode(ImportNormalizer.trimToNull(dto.getLegacyTicketCode()));
+        visit.setOdometer(dto.getOdometer());
+        visit.setCustomerNote(ImportNormalizer.trimToNull(dto.getCustomerNote()));
+        visit.setCallNote(ImportNormalizer.trimToNull(dto.getCallNote()));
+        visit.setTotalAmount(dto.getTotalAmount());
+        visit.setDiscountAmount(lines.discount);
+        visit.setServicesText(lines.servicesText);
+        visit.setAmountMismatch(isAmountMismatch(dto.getTotalAmount(), lines.itemsTotal));
+        visit.setDedupeKey(dedupeKey);
+        legacyVisitRepo.save(visit);
+
+        // Ghi lại toàn bộ dòng dịch vụ: sửa tại chỗ từng dòng sẽ lệch số thứ tự khi
+        // người dùng chèn hoặc bỏ dòng giữa chừng.
+        legacyVisitItemRepo.deleteAll(legacyVisitItemRepo.findByLegacyVisitIdOrderByLineNoAsc(legacyVisitId));
+        legacyVisitItemRepo.flush();
+
+        short lineNo = 1;
+        List<LegacyVisitItemJpa> entities = new ArrayList<>();
+        for (ImportItemDto item : lines.items) {
+            LegacyVisitItemJpa entity = new LegacyVisitItemJpa();
+            entity.setLegacyVisitId(legacyVisitId);
+            entity.setLineNo(lineNo++);
+            entity.setCategory(ImportNormalizer.trimToNull(item.getCategory()));
+            entity.setItemName(displayName(item));
+            entity.setQuantity(item.getQuantity());
+            entity.setUnitPrice(item.getUnitPrice());
+            entity.setAmount(item.getAmount());
+            entities.add(entity);
+        }
+        legacyVisitItemRepo.saveAll(entities);
+    }
+
+    /**
+     * Xoá hẳn một lượt cũ. Chỉ xoá đúng lượt đó — khách và xe giữ nguyên, vì một lượt
+     * ghi nhầm không có nghĩa là khách không tồn tại.
+     */
+    @Transactional
+    public void deleteLegacyVisit(Integer legacyVisitId) {
+        LegacyVisitJpa visit = legacyVisitRepo.findById(legacyVisitId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy lượt dịch vụ số " + legacyVisitId));
+        legacyVisitItemRepo.deleteAll(legacyVisitItemRepo.findByLegacyVisitIdOrderByLineNoAsc(legacyVisitId));
+        legacyVisitRepo.delete(visit);
+    }
+
     /* ============================== Hoàn tác ============================== */
 
     /**
@@ -602,7 +1056,22 @@ public class CustomerImportService {
         batch.setNote(ImportNormalizer.trimToNull(request.getNote()));
         batch.setImportedBy(staffId);
         batch.setStatus(ImportBatchJpa.STATUS_COMMITTED);
+        if (request.getPlateConflictPolicy() != null) {
+            batch.setPlateConflictPolicy(request.getPlateConflictPolicy().name());
+        }
+        batch.setRowsJson(writeRows(request.getRows()));
         return importBatchRepo.save(batch);
+    }
+
+    /** Giữ nguyên văn các dòng đã gửi để mở lô ra sửa lại được, kể cả dòng bị bỏ qua. */
+    private String writeRows(List<ImportRowDto> rows) {
+        if (rows == null || rows.isEmpty()) return null;
+        try {
+            return objectMapper.writeValueAsString(rows);
+        } catch (Exception e) {
+            log.warn("Không lưu được nội dung gốc của lô nhập: {}", e.getMessage());
+            return null;
+        }
     }
 
     private void preloadExistingDedupeKeys(List<ImportRowDto> rows, RunState state) {

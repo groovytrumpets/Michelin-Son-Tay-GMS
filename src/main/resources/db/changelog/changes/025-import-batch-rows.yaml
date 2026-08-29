@@ -1,0 +1,60 @@
+databaseChangeLog:
+  - changeSet:
+      id: 025-1-import-batch-rows-json
+      author: gms
+      comment: Giữ nguyên nội dung đã gửi của lô nhập sổ cũ để mở ra sửa và nhập lại
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: import_batch
+                columnName: rows_json
+      changes:
+        - addColumn:
+            tableName: import_batch
+            columns:
+              - column:
+                  name: rows_json
+                  type: LONGTEXT
+                  remarks: >-
+                    Nguyên văn danh sách dòng đã gửi lên khi ghi lô. Giữ lại để mở lô ra
+                    sửa rồi nhập lại, kể cả những dòng bị bỏ qua nên không có trong
+                    legacy_visit.
+
+  - changeSet:
+      id: 025-2-import-batch-plate-policy
+      author: gms
+      comment: Nhớ cách xử lý biển số trùng của lô để lần nhập lại giữ nguyên lựa chọn
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: import_batch
+                columnName: plate_conflict_policy
+      changes:
+        - addColumn:
+            tableName: import_batch
+            columns:
+              - column:
+                  name: plate_conflict_policy
+                  type: VARCHAR(20)
+                  remarks: KEEP_OWNER / TRANSFER / SKIP_VEHICLE — lựa chọn lúc ghi lô
+
+  - changeSet:
+      id: 025-3-import-batch-replaced-by
+      author: gms
+      comment: Nối lô cũ với lô thay thế sau khi sửa lại, để tra ngược lịch sử chỉnh sửa
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: import_batch
+                columnName: replaced_by_batch_id
+      changes:
+        - addColumn:
+            tableName: import_batch
+            columns:
+              - column:
+                  name: replaced_by_batch_id
+                  type: INT
+                  remarks: Lô mới sinh ra khi người dùng sửa lại và nhập lại lô này

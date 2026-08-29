@@ -4,6 +4,7 @@ import com.g42.platform.gms.booking_management.domain.enums.BookingEnum;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.customer.api.dto.CustomerCreateDto;
+import com.g42.platform.gms.customer.api.dto.CustomerDuplicateCheckDto;
 import com.g42.platform.gms.customer.api.dto.CustomerUpdateDto;
 import com.g42.platform.gms.customer.api.dto.TaxLookupDto;
 import com.g42.platform.gms.customer.application.service.CustomerService;
@@ -38,6 +39,18 @@ public class CustomerController {
     public ResponseEntity<ApiResponse<CustomerCreateDto>> createCustomer(@RequestBody CustomerCreateDto customerDto) {
         return ResponseEntity.ok(ApiResponses.success(customerService.createNewCustomer(customerDto)));
     }
+    /**
+     * Kiểm tra SĐT/email đã có hồ sơ nào giữ chưa. Form thêm khách gọi liên tục khi
+     * nhân viên gõ để chặn tạo trùng ngay tại chỗ thay vì báo lỗi lúc bấm lưu.
+     */
+    @GetMapping("check-duplicate")
+    public ResponseEntity<ApiResponse<CustomerDuplicateCheckDto>> checkDuplicate(
+            @RequestParam(required = false) String phone,
+            @RequestParam(required = false) String email,
+            @RequestParam(required = false) Integer excludeCustomerId) {
+        return ResponseEntity.ok(ApiResponses.success(customerService.checkDuplicate(phone, email, excludeCustomerId)));
+    }
+
     @GetMapping("getAllCustomer")
     public ResponseEntity<ApiResponse<Page<CustomerProfile>>> getAllCustomerProfile(@RequestParam(defaultValue = "0") int page,
                                                                                     @RequestParam(defaultValue = "10") int size,

@@ -1,5 +1,6 @@
 package com.g42.platform.gms.customerimport.infrastructure.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -46,6 +47,24 @@ public class ImportBatchJpa {
 
     @Column(name = "note", length = 500)
     private String note;
+
+    /** KEEP_OWNER / TRANSFER / SKIP_VEHICLE — nhớ lại để lần nhập lại giữ nguyên lựa chọn. */
+    @Column(name = "plate_conflict_policy", length = 20)
+    private String plateConflictPolicy;
+
+    /** Lô mới thay thế lô này sau khi người dùng sửa lại và nhập lại. */
+    @Column(name = "replaced_by_batch_id")
+    private Integer replacedByBatchId;
+
+    /**
+     * Nguyên văn các dòng đã gửi lên lúc ghi. Giữ lại để mở lô ra sửa rồi nhập lại,
+     * kể cả những dòng bị bỏ qua nên không nằm trong legacy_visit.
+     *
+     * Không trả kèm khi liệt kê lô: nội dung này to gấp nhiều lần phần còn lại.
+     */
+    @JsonIgnore
+    @Column(name = "rows_json", columnDefinition = "LONGTEXT")
+    private String rowsJson;
 
     @PrePersist
     protected void onCreate() {

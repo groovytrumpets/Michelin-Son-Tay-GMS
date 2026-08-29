@@ -5,6 +5,8 @@ import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.customerimport.api.dto.CustomerImportReport;
 import com.g42.platform.gms.customerimport.api.dto.CustomerImportRequest;
+import com.g42.platform.gms.customerimport.api.dto.ImportBatchDetailDto;
+import com.g42.platform.gms.customerimport.api.dto.ImportBatchRowsDto;
 import com.g42.platform.gms.customerimport.application.service.CustomerImportService;
 import com.g42.platform.gms.customerimport.infrastructure.entity.ImportBatchJpa;
 import com.g42.platform.gms.systemlog.annotation.Auditable;
@@ -51,6 +53,25 @@ public class CustomerImportController {
     @GetMapping("/batches")
     public ResponseEntity<ApiResponse<List<ImportBatchJpa>>> batches() {
         return ResponseEntity.ok(ApiResponses.success(service.listBatches()));
+    }
+
+    /**
+     * Lô đó đưa vào hệ thống những khách nào, mỗi khách có xe gì và những lượt nào.
+     * Dùng cho màn xem chi tiết lô, không phải để sửa.
+     */
+    @GetMapping("/batches/{batchId}/detail")
+    public ResponseEntity<ApiResponse<ImportBatchDetailDto>> batchDetail(@PathVariable Integer batchId) {
+        return ResponseEntity.ok(ApiResponses.success(service.batchDetail(batchId)));
+    }
+
+    /**
+     * Nội dung một lô để mở lại lên bảng mà sửa. Trả nguyên văn các dòng đã gửi lần
+     * trước; lô nhập từ trước khi có chỗ lưu nguyên văn thì dựng lại từ dữ liệu đã ghi
+     * và bật cờ reconstructed.
+     */
+    @GetMapping("/batches/{batchId}/rows")
+    public ResponseEntity<ApiResponse<ImportBatchRowsDto>> batchRows(@PathVariable Integer batchId) {
+        return ResponseEntity.ok(ApiResponses.success(service.batchRows(batchId)));
     }
 
     /** Gỡ nguyên lô: xoá lượt dịch vụ, và chỉ xoá khách/xe do chính lô này tạo ra. */

@@ -23,6 +23,12 @@ public class CustomerImportRequest {
         SKIP_VEHICLE
     }
 
+    /**
+     * Nhập lại một lô đã ghi sau khi sửa: gỡ lô cũ rồi ghi lô mới trong cùng một giao
+     * dịch, để dữ liệu không bị nhân đôi. Null nghĩa là lô nhập mới hoàn toàn.
+     */
+    private Integer replaceBatchId;
+
     private String fileName;
     private String sheetName;
     private String note;

@@ -2,6 +2,7 @@ package com.g42.platform.gms.customer.domain.repository;
 
 
 import com.g42.platform.gms.customer.api.dto.CustomerCreateDto;
+import com.g42.platform.gms.customer.api.dto.CustomerDuplicateCheckDto;
 import com.g42.platform.gms.customer.domain.entity.CustomerAuth;
 import com.g42.platform.gms.customer.domain.entity.CustomerProfile;
 import org.springframework.data.domain.Page;
@@ -30,4 +31,10 @@ public interface CustomerRepo {
 
     /** Ném lỗi nếu email đã được hồ sơ khác sử dụng — email là định danh đăng nhập nên phải duy nhất. */
     void ensureEmailAvailable(String email, Integer selfCustomerId);
+
+    /** Ném lỗi nếu số điện thoại đã được hồ sơ khác sử dụng — SĐT là định danh chính của khách. */
+    void ensurePhoneAvailable(String phone, Integer selfCustomerId);
+
+    /** Tra trước xem SĐT/email đã có hồ sơ nào giữ chưa, dùng cho kiểm tra tức thời trên form. */
+    CustomerDuplicateCheckDto checkDuplicate(String phone, String email, Integer excludeCustomerId);
 }
