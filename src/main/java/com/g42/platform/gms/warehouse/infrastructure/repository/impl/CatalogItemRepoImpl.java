@@ -114,6 +114,10 @@ public class CatalogItemRepoImpl implements CatalogItemRepo {
         return catalogItemJpaRepo.findBySlug(slug).map(CatalogItemJpa::getItemId).orElse(null);
     }
     @Override
+    public Long findServiceIdBySlug(String slug) {
+        return catalogItemJpaRepo.findBySlug(slug).map(CatalogItemJpa::getServiceId).orElse(null);
+    }
+    @Override
     @Transactional
     public ItemCategory saveItemCate(ItemCategory itemCategory) {
 

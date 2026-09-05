@@ -375,6 +375,17 @@ public class CatalogItemService {
         return normalized == null ? null : catalogItemRepo.findItemIdBySlug(normalized);
     }
 
+    /**
+     * serviceId của mặt hàng theo đường dẫn chữ — để FE mở đúng /home/service/{serviceId}.
+     * Trước đây FE chỉ có catalogItemId nên gọi /home/service/{catalogItemId} và bị 404 với
+     * phụ tùng (serviceId != catalogItemId). Null nếu slug không tồn tại hoặc mặt hàng chưa
+     * gắn với bản ghi service nào.
+     */
+    public Long findServiceIdBySlug(String slug) {
+        String normalized = normalizeSlug(slug);
+        return normalized == null ? null : catalogItemRepo.findServiceIdBySlug(normalized);
+    }
+
     /** Chi tiết an toàn cho trang bán hàng công khai — không lộ costPrice/tồn kho nội bộ. */
     public PublicPartDetailDto getPublicPartDetail(Integer catalogItemId) {
         CatalogItem catalogItem = catalogItemRepo.getCatalogItemById(catalogItemId);

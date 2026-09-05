@@ -8,6 +8,7 @@ import com.g42.platform.gms.marketing.service_catalog.api.dto.ServiceCreateReque
 import com.g42.platform.gms.marketing.service_catalog.api.dto.ServiceDetailRespond;
 import com.g42.platform.gms.marketing.service_catalog.api.dto.ServiceSumaryRespond;
 import com.g42.platform.gms.marketing.service_catalog.application.service.ServiceCatalogService;
+import com.g42.platform.gms.marketing.service_catalog.domain.exception.ServiceException;
 import com.g42.platform.gms.warehouse.api.dto.BrandHintDto;
 import com.g42.platform.gms.warehouse.api.dto.CatalogCreateDto;
 import com.g42.platform.gms.warehouse.api.dto.CatalogItemDto;
@@ -93,6 +94,25 @@ public class ServiceController {
     public ResponseEntity<ApiResponse<ServiceDetailRespond>> getServiceDetail(@PathVariable Long serviceId) {
         ServiceDetailRespond serviceDetailRespond = serviceCatalogService.getServiceDetailById(serviceId);
         return ResponseEntity.ok(ApiResponses.success(serviceDetailRespond));
+    }
+
+    /**
+     * Chi tiết theo đường dẫn chữ (catalog_item.slug) — dùng khi mở /parts|/services/{slug}
+     * mà mặt hàng chưa có "Bài viết" (item_post). Tự tra serviceId của mặt hàng nên phụ tùng
+     * (serviceId != catalogItemId) cũng mở được. Trả data=null nếu slug không có hoặc mặt hàng
+     * chưa gắn service — FE tự fallback sang luồng theo catalogItemId.
+     */
+    @GetMapping("/service/slug/{slug}")
+    public ResponseEntity<ApiResponse<ServiceDetailRespond>> getServiceDetailBySlug(@PathVariable String slug) {
+        Long serviceId = catalogItemService.findServiceIdBySlug(slug);
+        if (serviceId == null) {
+            return ResponseEntity.ok(ApiResponses.success(null));
+        }
+        try {
+            return ResponseEntity.ok(ApiResponses.success(serviceCatalogService.getServiceDetailById(serviceId)));
+        } catch (ServiceException ex) {
+            return ResponseEntity.ok(ApiResponses.success(null));
+        }
     }
     @GetMapping("/catalog")
     public Long [] getCatalogId(@RequestParam Long[] serviceId) {

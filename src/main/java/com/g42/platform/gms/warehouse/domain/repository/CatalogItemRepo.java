@@ -33,6 +33,9 @@ public interface CatalogItemRepo {
 
     Integer findItemIdBySlug(String slug);
 
+    /** serviceId (bản ghi marketing "service") gắn với mặt hàng có slug này — null nếu chưa gắn. */
+    Long findServiceIdBySlug(String slug);
+
     ItemCategory saveItemCate(ItemCategory itemCategory);
 
     ProductLine getProductLineById(Integer productLineId);
