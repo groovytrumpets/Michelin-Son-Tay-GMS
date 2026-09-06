@@ -1,6 +1,7 @@
 package com.g42.platform.gms.common.handler;
 
 import com.g42.platform.gms.aiassistant.exception.AiAssistantException;
+import com.g42.platform.gms.analytics.exception.GoogleAnalyticsException;
 import com.g42.platform.gms.attendancerequest.domain.exception.AttendanceRequestException;
 import com.g42.platform.gms.auth.constant.AuthErrorCode;
 import com.g42.platform.gms.billing.domain.exception.BillingException;
@@ -279,6 +280,20 @@ public class GlobalExceptionHandler {
             case NOT_CONFIGURED -> HttpStatus.SERVICE_UNAVAILABLE;
             case UPSTREAM_ERROR, EMPTY_RESPONSE -> HttpStatus.BAD_GATEWAY;
             case RATE_LIMITED -> HttpStatus.TOO_MANY_REQUESTS;
+        };
+        return ResponseEntity
+                .status(status)
+                .body(ApiResponses.error(ex.getErrorCode().getCode(), ex.getMessage()));
+    }
+
+    @ExceptionHandler(GoogleAnalyticsException.class)
+    public ResponseEntity<ApiResponse<?>> handleGoogleAnalyticsException(GoogleAnalyticsException ex) {
+        System.err.println("Google Analytics Error: " + ex.getErrorCode().getCode() + " - " + ex.getMessage());
+        HttpStatus status = switch (ex.getErrorCode()) {
+            case NOT_CONFIGURED, PROPERTY_NOT_CONFIGURED, SITE_NOT_CONFIGURED -> HttpStatus.SERVICE_UNAVAILABLE;
+            case NOT_CONNECTED -> HttpStatus.CONFLICT;
+            case INVALID_STATE -> HttpStatus.BAD_REQUEST;
+            case UPSTREAM_ERROR -> HttpStatus.BAD_GATEWAY;
         };
         return ResponseEntity
                 .status(status)

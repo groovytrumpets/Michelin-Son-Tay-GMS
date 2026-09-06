@@ -52,6 +52,7 @@ public class StaffJwtFilter extends OncePerRequestFilter {
                 || path.startsWith("/api/webhook/")
                 || path.startsWith("/zalo/callback")
                 ||  path.startsWith("/zalo/login")
+                || path.startsWith("/api/admin/analytics/google/callback")
                 || path.startsWith("/error")
         ||path.startsWith("ws-notifications")) {
             filterChain.doFilter(request, response);

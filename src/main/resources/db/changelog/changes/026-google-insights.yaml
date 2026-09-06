@@ -1,0 +1,61 @@
+databaseChangeLog:
+  - changeSet:
+      id: 026-1-google-oauth-token
+      author: gms
+      comment: Lưu access/refresh token kết nối Google (đọc GA4 + Search Console) cho trang quản trị
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: google_oauth_token
+      changes:
+        - createTable:
+            tableName: google_oauth_token
+            remarks: >-
+              Bảng một dòng (id = 1) lưu kết nối OAuth Google dùng chung cho toàn hệ
+              thống để đọc số liệu Google Analytics (GA4) + Google Search Console.
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: status
+                  type: VARCHAR(20)
+                  defaultValue: PENDING
+                  remarks: PENDING (đang chờ Google redirect về /callback) / CONNECTED / DISCONNECTED
+              - column:
+                  name: state
+                  type: VARCHAR(64)
+                  remarks: Nonce chống CSRF sinh ra lúc bấm Kết nối, đối chiếu lại khi Google gọi /callback
+              - column:
+                  name: access_token
+                  type: TEXT
+              - column:
+                  name: refresh_token
+                  type: TEXT
+              - column:
+                  name: token_expires_at
+                  type: TIMESTAMP
+              - column:
+                  name: scope
+                  type: VARCHAR(500)
+              - column:
+                  name: connected_email
+                  type: VARCHAR(255)
+                  remarks: Email tài khoản Google đã cấp quyền — hiển thị cho admin biết đang xem số liệu qua tài khoản nào
+              - column:
+                  name: connected_by_staff_id
+                  type: INT
+                  remarks: Nhân viên đã thực hiện thao tác kết nối gần nhất
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP

@@ -63,6 +63,10 @@ public class SecurityConfig {
                                 "/swagger-ui.html",
                                 "/zalo/callback",
                                 "/zalo/login",
+                                // Google tự redirect trình duyệt về đây sau khi cấp quyền GA4/Search
+                                // Console — không kèm Authorization header nên phải công khai; an toàn
+                                // nhờ tham số state đối chiếu ở GoogleOAuthService#handleCallback.
+                                "/api/admin/analytics/google/callback",
                                 "/api/warehouse/item-categoy/all",
                                 "/api/warehouse/search/catalog-items-detail",
                                 "/home/**",
