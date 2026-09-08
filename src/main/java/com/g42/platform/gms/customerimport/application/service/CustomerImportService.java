@@ -281,7 +281,9 @@ public class CustomerImportService {
 
         for (ImportRowDto row : rows) {
             String phone = ImportNormalizer.normalizePhone(row.getPhone());
+            String plateKey = ImportNormalizer.normalizePlate(row.getLicensePlate());
             String key = phone != null ? phone
+                    : plateKey != null ? "plate:" + plateKey
                     : "row:" + (row.getSourceRowNo() == null ? row.hashCode() : row.getSourceRowNo());
 
             ImportBatchDetailDto.Customer customer = byPhone.computeIfAbsent(key, k -> {
@@ -494,6 +496,11 @@ public class CustomerImportService {
         }
 
         String plateKey = ImportNormalizer.normalizePlate(row.getLicensePlate());
+        if (plateKey == null) {
+            throw new RowRejected("licensePlate",
+                    "Thiếu biển số. Sổ dịch vụ cũ dùng biển số để định danh xe và khách nên mỗi phiếu bắt buộc phải có biển số. "
+                            + "Số điện thoại có thể để trống. Bổ sung biển số rồi nhập lại.");
+        }
 
         Integer customerId = resolveCustomer(row, phone, plateKey, state, report, dryRun);
         Integer vehicleId = resolveVehicle(row, plateKey, customerId, state, report, dryRun);
@@ -510,7 +517,9 @@ public class CustomerImportService {
 
         VisitLines lines = splitLines(row);
 
-        String customerRef = phone != null ? phone : "cust:" + customerId;
+        // Khách không có SĐT thì định danh theo biển số; "plate:" + khoá biển số là chuỗi
+        // ổn định giữa bước kiểm tra thử và bước ghi (customerId lúc thử là id giả âm).
+        String customerRef = phone != null ? phone : "plate:" + plateKey;
         String dedupeKey = ImportNormalizer.dedupeKey(customerRef, visitedDate,
                 row.getLegacyTicketCode(), lines.itemNames);
 
@@ -579,6 +588,7 @@ public class CustomerImportService {
             Integer known = state.customerIdByPhone.get(phone);
             if (known != null) {
                 report.setCustomersMerged(report.getCustomersMerged() + 1);
+                if (plateKey != null) state.customerIdByPlateKey.putIfAbsent(plateKey, known);
                 return known;
             }
             CustomerProfileJpa existing = customerProfileRepo.findByPhone(phone);
@@ -586,34 +596,54 @@ public class CustomerImportService {
                 mergeBlankFields(existing, row, report, dryRun);
                 report.setCustomersMerged(report.getCustomersMerged() + 1);
                 state.customerIdByPhone.put(phone, existing.getCustomerId());
+                if (plateKey != null) state.customerIdByPlateKey.putIfAbsent(plateKey, existing.getCustomerId());
                 return existing.getCustomerId();
             }
             Integer created = createCustomer(row, phone, report, dryRun, state);
             report.setCustomersCreated(report.getCustomersCreated() + 1);
             state.customerIdByPhone.put(phone, created);
+            if (plateKey != null) state.customerIdByPlateKey.putIfAbsent(plateKey, created);
             return created;
         }
 
-        // Không có số điện thoại thì thử tra chủ xe qua biển số
-        if (plateKey != null) {
-            Integer ownerId = findVehicleOwner(plateKey, state);
-            if (ownerId != null) {
+        // Không có số điện thoại: định danh khách theo BIỂN SỐ, đúng cách SĐT định danh ở nhánh
+        // trên. Cùng một biển số là cùng một khách; tên khác trong file chỉ cảnh báo qua
+        // mergeBlankFields chứ không ghi đè — giống hệt quy tắc trùng tên khi gộp theo SĐT.
+        Integer knownByPlate = state.customerIdByPlateKey.get(plateKey);
+        if (knownByPlate != null) {
+            report.setCustomersMerged(report.getCustomersMerged() + 1);
+            return knownByPlate;
+        }
+
+        Optional<Vehicle> existingVehicle = findVehicleByPlateKey(plateKey, state);
+        if (existingVehicle.isPresent() && existingVehicle.get().getCustomer() != null) {
+            Integer ownerId = existingVehicle.get().getCustomer().getCustomerId();
+            CustomerProfileJpa owner = customerProfileRepo.findByCustomerId(ownerId);
+            if (owner != null) {
+                mergeBlankFields(owner, row, report, dryRun);
                 report.setCustomersMerged(report.getCustomersMerged() + 1);
                 report.add(ImportIssueDto.warning(row.getSourceRowNo(), "phone",
-                        "Dòng không có số điện thoại — đã gắn vào chủ xe của biển số " + row.getLicensePlate() + "."));
+                        "Dòng không có số điện thoại — gộp vào chủ xe hiện có của biển số " + row.getLicensePlate() + "."));
+                state.customerIdByPlateKey.put(plateKey, ownerId);
                 return ownerId;
             }
         }
 
-        throw new RowRejected("phone",
-                "Không có cả số điện thoại lẫn biển số nên không xác định được khách. Bổ sung một trong hai rồi nhập lại.");
+        Integer created = createCustomer(row, null, report, dryRun, state);
+        report.setCustomersCreated(report.getCustomersCreated() + 1);
+        report.add(ImportIssueDto.warning(row.getSourceRowNo(), "phone",
+                "Dòng không có số điện thoại — tạo khách mới và định danh theo biển số " + row.getLicensePlate()
+                        + ". Bổ sung số điện thoại trong hồ sơ khách khi có."));
+        state.customerIdByPlateKey.put(plateKey, created);
+        return created;
     }
 
     private Integer createCustomer(ImportRowDto row, String phone, CustomerImportReport report,
                                    boolean dryRun, RunState state) {
         if (dryRun) {
-            // Id giả chỉ dùng để đếm trong phiên chạy thử, không bao giờ chạm cơ sở dữ liệu
-            return -(state.customerIdByPhone.size() + 1);
+            // Id giả chỉ dùng để đếm trong phiên chạy thử, không bao giờ chạm cơ sở dữ liệu.
+            // Bộ đếm riêng để khách nhận theo SĐT và khách nhận theo biển số không đụng id nhau.
+            return -(++state.dryRunCustomerSeq);
         }
 
         CustomerProfileJpa profile = new CustomerProfileJpa();
@@ -780,16 +810,6 @@ public class CustomerImportService {
                 return vehicle.getVehicleId();
             }
         }
-    }
-
-    private Integer findVehicleOwner(String plateKey, RunState state) {
-        Integer cached = state.vehicleOwnerByPlate.get(plateKey);
-        if (cached != null) return cached;
-        Optional<Vehicle> vehicle = findVehicleByPlateKey(plateKey, state);
-        if (vehicle.isEmpty() || vehicle.get().getCustomer() == null) return null;
-        Integer ownerId = vehicle.get().getCustomer().getCustomerId();
-        state.vehicleOwnerByPlate.put(plateKey, ownerId);
-        return ownerId;
     }
 
     /**
@@ -1078,13 +1098,21 @@ public class CustomerImportService {
         if (rows.isEmpty()) return;
         Set<String> candidates = new HashSet<>();
         for (ImportRowDto row : rows) {
+            // Cùng công thức customerRef với processRow: SĐT nếu có, không thì "plate:" + khoá biển số.
             String phone = ImportNormalizer.normalizePhone(row.getPhone());
-            if (phone == null) continue;
+            String customerRef;
+            if (phone != null) {
+                customerRef = phone;
+            } else {
+                String plateKey = ImportNormalizer.normalizePlate(row.getLicensePlate());
+                if (plateKey == null) continue;
+                customerRef = "plate:" + plateKey;
+            }
             LocalDate date = ImportNormalizer.parseDate(row.getVisitedDate());
             if (date == null) date = ImportNormalizer.parseDate(row.getDeliveredDate());
             if (date == null) continue;
             VisitLines lines = splitLines(row);
-            candidates.add(ImportNormalizer.dedupeKey(phone, date, row.getLegacyTicketCode(), lines.itemNames));
+            candidates.add(ImportNormalizer.dedupeKey(customerRef, date, row.getLegacyTicketCode(), lines.itemNames));
         }
         if (candidates.isEmpty()) return;
         state.existingDedupeKeys.addAll(legacyVisitRepo.findExistingDedupeKeys(candidates));
@@ -1122,8 +1150,10 @@ public class CustomerImportService {
     private static final class RunState {
         CustomerImportRequest.PlateConflictPolicy policy = CustomerImportRequest.PlateConflictPolicy.KEEP_OWNER;
         final Map<String, Integer> customerIdByPhone = new HashMap<>();
+        /** Khách nhận diện theo biển số (dòng không có SĐT). Cùng biển số = cùng một khách. */
+        final Map<String, Integer> customerIdByPlateKey = new HashMap<>();
+        int dryRunCustomerSeq = 0;
         final Map<String, Integer> vehicleIdByPlate = new HashMap<>();
-        final Map<String, Integer> vehicleOwnerByPlate = new HashMap<>();
         final Map<String, Vehicle> vehiclesByPlateKey = new HashMap<>();
         boolean vehiclesLoaded = false;
         final Set<String> seenDedupeKeys = new HashSet<>();
