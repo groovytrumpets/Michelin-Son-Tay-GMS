@@ -496,10 +496,10 @@ public class CustomerImportService {
         }
 
         String plateKey = ImportNormalizer.normalizePlate(row.getLicensePlate());
-        if (plateKey == null) {
+        if (phone == null && plateKey == null) {
             throw new RowRejected("licensePlate",
-                    "Thiếu biển số. Sổ dịch vụ cũ dùng biển số để định danh xe và khách nên mỗi phiếu bắt buộc phải có biển số. "
-                            + "Số điện thoại có thể để trống. Bổ sung biển số rồi nhập lại.");
+                    "Phiếu phải có ít nhất một trong hai: biển số hoặc số điện thoại, để xác định khách. "
+                            + "Có biển số thì bỏ trống số điện thoại cũng được, và ngược lại. Bổ sung một trong hai rồi nhập lại.");
         }
 
         Integer customerId = resolveCustomer(row, phone, plateKey, state, report, dryRun);

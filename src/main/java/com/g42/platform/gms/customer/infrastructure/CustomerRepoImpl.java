@@ -283,30 +283,61 @@ public class CustomerRepoImpl implements CustomerRepo {
                 .collect(java.util.stream.Collectors.toMap(
                         com.g42.platform.gms.customer.infrastructure.entity.CustomerGroupJpa::getGroupId,
                         com.g42.platform.gms.customer.infrastructure.entity.CustomerGroupJpa::getName));
+
+        // Nạp theo lô toàn bộ dữ liệu phụ của trang hiện tại (bản ghi bảo mật, điểm/hạng,
+        // số lần đặt lịch) trong 3 truy vấn, thay vì 3 truy vấn / mỗi khách. Trước đây
+        // vòng lặp bên dưới gây N+1 rất nặng khi màn Danh bạ tải hàng nghìn khách một lúc.
+        java.util.List<Integer> pageIds = customerProfileJpas.getContent().stream()
+                .map(CustomerProfileJpa::getCustomerId)
+                .filter(java.util.Objects::nonNull)
+                .toList();
+
+        java.util.Map<Integer, CustomerAuthJpa> authByCustomer = pageIds.isEmpty()
+                ? java.util.Collections.emptyMap()
+                : customerAuthJpaRepo.findByCustomerIdIn(pageIds).stream()
+                        .collect(java.util.stream.Collectors.toMap(
+                                CustomerAuthJpa::getCustomerId, a -> a, (a, b) -> a));
+
+        java.util.Map<Integer, CustomerPointsJpa> pointsByCustomer = pageIds.isEmpty()
+                ? java.util.Collections.emptyMap()
+                : customerPointsJpaRepo.findByCustomerIdIn(pageIds).stream()
+                        .collect(java.util.stream.Collectors.toMap(
+                                CustomerPointsJpa::getCustomerId, p -> p, (a, b) -> a));
+
+        java.util.Map<Integer, Long> bookingCountByCustomer = new java.util.HashMap<>();
+        if (!pageIds.isEmpty()) {
+            for (Object[] row : customerPointsHistoryJpaRepo
+                    .countByReasonGroupedByCustomer("SERVICE_PAYMENT", pageIds)) {
+                bookingCountByCustomer.put((Integer) row[0], (Long) row[1]);
+            }
+        }
+
         return customerProfileJpas.map(jpa -> {
-            System.out.println("[DEBUG_JAVA_LIST] ID=" + jpa.getCustomerId() + " Name=" + jpa.getFullName() + " jpaIsCompany=" + jpa.getIsCompany() + " jpaCompanyName=" + jpa.getCompanyName());
             CustomerProfile profile = customerJpaMapper.toDomain(jpa);
             copyPartnerFieldsToDomain(jpa, profile);
             if (profile.getCustomerGroupId() != null) {
                 profile.setCustomerGroupName(groupNames.get(profile.getCustomerGroupId()));
             }
-            CustomerAuthJpa auth = customerAuthJpaRepo.findByCustomerId(jpa.getCustomerId());
+
+            CustomerAuthJpa auth = authByCustomer.get(jpa.getCustomerId());
             if (auth != null) profile.setStatus(auth.getStatus());
-            // Default BRONZE nếu chưa có record điểm
+
+            // Mặc định BRONZE / 0 điểm nếu khách chưa có bản ghi điểm.
             profile.setCurrentRank(com.g42.platform.gms.customer.domain.enums.CustomerRank.BRONZE);
             profile.setTotalPoints(0);
-            profile.setTotalBookings(0);
             profile.setCurrentDealerRank("LEVEL_1");
-            customerPointsJpaRepo.findByCustomerId(jpa.getCustomerId()).ifPresent(pts -> {
+            CustomerPointsJpa pts = pointsByCustomer.get(jpa.getCustomerId());
+            if (pts != null) {
                 profile.setCurrentRank(pts.getCurrentRank());
                 profile.setTotalPoints(pts.getTotalPoints());
                 if (pts.getCurrentDealerRank() != null) {
                     profile.setCurrentDealerRank(pts.getCurrentDealerRank().name());
                 }
-            });
-            // Tính số lần đặt lịch
-            long bookings = customerPointsHistoryJpaRepo.countByCustomerIdAndReason(jpa.getCustomerId(), "SERVICE_PAYMENT");
-            profile.setTotalBookings((int) bookings);
+            }
+
+            // Số lần đặt lịch = số lượt cộng điểm lý do SERVICE_PAYMENT.
+            profile.setTotalBookings(
+                    bookingCountByCustomer.getOrDefault(jpa.getCustomerId(), 0L).intValue());
             return profile;
         });
     }
@@ -362,7 +393,6 @@ public class CustomerRepoImpl implements CustomerRepo {
     @Override
     public CustomerProfile findCustomerById(Integer customerId) {
         CustomerProfileJpa jpa = customerProfileJpaRepo.findByCustomerId(customerId);
-        System.out.println("[DEBUG_JAVA_DETAIL] ID=" + customerId + " jpaIsCompany=" + (jpa != null ? jpa.getIsCompany() : "NULL_JPA") + " jpaCompanyName=" + (jpa != null ? jpa.getCompanyName() : "NULL_JPA"));
         CustomerProfile profile = customerJpaMapper.toDomain(jpa);
         copyPartnerFieldsToDomain(jpa, profile);
         fillGroupName(profile);

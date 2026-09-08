@@ -6,12 +6,16 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
 public interface CustomerPointsJpaRepo extends JpaRepository<CustomerPointsJpa, Integer> {
 
     Optional<CustomerPointsJpa> findByCustomerId(Integer customerId);
+
+    /** Nạp điểm/hạng của cả một trang khách trong một truy vấn, tránh N+1. */
+    List<CustomerPointsJpa> findByCustomerIdIn(Collection<Integer> customerIds);
 
     /** Tất cả khách chưa hoạt động trong năm hiện tại (để reset điểm) */
     @Query("""
