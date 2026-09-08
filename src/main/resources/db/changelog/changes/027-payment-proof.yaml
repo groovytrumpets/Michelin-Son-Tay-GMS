@@ -1,0 +1,107 @@
+# Chứng từ thanh toán — ảnh/video đính kèm cho một phiếu dịch vụ.
+#
+# VÌ SAO KHOÁ THEO service_ticket_id CHỨ KHÔNG THEO bill_id
+# Người dùng cần thấy và bổ sung chứng từ ở CẢ màn thanh toán (chưa chắc đã có
+# bill lúc mở) lẫn màn chi tiết phiếu. Gắn theo phiếu dịch vụ thì hai màn dùng
+# chung một rổ, không phải hợp nhất nhiều nguồn. bill_id vẫn lưu lại (nullable)
+# để biết chứng từ được thêm trong lần thu nào.
+#
+# media_type — IMAGE / VIDEO
+# File đã đẩy lên Cloudinary ở FE rồi mới gọi API lưu URL, nên ở đây chỉ giữ URL
+# và loại để giao diện biết render <img> hay <video>.
+#
+# GIỚI HẠN 10 FILE / PHIẾU được ép ở tầng service (PaymentProofService), không
+# đặt constraint DB để lỡ nghiệp vụ đổi số thì không phải viết changeset mới.
+databaseChangeLog:
+  - changeSet:
+      id: 027-1-payment-proof
+      author: gms
+      comment: Bảng chứng từ thanh toán (ảnh/video) đính kèm theo phiếu dịch vụ
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: payment_proof
+      changes:
+        - createTable:
+            tableName: payment_proof
+            remarks: Ảnh/video chứng từ thanh toán của một phiếu dịch vụ
+            columns:
+              - column:
+                  name: payment_proof_id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: service_ticket_id
+                  type: INT
+                  constraints:
+                    nullable: false
+                  remarks: Phiếu dịch vụ mà chứng từ thuộc về
+              - column:
+                  name: bill_id
+                  type: INT
+                  remarks: Hoá đơn tại thời điểm thêm chứng từ, để trống nếu chưa có
+              - column:
+                  name: media_type
+                  type: VARCHAR(16)
+                  constraints:
+                    nullable: false
+                  remarks: IMAGE hoặc VIDEO
+              - column:
+                  name: url
+                  type: VARCHAR(512)
+                  constraints:
+                    nullable: false
+                  remarks: secure_url Cloudinary
+              - column:
+                  name: public_id
+                  type: VARCHAR(255)
+                  remarks: public_id Cloudinary, để xoá file khi cần
+              - column:
+                  name: file_name
+                  type: VARCHAR(255)
+                  remarks: Tên file gốc người dùng chọn
+              - column:
+                  name: file_size
+                  type: BIGINT
+                  remarks: Dung lượng byte, chỉ để hiển thị
+              - column:
+                  name: note
+                  type: VARCHAR(500)
+                  remarks: Ghi chú tuỳ chọn cho chứng từ
+              - column:
+                  name: uploaded_by
+                  type: INT
+                  remarks: Nhân viên tải lên, tham chiếu staff_profile
+              - column:
+                  name: created_at
+                  type: DATETIME
+                  defaultValueComputed: CURRENT_TIMESTAMP
+      rollback:
+        - dropTable:
+            tableName: payment_proof
+
+  - changeSet:
+      id: 027-2-payment-proof-index
+      author: gms
+      comment: Chỉ mục tra cứu chứng từ theo phiếu dịch vụ
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - indexExists:
+                tableName: payment_proof
+                indexName: idx_payment_proof_ticket
+      changes:
+        - createIndex:
+            tableName: payment_proof
+            indexName: idx_payment_proof_ticket
+            columns:
+              - column:
+                  name: service_ticket_id
+      rollback:
+        - dropIndex:
+            tableName: payment_proof
+            indexName: idx_payment_proof_ticket
