@@ -183,14 +183,20 @@ public class CheckInService {
             throw new CheckInException("Thiếu thông tin nhân viên thực hiện check-in");
         }
 
-        // 1. Validate and get vehicle
-        Vehicle vehicle = vehicleRepository.findById(request.getVehicleId())
-            .orElseThrow(() -> new CheckInException("Không tìm thấy xe với ID: " + request.getVehicleId()));
-        log.info("Using vehicle: vehicleId={}, licensePlate={}", vehicle.getVehicleId(), vehicle.getLicensePlate());
+        // 1. Validate and get vehicle (tuỳ chọn — có thể tiếp nhận trước, bổ sung xe sau)
+        Vehicle vehicle = null;
+        if (request.getVehicleId() != null) {
+            vehicle = vehicleRepository.findById(request.getVehicleId())
+                .orElseThrow(() -> new CheckInException("Không tìm thấy xe với ID: " + request.getVehicleId()));
+            log.info("Using vehicle: vehicleId={}, licensePlate={}", vehicle.getVehicleId(), vehicle.getLicensePlate());
+        } else {
+            log.info("Check-in không kèm xe — sẽ bổ sung sau ở màn chi tiết phiếu");
+        }
 
         // 2. Create Service Ticket
+        Integer vehicleIdForTicket = (vehicle != null) ? vehicle.getVehicleId() : null;
         ServiceTicket serviceTicket = serviceTicketService.createServiceTicket(
-            request.getBookingId(), vehicle.getVehicleId(), request.getCustomerId(), request.getStaffId());
+            request.getBookingId(), vehicleIdForTicket, request.getCustomerId(), request.getStaffId());
         log.info("Created service ticket: ticketCode={}", serviceTicket.getTicketCode());
 
         ServiceTicket ticketDomain = serviceTicketRepo.findByTicketCode(serviceTicket.getTicketCode())
@@ -242,7 +248,10 @@ public class CheckInService {
         boolean rollbackDetected = false;
         Integer previousReadingValue = null;
 
-        if (request.getOdometerReading() != null) {
+        if (request.getOdometerReading() != null && vehicle == null) {
+            log.warn("Bỏ qua số km khi check-in vì phiếu chưa gắn xe: bookingId={}", request.getBookingId());
+        }
+        if (request.getOdometerReading() != null && vehicle != null) {
             Optional<OdometerReading> previousReading = odometerRepo.findLatestByVehicleId(vehicle.getVehicleId());
             if (previousReading.isPresent()) {
                 previousReadingValue = previousReading.get().getReading();
@@ -308,13 +317,28 @@ public class CheckInService {
 
         // 9b. Assign technician (tuỳ chọn — lễ tân có thể phân công sớm ngay khi
         // check-in; bỏ trống thì cố vấn dịch vụ phân công sau).
+        //
+        // Phân công sớm này là "best-effort": nếu người được chọn sẵn từ lúc tạo
+        // lịch không còn giữ vai trò kỹ thuật viên (đổi vai trò, nghỉ việc, lịch
+        // cũ gán nhầm...) thì KHÔNG được làm hỏng cả lượt check-in — chỉ bỏ qua
+        // và cảnh báo, cố vấn dịch vụ sẽ phân công lại sau. Phải kiểm tra role
+        // TRƯỚC khi gọi assignStaff vì exception ném ra từ trong assignStaff
+        // (cùng transaction) sẽ đánh dấu rollback-only cho cả giao dịch.
+        String earlyTechnicianSkipReason = null;
         if (request.getTechnicianId() != null) {
-            AssignStaffDto technicianDto = new AssignStaffDto();
-            technicianDto.setStaffId(request.getTechnicianId());
-            technicianDto.setRoleInTicket("TECHNICIAN");
-            technicianDto.setIsPrimary(true);
-            ticketAssignmentService.assignStaff(savedTicketAll.getServiceTicketId(), technicianDto);
-            log.info("Technician {} assigned to ticket {}", request.getTechnicianId(), savedTicketAll.getTicketCode());
+            if (ticketAssignmentService.staffHasRoleForTicket(request.getTechnicianId(), "TECHNICIAN")) {
+                AssignStaffDto technicianDto = new AssignStaffDto();
+                technicianDto.setStaffId(request.getTechnicianId());
+                technicianDto.setRoleInTicket("TECHNICIAN");
+                technicianDto.setIsPrimary(true);
+                ticketAssignmentService.assignStaff(savedTicketAll.getServiceTicketId(), technicianDto);
+                log.info("Technician {} assigned to ticket {}", request.getTechnicianId(), savedTicketAll.getTicketCode());
+            } else {
+                earlyTechnicianSkipReason = "Kỹ thuật viên phân công sẵn (#" + request.getTechnicianId()
+                    + ") không còn giữ vai trò kỹ thuật viên — đã bỏ qua, cố vấn dịch vụ sẽ phân công lại.";
+                log.warn("Bỏ qua phân công kỹ thuật viên sớm cho phiếu {}: staffId={} không có role TECHNICIAN",
+                    savedTicketAll.getTicketCode(), request.getTechnicianId());
+            }
         }
 
         // 9. Build warnings
@@ -330,6 +354,14 @@ public class CheckInService {
             warnings.add(w);
         }
         warnings.addAll(buildAppointmentWarnings(booking));
+
+        if (earlyTechnicianSkipReason != null) {
+            ServiceTicketResponse.Warning w = new ServiceTicketResponse.Warning();
+            w.setCode("EARLY_TECHNICIAN_SKIPPED");
+            w.setMessage(earlyTechnicianSkipReason);
+            w.setSeverity("INFO");
+            warnings.add(w);
+        }
 
         // 10. Build response
         ServiceTicketResponse response = serviceTicketDtoMapper.toResponse(savedTicketAll);

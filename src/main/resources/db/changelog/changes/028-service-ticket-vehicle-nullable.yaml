@@ -1,0 +1,31 @@
+# Xe của khách không còn bắt buộc khi tiếp nhận (/check-in).
+#
+# TRƯỚC ĐÂY service_ticket.vehicle_id là NOT NULL nên lễ tân buộc phải chọn xe
+# có sẵn hoặc tạo xe mới thì mới lập được phiếu. Nhiều trường hợp khách vào
+# xưởng nhưng chưa xác định được xe (chưa có biển số, xe đi mượn, hồ sơ xe bổ
+# sung sau) khiến không thể tiếp nhận.
+#
+# TỪ NAY vehicle_id được phép NULL. Phiếu vẫn tạo được không kèm xe; xe bổ sung
+# sau ở màn chi tiết phiếu. Khoá ngoại fk_ticket_vehicle giữ nguyên (FK vốn cho
+# phép giá trị NULL). Tầng service (CheckInService) bỏ luôn số km khi phiếu chưa
+# gắn xe vì odometer_reading.vehicle_id vẫn NOT NULL.
+databaseChangeLog:
+  - changeSet:
+      id: 028-1-service-ticket-vehicle-nullable
+      author: gms
+      comment: Bỏ ràng buộc NOT NULL của service_ticket.vehicle_id — xe không bắt buộc khi check-in
+      preConditions:
+        - onFail: MARK_RAN
+        - columnExists:
+            tableName: service_ticket
+            columnName: vehicle_id
+      changes:
+        - dropNotNullConstraint:
+            tableName: service_ticket
+            columnName: vehicle_id
+            columnDataType: INT
+      rollback:
+        - addNotNullConstraint:
+            tableName: service_ticket
+            columnName: vehicle_id
+            columnDataType: INT

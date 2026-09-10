@@ -19,8 +19,7 @@ public class CompleteCheckInAllRequest {
     @NotNull(message = "Customer ID là bắt buộc")
     private Integer customerId;
     
-    // Vehicle information - REQUIRED: must select existing vehicle
-    @NotNull(message = "Vehicle ID là bắt buộc - vui lòng chọn xe hoặc tạo xe mới trước")
+    // Vehicle information - tuỳ chọn: lễ tân có thể tạo phiếu trước, bổ sung xe sau
     private Integer vehicleId;
     
     // License plate photo (optional)

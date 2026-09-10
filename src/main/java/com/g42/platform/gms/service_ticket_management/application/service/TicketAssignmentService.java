@@ -71,6 +71,18 @@ public class TicketAssignmentService {
     }
 
 
+    /**
+     * Kiểm tra nhân sự có đúng role (theo role_code) để được phân công vai trò này
+     * trong phiếu hay không. Dùng để phân công "sớm" (lúc check-in) có thể bỏ qua
+     * êm khi dữ liệu phân công trước đó không còn hợp lệ, thay vì ném lỗi làm hỏng
+     * cả giao dịch.
+     */
+    @Transactional(readOnly = true)
+    public boolean staffHasRoleForTicket(Integer staffId, String roleInTicket) {
+        if (staffId == null || roleInTicket == null) return false;
+        return staffProfileRepo.existsByStaffIdAndRole(staffId, roleInTicket);
+    }
+
     @Transactional
     public AssignStaffDto assignStaff(Integer ticketId, AssignStaffDto dto) {
         // Guard: không cho assign khi phiếu đã kết thúc

@@ -91,3 +91,6 @@ databaseChangeLog:
   - include:
       file: changes/027-payment-proof.yaml
       relativeToChangelogFile: true
+  - include:
+      file: changes/028-service-ticket-vehicle-nullable.yaml
+      relativeToChangelogFile: true
