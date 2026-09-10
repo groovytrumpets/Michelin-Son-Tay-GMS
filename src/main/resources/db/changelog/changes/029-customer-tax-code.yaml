@@ -1,0 +1,27 @@
+# Mã số thuế công ty của khách hàng.
+# Entity CustomerProfileJpa đã khai báo tax_code (từ đợt Danh bạ đối tác, trước đây
+# thêm bằng SQL chạy tay). Changeset này bảo đảm DB nào cũng có cột đó — DB đã có
+# sẵn thì preCondition đánh dấu đã chạy, không đụng gì.
+databaseChangeLog:
+  - changeSet:
+      id: 029-1-customer-profile-add-tax-code
+      author: gms
+      comment: Thêm cột tax_code vào customer_profile
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: customer_profile
+                columnName: tax_code
+      changes:
+        - addColumn:
+            tableName: customer_profile
+            columns:
+              - column:
+                  name: tax_code
+                  type: VARCHAR(20)
+                  remarks: Mã số thuế công ty của khách, không bắt buộc
+      rollback:
+        - dropColumn:
+            tableName: customer_profile
+            columnName: tax_code

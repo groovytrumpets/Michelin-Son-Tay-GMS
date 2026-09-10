@@ -408,6 +408,7 @@ public class CustomerImportService {
                 row.setFullName(customer.getFullName());
                 row.setPhone(customer.getPhone());
                 row.setEmail(customer.getEmail());
+                row.setTaxCode(customer.getTaxCode());
             }
 
             if (visit.getVehicleId() != null) {
@@ -650,6 +651,7 @@ public class CustomerImportService {
         profile.setPhone(phone);
         profile.setFullName(ImportNormalizer.trimToNull(row.getFullName()));
         profile.setEmail(resolveEmail(row, null, report));
+        profile.setTaxCode(ImportNormalizer.trimToNull(row.getTaxCode()));
         profile.setCreatedAt(LocalDateTime.now());
         CustomerProfileJpa saved = customerProfileRepo.save(profile);
 
@@ -698,6 +700,17 @@ public class CustomerImportService {
             if (email != null) {
                 existing.setEmail(email);
                 changed = true;
+            }
+        }
+
+        String taxCode = ImportNormalizer.trimToNull(row.getTaxCode());
+        if (taxCode != null) {
+            if (ImportNormalizer.trimToNull(existing.getTaxCode()) == null) {
+                existing.setTaxCode(taxCode);
+                changed = true;
+            } else if (!taxCode.equalsIgnoreCase(existing.getTaxCode())) {
+                report.add(ImportIssueDto.warning(row.getSourceRowNo(), "taxCode",
+                        "Khách đã có mã số thuế \"" + existing.getTaxCode() + "\" trong hệ thống, giữ nguyên và bỏ qua \"" + taxCode + "\" trong file."));
             }
         }
 

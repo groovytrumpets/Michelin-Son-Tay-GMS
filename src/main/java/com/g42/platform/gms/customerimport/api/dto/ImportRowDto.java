@@ -31,6 +31,9 @@ public class ImportRowDto {
     private String phone;
     private String email;
 
+    /** Mã số thuế công ty của khách, không bắt buộc. Chỉ điền vào hồ sơ khi ô đang trống. */
+    private String taxCode;
+
     private String licensePlate;
     private String brand;
     private String model;
