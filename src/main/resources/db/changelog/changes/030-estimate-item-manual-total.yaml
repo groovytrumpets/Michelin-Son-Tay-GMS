@@ -1,0 +1,30 @@
+# THÀNH TIỀN nhập tay cho từng dòng báo giá.
+#
+# Trước đây backend luôn tính lại THÀNH TIỀN = số lượng x đơn giá x thuế, không có
+# chỗ nào lưu số advisor gõ tay. Nay thêm cột manual_line_total: khi khác NULL thì
+# EstimateService dùng thẳng số này làm total_price / final_price của dòng, không
+# đụng tới số lượng / đơn giá / thuế đã nhập. Cột is_overridden đã có sẵn từ schema
+# gốc nên không cần thêm.
+databaseChangeLog:
+  - changeSet:
+      id: 030-1-estimate-item-manual-line-total
+      author: gms
+      comment: Cột THÀNH TIỀN gõ tay đè lên số tính tự động cho dòng báo giá
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: estimate_item
+                columnName: manual_line_total
+      changes:
+        - addColumn:
+            tableName: estimate_item
+            columns:
+              - column:
+                  name: manual_line_total
+                  type: DECIMAL(12,2)
+                  remarks: THÀNH TIỀN advisor khoá tay; NULL nghĩa là tính tự động theo SL x đơn giá x thuế
+      rollback:
+        - dropColumn:
+            tableName: estimate_item
+            columnName: manual_line_total

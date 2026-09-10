@@ -48,6 +48,10 @@ public class EstimateItemJpa {
     @Column(name = "override_reason")
     private String overrideReason;
 
+    /** THÀNH TIỀN gõ tay của dòng; NULL nghĩa là tính tự động theo SL x đơn giá x thuế. */
+    @Column(name = "manual_line_total", precision = 12, scale = 2)
+    private BigDecimal manualLineTotal;
+
     @Column(name = "warehouse_id")
     private Integer warehouseId;
     /** Danh mục là tùy chọn — dòng báo giá không bắt buộc thuộc nhóm nào. */

@@ -30,6 +30,8 @@ public class EstimateItem {
     private BigDecimal unitPrice;
     private Boolean isOverridden;
     private String overrideReason;
+    /** THÀNH TIỀN gõ tay; khi khác null thì dùng thẳng số này, bỏ qua SL x đơn giá x thuế. */
+    private BigDecimal manualLineTotal;
     private Integer warehouseId;
     private Integer itemCategoryId;
     /**

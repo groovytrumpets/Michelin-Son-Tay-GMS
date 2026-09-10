@@ -31,6 +31,10 @@ public class EstimateItemReqDto {
     private Integer triggeredByItemId;
     private BigDecimal discountAmount;
 //    private BigDecimal finalPrice;
+    /** True khi advisor khoá THÀNH TIỀN bằng tay cho dòng này. */
+    private Boolean isOverridden;
+    /** THÀNH TIỀN gõ tay; khi có, backend dùng thẳng số này thay vì SL x đơn giá x thuế. */
+    private BigDecimal manualLineTotal;
     private Integer entryItemId;
     private Boolean isOutsource;
     private Integer outsourcePartnerId;

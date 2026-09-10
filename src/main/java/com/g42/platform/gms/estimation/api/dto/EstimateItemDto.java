@@ -35,6 +35,10 @@ public class EstimateItemDto {
     private Integer triggeredByItemId;
     private BigDecimal discountAmount;
     private BigDecimal finalPrice;
+    /** True khi THÀNH TIỀN của dòng được advisor khoá tay. */
+    private Boolean isOverridden;
+    /** THÀNH TIỀN gõ tay đang áp cho dòng; null nghĩa là tính tự động. */
+    private BigDecimal manualLineTotal;
     private WarehouseDto warehouse;
     private StockAllocationDto stockAllocation;
     private Integer entryItemId;

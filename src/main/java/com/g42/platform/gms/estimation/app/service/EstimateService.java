@@ -314,10 +314,12 @@ public class EstimateService {
 
                 if (Boolean.TRUE.equals(existing.getIsGift())) {
                     existing.setFinalPrice(BigDecimal.ZERO);
-                } else {
+                    existing.setIsOverridden(false);
+                    existing.setManualLineTotal(null);
+                } else if (!applyManualLineTotal(existing, req)) {
                     existing.setFinalPrice(existing.getTotalPrice());
                 }
-                
+
                 toSave.add(existing);
                 incomingIds.add(req.getEstimateItemId());
             } else {
@@ -434,10 +436,34 @@ public class EstimateService {
             applyTax(item,ruleId);
             if (item.getIsGift()==true){
                 item.setFinalPrice(BigDecimal.ZERO);
-            }else
-            item.setFinalPrice(item.getTotalPrice());
+                item.setIsOverridden(false);
+                item.setManualLineTotal(null);
+            } else if (!applyManualLineTotal(item, req)) {
+                item.setFinalPrice(item.getTotalPrice());
+            }
             return item;
         }).toList();
+    }
+
+    /**
+     * Nếu advisor khoá THÀNH TIỀN bằng tay thì dùng thẳng số đó cho dòng,
+     * không tính lại theo SL x đơn giá x thuế. Trả về true nếu đã áp số gõ tay.
+     */
+    private boolean applyManualLineTotal(EstimateItem item, EstimateItemReqDto req) {
+        boolean overridden = Boolean.TRUE.equals(req.getIsOverridden())
+                && req.getManualLineTotal() != null
+                && req.getManualLineTotal().compareTo(BigDecimal.ZERO) >= 0
+                && !Boolean.TRUE.equals(item.getIsGift());
+        if (overridden) {
+            item.setIsOverridden(true);
+            item.setManualLineTotal(req.getManualLineTotal());
+            item.setTotalPrice(req.getManualLineTotal());
+            item.setFinalPrice(req.getManualLineTotal());
+        } else {
+            item.setIsOverridden(false);
+            item.setManualLineTotal(null);
+        }
+        return overridden;
     }
     /**
      * Tra tên các đối tác thuê ngoài đang được dùng trong danh sách dòng báo giá.
@@ -596,6 +622,17 @@ public class EstimateService {
 
         if (Boolean.TRUE.equals(estimateItem.getIsGift())) {
             estimateItem.setFinalPrice(BigDecimal.ZERO);
+            estimateItem.setIsOverridden(false);
+            estimateItem.setManualLineTotal(null);
+        } else if (request.getIsOverridden() != null) {
+            // Request nói rõ về việc khoá THÀNH TIỀN tay -> theo request
+            if (!applyManualLineTotal(estimateItem, request)) {
+                estimateItem.setFinalPrice(estimateItem.getTotalPrice());
+            }
+        } else if (Boolean.TRUE.equals(estimateItem.getIsOverridden()) && estimateItem.getManualLineTotal() != null) {
+            // Request im lặng (vd huỷ giữ hàng) -> giữ nguyên số THÀNH TIỀN đã khoá tay trước đó
+            estimateItem.setTotalPrice(estimateItem.getManualLineTotal());
+            estimateItem.setFinalPrice(estimateItem.getManualLineTotal());
         } else {
             estimateItem.setFinalPrice(estimateItem.getTotalPrice());
         }
