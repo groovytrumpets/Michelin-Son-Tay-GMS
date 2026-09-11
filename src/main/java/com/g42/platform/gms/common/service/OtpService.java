@@ -1,6 +1,7 @@
 package com.g42.platform.gms.common.service;
 
-import com.g42.platform.gms.auth.exception.AuthException; // Hoặc tạo Exception chung
+import com.g42.platform.gms.auth.constant.AuthErrorCode;
+import com.g42.platform.gms.auth.exception.AuthException;
 import com.g42.platform.gms.auth.repository.CustomerProfileRepository;
 import com.g42.platform.gms.notification.application.service.CustomerNotificationDispatcher;
 import com.g42.platform.gms.notification.domain.NotificationChannel;
@@ -71,9 +72,13 @@ public class OtpService {
 
         NotificationChannel sentVia = notificationDispatcher.sendOtpVerify(recipient, otp);
         if (sentVia == null) {
-            // Chưa cấu hình được kênh nào (dev/demo chưa có Zalo token lẫn SMTP) — in ra log để còn đăng nhập được.
-            // Khi có ít nhất một kênh chạy được thì OTP KHÔNG bao giờ xuất hiện trong log.
+            // Cả Zalo lẫn Email đều không gửi được — khách sẽ không bao giờ nhận được mã này,
+            // nên báo lỗi ngay thay vì để khách chờ ở màn nhập OTP. Vẫn in ra log ở mức WARN để
+            // dev/ops còn tra cứu được (không phải cơ chế cho khách đăng nhập bằng log nữa).
             log.warn("Không gửi được OTP qua kênh nào cho [{}], mã tạm thời: {}", otpKey, otp);
+            otpCache.remove(otpKey);
+            throw new AuthException(AuthErrorCode.OTP_SEND_FAILED.name(),
+                    "Không thể gửi mã OTP qua Zalo hoặc Email lúc này. Vui lòng thử lại sau.");
         }
         // Sau này tích hợp SMS API tại đây
         return sentVia;

@@ -13,6 +13,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class OtpSentResponse {
-    /** null nghĩa là không gửi được qua kênh nào. */
+    /** Không bao giờ null — gửi thất bại cả hai kênh thì OtpService ném lỗi thay vì trả response này. */
     private NotificationChannel sentVia;
 }

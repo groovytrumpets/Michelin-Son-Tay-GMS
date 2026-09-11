@@ -85,7 +85,7 @@ public class CustomerAuthService {
      *
      * @param requestedChannel kênh khách tự chọn ở màn quên mật khẩu; để null thì hệ thống
      *                         tự quyết (nhập bằng email → gửi email, còn lại theo kênh trong hồ sơ)
-     * @return kênh đã gửi thành công, null nếu không gửi được qua kênh nào
+     * @return kênh đã gửi thành công; ném AuthException(OTP_SEND_FAILED) nếu không gửi được qua kênh nào
      */
     @Transactional
     public NotificationChannel requestOtp(String identifier, NotificationChannel requestedChannel) {

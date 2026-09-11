@@ -141,7 +141,7 @@ public class StaffAuthService {
      *
      * @param requestedChannel kênh nhân viên tự chọn ("ZALO"/"EMAIL"); null thì hệ thống tự quyết
      *                         (nhập bằng email → gửi email, nhập bằng SĐT → gửi Zalo)
-     * @return kênh đã gửi thành công, null nếu không gửi được qua kênh nào
+     * @return kênh đã gửi thành công; ném AuthException(OTP_SEND_FAILED) nếu không gửi được qua kênh nào
      */
     @Transactional
     public NotificationChannel requestOtpPhone(String identifier, NotificationChannel requestedChannel) {
