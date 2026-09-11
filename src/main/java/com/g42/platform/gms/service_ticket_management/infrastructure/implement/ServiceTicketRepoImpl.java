@@ -2,6 +2,7 @@ package com.g42.platform.gms.service_ticket_management.infrastructure.implement;
 
 import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicket;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
+import com.g42.platform.gms.service_ticket_management.domain.enums.TicketType;
 import com.g42.platform.gms.service_ticket_management.domain.repository.ServiceTicketRepo;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
 import com.g42.platform.gms.service_ticket_management.infrastructure.mapper.ServiceTicketMapper;
@@ -69,8 +70,8 @@ public class ServiceTicketRepoImpl implements ServiceTicketRepo {
     }
 
     @Override
-    public Page<ServiceTicket> findAll(TicketStatus status, LocalDate date, String search, Pageable pageable) {
-        Specification<ServiceTicketJpa> spec = ServiceTicketSpecification.filter(date, status);
+    public Page<ServiceTicket> findAll(TicketStatus status, LocalDate date, String search, TicketType ticketType, Pageable pageable) {
+        Specification<ServiceTicketJpa> spec = ServiceTicketSpecification.filter(date, status, ticketType);
         if (search != null && !search.isBlank()) {
             spec = spec.and(ServiceTicketSpecification.search(search));
         }
@@ -80,7 +81,7 @@ public class ServiceTicketRepoImpl implements ServiceTicketRepo {
     @Override
     public Page<ServiceTicket> findByAssignedStaff(Integer staffId, TicketStatus status, LocalDate date, String search, Pageable pageable) {
         Specification<ServiceTicketJpa> spec = ServiceTicketSpecification.assignedToStaff(staffId)
-                .and(ServiceTicketSpecification.filter(date, status));
+                .and(ServiceTicketSpecification.filter(date, status, null));
         if (search != null && !search.isBlank()) {
             spec = spec.and(ServiceTicketSpecification.search(search));
         }

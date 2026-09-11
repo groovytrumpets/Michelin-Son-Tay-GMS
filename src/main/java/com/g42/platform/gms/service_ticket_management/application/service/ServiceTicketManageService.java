@@ -23,6 +23,7 @@ import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceTick
 import com.g42.platform.gms.service_ticket_management.api.mapper.ServiceTicketDtoMapper;
 import com.g42.platform.gms.service_ticket_management.domain.entity.SafetyInspection;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
+import com.g42.platform.gms.service_ticket_management.domain.enums.TicketType;
 import com.g42.platform.gms.service_ticket_management.domain.entity.OdometerReading;
 import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicket;
 import com.g42.platform.gms.service_ticket_management.domain.entity.VehicleConditionPhoto;
@@ -109,15 +110,16 @@ public class ServiceTicketManageService {
             int size,
             LocalDate date,
             TicketStatus status,
-            String search) {
+            String search,
+            TicketType ticketType) {
 
-        log.info("Getting service ticket list: page={}, size={}, date={}, status={}, search={}",
-                page, size, date, status, search);
+        log.info("Getting service ticket list: page={}, size={}, date={}, status={}, search={}, ticketType={}",
+                page, size, date, status, search, ticketType);
 
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "receivedAt"));
 
 
-        Page<ServiceTicket> ticketPage = serviceTicketRepo.findAll(status, date, search, pageable);
+        Page<ServiceTicket> ticketPage = serviceTicketRepo.findAll(status, date, search, ticketType, pageable);
         return ticketPage.map(this::mapToListResponse);
     }
 
@@ -444,7 +446,7 @@ public class ServiceTicketManageService {
         return serviceTicketDtoMapper.toDto(savedServiceTicket);
     }
     @Transactional
-    public byte[] exportTicketToExcel(LocalDate startDate, LocalDate endDate){
+    public byte[] exportTicketToExcel(LocalDate startDate, LocalDate endDate, TicketType ticketType){
         if (startDate == null) {
             startDate = LocalDate.of(2020, 1, 1);
         }
@@ -454,6 +456,11 @@ public class ServiceTicketManageService {
         LocalDateTime start = startDate.atStartOfDay();
         LocalDateTime end = endDate.atTime(23, 59, 59);
         List<ServiceTicket> serviceTickets = serviceTicketRepo.findBetween(start,end);
+        if (ticketType != null) {
+            serviceTickets = serviceTickets.stream()
+                    .filter(t -> t.getTicketType() == ticketType)
+                    .toList();
+        }
 
         List<Integer> customerIds = serviceTickets.stream().map(ServiceTicket::getCustomerId).distinct().toList();
         List<Integer> vehicleIds = serviceTickets.stream().map(ServiceTicket::getVehicleId)

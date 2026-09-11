@@ -14,9 +14,11 @@ public class StaffDirectBookingRequest extends BaseBookingRequest {
     @Positive(message = "Estimate ID phai la so duong")
     private Integer estimateId;
 
-    @NotBlank(message = "So dien thoai la bat buoc")
-    @Pattern(regexp = "^0[0-9]{9,10}$", message = "So dien thoai phai bat dau bang 0 va co 10-11 chu so")
+    // Không bắt buộc riêng lẻ nữa — cần ít nhất phone HOẶC licensePlate (validate ở BookingService).
+    @Pattern(regexp = "^(0[0-9]{9,10})?$", message = "So dien thoai phai bat dau bang 0 va co 10-11 chu so")
     private String phone;
+
+    private String licensePlate;
 
     @NotBlank(message = "Ten khach hang la bat buoc")
     @Size(min = 2, max = 100, message = "Ten khach hang phai tu 2 den 100 ky tu")

@@ -2,6 +2,7 @@ package com.g42.platform.gms.service_ticket_management.infrastructure.specificat
 
 import com.g42.platform.gms.auth.entity.CustomerProfile;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
+import com.g42.platform.gms.service_ticket_management.domain.enums.TicketType;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketAssignmentJpa;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
 import com.g42.platform.gms.vehicle.entity.Vehicle;
@@ -28,27 +29,34 @@ public class ServiceTicketSpecification {
      * @param status Filter theo ticket status
      * @return Specification
      */
-    public static Specification<ServiceTicketJpa> filter(LocalDate date, TicketStatus status) {
+    public static Specification<ServiceTicketJpa> filter(LocalDate date, TicketStatus status, TicketType ticketType) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
-            
+
             // Filter theo received_at date
             if (date != null) {
                 LocalDateTime startOfDay = date.atStartOfDay();
                 LocalDateTime endOfDay = date.atTime(LocalTime.MAX);
-                
+
                 predicates.add(
                     cb.between(root.get("receivedAt"), startOfDay, endOfDay)
                 );
             }
-            
+
             // Filter theo status
             if (status != null) {
                 predicates.add(
                     cb.equal(root.get("ticketStatus"), status)
                 );
             }
-            
+
+            // Filter theo loại phiếu (Sửa xe / Bán hàng)
+            if (ticketType != null) {
+                predicates.add(
+                    cb.equal(root.get("ticketType"), ticketType)
+                );
+            }
+
             return cb.and(predicates.toArray(new Predicate[0]));
         };
     }

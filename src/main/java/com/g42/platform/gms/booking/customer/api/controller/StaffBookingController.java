@@ -12,6 +12,8 @@ import com.g42.platform.gms.booking.customer.application.service.BookingService;
 import com.g42.platform.gms.booking.customer.domain.entity.Booking;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
+import com.g42.platform.gms.vehicle.entity.Vehicle;
+import com.g42.platform.gms.vehicle.repository.VehicleRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -39,22 +41,36 @@ public class StaffBookingController {
     private final BookingDtoMapper dtoMapper;
     private final CustomerProfileRepository customerRepository;
     private final ServiceTicketRepository serviceTicketRepository;
+    private final VehicleRepository vehicleRepository;
 
     /**
-     * Lookup customer info bằng số điện thoại
-     * 
-     * Use case: Khi receptionist nhập số điện thoại, tự động điền tên nếu customer đã tồn tại
-     * 
-     * @param phone Số điện thoại cần tra cứu
+     * Lookup customer info bằng số điện thoại HOẶC biển số xe (ít nhất 1 trong 2)
+     *
+     * Use case: Khi receptionist nhập số điện thoại hoặc biển số xe, tự động điền tên nếu customer đã tồn tại
+     *
+     * @param phone Số điện thoại cần tra cứu (tuỳ chọn)
+     * @param licensePlate Biển số xe cần tra cứu (tuỳ chọn) — dùng khi không có/không nhớ số điện thoại
      * @return Thông tin customer (nếu có) hoặc empty response
      */
     @GetMapping("/customer-lookup")
     // @PreAuthorize("hasAnyRole('STAFF', 'RECEPTIONIST', 'ADMIN')")
     public ResponseEntity<ApiResponse<CustomerLookupResponse>> lookupCustomer(
-            @RequestParam String phone
+            @RequestParam(required = false) String phone,
+            @RequestParam(required = false) String licensePlate
     ) {
-        CustomerProfile customer = customerRepository.findByPhone(phone).orElse(null);
-        
+        String normalizedPhone = phone == null ? "" : phone.trim();
+        String normalizedPlate = licensePlate == null ? "" : licensePlate.trim().toUpperCase();
+
+        CustomerProfile customer = normalizedPhone.isBlank()
+                ? null
+                : customerRepository.findByPhone(normalizedPhone).orElse(null);
+
+        if (customer == null && !normalizedPlate.isBlank()) {
+            customer = vehicleRepository.findByLicensePlate(normalizedPlate)
+                    .map(Vehicle::getCustomer)
+                    .orElse(null);
+        }
+
         CustomerLookupResponse response;
         if (customer != null) {
             long count = serviceTicketRepository.countActiveTicketsByCustomerId(customer.getCustomerId());
@@ -69,13 +85,13 @@ public class StaffBookingController {
         } else {
             response = new CustomerLookupResponse(
                     null,
-                    phone,
+                    normalizedPhone,
                     null,
                     null,
                     false
             );
         }
-        
+
         return ResponseEntity.ok(ApiResponses.success(response));
     }
 
@@ -97,11 +113,15 @@ public class StaffBookingController {
             @RequestBody @Valid StaffDirectBookingRequest request
     ) {
         Booking domain = bookingService.createDirectBookingByStaff(request);
-        
+
         BookingResponse response = dtoMapper.toResponse(domain);
-        
-        // Populate customer info
-        response.setPhone(request.getPhone());
+
+        // Populate customer info — ưu tiên lấy phone thật của customer đã resolve (có thể tạo/tra
+        // ra từ biển số xe chứ không nhất thiết trùng request.getPhone()).
+        String resolvedPhone = customerRepository.findById(domain.getCustomerId())
+                .map(CustomerProfile::getPhone)
+                .orElse(request.getPhone());
+        response.setPhone(resolvedPhone);
         response.setCustomerName(request.getFullName());
         
         return ResponseEntity.ok(ApiResponses.success(response));

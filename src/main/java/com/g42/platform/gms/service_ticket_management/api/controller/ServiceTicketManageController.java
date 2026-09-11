@@ -12,6 +12,7 @@ import com.g42.platform.gms.service_ticket_management.api.dto.manage.UpdateServi
 import com.g42.platform.gms.service_ticket_management.application.service.ServiceTicketAdvisorService;
 import com.g42.platform.gms.service_ticket_management.application.service.ServiceTicketManageService;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
+import com.g42.platform.gms.service_ticket_management.domain.enums.TicketType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -42,14 +43,19 @@ public class ServiceTicketManageController {
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) LocalDate date,
             @RequestParam(required = false) String status,
-            @RequestParam(required = false) String search) {
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String ticketType) {
 
         TicketStatus ticketStatus = null;
         if (status != null && !status.isBlank()) {
             try { ticketStatus = TicketStatus.valueOf(status.toUpperCase()); } catch (IllegalArgumentException ignored) {}
         }
+        TicketType type = null;
+        if (ticketType != null && !ticketType.isBlank()) {
+            try { type = TicketType.valueOf(ticketType.toUpperCase()); } catch (IllegalArgumentException ignored) {}
+        }
         return ResponseEntity.ok(ApiResponses.success(
-            serviceTicketManageService.getServiceTicketList(page, size, date, ticketStatus, search)));
+            serviceTicketManageService.getServiceTicketList(page, size, date, ticketStatus, search, type)));
     }
 
     @GetMapping("/tickets/{ticketCode}")
@@ -118,8 +124,13 @@ public class ServiceTicketManageController {
 
     @GetMapping("/export")
     public ResponseEntity<byte[]> exportServiceTicketList(            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate){
-        byte [] excelConetnt = serviceTicketManageService.exportTicketToExcel(startDate, endDate);
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) String ticketType){
+        TicketType type = null;
+        if (ticketType != null && !ticketType.isBlank()) {
+            try { type = TicketType.valueOf(ticketType.toUpperCase()); } catch (IllegalArgumentException ignored) {}
+        }
+        byte [] excelConetnt = serviceTicketManageService.exportTicketToExcel(startDate, endDate, type);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
         headers.setContentDispositionFormData("attachment","Danh_Sach_Phieu_Dich_Vu.xlsx");

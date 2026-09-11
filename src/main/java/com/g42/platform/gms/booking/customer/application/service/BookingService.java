@@ -18,6 +18,8 @@ import com.g42.platform.gms.catalog.infrastructure.repository.CatalogItemReposit
 import com.g42.platform.gms.estimation.api.internal.EstimateInternalApi;
 import com.g42.platform.gms.estimation.domain.entity.Estimate;
 import com.g42.platform.gms.notification.application.service.CustomerNotificationDispatcher;
+import com.g42.platform.gms.vehicle.entity.Vehicle;
+import com.g42.platform.gms.vehicle.repository.VehicleRepository;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -76,6 +78,7 @@ public class BookingService {
     private final IpBlacklistRepository ipBlacklistRepository;
     private final BookingCodeGenerator bookingCodeGenerator;
     private final com.g42.platform.gms.catalog.infrastructure.repository.ComboItemRepository comboItemRepository;
+    private final VehicleRepository vehicleRepository;
 
     /** Cache để tracking rate limit (in-memory, sẽ reset khi restart server) */
     private final Map<String, RateLimitInfo> rateLimitCache = new ConcurrentHashMap<>();
@@ -295,29 +298,48 @@ public class BookingService {
     public Booking createDirectBookingByStaff(StaffDirectBookingRequest request) {
 
         
-        // === 1. TÌM HOẶC TẠO CUSTOMER ACCOUNT ===
-        CustomerProfile customer = customerRepository.findByPhone(request.getPhone()).orElse(null);
-        
+        // === 1. TÌM HOẶC TẠO CUSTOMER ACCOUNT (theo phone HOẶC biển số xe) ===
+        String phone = request.getPhone() == null ? "" : request.getPhone().trim();
+        String licensePlate = request.getLicensePlate() == null ? "" : request.getLicensePlate().trim().toUpperCase();
+        if (phone.isBlank() && licensePlate.isBlank()) {
+            throw new BookingException("Vui lòng nhập số điện thoại hoặc biển số xe.");
+        }
+
+        CustomerProfile customer = phone.isBlank() ? null : customerRepository.findByPhone(phone).orElse(null);
+
+        // Không có/không tìm thấy theo phone thì thử tra theo biển số xe đã có trong hệ thống.
+        Vehicle resolvedVehicle = null;
+        if (customer == null && !licensePlate.isBlank()) {
+            resolvedVehicle = vehicleRepository.findByLicensePlate(licensePlate).orElse(null);
+            if (resolvedVehicle != null) {
+                customer = resolvedVehicle.getCustomer();
+            }
+        }
+
         Integer customerId;
         if (customer == null) {
+            // Không thể tạo khách hàng mới nếu không có số điện thoại — biển số xe chỉ tra được khách đã có sẵn.
+            if (phone.isBlank()) {
+                throw new BookingException("Không tìm thấy khách hàng gắn với biển số xe này. Vui lòng nhập số điện thoại để tạo khách hàng mới.");
+            }
             // Tạo customer account mới
             CustomerProfile newCustomer = new CustomerProfile();
-            newCustomer.setPhone(request.getPhone());
+            newCustomer.setPhone(phone);
             newCustomer.setFullName(request.getFullName());
             newCustomer.setCreatedAt(LocalDateTime.now());
-            
+
             if (request.getReferrerPhone() != null && !request.getReferrerPhone().isBlank()) {
                 customerRepository.findByPhone(request.getReferrerPhone()).ifPresent(referrer -> {
                     newCustomer.setReferrerId(referrer.getCustomerId());
                 });
             }
-            
+
             CustomerProfile savedCustomer = customerRepository.save(newCustomer);
             customerId = savedCustomer.getCustomerId();
-            log.info("Created new customer account: customerId={}, phone={}", customerId, request.getPhone());
+            log.info("Created new customer account: customerId={}, phone={}", customerId, phone);
         } else {
             customerId = customer.getCustomerId();
-            
+
             boolean updated = false;
             // Update tên nếu khác
             if (!request.getFullName().equals(customer.getFullName())) {
@@ -327,17 +349,18 @@ public class BookingService {
             }
             // Update referrerPhone neu chua co
             if (customer.getReferrerId() == null && request.getReferrerPhone() != null && !request.getReferrerPhone().isBlank()) {
+                final CustomerProfile customerToUpdate = customer;
                 customerRepository.findByPhone(request.getReferrerPhone()).ifPresent(referrer -> {
-                    customer.setReferrerId(referrer.getCustomerId());
+                    customerToUpdate.setReferrerId(referrer.getCustomerId());
                 });
                 updated = true;
             }
-            
+
             if (updated) {
                 customerRepository.save(customer);
             }
         }
-        
+
         // === 2. BUILD BOOKING OBJECT VỚI STATUS = CONFIRMED ===
         Booking booking = new Booking();
         booking.setCustomerId(customerId);
@@ -354,7 +377,12 @@ public class BookingService {
         booking.setEstimateId(request.getEstimateId());
         booking.setIsPartsSale(request.getIsPartsSale() != null ? request.getIsPartsSale() : false);
         // Phân công sẵn (tuỳ chọn) — check-in sẽ dùng làm giá trị mặc định.
-        booking.setVehicleId(request.getVehicleId());
+        // Nếu khách được tra ra từ biển số xe thì mặc định luôn xe đó, trừ khi lễ tân đã chọn xe khác.
+        Integer preAssignVehicleId = request.getVehicleId();
+        if (preAssignVehicleId == null && resolvedVehicle != null) {
+            preAssignVehicleId = resolvedVehicle.getVehicleId();
+        }
+        booking.setVehicleId(preAssignVehicleId);
         booking.setAdvisorId(request.getAdvisorId());
         booking.setTechnicianId(request.getTechnicianId());
 

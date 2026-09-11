@@ -2,6 +2,7 @@ package com.g42.platform.gms.service_ticket_management.domain.repository;
 
 import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicket;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
+import com.g42.platform.gms.service_ticket_management.domain.enums.TicketType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -30,7 +31,7 @@ public interface ServiceTicketRepo {
 
     List<ServiceTicket> findAll();
 
-    Page<ServiceTicket> findAll(TicketStatus status, LocalDate date, String search, Pageable pageable);
+    Page<ServiceTicket> findAll(TicketStatus status, LocalDate date, String search, TicketType ticketType, Pageable pageable);
 
     Page<ServiceTicket> findByAssignedStaff(Integer staffId, TicketStatus status, LocalDate date, String search, Pageable pageable);
 
