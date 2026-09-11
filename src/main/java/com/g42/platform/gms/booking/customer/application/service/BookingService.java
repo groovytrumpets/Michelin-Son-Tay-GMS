@@ -17,7 +17,9 @@ import com.g42.platform.gms.booking.customer.domain.repository.IpBlacklistReposi
 import com.g42.platform.gms.catalog.infrastructure.repository.CatalogItemRepository;
 import com.g42.platform.gms.estimation.api.internal.EstimateInternalApi;
 import com.g42.platform.gms.estimation.domain.entity.Estimate;
+import com.g42.platform.gms.customer.domain.enums.CustomerType;
 import com.g42.platform.gms.notification.application.service.CustomerNotificationDispatcher;
+import com.g42.platform.gms.notification.domain.NotificationChannel;
 import com.g42.platform.gms.vehicle.entity.Vehicle;
 import com.g42.platform.gms.vehicle.repository.VehicleRepository;
 import org.springframework.transaction.annotation.Transactional;
@@ -318,15 +320,18 @@ public class BookingService {
 
         Integer customerId;
         if (customer == null) {
-            // Không thể tạo khách hàng mới nếu không có số điện thoại — biển số xe chỉ tra được khách đã có sẵn.
-            if (phone.isBlank()) {
-                throw new BookingException("Không tìm thấy khách hàng gắn với biển số xe này. Vui lòng nhập số điện thoại để tạo khách hàng mới.");
-            }
-            // Tạo customer account mới
+            // Tạo customer account mới — cho phép tạo chỉ bằng biển số xe (phone để trống, cột phone
+            // cho phép NULL và UNIQUE KEY vẫn chấp nhận nhiều NULL). Lễ tân có thể bổ sung SĐT sau.
             CustomerProfile newCustomer = new CustomerProfile();
-            newCustomer.setPhone(phone);
+            newCustomer.setPhone(phone.isBlank() ? null : phone);
             newCustomer.setFullName(request.getFullName());
             newCustomer.setCreatedAt(LocalDateTime.now());
+            // customer_type và notification_channel là NOT NULL dưới DB, Hibernate insert thẳng NULL
+            // nếu không set nên phải điền mặc định của khách lẻ đi bộ vào xưởng.
+            newCustomer.setCustomerType(CustomerType.INDIVIDUAL);
+            newCustomer.setNotificationChannel(NotificationChannel.ZALO);
+            newCustomer.setIsDealer(false);
+            newCustomer.setIsCompany(false);
 
             if (request.getReferrerPhone() != null && !request.getReferrerPhone().isBlank()) {
                 customerRepository.findByPhone(request.getReferrerPhone()).ifPresent(referrer -> {
@@ -336,7 +341,17 @@ public class BookingService {
 
             CustomerProfile savedCustomer = customerRepository.save(newCustomer);
             customerId = savedCustomer.getCustomerId();
-            log.info("Created new customer account: customerId={}, phone={}", customerId, phone);
+            log.info("Created new customer account: customerId={}, phone={}, licensePlate={}", customerId, phone, licensePlate);
+
+            // Chưa tra ra xe nào khớp biển số này thì tạo luôn xe mới gắn với khách vừa tạo.
+            if (!licensePlate.isBlank() && resolvedVehicle == null) {
+                Vehicle newVehicle = new Vehicle();
+                newVehicle.setLicensePlate(licensePlate);
+                newVehicle.setCustomer(savedCustomer);
+                resolvedVehicle = vehicleRepository.save(newVehicle);
+                log.info("Created new vehicle from license plate: vehicleId={}, licensePlate={}, customerId={}",
+                        resolvedVehicle.getVehicleId(), licensePlate, customerId);
+            }
         } else {
             customerId = customer.getCustomerId();
 

@@ -62,6 +62,12 @@ public class CustomerGatewayImpl implements CustomerGateway {
             cus.setFullName(command.fullName());
             cus.setPhone(command.phone());
             cus.setFirstBookingAt(command.firstBookingAt());
+            // customer_type và notification_channel là NOT NULL dưới DB — không set thì Hibernate
+            // insert NULL và văng ConstraintViolation.
+            cus.setCustomerType(com.g42.platform.gms.customer.domain.enums.CustomerType.INDIVIDUAL);
+            cus.setNotificationChannel(com.g42.platform.gms.notification.domain.NotificationChannel.ZALO);
+            cus.setIsDealer(false);
+            cus.setIsCompany(false);
             
             if (command.referrerPhone() != null && !command.referrerPhone().isBlank()) {
                 customerProfileRepository.findByPhone(command.referrerPhone()).ifPresent(referrer -> {
