@@ -48,4 +48,9 @@ public interface ServiceTicketRepo {
     List<ServiceTicket> findByCustomerAndVehicle(Integer customerId, Integer vehicleId);
 
     List<ServiceTicket> findByCustomerId(Integer customerId);
+
+    /**
+     * Phieu dang giu hang (HOLDING) tao truoc moc thoi gian - job quet qua han dung.
+     */
+    List<ServiceTicket> findExpiredHoldingTickets(TicketType ticketType, LocalDateTime createdBefore);
 }

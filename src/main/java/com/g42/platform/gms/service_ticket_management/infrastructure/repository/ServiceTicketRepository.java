@@ -1,6 +1,8 @@
 package com.g42.platform.gms.service_ticket_management.infrastructure.repository;
 
 import com.g42.platform.gms.marketing.service_catalog.infrastructure.entity.ServiceJpaEntity;
+import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
+import com.g42.platform.gms.service_ticket_management.domain.enums.TicketType;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -70,6 +72,9 @@ public interface ServiceTicketRepository extends JpaRepository<ServiceTicketJpa,
     List<ServiceTicketJpa> findAllByCustomerIdAndVehicleIdOrderByReceivedAtDesc(Integer customerId, Integer vehicleId);
 
     List<ServiceTicketJpa> findAllByCustomerIdOrderByReceivedAtDesc(Integer customerId);
+
+    List<ServiceTicketJpa> findByTicketStatusAndTicketTypeAndReceivedAtBefore(
+            TicketStatus ticketStatus, TicketType ticketType, LocalDateTime receivedAt);
 
     @Query("select count(st) from ServiceTicketManagement st where st.customerId = :customerId and (st.isDeleted is null or st.isDeleted = false)")
     long countActiveTicketsByCustomerId(@Param("customerId") Integer customerId);

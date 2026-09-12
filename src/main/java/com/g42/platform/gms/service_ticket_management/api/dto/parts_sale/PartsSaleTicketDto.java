@@ -8,8 +8,10 @@ import lombok.Setter;
 import java.math.BigDecimal;
 
 /**
- * Kết quả tạo phiếu bán linh kiện: phiếu đã COMPLETED, báo giá ARCHIVED,
- * hàng đã giữ (RESERVED) và bill sẵn sàng thanh toán.
+ * Ket qua thao tac tren phieu ban linh kien.
+ *
+ * - Buoc giu hang: phieu HOLDING, hang da RESERVED, billId/finalAmount con null.
+ * - Buoc chot: phieu COMPLETED, bao gia ARCHIVED, bill san sang thu tien.
  */
 @Getter
 @Setter
@@ -22,4 +24,6 @@ public class PartsSaleTicketDto {
     private Integer estimateId;
     private Integer billId;
     private BigDecimal finalAmount;
+    /** HOLDING (dang giu hang) hoac COMPLETED (da chot, cho thu tien) */
+    private String ticketStatus;
 }

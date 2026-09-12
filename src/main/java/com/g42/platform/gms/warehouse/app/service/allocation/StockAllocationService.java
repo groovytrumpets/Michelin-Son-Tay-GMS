@@ -19,6 +19,7 @@ import com.g42.platform.gms.warehouse.domain.entity.StockAllocation;
 import com.g42.platform.gms.warehouse.domain.enums.AllocationStatus;
 import com.g42.platform.gms.warehouse.domain.enums.InventoryTransactionType;
 import com.g42.platform.gms.warehouse.domain.enums.IssueType;
+import com.g42.platform.gms.warehouse.domain.enums.StockIssueStatus;
 import com.g42.platform.gms.warehouse.domain.repository.InventoryRepo;
 import com.g42.platform.gms.warehouse.domain.repository.InventoryTransactionRepo;
 import com.g42.platform.gms.warehouse.domain.repository.StockAllocationRepo;
@@ -328,6 +329,55 @@ public class StockAllocationService {
     }
 
     /**
+     * Xuất kho trọn gói cho phiếu bán linh kiện ngay khi thu tiền.
+     *
+     * Luồng bán lẻ tại quầy không có khâu kho duyệt riêng: khách trả tiền là hàng
+     * rời kho ngay. Vì vậy ở đây gộp hai bước của luồng thường (tạo phiếu xuất DRAFT
+     * rồi nhân viên kho bấm xác nhận) thành một, chạy trong cùng transaction thanh toán:
+     *
+     * 1. Bỏ qua nếu đã có phiếu xuất CONFIRMED (thanh toán lại / gọi trùng)
+     * 2. Tạo phiếu xuất DRAFT từ các allocation RESERVED chưa gắn phiếu
+     * 3. Xác nhận mọi phiếu DRAFT của ticket — trừ tồn thật, trừ lô FIFO,
+     *    ghi inventory_transaction OUT và chuyển allocation RESERVED → COMMITTED
+     *
+     * Báo giá toàn dịch vụ (không có dòng nào thuộc kho) thì không có gì để xuất,
+     * hàm kết thúc im lặng.
+     *
+     * @param serviceTicketId - ID phiếu vừa được thanh toán
+     * @param staffId - ID nhân viên thu tiền
+     */
+    @Transactional
+    public void issueAndConfirmOnPaid(Integer serviceTicketId, Integer staffId) {
+        if (serviceTicketId == null) {
+            return;
+        }
+        if (stockIssueRepo.existsConfirmedServiceTicketIssue(serviceTicketId)) {
+            return;
+        }
+
+        List<StockAllocation> reserved = allocationRepo
+                .findByTicketAndStatus(serviceTicketId, AllocationStatus.RESERVED);
+        if (reserved.isEmpty()) {
+            return;
+        }
+
+        // Chỉ tạo phiếu mới cho phần allocation chưa gắn phiếu xuất nào
+        boolean hasUnattached = reserved.stream().anyMatch(alloc -> alloc.getIssueId() == null);
+        if (hasUnattached) {
+            requestIssueDraft(serviceTicketId, staffId);
+        }
+
+        List<com.g42.platform.gms.warehouse.domain.entity.StockIssue> issues =
+                stockIssueRepo.findByServiceTicketId(serviceTicketId);
+        for (com.g42.platform.gms.warehouse.domain.entity.StockIssue issue : issues) {
+            if (issue.getStatus() == StockIssueStatus.DRAFT) {
+                // requireAttachment=false: không có nhân viên kho đứng bấm nút ở luồng này
+                stockIssueService.confirm(issue.getIssueId(), staffId, false);
+            }
+        }
+    }
+
+    /**
      * Hủy giữ chỗ (release) cho tất cả allocation RESERVED của 1 service ticket.
      * Dùng khi service ticket bị hủy trước khi xuất kho.
      *
@@ -355,6 +405,86 @@ public class StockAllocationService {
             }
 
             // Chuyển trạng thái RESERVED → RELEASED (hủy)
+            alloc.setStatus(AllocationStatus.RELEASED);
+            allocationRepo.save(alloc);
+        }
+    }
+
+    /**
+     * Nha mot danh sach allocation cu the ve kho (giam reserved_quantity + ghi audit).
+     *
+     * Dung cho job quet giu hang mo coi: allocation giu tu luc dat lich nen chua
+     * gan phieu dich vu nao, khong tim duoc theo serviceTicketId nhu release(...).
+     * Allocation khong con RESERVED thi bo qua.
+     *
+     * @return so allocation da nha
+     */
+    @Transactional
+    public int releaseAllocations(List<Integer> allocationIds, Integer staffId) {
+        if (allocationIds == null || allocationIds.isEmpty()) {
+            return 0;
+        }
+        int released = 0;
+        for (Integer allocationId : allocationIds) {
+            StockAllocation alloc = allocationRepo.findById(allocationId).orElse(null);
+            if (alloc == null || alloc.getStatus() != AllocationStatus.RESERVED) {
+                continue;
+            }
+            Inventory inv = inventoryRepo
+                    .findByWarehouseAndItemWithLock(alloc.getWarehouseId(), alloc.getItemId())
+                    .orElse(null);
+            if (inv != null) {
+                inv.setReservedQuantity(Math.max(0, inv.getReservedQuantity() - alloc.getQuantity()));
+                inventoryRepo.save(inv);
+
+                // inventory_transaction.created_by la NOT NULL: job chay nen khong co
+                // nhan vien nao dung sau, ghi nhan nguoi da giu hang luc dau.
+                Integer actorId = staffId != null ? staffId : alloc.getCreatedBy();
+                logTransaction(alloc.getWarehouseId(), alloc.getItemId(),
+                        -alloc.getQuantity(), inv.getQuantity(), "stock_allocation_release",
+                        alloc.getAllocationId(), actorId);
+            }
+            alloc.setStatus(AllocationStatus.RELEASED);
+            allocationRepo.save(alloc);
+            released++;
+        }
+        return released;
+    }
+
+    /**
+     * Nha cac allocation RESERVED cua phieu nhung thuoc ve ban bao gia KHAC.
+     *
+     * Dung cho luong ban linh kien: nhan vien sua bao gia thi FE sinh mot version
+     * moi, neu khong nha hang cua version cu thi tồn kho bi giu chong hai lan.
+     * Allocation da COMMITTED (da xuat kho) khong bi dung toi.
+     *
+     * @param serviceTicketId - phieu dang giu hang
+     * @param keepEstimateId - ban bao gia dang hieu luc, giu nguyen
+     * @param staffId - nhan vien thao tac
+     */
+    @Transactional
+    public void releaseOtherEstimates(Integer serviceTicketId, Integer keepEstimateId, Integer staffId) {
+        if (serviceTicketId == null) {
+            return;
+        }
+        List<StockAllocation> reserved = allocationRepo
+                .findByTicketAndStatus(serviceTicketId, AllocationStatus.RESERVED);
+
+        for (StockAllocation alloc : reserved) {
+            if (keepEstimateId != null && keepEstimateId.equals(alloc.getEstimateId())) {
+                continue;
+            }
+            Inventory inv = inventoryRepo
+                    .findByWarehouseAndItemWithLock(alloc.getWarehouseId(), alloc.getItemId())
+                    .orElse(null);
+            if (inv != null) {
+                inv.setReservedQuantity(Math.max(0, inv.getReservedQuantity() - alloc.getQuantity()));
+                inventoryRepo.save(inv);
+
+                logTransaction(alloc.getWarehouseId(), alloc.getItemId(),
+                        -alloc.getQuantity(), inv.getQuantity(), "stock_allocation_release",
+                        alloc.getAllocationId(), staffId);
+            }
             alloc.setStatus(AllocationStatus.RELEASED);
             allocationRepo.save(alloc);
         }

@@ -139,4 +139,13 @@ public class ServiceTicketRepoImpl implements ServiceTicketRepo {
                 .filter(t -> t.getIsDeleted() == null || !t.getIsDeleted())
                 .map(mapper::toDomain).toList();
     }
+
+    @Override
+    public List<ServiceTicket> findExpiredHoldingTickets(TicketType ticketType, LocalDateTime createdBefore) {
+        return jpaRepo
+                .findByTicketStatusAndTicketTypeAndReceivedAtBefore(TicketStatus.HOLDING, ticketType, createdBefore)
+                .stream()
+                .filter(t -> t.getIsDeleted() == null || !t.getIsDeleted())
+                .map(mapper::toDomain).toList();
+    }
 }

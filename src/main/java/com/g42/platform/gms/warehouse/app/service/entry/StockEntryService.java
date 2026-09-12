@@ -56,6 +56,7 @@ import com.g42.platform.gms.warehouse.api.dto.request.PatchEntryItemRequest;
 import com.g42.platform.gms.warehouse.api.dto.request.UpdateStockEntryRequest;
 import com.g42.platform.gms.warehouse.api.dto.response.StockEntryItemResponse;
 import com.g42.platform.gms.warehouse.api.dto.response.StockEntryResponse;
+import com.g42.platform.gms.warehouse.domain.entity.CatalogItem;
 import com.g42.platform.gms.warehouse.domain.entity.Inventory;
 import com.g42.platform.gms.warehouse.domain.entity.InventoryTransaction;
 import com.g42.platform.gms.warehouse.domain.entity.StockEntry;
@@ -704,12 +705,16 @@ public class StockEntryService {
                 .map(StockEntryItem::getItemId)
                 .collect(Collectors.toSet());
         Map<Integer, String> itemNameById = partCatalogRepo.findNamesByIds(itemIds.stream().toList());
+        // Enrich: mã SKU — để hiển thị "Mã sản phẩm" thay vì lộ ra itemId (khóa DB) ngoài UI.
+        Map<Integer, String> skuById = partCatalogRepo.findAllItemsByIds(itemIds.stream().toList()).stream()
+                .collect(Collectors.toMap(CatalogItem::getItemId, CatalogItem::getSku, (a, b) -> a));
 
         List<StockEntryItemResponse> itemResponses = entry.getItems().stream().map(i -> {
             StockEntryItemResponse ir = new StockEntryItemResponse();
             ir.setEntryItemId(i.getEntryItemId());
             ir.setItemId(i.getItemId());
             ir.setItemName(itemNameById.get(i.getItemId())); // lấy từ map đã batch load
+            ir.setSku(skuById.get(i.getItemId()));
             ir.setQuantity(i.getQuantity());
             ir.setImportPrice(i.getImportPrice());
             ir.setMarkupMultiplier(i.getMarkupMultiplier());

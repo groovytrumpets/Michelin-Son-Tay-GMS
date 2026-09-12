@@ -21,7 +21,8 @@ public class StockAllocationJpa {
     @Column(name = "allocation_id")
     private Integer allocationId;
 
-    @Column(name = "service_ticket_id", nullable = false)
+    // Nullable: giu hang cho lich hen chua co phieu dich vu (changeset 031)
+    @Column(name = "service_ticket_id")
     private Integer serviceTicketId;
 
     @Column(name = "issue_id")

@@ -29,4 +29,6 @@ public class BookedRespond {
     private Integer queueOrder;
     private Integer estimateId;
     private Boolean isPartsSale;
+    /** Bao gia cua lich hen nay dang giu hang trong kho (chua check-in) */
+    private Boolean hasStockHold;
 }

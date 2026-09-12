@@ -1,6 +1,8 @@
 package com.g42.platform.gms.service_ticket_management.application.service;
 
 import com.g42.platform.gms.estimation.api.internal.EstimateInternalApi;
+import com.g42.platform.gms.estimation.domain.entity.StockAllocation;
+import com.g42.platform.gms.estimation.domain.repository.StockAllocationRepository;
 import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicket;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import com.g42.platform.gms.service_ticket_management.domain.repository.ServiceTicketRepo;
@@ -26,6 +28,7 @@ public class ServiceTicketService {
     private final ServiceTicketCodeGenerator ticketCodeGenerator;
     private final com.g42.platform.gms.booking.customer.domain.repository.BookingRepository bookingRepository;
     private final EstimateInternalApi estimateInternalApi;
+    private final StockAllocationRepository stockAllocationRepository;
 
     /**
      * Create new service ticket using booking_code as ticket_code.
@@ -53,9 +56,34 @@ public class ServiceTicketService {
         ServiceTicket saved = serviceTicketRepo.save(ticket);
         if (booking.getEstimateId() != null) {
             estimateInternalApi.linkEstimateToServiceTicket(booking.getEstimateId(), saved.getServiceTicketId());
+            // Hàng đã giữ từ lúc đặt lịch chưa có phiếu để gắn vào; tới đây mới điền
+            // service_ticket_id để các bước xuất kho / trả hàng tìm được theo phiếu.
+            attachHeldStockToTicket(booking.getEstimateId(), saved.getServiceTicketId());
         }
         log.info("Created service ticket with code: {}", ticketCode);
         return saved;
+    }
+
+    /**
+     * Gắn các allocation đang giữ hàng của một báo giá vào phiếu vừa tạo.
+     * Chỉ đụng tới allocation chưa có phiếu (giữ từ lúc đặt lịch).
+     */
+    private void attachHeldStockToTicket(Integer estimateId, Integer serviceTicketId) {
+        List<StockAllocation> allocations = stockAllocationRepository.findByEstimateId(estimateId);
+        if (allocations == null || allocations.isEmpty()) {
+            return;
+        }
+        int attached = 0;
+        for (StockAllocation allocation : allocations) {
+            if (allocation.getServiceTicketId() == null) {
+                allocation.setServiceTicketId(serviceTicketId);
+                stockAllocationRepository.save(allocation);
+                attached++;
+            }
+        }
+        if (attached > 0) {
+            log.info("Attached {} held allocations of estimate {} to ticket {}", attached, estimateId, serviceTicketId);
+        }
     }
 
     @Transactional(readOnly = true)

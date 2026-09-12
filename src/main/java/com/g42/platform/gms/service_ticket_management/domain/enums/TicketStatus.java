@@ -3,6 +3,7 @@ package com.g42.platform.gms.service_ticket_management.domain.enums;
 /**
  * Trạng thái vòng đời phiếu dịch vụ.
  *
+ * HOLDING:    Phiếu bán linh kiện đã giữ hàng (allocation RESERVED), chờ thanh toán
  * CREATED:    Lễ tân tạo phiếu, chờ kỹ thuật viên bắt đầu kiểm tra
  * INSPECTING: Kỹ thuật viên đang kiểm tra an toàn xe
  * INSPECTED:  Kỹ thuật viên hoàn thành kiểm tra, chờ advisor lập báo giá
@@ -14,6 +15,7 @@ package com.g42.platform.gms.service_ticket_management.domain.enums;
  * CANCELLED:  Phiếu dịch vụ đã hủy
  */
 public enum TicketStatus {
+    HOLDING,
     CREATED,
     INSPECTING,
     INSPECTED,

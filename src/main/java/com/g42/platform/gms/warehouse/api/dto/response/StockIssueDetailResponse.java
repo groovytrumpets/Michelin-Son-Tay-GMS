@@ -45,6 +45,7 @@ public class StockIssueDetailResponse {
         private String issueItemCode;
         private Integer itemId;
         private String itemName;
+        private String sku;
         private Integer entryItemId;   // lô nhập tương ứng
         private String entryCode;
         private String entryLotCode;

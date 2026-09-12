@@ -19,6 +19,7 @@ import com.g42.platform.gms.warehouse.api.dto.request.PatchIssueItemRequest;
 import com.g42.platform.gms.warehouse.api.dto.request.UpdateStockIssueRequest;
 import com.g42.platform.gms.warehouse.api.dto.response.StockIssueDetailResponse;
 import com.g42.platform.gms.warehouse.api.dto.response.StockIssueResponse;
+import com.g42.platform.gms.warehouse.domain.entity.CatalogItem;
 import com.g42.platform.gms.warehouse.domain.entity.Inventory;
 import com.g42.platform.gms.warehouse.domain.entity.InventoryTransaction;
 import com.g42.platform.gms.warehouse.domain.entity.StockAllocation;
@@ -466,6 +467,16 @@ public class StockIssueService {
      */
     @Transactional
     public StockIssueResponse confirm(Integer issueId, Integer staffId) {
+        return confirm(issueId, staffId, true);
+    }
+
+    /**
+     * Biến thể cho luồng xuất kho tự động (bán linh kiện: xuất ngay khi thu tiền).
+     * Ở đó không có nhân viên kho bấm xác nhận nên không thể bắt buộc ảnh chứng từ;
+     * mọi bước trừ tồn / ghi audit / commit allocation vẫn chạy y hệt luồng thủ công.
+     */
+    @Transactional
+    public StockIssueResponse confirm(Integer issueId, Integer staffId, boolean requireAttachment) {
         StockIssue issue = findOrThrow(issueId);
 
         // Kiểm tra phiếu chưa CONFIRMED
@@ -473,12 +484,14 @@ public class StockIssueService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Phiếu đã được xác nhận");
         }
 
-        // Kiểm tra có ảnh đính kèm (yêu cầu bắt buộc)
-        boolean hasAttachment = attachmentRepo.existsByRefTypeAndRefId(
-            WarehouseAttachment.RefType.STOCK_ISSUE, issueId);
-        if (!hasAttachment) {
-            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
-                    "Cần đính kèm ảnh chứng từ trước khi xác nhận");
+        // Kiểm tra có ảnh đính kèm (bắt buộc với luồng nhân viên kho bấm xác nhận)
+        if (requireAttachment) {
+            boolean hasAttachment = attachmentRepo.existsByRefTypeAndRefId(
+                WarehouseAttachment.RefType.STOCK_ISSUE, issueId);
+            if (!hasAttachment) {
+                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                        "Cần đính kèm ảnh chứng từ trước khi xác nhận");
+            }
         }
 
         // Lấy allocation RESERVED để sau này release reserved_quantity
@@ -492,9 +505,22 @@ public class StockIssueService {
         }
 
         // Bước 2-4: Giảm hàng trong kho
+        //
+        // Đọc dòng phiếu thẳng từ DB thay vì dùng issue.getItems(): quan hệ @OneToMany
+        // của StockIssueJpa là LAZY và các dòng con được lưu bằng repo riêng, nên khi
+        // create(...) rồi confirm(...) chạy trong CÙNG một transaction (luồng bán linh
+        // kiện: thu tiền là xuất kho ngay), entity cha còn nằm trong persistence context
+        // với collection rỗng đã khởi tạo — findById trả lại đúng instance đó và vòng lặp
+        // dưới đây sẽ không chạy lần nào, tồn kho không bị trừ mà phiếu vẫn CONFIRMED.
+        List<StockIssueItem> issueItems = stockIssueItemRepo.findByIssueId(issueId);
+        if (issueItems.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Phiếu xuất kho không có dòng hàng nào để xuất");
+        }
+
         // Nhóm issue items theo itemId để trừ inventory 1 lần/item
         Map<Integer, Integer> totalByItem = new HashMap<>();
-        for (StockIssueItem item : issue.getItems()) {
+        for (StockIssueItem item : issueItems) {
             // Nếu item này liên kết lô → giảm remainingQuantity của lô
             if (item.getEntryItemId() != null && item.getEntryItemId() > 0) {
                 stockEntryRepo.decreaseRemainingQuantity(item.getEntryItemId(), item.getQuantity());
@@ -707,6 +733,9 @@ public class StockIssueService {
             .map(StockIssueItem::getItemId)
             .collect(Collectors.toSet());
         Map<Integer, String> itemNameById = partCatalogRepo.findNamesByIds(itemIds.stream().toList());
+        // Enrich: mã SKU — để hiển thị "Mã sản phẩm" thay vì lộ ra itemId (khóa DB) ngoài UI.
+        Map<Integer, String> skuById = partCatalogRepo.findAllItemsByIds(itemIds.stream().toList()).stream()
+                .collect(Collectors.toMap(CatalogItem::getItemId, CatalogItem::getSku, (a, b) -> a));
 
         // Tạo map từ itemId → allocationId để gắn vào response
         Map<Integer, Integer> allocationIdByItemId = new HashMap<>();
@@ -753,6 +782,7 @@ public class StockIssueService {
             d.setIssueItemCode(issue.getIssueCode() + "-L" + it.getIssueItemId());
             d.setItemId(it.getItemId());
             d.setItemName(itemNameById.get(it.getItemId()));
+            d.setSku(skuById.get(it.getItemId()));
             d.setEntryItemId(it.getEntryItemId());
             d.setAllocationId(allocationIdByItemId.get(it.getItemId()));
 

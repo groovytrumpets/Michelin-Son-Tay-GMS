@@ -14,4 +14,11 @@ public class LotUpdateDto {
     private BigDecimal importPrice;
     private BigDecimal markupMultiplier;
     private BigDecimal markupMultiplierWholesale;
+
+    /**
+     * Chi dung cho LO MOI (entryItemId = null): ma lo va ngay nhap do nguoi dung
+     * go o popup "Chinh sua danh muc & Ton kho". Bo trong thi backend tu sinh ma.
+     */
+    private String entryCode;
+    private String entryDate;
 }

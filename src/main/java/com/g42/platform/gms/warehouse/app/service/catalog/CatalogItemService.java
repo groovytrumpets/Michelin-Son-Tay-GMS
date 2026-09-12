@@ -29,6 +29,7 @@ import com.g42.platform.gms.warehouse.infrastructure.repository.*;
 import com.g42.platform.gms.warehouse.infrastructure.entity.*;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import java.math.BigDecimal;
@@ -41,6 +42,10 @@ public class CatalogItemService {
     private InventoryJpaRepo inventoryJpaRepo;
     @Autowired
     private StockEntryItemJpaRepo stockEntryItemJpaRepo;
+    @Autowired
+    private StockEntryJpaRepo stockEntryJpaRepo;
+    @Autowired
+    private InventoryTransactionJpaRepo inventoryTransactionJpaRepo;
     @Autowired
     private WarehousePricingRepo warehousePricingRepo;
     @Autowired
@@ -516,7 +521,7 @@ public class CatalogItemService {
     }
 
     @Transactional
-    public CatalogItemDto updateCatalog(CatalogCreateDto updateDto, Integer itemId) {
+    public CatalogItemDto updateCatalog(CatalogCreateDto updateDto, Integer itemId, Integer staffId) {
         CatalogItem catalogItem = catalogItemRepo.getCatalogItemById(itemId);
         if (catalogItem == null) {
             throw new WarehouseException("Catalog item not found", WarehouseErrorCode.CATALOG_404);
@@ -639,6 +644,12 @@ public class CatalogItemService {
                 // Update Lots
                 if (whDto.getLots() != null) {
                     for (LotUpdateDto lotDto : whDto.getLots()) {
+                        if (lotDto.getEntryItemId() == null) {
+                            // Lô mới người dùng thêm tay ở popup. Trước đây nhánh này bị bỏ qua
+                            // nên bấm "Thêm lô" xong lưu lại là lô biến mất.
+                            createManualLot(itemId, whDto.getWarehouseId(), lotDto, staffId);
+                            continue;
+                        }
                         if (lotDto.getEntryItemId() != null) {
                             Optional<StockEntryItemJpa> lotOpt = stockEntryItemJpaRepo.findById(lotDto.getEntryItemId());
                             if (lotOpt.isPresent()) {
@@ -667,11 +678,214 @@ public class CatalogItemService {
                         }
                     }
                 }
+
+                // Chốt lại: tồn kho luôn phải bằng tổng số còn lại của các lô.
+                syncInventoryWithLots(itemId, whDto.getWarehouseId(), inventory, staffId);
             }
         }
 
         CatalogItem saved = catalogItemRepo.saveCatalogItem(catalogItem);
         return catalogDtoMapper.toDto(saved);
+    }
+
+    // ─── Tồn kho luôn đi kèm lô ────────────────────────────────────────────────
+    //
+    // Giá vốn, lãi gộp và FIFO đều đọc từ stock_entry_item. Tồn kho khai báo tay ở
+    // popup "Chỉnh sửa danh mục & Tồn kho" mà không có lô nào thì lúc bán, dòng
+    // xuất kho nhận entry_item_id = 0 → giá nhập và giá bán ghi nhận bằng 0, báo
+    // cáo lãi kho bỏ sót toàn bộ và tồn kho trôi dần khỏi tổng số lô.
+    //
+    // Nên sau mỗi lần sửa tồn kho, phần chênh giữa số lượng khai báo và tổng số
+    // còn lại của các lô được cân lại bằng một "lô điều chỉnh" của chính kho đó.
+
+    /** Nhà cung cấp quy ước của phiếu nhập sinh tự động khi cân tồn kho. */
+    private static final String ADJUSTMENT_SUPPLIER = "Điều chỉnh tồn kho";
+
+    /** Tạo lô mới do người dùng thêm tay ở popup sửa tồn kho. */
+    private void createManualLot(Integer itemId, Integer warehouseId, LotUpdateDto lotDto, Integer staffId) {
+        int quantity = lotDto.getRemainingQuantity() != null ? lotDto.getRemainingQuantity() : 0;
+        if (warehouseId == null || quantity <= 0) {
+            return;
+        }
+
+        String entryCode = lotDto.getEntryCode() != null ? lotDto.getEntryCode().trim() : "";
+        StockEntryJpa entry = resolveOrCreateEntry(
+                warehouseId,
+                entryCode.isEmpty() ? null : entryCode,
+                parseEntryDate(lotDto.getEntryDate()),
+                "Nhập tay từ màn danh mục",
+                staffId);
+
+        BigDecimal importPrice = lotDto.getImportPrice() != null ? lotDto.getImportPrice() : BigDecimal.ZERO;
+        StockEntryItemJpa lot = new StockEntryItemJpa();
+        lot.setEntryId(entry.getEntryId());
+        lot.setItemId(itemId);
+        lot.setQuantity(quantity);
+        lot.setRemainingQuantity(quantity);
+        lot.setImportPrice(importPrice);
+        lot.setMarkupMultiplier(resolveMarkup(lotDto, importPrice));
+        lot.setMarkupMultiplierWholesale(lotDto.getMarkupMultiplierWholesale());
+        stockEntryItemJpaRepo.save(lot);
+    }
+
+    /**
+     * Cân tồn kho với tổng số còn lại của các lô.
+     *
+     * Thừa (tồn > lô): dồn phần chênh vào lô điều chỉnh của kho, giá nhập lấy theo
+     * lô gần nhất để giá vốn không bị về 0.
+     * Thiếu (lô > tồn): trừ bớt lô, ưu tiên lô điều chỉnh rồi tới lô mới nhất, để
+     * các lô nhập thật cũ nhất giữ nguyên thứ tự FIFO và giá vốn.
+     */
+    private void syncInventoryWithLots(Integer itemId, Integer warehouseId, InventoryJpa inventory, Integer staffId) {
+        if (warehouseId == null || inventory == null) {
+            return;
+        }
+        int target = inventory.getQuantity() != null ? inventory.getQuantity() : 0;
+        List<StockEntryItemJpa> lots = stockEntryItemJpaRepo.findFifoLots(warehouseId, itemId);
+        int lotTotal = lots.stream()
+                .mapToInt(l -> l.getRemainingQuantity() != null ? l.getRemainingQuantity() : 0)
+                .sum();
+
+        int diff = target - lotTotal;
+        if (diff == 0) {
+            return;
+        }
+
+        if (diff > 0) {
+            addToAdjustmentLot(itemId, warehouseId, diff, staffId);
+        } else {
+            reduceLots(lots, -diff);
+        }
+
+        logInventoryAdjustment(warehouseId, itemId, diff, target, staffId);
+    }
+
+    /** Dồn phần tồn dôi ra vào một lô điều chỉnh mới của kho. */
+    private void addToAdjustmentLot(Integer itemId, Integer warehouseId, int quantity, Integer staffId) {
+        BigDecimal importPrice = BigDecimal.ZERO;
+        BigDecimal markup = null;
+        BigDecimal markupWholesale = null;
+        List<StockEntryItemJpa> latest = stockEntryItemJpaRepo.findLatestLot(warehouseId, itemId);
+        if (!latest.isEmpty()) {
+            StockEntryItemJpa ref = latest.get(0);
+            importPrice = ref.getImportPrice() != null ? ref.getImportPrice() : BigDecimal.ZERO;
+            markup = ref.getMarkupMultiplier();
+            markupWholesale = ref.getMarkupMultiplierWholesale();
+        }
+
+        StockEntryJpa entry = resolveOrCreateEntry(warehouseId, null, LocalDate.now(), ADJUSTMENT_SUPPLIER, staffId);
+        StockEntryItemJpa lot = new StockEntryItemJpa();
+        lot.setEntryId(entry.getEntryId());
+        lot.setItemId(itemId);
+        lot.setQuantity(quantity);
+        lot.setRemainingQuantity(quantity);
+        lot.setImportPrice(importPrice);
+        lot.setMarkupMultiplier(markup != null ? markup : BigDecimal.ONE);
+        lot.setMarkupMultiplierWholesale(markupWholesale);
+        lot.setNotes("Lô điều chỉnh tự động khi sửa tồn kho ở màn danh mục");
+        stockEntryItemJpaRepo.save(lot);
+    }
+
+    /**
+     * Trừ bớt số còn lại của các lô khi tồn khai báo thấp hơn tổng lô.
+     * Trừ từ lô mới nhất trở về trước để lô cũ nhất (đang đứng đầu hàng FIFO)
+     * giữ nguyên số lượng và giá vốn.
+     */
+    private void reduceLots(List<StockEntryItemJpa> fifoLots, int quantityToRemove) {
+        int remain = quantityToRemove;
+        List<StockEntryItemJpa> newestFirst = new ArrayList<>(fifoLots);
+        java.util.Collections.reverse(newestFirst);
+
+        for (StockEntryItemJpa lot : newestFirst) {
+            if (remain <= 0) break;
+            int available = lot.getRemainingQuantity() != null ? lot.getRemainingQuantity() : 0;
+            if (available <= 0) continue;
+            int take = Math.min(available, remain);
+            lot.setRemainingQuantity(available - take);
+            stockEntryItemJpaRepo.save(lot);
+            remain -= take;
+        }
+    }
+
+    /**
+     * Lấy phiếu nhập theo mã, hoặc tạo phiếu mới ở trạng thái CONFIRMED.
+     * Phải CONFIRMED thì lô mới lọt vào truy vấn FIFO và hiện ở popup chọn lô.
+     */
+    private StockEntryJpa resolveOrCreateEntry(Integer warehouseId, String entryCode, LocalDate entryDate, String supplierName, Integer staffId) {
+        if (entryCode != null && !entryCode.isBlank()) {
+            Optional<StockEntryJpa> existing = stockEntryJpaRepo.findByEntryCode(entryCode);
+            if (existing.isPresent() && warehouseId.equals(existing.get().getWarehouseId())) {
+                return existing.get();
+            }
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        StockEntryJpa entry = new StockEntryJpa();
+        entry.setEntryCode(entryCode != null && !entryCode.isBlank() && !stockEntryJpaRepo.existsByEntryCode(entryCode)
+                ? entryCode
+                : generateAdjustmentEntryCode());
+        entry.setWarehouseId(warehouseId);
+        entry.setSupplierName(supplierName);
+        entry.setEntryDate(entryDate != null ? entryDate : LocalDate.now());
+        entry.setStatus(com.g42.platform.gms.warehouse.domain.enums.StockEntryStatus.CONFIRMED);
+        entry.setNotes("Sinh tự động từ màn Chỉnh sửa danh mục & Tồn kho");
+        entry.setCreatedBy(staffId);
+        entry.setConfirmedBy(staffId);
+        entry.setConfirmedAt(now);
+        entry.setCreatedAt(now);
+        entry.setUpdatedAt(now);
+        return stockEntryJpaRepo.save(entry);
+    }
+
+    private String generateAdjustmentEntryCode() {
+        String date = LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"));
+        for (int seq = 1; seq < 10000; seq++) {
+            String candidate = String.format("DC-%s-%d", date, seq);
+            if (!stockEntryJpaRepo.existsByEntryCode(candidate)) {
+                return candidate;
+            }
+        }
+        return "DC-" + System.currentTimeMillis();
+    }
+
+    private LocalDate parseEntryDate(String raw) {
+        if (raw == null || raw.isBlank()) return LocalDate.now();
+        try {
+            return LocalDate.parse(raw.substring(0, Math.min(10, raw.length())));
+        } catch (Exception ex) {
+            return LocalDate.now();
+        }
+    }
+
+    private BigDecimal resolveMarkup(LotUpdateDto lotDto, BigDecimal importPrice) {
+        if (lotDto.getMarkupMultiplier() != null) {
+            return lotDto.getMarkupMultiplier();
+        }
+        if (lotDto.getSellingPrice() != null && importPrice != null && importPrice.compareTo(BigDecimal.ZERO) > 0) {
+            return lotDto.getSellingPrice().divide(importPrice, 4, java.math.RoundingMode.HALF_UP);
+        }
+        return BigDecimal.ONE;
+    }
+
+    /** Ghi vết mọi lần tồn kho bị sửa tay — trước đây thao tác này không để lại dấu nào. */
+    private void logInventoryAdjustment(Integer warehouseId, Integer itemId, int diff, int balanceAfter, Integer staffId) {
+        if (staffId == null) {
+            // inventory_transaction.created_by là NOT NULL; không xác định được người
+            // thao tác thì bỏ qua phần ghi log chứ không làm hỏng cả thao tác sửa.
+            return;
+        }
+        InventoryTransactionJpa tx = new InventoryTransactionJpa();
+        tx.setWarehouseId(warehouseId);
+        tx.setItemId(itemId);
+        tx.setTransactionType(com.g42.platform.gms.warehouse.domain.enums.InventoryTransactionType.ADJUSTMENT);
+        tx.setQuantity(diff);
+        tx.setBalanceAfter(balanceAfter);
+        tx.setReferenceType("catalog_inventory_edit");
+        tx.setReferenceId(itemId);
+        tx.setNotes("Sửa tồn kho ở màn Chỉnh sửa danh mục & Tồn kho");
+        tx.setCreatedById(staffId);
+        tx.setCreatedAt(Instant.now());
+        inventoryTransactionJpaRepo.save(tx);
     }
 
     /**

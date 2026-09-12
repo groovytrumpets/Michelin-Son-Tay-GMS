@@ -31,6 +31,7 @@ import com.g42.platform.gms.service_ticket_management.api.internal.ServiceTicket
 import com.g42.platform.gms.service_ticket_management.application.service.ServiceTicketManageService;
 import com.g42.platform.gms.service_ticket_management.application.service.TicketAssignmentService;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
+import com.g42.platform.gms.service_ticket_management.domain.enums.TicketType;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
 import com.g42.platform.gms.service_ticket_management.infrastructure.repository.ServiceTicketRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -118,6 +119,19 @@ public class BillingService {
         return serviceBillDtoMapper.mapToDto(saved);
     }
 
+    /**
+     * Hoa don cua mot phieu dich vu, hoac null neu chua co.
+     * Khac getBillWithEstimate(...) o cho khong nem exception khi chua co hoa don,
+     * de goi ben chot phieu ban linh kien co the kiem tra double-click.
+     */
+    public ServiceBillDto findBillByServiceTicket(Integer serviceTicketId) {
+        if (serviceTicketId == null) {
+            return null;
+        }
+        ServiceBill bill = billingRepository.getBillingByServiceTicket(serviceTicketId);
+        return bill == null ? null : serviceBillDtoMapper.mapToDto(bill);
+    }
+
     private Promotion resolvePromotion(ServiceBillDto serviceBillDto){
         if (serviceBillDto.getPromotionId() == null){return null;}
         return promotionRepo.getAllPromotionForBilling(serviceBillDto);
@@ -154,8 +168,15 @@ public class BillingService {
         serviceBill.setPaymentStatus(PaymentStatus.PAID.name());
         serviceBill.setPaidAt(Instant.now());
 
-        // Luong moi: chi chuyen ticket sang PAID, viec tao phieu xuat kho DRAFT
-        // duoc goi bang API yeu cau xuat kho tu stock allocation.
+        // Phiếu dịch vụ thường: chỉ chuyển ticket sang PAID, phiếu xuất kho DRAFT
+        // do nhân viên kho tạo qua API yêu cầu xuất kho từ stock allocation.
+        //
+        // Phiếu bán linh kiện: khách trả tiền là lấy hàng đi luôn, không có khâu kho
+        // duyệt riêng — nên xuất kho ngay trong transaction thanh toán này. Không làm
+        // vậy thì allocation kẹt RESERVED vĩnh viễn và tồn kho không bao giờ giảm.
+        if (serviceTicketJpa.getTicketType() == TicketType.PARTS_SALE) {
+            warehouseStockAllocationService.issueAndConfirmOnPaid(serviceBill.getServiceTicketId(), staffId);
+        }
 
         //todo: send feedback
         String code = serviceTicketInternalApi.getCodeByServiceTicketId(serviceBill.getServiceTicketId());

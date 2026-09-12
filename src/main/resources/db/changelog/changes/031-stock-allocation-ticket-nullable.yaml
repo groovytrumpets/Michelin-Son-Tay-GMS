@@ -1,0 +1,31 @@
+# Giữ hàng được phép tồn tại trước khi có phiếu dịch vụ.
+#
+# TRƯỚC ĐÂY stock_allocation.service_ticket_id là NOT NULL, nghĩa là muốn giữ
+# chỗ hàng thì bắt buộc phải có phiếu dịch vụ trước. Lịch hẹn tạo ở /create-booking
+# chỉ có báo giá, phiếu dịch vụ mãi tới lúc check-in mới sinh ra — nên không có
+# cách nào giữ hàng cho lịch hẹn, khách chốt mua rồi mà hàng vẫn bán cho người khác.
+#
+# TỪ NAY service_ticket_id được phép NULL: allocation thuộc về BÁO GIÁ (estimate_id
+# vẫn NOT NULL), còn phiếu là thứ gắn vào sau. Lúc check-in, ServiceTicketService
+# điền service_ticket_id cho các allocation của báo giá gắn với booking đó, nên từ
+# thời điểm đó trở đi mọi truy vấn theo phiếu (xuất kho, trả hàng) chạy như cũ.
+databaseChangeLog:
+  - changeSet:
+      id: 031-1-stock-allocation-ticket-nullable
+      author: gms
+      comment: Bỏ NOT NULL của stock_allocation.service_ticket_id — giữ hàng cho lịch hẹn chưa có phiếu
+      preConditions:
+        - onFail: MARK_RAN
+        - columnExists:
+            tableName: stock_allocation
+            columnName: service_ticket_id
+      changes:
+        - dropNotNullConstraint:
+            tableName: stock_allocation
+            columnName: service_ticket_id
+            columnDataType: INT
+      rollback:
+        - addNotNullConstraint:
+            tableName: stock_allocation
+            columnName: service_ticket_id
+            columnDataType: INT

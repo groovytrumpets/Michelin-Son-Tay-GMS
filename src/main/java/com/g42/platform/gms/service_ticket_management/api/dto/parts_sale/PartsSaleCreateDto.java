@@ -17,4 +17,9 @@ public class PartsSaleCreateDto {
     private Integer estimateId;
     private String note;
     private Integer bookingId;
+    /**
+     * Phieu dang giu hang da tao truoc do (neu co). FE gui len khi luu lai bao gia
+     * da sua de backend dung lai dung phieu cu thay vi tao phieu moi.
+     */
+    private Integer serviceTicketId;
 }

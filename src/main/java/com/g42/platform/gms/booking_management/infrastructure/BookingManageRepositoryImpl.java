@@ -44,6 +44,7 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
     private final BookingDraffManagerMapper bookingDraffManagerMapper;
     private final CatalogItemManageMapper catalogItemManageMapper;
     private final CustomerProfileJpaRepo customerProfileJpaRepo;
+    private final com.g42.platform.gms.estimation.infrastructure.repository.StaleStockHoldJpaRepo staleStockHoldJpaRepo;
 
     @Override
     public Page<BookedRespond> getBookedList(int page, int size, LocalDate date, Boolean isGuest, BookingEnum status, String search) {
@@ -79,6 +80,17 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
                 .findAllById(customerIds).stream()
                 .collect(Collectors.toMap(CustomerProfileJpa::getCustomerId, c -> c));
 
+        // Lịch hẹn giữ hàng từ lúc chốt lịch: đánh dấu trong đúng một truy vấn
+        // thay vì hỏi kho từng dòng.
+        List<Integer> estimateIds = bookingPage.getContent().stream()
+                .map(BookingJpa::getEstimateId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        java.util.Set<Integer> heldEstimateIds = estimateIds.isEmpty()
+                ? java.util.Set.of()
+                : java.util.Set.copyOf(staleStockHoldJpaRepo.findEstimateIdsWithActiveHold(estimateIds));
+
         return bookingPage.map(b -> {
             CustomerProfileJpa customer = customerMap.get(b.getCustomerId());
             return new BookedRespond(
@@ -99,7 +111,8 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
                     b.getEstimateTime(),
                     b.getQueueOrder(),
                     b.getEstimateId(),
-                    b.getIsPartsSale()
+                    b.getIsPartsSale(),
+                    b.getEstimateId() != null && heldEstimateIds.contains(b.getEstimateId())
             );
         });
     }

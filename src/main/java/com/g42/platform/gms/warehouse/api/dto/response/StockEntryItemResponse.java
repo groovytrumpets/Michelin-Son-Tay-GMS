@@ -9,6 +9,7 @@ public class StockEntryItemResponse {
     private Integer entryItemId;
     private Integer itemId;
     private String itemName;
+    private String sku;
     private Integer quantity;
     private BigDecimal importPrice;
     private BigDecimal markupMultiplier;

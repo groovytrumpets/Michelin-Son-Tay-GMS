@@ -13,6 +13,7 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -78,8 +79,12 @@ public class WarehouseController {
         return ResponseEntity.ok(ApiResponses.success(catalogItemService.createNewCatalog(createDto)));
     }
     @PutMapping("/catalog-item/update/{itemId}")
-    public ResponseEntity<ApiResponse<CatalogItemDto>> updateCatalog(@RequestBody CatalogCreateDto updateDto, @PathVariable Integer itemId) {
-        return ResponseEntity.ok(ApiResponses.success(catalogItemService.updateCatalog(updateDto, itemId)));
+    public ResponseEntity<ApiResponse<CatalogItemDto>> updateCatalog(
+            @RequestBody CatalogCreateDto updateDto,
+            @PathVariable Integer itemId,
+            @AuthenticationPrincipal com.g42.platform.gms.auth.entity.StaffPrincipal principal) {
+        Integer staffId = principal != null ? principal.getStaffId() : null;
+        return ResponseEntity.ok(ApiResponses.success(catalogItemService.updateCatalog(updateDto, itemId, staffId)));
     }
     @DeleteMapping("/catalog-item/{itemId}")
     @PreAuthorize("hasAnyRole('WAREHOUSE_MANAGER','MANAGER','ADMIN')")

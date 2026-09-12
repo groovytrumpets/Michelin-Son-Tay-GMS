@@ -230,18 +230,24 @@ public class StockAllocationService {
         if (oldMap.isEmpty()){
             return createStockAllocation(estimateId, staffId);
         }
-        Map<Integer,StockAllocation> activeMapByItemId = oldList.stream()
+        // Khoá chống trùng là CẶP (itemId, entryItemId) chứ không phải riêng itemId:
+        // một sản phẩm có thể được lấy từ nhiều lô trong cùng một báo giá (mỗi lô một
+        // dòng, vì giá bán và giá vốn khác nhau theo lô). Nếu chỉ khoá theo itemId thì
+        // dòng lô thứ hai bị coi là bấm đúp và bị gộp vào lô thứ nhất, hàng của lô đó
+        // không được giữ.
+        Map<String,StockAllocation> activeMapByItemId = oldList.stream()
                 .filter(s -> s.getStatus().equals("RESERVED")||s.getStatus().equals("COMMITTED"))
-                .collect(Collectors.toMap(StockAllocation::getItemId,allocation -> allocation,
+                .collect(Collectors.toMap(StockAllocationService::buildItemLotKey,allocation -> allocation,
                         (existing, replacement) -> existing));
         //handle add new and update:
         for (StockAllocationDto dto : stockAllocationDtos) {
             System.out.println("DEBUG allo:"+dto.getAllocationId()+", "+dto.getStatus());
         if (dto.getAllocationId()==null) {
             //todo: check frontend duplicate
-            if (activeMapByItemId.containsKey(dto.getItemId())) {
-                System.err.println("CẢNH BÁO: Frontend gửi đúp item " + dto.getItemId() + " (do lỗi UI hiện lại nút Xác nhận). Tự động map về Allocation cũ.");
-                StockAllocation existingAlloc = activeMapByItemId.get(dto.getItemId());
+            String itemLotKey = buildItemLotKey(dto.getItemId(), dto.getEntryItemId());
+            if (activeMapByItemId.containsKey(itemLotKey)) {
+                System.err.println("CẢNH BÁO: Frontend gửi đúp item " + dto.getItemId() + " (lô " + dto.getEntryItemId() + ") do lỗi UI hiện lại nút Xác nhận. Tự động map về Allocation cũ.");
+                StockAllocation existingAlloc = activeMapByItemId.get(itemLotKey);
 
                 // 1. Gỡ nó khỏi oldMap để vòng lặp cuối hàm KHÔNG XÓA NHẦM nó
                 oldMap.remove(existingAlloc.getAllocationId());
@@ -305,6 +311,15 @@ public class StockAllocationService {
             stockAllocationRepository.delete(deletedAlloc);
         }
         return stockAllocationRepository.findByEstimateId(estimateId).stream().map(stockAllocationDtoMapper::toDto).toList();
+    }
+
+    /** Khoá nhận dạng một dòng giữ hàng: cùng sản phẩm nhưng khác lô là hai dòng khác nhau. */
+    private static String buildItemLotKey(Integer itemId, Integer entryItemId) {
+        return itemId + "|" + (entryItemId == null ? "" : entryItemId);
+    }
+
+    private static String buildItemLotKey(StockAllocation allocation) {
+        return buildItemLotKey(allocation.getItemId(), allocation.getEntryItemId());
     }
 
     public List<StockAllocationDto> getStockAllocationByEstimate(Integer estimateId) {

@@ -17,6 +17,7 @@ import com.g42.platform.gms.booking.customer.domain.repository.IpBlacklistReposi
 import com.g42.platform.gms.catalog.infrastructure.repository.CatalogItemRepository;
 import com.g42.platform.gms.estimation.api.internal.EstimateInternalApi;
 import com.g42.platform.gms.estimation.domain.entity.Estimate;
+import com.g42.platform.gms.estimation.domain.entity.StockAllocation;
 import com.g42.platform.gms.customer.domain.enums.CustomerType;
 import com.g42.platform.gms.notification.application.service.CustomerNotificationDispatcher;
 import com.g42.platform.gms.notification.domain.NotificationChannel;
@@ -25,6 +26,8 @@ import com.g42.platform.gms.vehicle.repository.VehicleRepository;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -86,6 +89,11 @@ public class BookingService {
     private final Map<String, RateLimitInfo> rateLimitCache = new ConcurrentHashMap<>();
     private final BookingManageInternalApi bookingManageInternalApi;
     private final EstimateInternalApi estimateInternalApi;
+    private final com.g42.platform.gms.estimation.domain.repository.StockAllocationRepository stockAllocationRepository;
+
+    @Autowired
+    @Qualifier("warehouseStockAllocationService")
+    private com.g42.platform.gms.warehouse.app.service.allocation.StockAllocationService warehouseStockAllocationService;
 
     // ========================================
     // CREATE BOOKING - Tạo booking mới
@@ -651,7 +659,36 @@ public class BookingService {
 
         slotService.releaseForBooking(booking.getBookingId());
 
+        // Hủy lịch thì nhả luôn số hàng đã giữ cho báo giá của lịch đó. Job quét nền
+        // cũng dọn được nhưng phải chờ tới lần chạy sau, trong khi hàng nên bán lại ngay.
+        releaseBookingStockHold(booking);
+
         log.info("Customer booking cancelled: bookingId={}, customerId={}", booking.getBookingId(), customerId);
+    }
+
+    /**
+     * Nhả số hàng đã giữ từ lúc chốt lịch (allocation chưa gắn phiếu dịch vụ nào).
+     * Lịch đã check-in thì allocation đã có phiếu, việc nhả hàng đi theo luồng phiếu.
+     */
+    private void releaseBookingStockHold(Booking booking) {
+        if (booking.getEstimateId() == null) {
+            return;
+        }
+        try {
+            List<StockAllocation> allocations = stockAllocationRepository.findByEstimateId(booking.getEstimateId());
+            List<Integer> holdIds = allocations.stream()
+                    .filter(a -> a.getServiceTicketId() == null)
+                    .filter(a -> "RESERVED".equals(a.getStatus()))
+                    .map(StockAllocation::getAllocationId)
+                    .toList();
+            if (!holdIds.isEmpty()) {
+                warehouseStockAllocationService.releaseAllocations(holdIds, null);
+                log.info("Released {} stock holds of cancelled booking {}", holdIds.size(), booking.getBookingCode());
+            }
+        } catch (Exception ex) {
+            // Không để lỗi kho chặn việc hủy lịch; job quét nền sẽ dọn nốt.
+            log.error("Không nhả được hàng giữ của booking {}: {}", booking.getBookingId(), ex.getMessage());
+        }
     }
 
     // ========================================

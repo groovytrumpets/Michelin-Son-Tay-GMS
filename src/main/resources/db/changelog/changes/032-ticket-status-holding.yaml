@@ -1,0 +1,38 @@
+# Thêm trạng thái HOLDING cho phiếu dịch vụ.
+#
+# service_ticket.ticket_status là một MySQL ENUM (không phải VARCHAR như
+# @Column(length = 50) trong ServiceTicketJpa gợi ý — độ dài đó chỉ dùng khi
+# Hibernate tự sinh DDL, còn schema thật do Liquibase/dump quản lý). Vì vậy ghi
+# một giá trị ngoài danh sách sẽ bị MySQL từ chối:
+#   Data truncated for column 'ticket_status' at row 1
+#
+# HOLDING = phiếu bán linh kiện đã giữ hàng trong kho và đang chờ thanh toán.
+# Dùng SQL thẳng thay vì modifyDataType để giữ nguyên CHARACTER SET / COLLATE /
+# DEFAULT NULL của cột — modifyDataType sinh câu MODIFY trần và sẽ làm rơi chúng.
+databaseChangeLog:
+  - changeSet:
+      id: 032-1-ticket-status-add-holding
+      author: gms
+      comment: Thêm giá trị HOLDING vào enum service_ticket.ticket_status
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: "0"
+            sql: >-
+              SELECT COUNT(*) FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = 'service_ticket'
+                AND COLUMN_NAME = 'ticket_status'
+                AND COLUMN_TYPE LIKE '%HOLDING%'
+      changes:
+        - sql:
+            sql: >-
+              ALTER TABLE `service_ticket` MODIFY COLUMN `ticket_status`
+              enum('HOLDING','CREATED','INSPECTING','PENDING','INSPECTED','ESTIMATED','REPAIRING','CANCELLED','COMPLETED','PAID')
+              CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL
+      rollback:
+        - sql:
+            sql: >-
+              ALTER TABLE `service_ticket` MODIFY COLUMN `ticket_status`
+              enum('CREATED','INSPECTING','PENDING','INSPECTED','ESTIMATED','REPAIRING','CANCELLED','COMPLETED','PAID')
+              CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL
