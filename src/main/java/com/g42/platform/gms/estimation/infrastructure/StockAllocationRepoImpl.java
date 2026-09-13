@@ -83,12 +83,18 @@ public class StockAllocationRepoImpl implements StockAllocationRepository {
 
             StockAllocationJpa stockAllocationJpa = stockAllocationRepositoryJpa.getStockAllocationJpaByAllocationId(stockAllocationNew.getAllocationId());
             if (stockAllocationJpa == null) {
-                new RuntimeException("Không tìm thấy Allocation ID:" + stockAllocationNew.getAllocationId());
+                throw new RuntimeException("Không tìm thấy Allocation ID:" + stockAllocationNew.getAllocationId());
             }
             stockAllocationJpa.setQuantity(stockAllocationNew.getQuantity());
             stockAllocationJpa.setWarehouseId(stockAllocationNew.getWarehouseId());
             stockAllocationJpa.setItemId(stockAllocationNew.getItemId());
             stockAllocationJpa.setEntryItemId(stockAllocationNew.getEntryItemId());
+            // Trước đây thiếu 3 dòng dưới: các nơi gọi save() chỉ để đổi serviceTicketId/status/issueId
+            // (VD: gắn phiếu dịch vụ vào allocation đã giữ hàng từ lúc đặt lịch — attachHeldStockToTicket)
+            // bị coi như không đổi gì vì hàm chỉ ghi đè 4 field ở trên bằng giá trị cũ đọc lại từ DB.
+            stockAllocationJpa.setServiceTicketId(stockAllocationNew.getServiceTicketId());
+            stockAllocationJpa.setStatus(stockAllocationNew.getStatus());
+            stockAllocationJpa.setIssueId(stockAllocationNew.getIssueId());
             stockAllocationRepositoryJpa.save(stockAllocationJpa);
         } else {
             StockAllocationJpa stockAllocationJpa = stockAllocationJpaMapper.fromDomain(stockAllocationNew);
