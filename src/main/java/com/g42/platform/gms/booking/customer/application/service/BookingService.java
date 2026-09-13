@@ -408,6 +408,9 @@ public class BookingService {
         booking.setVehicleId(preAssignVehicleId);
         booking.setAdvisorId(request.getAdvisorId());
         booking.setTechnicianId(request.getTechnicianId());
+        if (request.getVehicleTypeNote() != null && !request.getVehicleTypeNote().isBlank()) {
+            booking.setVehicleTypeNote(request.getVehicleTypeNote().trim());
+        }
 
         if (request.getSelectedServiceIds() != null && !request.getSelectedServiceIds().isEmpty()) {
             booking.setCatalogItemIds(request.getSelectedServiceIds());

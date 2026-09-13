@@ -35,4 +35,9 @@ public class StaffDirectBookingRequest extends BaseBookingRequest {
     private Integer advisorId;
 
     private Integer technicianId;
+
+    // Loại xe khách đọc qua điện thoại (VD: "Honda Air Blade 2020") — chỉ là ghi chú tham khảo,
+    // không bắt buộc và không thay thế cho việc chọn/đăng ký xe thật ở check-in.
+    @Size(max = 100, message = "Loai xe khong duoc qua 100 ky tu")
+    private String vehicleTypeNote;
 }

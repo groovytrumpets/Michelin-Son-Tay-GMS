@@ -7,6 +7,8 @@ import com.g42.platform.gms.service_ticket_management.infrastructure.entity.Serv
 import com.g42.platform.gms.service_ticket_management.infrastructure.repository.OdometerHistoryRepository;
 import com.g42.platform.gms.service_ticket_management.infrastructure.repository.ServiceTicketRepository;
 import com.g42.platform.gms.vehicle.dto.VehicleListResponse;
+import com.g42.platform.gms.vehicle.dto.VehicleUpdateRequest;
+import com.g42.platform.gms.vehicle.dto.VehicleUpdateResponse;
 import com.g42.platform.gms.vehicle.entity.Vehicle;
 import com.g42.platform.gms.vehicle.repository.VehicleRepository;
 import lombok.RequiredArgsConstructor;
@@ -95,8 +97,43 @@ public class VehicleService {
         }
         
         response.setVehicles(vehicleInfos);
-        
+
         log.info("Found {} vehicles for customer: {}", vehicleInfos.size(), customerId);
+        return response;
+    }
+
+    /**
+     * Update an existing vehicle's plate/brand/model/year.
+     * Used by staff when editing a customer's profile in the admin panel.
+     *
+     * @param vehicleId ID of the vehicle to update
+     * @param request New vehicle info
+     * @return Updated vehicle entity
+     */
+    @Transactional
+    public VehicleUpdateResponse updateVehicle(Integer vehicleId, VehicleUpdateRequest request) {
+        Vehicle vehicle = vehicleRepo.findById(vehicleId)
+            .orElseThrow(() -> new RuntimeException("Không tìm thấy xe"));
+
+        String newPlate = request.getLicensePlate().trim().toUpperCase();
+        vehicleRepo.findByLicensePlate(newPlate).ifPresent(other -> {
+            if (!other.getVehicleId().equals(vehicleId)) {
+                throw new RuntimeException("Biển số xe đã tồn tại: " + newPlate);
+            }
+        });
+
+        vehicle.setLicensePlate(newPlate);
+        vehicle.setBrand(request.getBrand() != null ? request.getBrand().trim() : null);
+        vehicle.setModel(request.getModel() != null ? request.getModel().trim() : null);
+        vehicle.setManufactureYear(request.getManufactureYear());
+        vehicle = vehicleRepo.save(vehicle);
+
+        VehicleUpdateResponse response = new VehicleUpdateResponse();
+        response.setVehicleId(vehicle.getVehicleId());
+        response.setLicensePlate(vehicle.getLicensePlate());
+        response.setBrand(vehicle.getBrand());
+        response.setModel(vehicle.getModel());
+        response.setManufactureYear(vehicle.getManufactureYear());
         return response;
     }
 }

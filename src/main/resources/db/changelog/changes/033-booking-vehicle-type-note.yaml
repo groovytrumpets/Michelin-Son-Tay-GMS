@@ -1,0 +1,25 @@
+# Ghi chú loại xe (hãng/dòng xe) khách đọc qua điện thoại lúc tạo lịch ở /create-booking,
+# trước khi xe được đăng ký chính thức vào bảng vehicle (thường ở check-in).
+databaseChangeLog:
+  - changeSet:
+      id: 033-1-booking-add-vehicle-type-note
+      author: gms
+      comment: Thêm cột vehicle_type_note vào booking
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: booking
+                columnName: vehicle_type_note
+      changes:
+        - addColumn:
+            tableName: booking
+            columns:
+              - column:
+                  name: vehicle_type_note
+                  type: VARCHAR(100)
+                  remarks: Loại xe khách cung cấp lúc đặt lịch (chưa chắc đã có xe trong hệ thống), không bắt buộc
+      rollback:
+        - dropColumn:
+            tableName: booking
+            columnName: vehicle_type_note

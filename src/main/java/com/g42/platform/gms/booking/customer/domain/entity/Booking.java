@@ -29,6 +29,8 @@ public class Booking {
     private Integer vehicleId;
     private Integer advisorId;
     private Integer technicianId;
+    /** Loại xe khách đọc qua điện thoại lúc tạo lịch (khi chưa có/chưa chọn xe trong hệ thống). */
+    private String vehicleTypeNote;
     
     public void initializeDefaults() {
         if (createdAt == null) {
