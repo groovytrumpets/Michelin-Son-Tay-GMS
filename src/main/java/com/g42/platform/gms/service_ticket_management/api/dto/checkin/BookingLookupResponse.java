@@ -29,6 +29,8 @@ public class BookingLookupResponse {
     private Integer vehicleId;
     private Integer advisorId;
     private Integer technicianId;
+    // Số km ước tính lễ tân ghi lại lúc đặt lịch — chỉ gợi ý, không phải số đo thật.
+    private Integer odometerEstimate;
 
     // Customer information
     private Integer customerId;

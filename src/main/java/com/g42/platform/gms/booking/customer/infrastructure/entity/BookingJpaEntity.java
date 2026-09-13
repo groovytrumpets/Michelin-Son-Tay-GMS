@@ -66,6 +66,9 @@ public class BookingJpaEntity {
     @Column(name = "vehicle_type_note", length = 100)
     private String vehicleTypeNote;
 
+    @Column(name = "odometer_estimate")
+    private Integer odometerEstimate;
+
     @ManyToMany
     @JoinTable(
             name = "booking_details",

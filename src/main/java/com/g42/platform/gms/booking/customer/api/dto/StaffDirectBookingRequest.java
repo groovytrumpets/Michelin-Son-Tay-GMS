@@ -3,6 +3,7 @@ package com.g42.platform.gms.booking.customer.api.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -46,4 +47,9 @@ public class StaffDirectBookingRequest extends BaseBookingRequest {
     private String vehicleModel;
 
     private Integer vehicleYear;
+
+    // Số km ước tính khách đọc qua điện thoại — chỉ để KTV/lễ tân tham khảo trước, không phải số
+    // đo thật (số đo thật vẫn phải nhập lại lúc check-in, có đối chiếu odometer_history).
+    @PositiveOrZero(message = "So km phai la so khong am")
+    private Integer odometerEstimate;
 }

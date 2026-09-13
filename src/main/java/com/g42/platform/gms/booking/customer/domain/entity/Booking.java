@@ -31,6 +31,8 @@ public class Booking {
     private Integer technicianId;
     /** Loại xe khách đọc qua điện thoại lúc tạo lịch (khi chưa có/chưa chọn xe trong hệ thống). */
     private String vehicleTypeNote;
+    /** Số km ước tính khách đọc qua điện thoại lúc tạo lịch — chỉ để tham khảo, không phải số đo thật. */
+    private Integer odometerEstimate;
     
     public void initializeDefaults() {
         if (createdAt == null) {

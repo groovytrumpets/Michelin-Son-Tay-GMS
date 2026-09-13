@@ -29,6 +29,7 @@ public class BookingResponse {
     private Integer advisorId;
     private Integer technicianId;
     private String vehicleTypeNote;
+    private Integer odometerEstimate;
 
     // Progress tracking
     private List<ProgressStep> progressSteps;

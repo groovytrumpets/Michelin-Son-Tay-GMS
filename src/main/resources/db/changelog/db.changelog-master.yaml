@@ -112,3 +112,6 @@ databaseChangeLog:
   - include:
       file: changes/034-quantity-decimal-measurement-serial.yaml
       relativeToChangelogFile: true
+  - include:
+      file: changes/035-booking-odometer-estimate.yaml
+      relativeToChangelogFile: true

@@ -1,0 +1,25 @@
+# Số km ước tính khách đọc qua điện thoại lúc tạo lịch ở /create-booking — chỉ để lễ tân/KTV
+# tham khảo trước, KHÔNG phải số đo thật (số đo thật vẫn ghi ở odometer_history lúc check-in).
+databaseChangeLog:
+  - changeSet:
+      id: 035-1-booking-add-odometer-estimate
+      author: gms
+      comment: Thêm cột odometer_estimate vào booking
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: booking
+                columnName: odometer_estimate
+      changes:
+        - addColumn:
+            tableName: booking
+            columns:
+              - column:
+                  name: odometer_estimate
+                  type: INT
+                  remarks: Số km ước tính khách đọc qua điện thoại lúc tạo lịch, không bắt buộc, chỉ để tham khảo
+      rollback:
+        - dropColumn:
+            tableName: booking
+            columnName: odometer_estimate

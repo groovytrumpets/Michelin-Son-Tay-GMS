@@ -452,6 +452,12 @@ public class BookingService {
             }
         }
 
+        // Số km ước tính lễ tân ghi lại qua điện thoại — chỉ để tham khảo, không ghi vào
+        // odometer_history (bảng đó chỉ dành cho số đo thật lúc check-in, có đối chiếu gian lận).
+        if (request.getOdometerEstimate() != null) {
+            booking.setOdometerEstimate(request.getOdometerEstimate());
+        }
+
         if (request.getSelectedServiceIds() != null && !request.getSelectedServiceIds().isEmpty()) {
             booking.setCatalogItemIds(request.getSelectedServiceIds());
         } else {

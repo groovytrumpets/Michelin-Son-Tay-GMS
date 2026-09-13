@@ -27,6 +27,7 @@ public interface BookingLookupMapper {
     @Mapping(target = "vehicleId", source = "booking.vehicleId")
     @Mapping(target = "advisorId", source = "booking.advisorId")
     @Mapping(target = "technicianId", source = "booking.technicianId")
+    @Mapping(target = "odometerEstimate", source = "booking.odometerEstimate")
     @Mapping(target = "customerId", source = "customer.customerId")
     @Mapping(target = "customerName", source = "customer.fullName")
     @Mapping(target = "customerPhone", source = "customer.phone")
