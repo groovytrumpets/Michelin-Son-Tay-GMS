@@ -1,5 +1,7 @@
 package com.g42.platform.gms.warehouse.infrastructure.entity;
 
+
+import java.math.BigDecimal;
 import com.g42.platform.gms.warehouse.domain.enums.DefectCause;
 import com.g42.platform.gms.warehouse.domain.enums.ReturnReason;
 import jakarta.persistence.*;
@@ -44,7 +46,7 @@ public class ReturnEntryItemJpa {
     private Integer entryItemId;
 
     @Column(name = "quantity", nullable = false)
-    private Integer quantity;
+    private BigDecimal quantity;
 
     @Column(name = "condition_note", columnDefinition = "TEXT", nullable = false)
     private String conditionNote;
@@ -80,4 +82,8 @@ public class ReturnEntryItemJpa {
      */
     @Column(name = "defective_warehouse_id")
     private Integer defectiveWarehouseId;
+
+    /** Mảng JSON serial_id đã đưa về kho khi xác nhận phiếu hoàn. */
+    @Column(name = "serial_ids", length = 2000)
+    private String serialIdsJson;
 }

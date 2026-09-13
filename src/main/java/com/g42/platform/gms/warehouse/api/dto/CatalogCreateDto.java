@@ -48,6 +48,20 @@ public class CatalogCreateDto {
     /** Bảo hành cho đại lý; warrantyDurationMonths là bảo hành khách lẻ. */
     private Integer dealerWarrantyMonths;
     private BigDecimal costPrice;
+    /** COUNT = đếm (số nguyên), MEASURE = đo lường (cho phép số lẻ). */
+    private String measurementType;
+    /** Số chữ số thập phân cho phép khi nhập số lượng (0-3). */
+    private Integer decimalScale;
+    /** Đơn vị nhập lớn (can, phuy, hộp); null = nhập theo đơn vị tồn. */
+    private String packagingUnit;
+    /** Số đơn vị tồn trong một đơn vị nhập. */
+    private BigDecimal conversionFactor;
+    /** Chỉ bán theo bội số của conversionFactor. */
+    private Boolean sellByPackageOnly;
+    /** Cho chọn lô khi bán; false = tự lấy FIFO. */
+    private Boolean tracksLot;
+    /** Mỗi đơn vị hàng có số serial riêng. */
+    private Boolean tracksSerial;
     /** Danh sách xe tương thích; gửi lên là thay thế toàn bộ danh sách cũ. */
     private java.util.List<CatalogItemCompatDto> compatibilities;
     private java.util.List<WarehouseUpdateDto> warehouseDetails;

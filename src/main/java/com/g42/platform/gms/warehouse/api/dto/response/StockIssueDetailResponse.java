@@ -34,7 +34,7 @@ public class StockIssueDetailResponse {
     private LocalDateTime createdAt;
     private List<IssueItemDetail> items;
     private List<String> attachmentUrls;  // danh sách URL ảnh chứng từ
-    private Integer totalQuantity;        // tổng số lượng
+    private BigDecimal totalQuantity;        // tổng số lượng
     private BigDecimal totalValue;        // tổng giá trị (sum finalPrice)
     private Boolean hasBill;
     private Integer billId;
@@ -50,7 +50,7 @@ public class StockIssueDetailResponse {
         private String entryCode;
         private String entryLotCode;
         private Integer allocationId;  // allocation gốc (cho phiếu SERVICE_TICKET)
-        private Integer quantity;
+        private BigDecimal quantity;
         private BigDecimal exportPrice;   // = selling_price của lô
         private BigDecimal estimateUnitPrice; // giá đơn vị đã chốt trên estimate
         private BigDecimal importPrice;   // = import_price của lô

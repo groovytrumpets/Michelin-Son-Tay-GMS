@@ -19,5 +19,5 @@ public class HomeStockLocationDto {
     private String warehouseName;
     private String warehouseType;
     private String address;
-    private Integer availableQty;
+    private java.math.BigDecimal availableQty;
 }

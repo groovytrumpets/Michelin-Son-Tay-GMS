@@ -1,5 +1,9 @@
 package com.g42.platform.gms.estimation.api.internal;
 
+
+
+import java.math.BigDecimal;
+import com.g42.platform.gms.common.util.Qty;
 import com.g42.platform.gms.estimation.api.dto.UsedEstimateItemDto;
 import com.g42.platform.gms.estimation.domain.entity.Estimate;
 import jakarta.validation.constraints.Min;
@@ -25,7 +29,7 @@ public interface EstimateInternalApi {
 
     void updateBookingToRemindById(Integer reminderId, Integer bookingId);
 
-    Integer releaseEstimate(Integer allocationId, Integer quantity, Integer staffId);
+    Integer releaseEstimate(Integer allocationId, BigDecimal quantity, Integer staffId);
 
     void calculateAndLockGrossProfit(Integer serviceTicketId);
 //

@@ -1,5 +1,7 @@
 package com.g42.platform.gms.warehouse.app.service.entry;
 
+
+import com.g42.platform.gms.common.util.Qty;
 /**
  * ============================================================
  * LUỒNG NHẬP KHO (Stock Entry Flow)
@@ -120,6 +122,9 @@ public class StockEntryService {
     private final StaffProfileRepo staffProfileRepo;     // lấy tên nhân viên để hiển thị
     private final PartCatalogRepo partCatalogRepo;       // lấy tên sản phẩm theo itemId (batch)
     private final StaffNotifyService staffNotifyService;
+    private final com.g42.platform.gms.warehouse.app.service.catalog.ItemQuantityPolicy itemQuantityPolicy;
+    private final com.g42.platform.gms.warehouse.app.service.serial.ItemSerialService itemSerialService;
+    private final com.g42.platform.gms.warehouse.infrastructure.repository.CatalogItemJpaRepo catalogItemJpaRepo;
 
     // ObjectMapper để parse JSON string "items" từ multipart form
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
@@ -315,11 +320,25 @@ public class StockEntryService {
                         "Không tìm thấy item id=" + entryItemId + " trong phiếu id=" + entryId));
 
         // Partial update từng field
-        if (request.getQuantity() != null) {
-            item.setQuantity(request.getQuantity());
+        if (request.getQuantity() != null || request.getInputQuantity() != null) {
+            ResolvedEntryQuantity resolved = resolveEntryQuantity(item.getItemId(),
+                    request.getQuantity() != null ? request.getQuantity() : item.getQuantity(),
+                    request.getInputUnit(), request.getInputQuantity());
+            item.setQuantity(resolved.quantity());
             // Sync remainingQuantity = quantity khi còn DRAFT
             // (sau CONFIRMED, remainingQuantity sẽ giảm dần theo FIFO xuất kho)
-            item.setRemainingQuantity(request.getQuantity());
+            item.setRemainingQuantity(resolved.quantity());
+            item.setInputUnit(resolved.inputUnit());
+            item.setInputQuantity(resolved.inputQuantity());
+            item.setConversionFactor(resolved.conversionFactor());
+        }
+        if (request.getSerialCodes() != null) {
+            item.setSerialCodes(resolveEntrySerials(item.getItemId(), item.getQuantity(), request.getSerialCodes(),
+                    new java.util.HashMap<>()));
+        } else if (item.getSerialCodes() != null
+                && itemSerialService.parseCodes(item.getSerialCodes()).size() > Qty.nz(item.getQuantity()).intValue()) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Số serial đã nhập nhiều hơn số lượng mới — bớt serial trước khi giảm số lượng");
         }
         if (request.getImportPrice() != null) item.setImportPrice(request.getImportPrice());
         if (request.getMarkupMultiplier() != null) item.setMarkupMultiplier(request.getMarkupMultiplier());
@@ -410,6 +429,9 @@ public class StockEntryService {
         // Cộng tồn kho cho từng item trong phiếu
         for (StockEntryItem item : entry.getItems()) {
             increaseInventory(entry.getWarehouseId(), item, entryId, staffId);
+            // Serial nhập kèm thành serial trong kho, trỏ về đúng lô vừa nhập
+            itemSerialService.createForConfirmedEntryItem(entry.getWarehouseId(), item.getEntryItemId(),
+                    item.getItemId(), item.getSerialCodes(), staffId);
         }
 
         // Đánh dấu phiếu đã xác nhận
@@ -489,12 +511,12 @@ public class StockEntryService {
                 .orElseGet(() -> Inventory.builder()
                         .warehouseId(warehouseId)
                         .itemId(item.getItemId())
-                        .quantity(0)
-                        .reservedQuantity(0)
+                        .quantity(BigDecimal.ZERO)
+                        .reservedQuantity(BigDecimal.ZERO)
                         .build());
 
         // Cộng thêm số lượng từ lô nhập vào tồn kho
-        int balanceAfter = inventory.getQuantity() + item.getQuantity();
+        BigDecimal balanceAfter = Qty.add(inventory.getQuantity(), item.getQuantity());
         inventory.setQuantity(balanceAfter);
         inventoryRepo.save(inventory);
 
@@ -516,7 +538,7 @@ public class StockEntryService {
      */
     private void saveInventoryTransaction(
             Integer warehouseId, Integer itemId,
-            Integer quantity, Integer balanceAfter,
+            BigDecimal quantity, BigDecimal balanceAfter,
             Integer entryId, Integer staffId) {
         InventoryTransaction tx = new InventoryTransaction();
         tx.setWarehouseId(warehouseId);
@@ -564,19 +586,75 @@ public class StockEntryService {
      */
     private List<StockEntryItem> buildEntryItems(List<StockEntryItemRequest> requests, Integer entryId) {
         List<StockEntryItem> items = new ArrayList<>();
+        Map<Integer, Set<String>> serialsByItem = new java.util.HashMap<>();
         for (StockEntryItemRequest req : requests) {
+            ResolvedEntryQuantity resolved = resolveEntryQuantity(
+                    req.getItemId(), req.getQuantity(), req.getInputUnit(), req.getInputQuantity());
+            String serialJson = resolveEntrySerials(req.getItemId(), resolved.quantity(), req.getSerialCodes(), serialsByItem);
             items.add(StockEntryItem.builder()
                     .entryId(entryId)
                     .itemId(req.getItemId())
-                    .quantity(req.getQuantity())
+                    .quantity(resolved.quantity())
                     .importPrice(req.getImportPrice())
                     .markupMultiplier(req.getMarkupMultiplier())
                     .markupMultiplierWholesale(req.getMarkupMultiplierWholesale())
-                    .remainingQuantity(req.getQuantity()) // ban đầu = quantity, chưa xuất gì
+                    .remainingQuantity(resolved.quantity()) // ban đầu = quantity, chưa xuất gì
                     .notes(req.getNotes())
+                    .inputUnit(resolved.inputUnit())
+                    .inputQuantity(resolved.inputQuantity())
+                    .conversionFactor(resolved.conversionFactor())
+                    .serialCodes(serialJson)
                     .build());
         }
         return items;
+    }
+
+    private record ResolvedEntryQuantity(BigDecimal quantity, String inputUnit, BigDecimal inputQuantity,
+                                         BigDecimal conversionFactor) {
+    }
+
+    /**
+     * Nhập theo đơn vị đóng gói (1 phuy) thì quy ra đơn vị tồn (200 lít) bằng hệ số của
+     * sản phẩm; nhập thẳng theo đơn vị tồn thì giữ nguyên. Số tồn phải đúng số chữ số lẻ.
+     */
+    private ResolvedEntryQuantity resolveEntryQuantity(Integer itemId, BigDecimal quantity,
+                                                       String inputUnit, BigDecimal inputQuantity) {
+        var item = catalogItemJpaRepo.findById(itemId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy sản phẩm id=" + itemId));
+        var rules = com.g42.platform.gms.warehouse.app.service.catalog.ItemQuantityPolicy.Rules.of(item);
+
+        String unit = inputUnit == null ? "" : inputUnit.trim();
+        boolean byPackage = !unit.isEmpty() && inputQuantity != null
+                && item.getPackagingUnit() != null && item.getPackagingUnit().trim().equalsIgnoreCase(unit)
+                && !unit.equalsIgnoreCase(item.getUnit() == null ? "" : item.getUnit().trim());
+        if (byPackage) {
+            if (inputQuantity.signum() <= 0) {
+                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                        item.getItemName() + ": số lượng nhập phải lớn hơn 0");
+            }
+            BigDecimal factor = rules.factor();
+            BigDecimal stockQuantity = com.g42.platform.gms.warehouse.app.service.catalog.ItemQuantityPolicy
+                    .toStockQuantity(inputQuantity, factor);
+            itemQuantityPolicy.validateStockQuantity(rules, stockQuantity, item.getItemName());
+            return new ResolvedEntryQuantity(stockQuantity, item.getPackagingUnit().trim(), Qty.normalize(inputQuantity), factor);
+        }
+        itemQuantityPolicy.validateStockQuantity(rules, quantity, item.getItemName());
+        return new ResolvedEntryQuantity(Qty.normalize(quantity), null, null, null);
+    }
+
+    /** Kiểm tra serial nhập kèm (không trùng trong phiếu, không trùng serial đã có) và trả JSON để lưu. */
+    private String resolveEntrySerials(Integer itemId, BigDecimal stockQuantity, List<String> codes,
+                                       Map<Integer, Set<String>> serialsByItem) {
+        if (codes == null || codes.stream().allMatch(c -> c == null || c.isBlank())) return null;
+        List<String> normalized = itemSerialService.validateEntrySerials(itemId, stockQuantity, codes);
+        Set<String> seen = serialsByItem.computeIfAbsent(itemId, k -> new java.util.HashSet<>());
+        for (String code : normalized) {
+            if (!seen.add(code)) {
+                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                        "Serial " + code + " bị nhập ở hai dòng trong cùng phiếu");
+            }
+        }
+        return itemSerialService.toJson(normalized);
     }
 
     /**
@@ -709,6 +787,10 @@ public class StockEntryService {
         Map<Integer, String> skuById = partCatalogRepo.findAllItemsByIds(itemIds.stream().toList()).stream()
                 .collect(Collectors.toMap(CatalogItem::getItemId, CatalogItem::getSku, (a, b) -> a));
 
+        Map<Integer, com.g42.platform.gms.warehouse.infrastructure.entity.CatalogItemJpa> catalogById =
+                catalogItemJpaRepo.findAllById(itemIds).stream()
+                        .collect(Collectors.toMap(c -> c.getItemId(), c -> c, (a, b) -> a));
+
         List<StockEntryItemResponse> itemResponses = entry.getItems().stream().map(i -> {
             StockEntryItemResponse ir = new StockEntryItemResponse();
             ir.setEntryItemId(i.getEntryItemId());
@@ -721,6 +803,17 @@ public class StockEntryService {
             ir.setMarkupMultiplierWholesale(i.getMarkupMultiplierWholesale());
             ir.setRemainingQuantity(i.getRemainingQuantity()); // bao nhiêu chưa xuất kho
             ir.setNotes(i.getNotes());
+            ir.setInputUnit(i.getInputUnit());
+            ir.setInputQuantity(i.getInputQuantity());
+            ir.setConversionFactor(i.getConversionFactor());
+            ir.setSerialCodes(itemSerialService.parseCodes(i.getSerialCodes()));
+            var catalog = catalogById.get(i.getItemId());
+            if (catalog != null) {
+                ir.setUnit(catalog.getUnit());
+                ir.setMeasurementType(catalog.getMeasurementType());
+                ir.setDecimalScale(catalog.getDecimalScale());
+                ir.setTracksSerial(catalog.getTracksSerial());
+            }
             return ir;
         }).collect(Collectors.toList());
         r.setItems(itemResponses);

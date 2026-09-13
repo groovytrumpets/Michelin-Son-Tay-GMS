@@ -21,7 +21,7 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class ItemProfitAggregate {
     private Integer itemId;
-    private Integer totalQuantity;
+    private BigDecimal totalQuantity;
     private BigDecimal totalRevenue;
     private BigDecimal totalCost;
     private BigDecimal totalGrossProfit;

@@ -63,7 +63,7 @@ public interface InventoryJpaRepo extends JpaRepository<InventoryJpa, Integer> {
     /** Tổng tồn khả dụng (quantity - reserved) theo item, chỉ tính kho active và không phải kho hàng lỗi. */
     interface ItemAvailableProjection {
         Integer getItemId();
-        Long getAvailableQty();
+        java.math.BigDecimal getAvailableQty();
     }
 
     @Query("""

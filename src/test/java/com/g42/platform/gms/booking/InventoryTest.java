@@ -28,7 +28,7 @@ class InventoryServiceTest {
                         latch.await(); // Tất cả các luồng đứng đây đợi...
 
                         // Gọi hàm mua 1 lốp
-                        inventoryService.increaseReservedQuantity(1029, 1, 1);
+                        inventoryService.increaseReservedQuantity(1029, 1, java.math.BigDecimal.ONE);
                     } catch (Exception e) {
                         System.out.println("Bị chặn do hết hàng hoặc lỗi: " + e.getMessage());
                     } finally {

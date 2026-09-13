@@ -1,5 +1,7 @@
 package com.g42.platform.gms.warehouse.domain.entity;
 
+
+import java.math.BigDecimal;
 import com.g42.platform.gms.warehouse.domain.enums.DefectCause;
 import com.g42.platform.gms.warehouse.domain.enums.ReturnReason;
 import lombok.Data;
@@ -12,7 +14,7 @@ public class ReturnEntryItem {
     private Integer allocationId;
     private Integer sourceIssueItemId;
     private Integer entryItemId;
-    private Integer quantity;
+    private BigDecimal quantity;
     private String conditionNote;
     private boolean exchangeItem;
 
@@ -41,4 +43,6 @@ public class ReturnEntryItem {
      * Được điền tự động khi confirm (tìm kho DEFECTIVE của chi nhánh).
      */
     private Integer defectiveWarehouseId;
+    /** Mảng JSON serial_id đã đưa về kho khi xác nhận phiếu hoàn. */
+    private String serialIdsJson;
 }

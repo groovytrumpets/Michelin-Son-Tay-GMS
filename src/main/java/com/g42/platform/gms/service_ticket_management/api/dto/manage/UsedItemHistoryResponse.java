@@ -22,7 +22,7 @@ public class UsedItemHistoryResponse {
     private LocalDateTime receivedAt;
     private String itemName;
     private String categoryName;
-    private Integer quantity;
+    private BigDecimal quantity;
     private BigDecimal unitPrice;
     private BigDecimal finalPrice;
     private Boolean isGift;

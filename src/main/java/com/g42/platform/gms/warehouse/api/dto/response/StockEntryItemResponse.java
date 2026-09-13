@@ -10,10 +10,18 @@ public class StockEntryItemResponse {
     private Integer itemId;
     private String itemName;
     private String sku;
-    private Integer quantity;
+    private BigDecimal quantity;
     private BigDecimal importPrice;
     private BigDecimal markupMultiplier;
     private BigDecimal markupMultiplierWholesale;
-    private Integer remainingQuantity;
+    private BigDecimal remainingQuantity;
     private String notes;
+    private String unit;
+    private String measurementType;
+    private Integer decimalScale;
+    private Boolean tracksSerial;
+    private String inputUnit;
+    private BigDecimal inputQuantity;
+    private BigDecimal conversionFactor;
+    private java.util.List<String> serialCodes;
 }

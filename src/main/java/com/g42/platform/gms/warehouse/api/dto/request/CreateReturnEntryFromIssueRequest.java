@@ -1,5 +1,7 @@
 package com.g42.platform.gms.warehouse.api.dto.request;
 
+
+import java.math.BigDecimal;
 import com.g42.platform.gms.warehouse.domain.enums.ReturnType;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
@@ -41,8 +43,8 @@ public class CreateReturnEntryFromIssueRequest {
         private Integer allocationId;
 
         @NotNull(message = "quantity không được null")
-        @Min(value = 1, message = "quantity phải >= 1")
-        private Integer quantity;
+        @jakarta.validation.constraints.DecimalMin(value = "0", inclusive = false, message = "quantity phải > 0")
+        private BigDecimal quantity;
 
         private String conditionNote;
 

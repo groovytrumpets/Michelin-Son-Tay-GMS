@@ -256,11 +256,11 @@ public class ServiceCatalogService {
             dto.setProductLineName(info.getProductLineName());
             dto.setCompatibleCars(info.getCompatibleCars());
             dto.setSlug(info.getSlug());
-            Integer availableQty = info.getAvailableQty();
+            java.math.BigDecimal availableQty = info.getAvailableQty();
             dto.setAvailableQty(availableQty);
             // inStock chỉ có ý nghĩa với phụ tùng; dịch vụ không quản lý tồn kho
             if ("PART".equalsIgnoreCase(info.getItemType())) {
-                dto.setInStock(availableQty != null && availableQty > 0);
+                dto.setInStock(availableQty != null && availableQty.signum() > 0);
             }
         }
     }

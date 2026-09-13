@@ -1,5 +1,7 @@
 package com.g42.platform.gms.estimation.infrastructure.entity;
 
+
+import java.math.BigDecimal;
 import com.g42.platform.gms.booking.customer.infrastructure.entity.CatalogItemJpaEntity;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
 import com.g42.platform.gms.warehouse.infrastructure.entity.WarehouseJpa;
@@ -43,7 +45,7 @@ public class StockAllocationJpa {
 
     @NotNull
     @Column(name = "quantity", nullable = false)
-    private Integer quantity;
+    private BigDecimal quantity;
     @NotNull
     @ColumnDefault("'RESERVED'")
     @Lob

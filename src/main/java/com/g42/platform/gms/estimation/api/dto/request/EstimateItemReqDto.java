@@ -19,7 +19,7 @@ public class EstimateItemReqDto {
     private Integer itemId;
     private Integer warehouseId;
     private String itemName;
-    private Integer quantity;
+    private BigDecimal quantity;
     private BigDecimal unitPrice;
     private Integer taxRuleId;
     private Boolean isChecked;
@@ -42,4 +42,6 @@ public class EstimateItemReqDto {
     private BigDecimal laborCost;
     private String note;
     private BigDecimal discountPercent;
+    /** Serial đã chọn (hàng theo dõi serial); số phần tử phải bằng quantity. */
+    private java.util.List<Integer> serialIds;
 }

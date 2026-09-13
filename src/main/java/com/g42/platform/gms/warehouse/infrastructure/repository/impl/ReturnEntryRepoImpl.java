@@ -90,9 +90,9 @@ public class ReturnEntryRepoImpl implements ReturnEntryRepo {
     }
 
     @Override
-    public int sumActiveReturnedQuantityByAllocationId(Integer allocationId) {
-        Long sum = jpaRepo.sumActiveReturnedQuantityByAllocationId(allocationId);
-        return sum == null ? 0 : sum.intValue();
+    public java.math.BigDecimal sumActiveReturnedQuantityByAllocationId(Integer allocationId) {
+        java.math.BigDecimal sum = jpaRepo.sumActiveReturnedQuantityByAllocationId(allocationId);
+        return sum != null ? sum : java.math.BigDecimal.ZERO;
     }
 
     @Override
@@ -171,6 +171,7 @@ public class ReturnEntryRepoImpl implements ReturnEntryRepo {
         item.setDefectCause(jpa.getDefectCause());
         item.setResponsibleStaffId(jpa.getResponsibleStaffId());
         item.setDefectiveWarehouseId(jpa.getDefectiveWarehouseId());
+        item.setSerialIdsJson(jpa.getSerialIdsJson());
         return item;
     }
 
@@ -191,6 +192,7 @@ public class ReturnEntryRepoImpl implements ReturnEntryRepo {
         item.setDefectCause(domain.getDefectCause());
         item.setResponsibleStaffId(domain.getResponsibleStaffId());
         item.setDefectiveWarehouseId(domain.getDefectiveWarehouseId());
+        item.setSerialIdsJson(domain.getSerialIdsJson());
         return item;
     }
 }

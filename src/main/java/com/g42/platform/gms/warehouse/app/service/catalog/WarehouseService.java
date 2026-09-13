@@ -1,5 +1,7 @@
 package com.g42.platform.gms.warehouse.app.service.catalog;
 
+
+import com.g42.platform.gms.common.util.Qty;
 import com.g42.platform.gms.warehouse.api.dto.CatalogDetailDto;
 import com.g42.platform.gms.warehouse.api.dto.CatalogSummaryDto;
 import com.g42.platform.gms.warehouse.api.dto.CatalogWarehouseDto;

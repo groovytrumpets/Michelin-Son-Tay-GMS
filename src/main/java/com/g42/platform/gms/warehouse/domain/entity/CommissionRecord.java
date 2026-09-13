@@ -11,7 +11,7 @@ public class CommissionRecord {
     private Integer staffId;
     private Integer itemId;
     private Integer issueId;
-    private Integer quantity;
+    private BigDecimal quantity;
     private BigDecimal finalPrice;
     private BigDecimal commissionRate;
     private BigDecimal commissionValue; // finalPrice * quantity * rate / 100

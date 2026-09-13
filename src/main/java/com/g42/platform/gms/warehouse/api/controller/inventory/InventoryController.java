@@ -1,5 +1,9 @@
 package com.g42.platform.gms.warehouse.api.controller.inventory;
 
+
+
+import java.math.BigDecimal;
+import com.g42.platform.gms.common.util.Qty;
 import com.g42.platform.gms.auth.entity.StaffPrincipal;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
@@ -49,7 +53,7 @@ public class InventoryController {
     /** Số lượng khả dụng đơn lẻ */
     @GetMapping("/{warehouseId}/{itemId}/available")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<Integer>> getAvailableQuantity(
+    public ResponseEntity<ApiResponse<java.math.BigDecimal>> getAvailableQuantity(
             @PathVariable Integer warehouseId,
             @PathVariable Integer itemId) {
         return ResponseEntity.ok(ApiResponses.success(

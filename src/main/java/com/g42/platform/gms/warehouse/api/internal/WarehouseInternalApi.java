@@ -1,5 +1,7 @@
 package com.g42.platform.gms.warehouse.api.internal;
 
+
+import com.g42.platform.gms.common.util.Qty;
 import org.apache.commons.lang3.tuple.Pair;
 import com.g42.platform.gms.marketing.service_catalog.domain.entity.Service;
 import com.g42.platform.gms.warehouse.api.dto.CatalogItemDto;
@@ -21,7 +23,7 @@ public interface WarehouseInternalApi {
     /** Gỡ liên kết service khỏi mọi catalog item đang trỏ tới nó — dùng trước khi xóa service. */
     void clearCatalogService(Long serviceId);
 
-    void updateInventoryEstimateAllocation(Integer itemId, Integer warehouseId,Integer quantity);
+    void updateInventoryEstimateAllocation(Integer itemId, Integer warehouseId,BigDecimal quantity);
 
     Integer findCodeByCategoryCode(String categoryCode);
 
@@ -43,6 +45,6 @@ public interface WarehouseInternalApi {
     /** Thông tin hạng mục/hãng/dòng/xe tương thích/tồn kho khả dụng cho trang public, batch theo itemIds. */
     Map<Integer, HomeCatalogItemInfoDto> getHomeCatalogInfoByItemIds(java.util.Set<Integer> itemIds);
 
-    /** Danh sách kho/cửa hàng còn hàng (available > 0) của một item cho trang chi tiết public. */
+    /** Danh sách kho/cửa hàng còn hàng (available.signum() > 0) của một item cho trang chi tiết public. */
     List<HomeStockLocationDto> getHomeStockLocations(Integer itemId);
 }

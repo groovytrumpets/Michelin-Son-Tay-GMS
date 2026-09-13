@@ -1,5 +1,7 @@
 package com.g42.platform.gms.estimation.domain.entity;
 
+
+import java.math.BigDecimal;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -21,7 +23,7 @@ public class StockAllocation {
     private Integer warehouseId;
     private Integer itemId;
     private Integer entryItemId;
-    private Integer quantity;
+    private BigDecimal quantity;
     private String status;
     private Integer createdBy;
     private Instant createdAt;

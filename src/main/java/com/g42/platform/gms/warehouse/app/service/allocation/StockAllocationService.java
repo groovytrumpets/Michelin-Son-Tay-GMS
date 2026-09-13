@@ -1,5 +1,7 @@
 package com.g42.platform.gms.warehouse.app.service.allocation;
 
+
+import com.g42.platform.gms.common.util.Qty;
 import com.g42.platform.gms.estimation.api.internal.EstimateInternalApi;
 import com.g42.platform.gms.estimation.domain.entity.Estimate;
 import com.g42.platform.gms.estimation.domain.entity.EstimateItem;
@@ -73,6 +75,7 @@ public class StockAllocationService {
     private final ServiceTicketRepo serviceTicketRepo;
     private final StockEntryRepo stockEntryRepo;
     private final EstimateInternalApi estimateInternalApi;
+    private final com.g42.platform.gms.warehouse.app.service.serial.ItemSerialService itemSerialService;
 
     /**
      * Giữ chỗ (reserve) stock dựa trên estimate items đã check.
@@ -92,7 +95,7 @@ public class StockAllocationService {
         List<StockShortageInfo> shortages = new ArrayList<>();
 
         for (EstimateItem estimateItem : estimateItems) {
-            int requiredQty = estimateItem.getQuantity();
+            BigDecimal requiredQty = estimateItem.getQuantity();
 
             // Kiểm tra allocation đã tồn tại
             StockAllocation existingAlloc = allocationRepo.findByEstimateItemId(estimateItem.getId())
@@ -110,13 +113,13 @@ public class StockAllocationService {
                             "Không tìm thấy tồn kho cho itemId=" + estimateItem.getItemId()));
 
             // Tính số lượng khả dụng (tồn kho - giữ chỗ)
-            int availableQty = Math.max(0, inv.getQuantity() - inv.getReservedQuantity());
+            BigDecimal availableQty = Qty.subFloorZero(inv.getQuantity(), inv.getReservedQuantity());
 
             // Tính delta: phần chênh lệch giữa yêu cầu và allocation cũ
-            int delta = existingAlloc != null ? requiredQty - existingAlloc.getQuantity() : requiredQty;
+            BigDecimal delta = existingAlloc != null ? Qty.sub(requiredQty, existingAlloc.getQuantity()) : requiredQty;
 
             // Nếu cần thêm hàng nhưng không đủ → báo thiếu
-            if (delta > 0 && availableQty < delta) {
+            if (delta.signum() > 0 && Qty.lt(availableQty, delta)) {
                 shortages.add(new StockShortageInfo(
                         estimateItem.getWarehouseId(),
                         estimateItem.getItemId(),
@@ -129,7 +132,7 @@ public class StockAllocationService {
             // Cập nhật allocation cũ hoặc tạo mới
             if (existingAlloc != null) {
                 boolean entryItemIdChanged = !Objects.equals(estimateItem.getEntryItemId(), existingAlloc.getEntryItemId());
-                if (delta == 0 && !entryItemIdChanged) continue;  // Không thay đổi → skip
+                if (delta.signum() == 0 && !entryItemIdChanged) continue;  // Không thay đổi → skip
 
                 // Cập nhật quantity
                 existingAlloc.setQuantity(requiredQty);
@@ -137,7 +140,7 @@ public class StockAllocationService {
                 allocationRepo.save(existingAlloc);
 
                 // Cập nhật reserved quantity trong inventory
-                inv.setReservedQuantity(inv.getReservedQuantity() + delta);
+                inv.setReservedQuantity(Qty.add(inv.getReservedQuantity(), delta));
                 inventoryRepo.save(inv);
 
                 // Ghi log transaction
@@ -160,7 +163,7 @@ public class StockAllocationService {
                 StockAllocation saved = allocationRepo.save(newAlloc);
 
                 // Cập nhật reserved quantity
-                inv.setReservedQuantity(inv.getReservedQuantity() + requiredQty);
+                inv.setReservedQuantity(Qty.add(inv.getReservedQuantity(), requiredQty));
                 inventoryRepo.save(inv);
 
                 // Ghi log transaction
@@ -259,17 +262,17 @@ public class StockAllocationService {
                             "Không tìm thấy tồn kho cho itemId=" + alloc.getItemId()));
 
             // Kiểm tra reserved quantity hợp lệ
-            if (inv.getReservedQuantity() < alloc.getQuantity()) {
+            if (Qty.lt(inv.getReservedQuantity(), alloc.getQuantity())) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT,
                         "Reserved quantity không hợp lệ cho itemId=" + alloc.getItemId());
             }
 
             // Giảm reserved quantity (vì đã xuất ra ngoài)
-            inv.setReservedQuantity(inv.getReservedQuantity() - alloc.getQuantity());
+            inv.setReservedQuantity(Qty.sub(inv.getReservedQuantity(), alloc.getQuantity()));
             inventoryRepo.save(inv);
 
             logTransaction(alloc.getWarehouseId(), alloc.getItemId(),
-                    -alloc.getQuantity(), inv.getQuantity(), "stock_allocation_commit",
+                    alloc.getQuantity().negate(), inv.getQuantity(), "stock_allocation_commit",
                     alloc.getAllocationId(), staffId);
 
             // Chuyển trạng thái RESERVED → COMMITTED
@@ -396,11 +399,11 @@ public class StockAllocationService {
 
             if (inv != null) {
                 // Giảm reserved quantity
-                inv.setReservedQuantity(Math.max(0, inv.getReservedQuantity() - alloc.getQuantity()));
+                inv.setReservedQuantity(Qty.subFloorZero(inv.getReservedQuantity(), alloc.getQuantity()));
                 inventoryRepo.save(inv);
 
                 logTransaction(alloc.getWarehouseId(), alloc.getItemId(),
-                        -alloc.getQuantity(), inv.getQuantity(), "stock_allocation_release",
+                        alloc.getQuantity().negate(), inv.getQuantity(), "stock_allocation_release",
                         alloc.getAllocationId(), staffId);
             }
 
@@ -408,6 +411,7 @@ public class StockAllocationService {
             alloc.setStatus(AllocationStatus.RELEASED);
             allocationRepo.save(alloc);
         }
+        releaseSerials(reserved);
     }
 
     /**
@@ -434,19 +438,20 @@ public class StockAllocationService {
                     .findByWarehouseAndItemWithLock(alloc.getWarehouseId(), alloc.getItemId())
                     .orElse(null);
             if (inv != null) {
-                inv.setReservedQuantity(Math.max(0, inv.getReservedQuantity() - alloc.getQuantity()));
+                inv.setReservedQuantity(Qty.subFloorZero(inv.getReservedQuantity(), alloc.getQuantity()));
                 inventoryRepo.save(inv);
 
                 // inventory_transaction.created_by la NOT NULL: job chay nen khong co
                 // nhan vien nao dung sau, ghi nhan nguoi da giu hang luc dau.
                 Integer actorId = staffId != null ? staffId : alloc.getCreatedBy();
                 logTransaction(alloc.getWarehouseId(), alloc.getItemId(),
-                        -alloc.getQuantity(), inv.getQuantity(), "stock_allocation_release",
+                        alloc.getQuantity().negate(), inv.getQuantity(), "stock_allocation_release",
                         alloc.getAllocationId(), actorId);
             }
             alloc.setStatus(AllocationStatus.RELEASED);
             allocationRepo.save(alloc);
             released++;
+            releaseSerials(List.of(alloc));
         }
         return released;
     }
@@ -478,15 +483,16 @@ public class StockAllocationService {
                     .findByWarehouseAndItemWithLock(alloc.getWarehouseId(), alloc.getItemId())
                     .orElse(null);
             if (inv != null) {
-                inv.setReservedQuantity(Math.max(0, inv.getReservedQuantity() - alloc.getQuantity()));
+                inv.setReservedQuantity(Qty.subFloorZero(inv.getReservedQuantity(), alloc.getQuantity()));
                 inventoryRepo.save(inv);
 
                 logTransaction(alloc.getWarehouseId(), alloc.getItemId(),
-                        -alloc.getQuantity(), inv.getQuantity(), "stock_allocation_release",
+                        alloc.getQuantity().negate(), inv.getQuantity(), "stock_allocation_release",
                         alloc.getAllocationId(), staffId);
             }
             alloc.setStatus(AllocationStatus.RELEASED);
             allocationRepo.save(alloc);
+            releaseSerials(List.of(alloc));
         }
     }
 
@@ -549,14 +555,14 @@ public class StockAllocationService {
                     .orElse(null);
 
             if (inventory != null) {
-                int updatedReserved = Math.max(0, inventory.getReservedQuantity() - allocation.getQuantity());
+                BigDecimal updatedReserved = Qty.subFloorZero(inventory.getReservedQuantity(), allocation.getQuantity());
                 inventory.setReservedQuantity(updatedReserved);
                 inventoryRepo.save(inventory);
 
                 logAdjustmentTransaction(
                         allocation.getWarehouseId(),
                         allocation.getItemId(),
-                        -allocation.getQuantity(),
+                        allocation.getQuantity().negate(),
                         inventory.getQuantity(),
                         "stock_allocation_cancel",
                         allocation.getAllocationId(),
@@ -567,6 +573,7 @@ public class StockAllocationService {
             allocation.setStatus(AllocationStatus.RELEASED);
             StockAllocation saved = allocationRepo.save(allocation);
             estimateInternalApi.releaseEstimate(saved.getAllocationId(), saved.getQuantity(), staffId);
+            releaseSerials(List.of(saved));
         }
     }
 
@@ -585,32 +592,32 @@ public class StockAllocationService {
 
         Integer itemId = allocations.get(0).getItemId();
         Integer warehouseId = allocations.get(0).getWarehouseId();
-        int cancelledQty = allocations.stream().mapToInt(StockAllocation::getQuantity).sum();
+        BigDecimal cancelledQty = allocations.stream().map(StockAllocation::getQuantity).reduce(BigDecimal.ZERO, Qty::add);
 
         // Release allocation của estimateItemId này
         for (StockAllocation allocation : allocations) {
             inventoryRepo.findByWarehouseAndItemWithLock(allocation.getWarehouseId(), allocation.getItemId())
                     .ifPresent(inv -> {
-                        inv.setReservedQuantity(Math.max(0, inv.getReservedQuantity() - allocation.getQuantity()));
+                        inv.setReservedQuantity(Qty.subFloorZero(inv.getReservedQuantity(), allocation.getQuantity()));
                         inventoryRepo.save(inv);
                     });
             logAdjustmentTransaction(
                     allocation.getWarehouseId(), allocation.getItemId(),
-                    -allocation.getQuantity(), 0,
+                    allocation.getQuantity().negate(), BigDecimal.ZERO,
                     "stock_allocation_cancel_item", allocation.getAllocationId(), staffId
             );
             allocation.setStatus(AllocationStatus.RELEASED);
             StockAllocation saved = allocationRepo.save(allocation);
             estimateInternalApi.releaseEstimate(saved.getAllocationId(), saved.getQuantity(), staffId);
+            releaseSerials(List.of(saved));
         }
 
         // Tính tổng RESERVED còn lại cho itemId trong kho sau khi cancel
-        int remainingReservedQty = allocationRepo
+        BigDecimal remainingReservedQty = allocationRepo
                 .findByTicketAndWarehouseAndStatus(allocations.get(0).getServiceTicketId(), warehouseId, AllocationStatus.RESERVED)
                 .stream()
                 .filter(a -> itemId.equals(a.getItemId()))
-                .mapToInt(StockAllocation::getQuantity)
-                .sum();
+                .map(StockAllocation::getQuantity).reduce(BigDecimal.ZERO, Qty::add);
 
         // Xóa tất cả issue items của itemId này trong phiếu
         List<StockIssueItem> existingIssueItems = stockIssueItemRepo.findByIssueId(issueId)
@@ -631,22 +638,22 @@ public class StockAllocationService {
             stockIssueItemRepo.deleteById(issueItem.getIssueItemId());
         }
 
-        if (remainingReservedQty > 0) {
+        if (remainingReservedQty.signum() > 0) {
             BigDecimal estimateUnitPrice = stockIssueService.resolveEstimateUnitPricePublic(
                     allocations.get(0).getServiceTicketId(), warehouseId, itemId);
             BigDecimal discountRate = BigDecimal.ZERO;
             BigDecimal marketSellingPrice = stockIssueService.resolveMarketSellingPricePublic(warehouseId, itemId);
 
             List<StockEntryItem> lots = stockEntryRepo.findFifoLots(warehouseId, itemId);
-            int remaining = remainingReservedQty;
+            BigDecimal remaining = remainingReservedQty;
             List<StockIssueItem> newLotItems = new ArrayList<>();
 
             StockEntryItem latestLot = stockEntryRepo.findLatestLot(warehouseId, itemId).orElse(null);
 
             for (StockEntryItem lot : lots) {
-                if (remaining <= 0) break;
-                int consume = Math.min(remaining, lot.getRemainingQuantity());
-                if (consume <= 0) continue;
+                if (remaining.signum() <= 0) break;
+                BigDecimal consume = Qty.min(remaining, lot.getRemainingQuantity());
+                if (consume.signum() <= 0) continue;
 
                 // Ưu tiên giá cũ của lô này nếu đã có — tránh ghi đè bởi latestLot mới
                 BigDecimal sellingPrice = oldExportPriceByLot.get(lot.getEntryItemId());
@@ -669,7 +676,7 @@ public class StockAllocationService {
                         .issueId(issueId).itemId(itemId).entryItemId(lot.getEntryItemId())
                         .quantity(consume).exportPrice(sellingPrice).estimateUnitPrice(estimateUnitPrice)
                         .importPrice(lot.getImportPrice()).discountRate(discountRate).finalPrice(finalPrice).build());
-                remaining -= consume;
+                remaining = remaining.subtract(consume);
             }
             if (!newLotItems.isEmpty()) {
                 stockIssueItemRepo.saveAll(newLotItems);
@@ -708,14 +715,14 @@ public class StockAllocationService {
                     .orElse(null);
 
             if (inventory != null) {
-                int updatedReserved = Math.max(0, inventory.getReservedQuantity() - allocation.getQuantity());
+                BigDecimal updatedReserved = Qty.subFloorZero(inventory.getReservedQuantity(), allocation.getQuantity());
                 inventory.setReservedQuantity(updatedReserved);
                 inventoryRepo.save(inventory);
 
                 logAdjustmentTransaction(
                         allocation.getWarehouseId(),
                         allocation.getItemId(),
-                        -allocation.getQuantity(),
+                        allocation.getQuantity().negate(),
                         inventory.getQuantity(),
                         "stock_allocation_cancel_item",
                         allocation.getAllocationId(),
@@ -727,6 +734,7 @@ public class StockAllocationService {
 
             StockAllocation saved = allocationRepo.save(allocation);
             estimateInternalApi.releaseEstimate(saved.getAllocationId(), saved.getQuantity(), staffId);
+            releaseSerials(List.of(saved));
         }
 
         // Xóa issue item khỏi phiếu
@@ -755,14 +763,14 @@ public class StockAllocationService {
 
             if (inventory != null) {
                 // Giảm reserved quantity (allocation vẫn ở RESERVED)
-                int updatedReserved = Math.max(0, inventory.getReservedQuantity() - allocation.getQuantity());
+                BigDecimal updatedReserved = Qty.subFloorZero(inventory.getReservedQuantity(), allocation.getQuantity());
                 inventory.setReservedQuantity(updatedReserved);
                 inventoryRepo.save(inventory);
 
                 logAdjustmentTransaction(
                         allocation.getWarehouseId(),
                         allocation.getItemId(),
-                        -allocation.getQuantity(),
+                        allocation.getQuantity().negate(),
                         inventory.getQuantity(),
                         "stock_allocation_cancel_with_issue",
                         allocation.getAllocationId(),
@@ -773,6 +781,7 @@ public class StockAllocationService {
             allocation.setStatus(AllocationStatus.RELEASED);
             StockAllocation saved = allocationRepo.save(allocation);
             estimateInternalApi.releaseEstimate(saved.getAllocationId(), saved.getQuantity(), staffId);
+            releaseSerials(List.of(saved));
         }
     }
 
@@ -786,7 +795,7 @@ public class StockAllocationService {
      * @return Kết quả allocation sau khi cập nhật
      */
     @Transactional
-    public StockAllocationResult updateAllocation(Integer allocationId, int newQuantity, Integer staffId) {
+    public StockAllocationResult updateAllocation(Integer allocationId, BigDecimal newQuantity, Integer staffId) {
         StockAllocation alloc = allocationRepo.findById(allocationId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Không tìm thấy allocation id=" + allocationId));
@@ -803,19 +812,19 @@ public class StockAllocationService {
                         "Không tìm thấy tồn kho"));
 
         // Tính delta (chênh lệch)
-        int delta = newQuantity - alloc.getQuantity();
+        BigDecimal delta = Qty.sub(newQuantity, alloc.getQuantity());
 
         // Nếu tăng → kiểm tra đủ tồn kho khả dụng không
-        if (delta > 0) {
-            int availableQty = Math.max(0, inv.getQuantity() - inv.getReservedQuantity());
-            if (availableQty < delta) {
+        if (delta.signum() > 0) {
+            BigDecimal availableQty = Qty.subFloorZero(inv.getQuantity(), inv.getReservedQuantity());
+            if (Qty.lt(availableQty, delta)) {
                 throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                         "Không đủ tồn kho khả dụng để tăng allocation");
             }
         }
 
         // Cập nhật reserved quantity
-        inv.setReservedQuantity(inv.getReservedQuantity() + delta);
+        inv.setReservedQuantity(Qty.add(inv.getReservedQuantity(), delta));
         inventoryRepo.save(inv);
 
         // Cập nhật allocation
@@ -834,7 +843,7 @@ public class StockAllocationService {
                 .stream()
                 .filter(i -> i.getWarehouseId() != null)
                 .filter(i -> i.getItemId() != null)
-                .filter(i -> i.getQuantity() != null && i.getQuantity() > 0)
+                .filter(i -> Qty.isPositive(i.getQuantity()))
                 .filter(i -> !Boolean.TRUE.equals(i.getIsRemoved()))
                 .filter(i -> Boolean.TRUE.equals(i.getIsChecked()))
                 .toList();
@@ -845,8 +854,8 @@ public class StockAllocationService {
      * @param inventory - Tồn kho hiện tại
      * @param delta - Số lượng thay đổi (dương=tăng, âm=giảm)
      */
-    private void adjustReservedQuantity(Inventory inventory, int delta) {
-        inventory.setReservedQuantity(inventory.getReservedQuantity() + delta);
+    private void adjustReservedQuantity(Inventory inventory, BigDecimal delta) {
+        inventory.setReservedQuantity(Qty.add(inventory.getReservedQuantity(), delta));
         inventoryRepo.save(inventory);
     }
 
@@ -865,8 +874,8 @@ public class StockAllocationService {
     private void logTransaction(
             Integer warehouseId,
             Integer itemId,
-            int qty,
-            int balanceAfter,
+            BigDecimal qty,
+            BigDecimal balanceAfter,
             String refType,
             Integer refId,
             Integer staffId
@@ -930,7 +939,7 @@ public class StockAllocationService {
             Map<Integer, List<CreateStockIssueRequest.IssueItemRequest>> issueItemsByWarehouse,
             Integer warehouseId,
             Integer itemId,
-            Integer quantity,
+            BigDecimal quantity,
             Integer entryItemId
     ) {
         CreateStockIssueRequest.IssueItemRequest item = new CreateStockIssueRequest.IssueItemRequest();
@@ -977,10 +986,10 @@ public class StockAllocationService {
                 // Tính qty đã consume từ mỗi lô bởi các issue_item hiện có
                 // key = entryItemId, value = tổng qty đã dùng từ lô đó
                 List<StockIssueItem> existingItems = stockIssueItemRepo.findByIssueId(existingIssueId);
-                Map<Integer, Integer> consumedByLot = new HashMap<>();
+                Map<Integer, BigDecimal> consumedByLot = new HashMap<>();
                 for (StockIssueItem si : existingItems) {
                     if (si.getEntryItemId() != null && si.getEntryItemId() > 0) {
-                        consumedByLot.merge(si.getEntryItemId(), si.getQuantity() != null ? si.getQuantity() : 0, Integer::sum);
+                        consumedByLot.merge(si.getEntryItemId(), Qty.nz(si.getQuantity()), BigDecimal::add);
                     }
                 }
 
@@ -993,8 +1002,8 @@ public class StockAllocationService {
 
                 for (StockAllocation alloc : allReserved) {
                     Integer itemId = alloc.getItemId();
-                    int needed = alloc.getQuantity();
-                    if (needed <= 0) continue;
+                    BigDecimal needed = alloc.getQuantity();
+                    if (needed.signum() <= 0) continue;
 
                     // Chỉ xử lý allocation MỚI (chưa gắn issueId)
                     if (alloc.getIssueId() != null) continue;
@@ -1024,14 +1033,14 @@ public class StockAllocationService {
 
                     // Phân bổ qty của allocation này vào các lô (theo lô được chọn hoặc FIFO)
                     // Mỗi lô có thể đã bị dùng một phần bởi dòng cũ → chỉ lấy phần còn lại
-                    int remaining = needed;
+                    BigDecimal remaining = needed;
                     if (alloc.getEntryItemId() != null && alloc.getEntryItemId() > 0) {
                         StockEntryItem lot = stockEntryRepo.findItemById(alloc.getEntryItemId()).orElse(null);
                         if (lot != null && lot.getItemId().equals(itemId)) {
-                            int alreadyConsumed = consumedByLot.getOrDefault(lot.getEntryItemId(), 0);
-                            int available = Math.max(0, lot.getRemainingQuantity() - alreadyConsumed);
-                            int consume = Math.min(remaining, available);
-                            if (consume > 0) {
+                            BigDecimal alreadyConsumed = consumedByLot.getOrDefault(lot.getEntryItemId(), BigDecimal.ZERO);
+                            BigDecimal available = Qty.subFloorZero(lot.getRemainingQuantity(), alreadyConsumed);
+                            BigDecimal consume = Qty.min(remaining, available);
+                            if (consume.signum() > 0) {
                                 BigDecimal sellingPrice;
                                 if (marketSellingPrice_cache != null) {
                                     sellingPrice = marketSellingPrice_cache;
@@ -1052,18 +1061,18 @@ public class StockAllocationService {
                                         .importPrice(lot.getImportPrice()).discountRate(BigDecimal.ZERO)
                                         .finalPrice(finalPrice).build());
 
-                                consumedByLot.merge(lot.getEntryItemId(), consume, Integer::sum);
-                                remaining -= consume;
+                                consumedByLot.merge(lot.getEntryItemId(), consume, BigDecimal::add);
+                                remaining = remaining.subtract(consume);
                             }
                         }
                     } else {
                         for (StockEntryItem lot : lots_cache) {
-                            if (remaining <= 0) break;
-                            int alreadyConsumed = consumedByLot.getOrDefault(lot.getEntryItemId(), 0);
-                            int available = Math.max(0, lot.getRemainingQuantity() - alreadyConsumed);
-                            if (available <= 0) continue;
+                            if (remaining.signum() <= 0) break;
+                            BigDecimal alreadyConsumed = consumedByLot.getOrDefault(lot.getEntryItemId(), BigDecimal.ZERO);
+                            BigDecimal available = Qty.subFloorZero(lot.getRemainingQuantity(), alreadyConsumed);
+                            if (available.signum() <= 0) continue;
 
-                            int consume = Math.min(remaining, available);
+                            BigDecimal consume = Qty.min(remaining, available);
 
                             BigDecimal sellingPrice;
                             if (marketSellingPrice_cache != null) {
@@ -1085,12 +1094,12 @@ public class StockAllocationService {
                                     .importPrice(lot.getImportPrice()).discountRate(BigDecimal.ZERO)
                                     .finalPrice(finalPrice).build());
 
-                            consumedByLot.merge(lot.getEntryItemId(), consume, Integer::sum);
-                            remaining -= consume;
+                            consumedByLot.merge(lot.getEntryItemId(), consume, BigDecimal::add);
+                            remaining = remaining.subtract(consume);
                         }
                     }
                     // Placeholder nếu không đủ lô
-                    if (remaining > 0) {
+                    if (remaining.signum() > 0) {
                         newLotItems.add(StockIssueItem.builder()
                                 .issueId(existingIssueId).itemId(itemId).entryItemId(0)
                                 .quantity(remaining).exportPrice(BigDecimal.ZERO)
@@ -1122,8 +1131,8 @@ public class StockAllocationService {
     private void logAdjustmentTransaction(
             Integer warehouseId,
             Integer itemId,
-            int qty,
-            int balanceAfter,
+            BigDecimal qty,
+            BigDecimal balanceAfter,
             String refType,
             Integer refId,
             Integer staffId
@@ -1184,6 +1193,14 @@ public class StockAllocationService {
         }
 
         return List.of();
+    }
+
+    /** Allocation bị nhả thì serial các dòng báo giá của nó đang giữ cũng về kho. */
+    private void releaseSerials(Collection<StockAllocation> allocations) {
+        itemSerialService.releaseByEstimateItems(allocations.stream()
+                .map(StockAllocation::getEstimateItemId)
+                .filter(Objects::nonNull)
+                .toList());
     }
 
     private StockAllocationResult toResult(StockAllocation a) {

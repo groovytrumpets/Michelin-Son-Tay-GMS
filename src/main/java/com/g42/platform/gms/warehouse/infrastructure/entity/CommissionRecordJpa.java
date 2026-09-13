@@ -26,7 +26,7 @@ public class CommissionRecordJpa {
     private Integer issueId;
 
     @Column(name = "quantity", nullable = false)
-    private Integer quantity;
+    private BigDecimal quantity;
 
     @Column(name = "final_price", nullable = false, precision = 12, scale = 2)
     private BigDecimal finalPrice;

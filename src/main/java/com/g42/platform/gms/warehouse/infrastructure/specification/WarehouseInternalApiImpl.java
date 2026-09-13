@@ -1,5 +1,7 @@
 package com.g42.platform.gms.warehouse.infrastructure.specification;
 
+
+import com.g42.platform.gms.common.util.Qty;
 import com.g42.platform.gms.warehouse.app.service.dto.PricingResolve;
 import org.apache.commons.lang3.tuple.Pair;
 import com.g42.platform.gms.warehouse.api.dto.CatalogItemDto;
@@ -86,7 +88,7 @@ public class WarehouseInternalApiImpl implements WarehouseInternalApi {
     }
 
     @Override
-    public void updateInventoryEstimateAllocation(Integer itemId, Integer warehouseId, Integer quantity) {
+    public void updateInventoryEstimateAllocation(Integer itemId, Integer warehouseId, BigDecimal quantity) {
         inventoryService.updateInventoryByEstimate(itemId,warehouseId,quantity);
     }
 
@@ -193,7 +195,7 @@ public class WarehouseInternalApiImpl implements WarehouseInternalApi {
         Map<Integer, String> brandMap = brandJpaRepo.getBrandMapByIds(brandIds);
         Map<Integer, String> lineMap = productLineJpaRepo.findAllLinesByIds(lineIds);
 
-        Map<Integer, Long> availableMap = new HashMap<>();
+        Map<Integer, BigDecimal> availableMap = new HashMap<>();
         for (InventoryJpaRepo.ItemAvailableProjection row : inventoryJpaRepo.sumAvailableByItemIds(itemIds)) {
             availableMap.put(row.getItemId(), row.getAvailableQty());
         }
@@ -216,8 +218,8 @@ public class WarehouseInternalApiImpl implements WarehouseInternalApi {
             dto.setProductLineName(item.getProductLineId() != null ? lineMap.get(item.getProductLineId()) : null);
             dto.setCompatibleCars(item.getCompatibleCars());
             dto.setSlug(item.getSlug());
-            Long available = availableMap.get(item.getItemId());
-            dto.setAvailableQty(available != null ? Math.toIntExact(Math.max(0, available)) : 0);
+            BigDecimal available = availableMap.get(item.getItemId());
+            dto.setAvailableQty(Qty.max(available, BigDecimal.ZERO));
             result.put(item.getItemId(), dto);
         }
         return result;
@@ -231,9 +233,8 @@ public class WarehouseInternalApiImpl implements WarehouseInternalApi {
         List<WarehouseDetailDto> details = warehouseJpaRepo.getListOfWarehouseDetailsByItemId(itemId);
         List<HomeStockLocationDto> result = new java.util.ArrayList<>();
         for (WarehouseDetailDto detail : details) {
-            int available = (detail.getQuantity() != null ? detail.getQuantity() : 0)
-                    - (detail.getReservedQuantity() != null ? detail.getReservedQuantity() : 0);
-            if (available <= 0) continue;
+            BigDecimal available = Qty.sub(detail.getQuantity(), detail.getReservedQuantity());
+            if (available.signum() <= 0) continue;
 
             WarehouseJpa warehouse = warehouseJpaRepo.findById(detail.getWarehouseId()).orElse(null);
             if (warehouse == null || Boolean.FALSE.equals(warehouse.getIsActive())) continue;

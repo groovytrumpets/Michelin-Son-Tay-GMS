@@ -8,7 +8,7 @@ import java.math.BigDecimal;
 @Setter
 public class LotUpdateDto {
     private Integer entryItemId;
-    private Integer remainingQuantity;
+    private BigDecimal remainingQuantity;
     private BigDecimal sellingPrice;
     private BigDecimal sellingPriceWholesale;
     private BigDecimal importPrice;

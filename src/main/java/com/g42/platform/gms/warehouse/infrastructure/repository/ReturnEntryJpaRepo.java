@@ -78,7 +78,7 @@ public interface ReturnEntryJpaRepo extends JpaRepository<ReturnEntryJpa, Intege
             where ri.allocation_id = :allocationId
               and r.status in ('SUBMITTED', 'CONFIRMED')
             """, nativeQuery = true)
-    Long sumActiveReturnedQuantityByAllocationId(@Param("allocationId") Integer allocationId);
+    java.math.BigDecimal sumActiveReturnedQuantityByAllocationId(@Param("allocationId") Integer allocationId);
 
         @Query(value = """
             select count(*)

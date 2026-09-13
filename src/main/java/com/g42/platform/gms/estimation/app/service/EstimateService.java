@@ -1,5 +1,7 @@
 package com.g42.platform.gms.estimation.app.service;
 
+
+import com.g42.platform.gms.common.util.Qty;
 import com.g42.platform.gms.auth.api.internal.CustomerInternalApi;
 import com.g42.platform.gms.auth.entity.CustomerProfile;
 import com.g42.platform.gms.booking_management.api.internal.BookingManageInternalApi;
@@ -61,6 +63,10 @@ public class EstimateService {
     private final FallbackPricingConfigJpaRepo fallbackPricingConfigJpaRepo;
     private final StockEntryItemJpaRepo stockEntryItemJpaRepo;
     private final CustomerInternalApi customerInternalApi;
+    private final com.g42.platform.gms.warehouse.app.service.serial.ItemSerialService itemSerialService;
+    private final com.g42.platform.gms.warehouse.app.service.catalog.ItemQuantityPolicy itemQuantityPolicy;
+    private final com.g42.platform.gms.warehouse.infrastructure.repository.ItemSerialJpaRepo itemSerialJpaRepo;
+    private final com.g42.platform.gms.warehouse.infrastructure.repository.CatalogItemJpaRepo catalogItemJpaRepo;
 
 
     public List<EstimateRespondDto> getEstimateByCode(Integer serviceTicketId) {
@@ -178,7 +184,7 @@ public class EstimateService {
                     }
 
                     // 2. Cộng dồn tiền hàng
-                    BigDecimal itemQty = BigDecimal.valueOf(item.getQuantity() != null ? item.getQuantity() : 0);
+                    BigDecimal itemQty = Qty.nz(item.getQuantity());
                     BigDecimal itemPrice = item.getUnitPrice() != null ? item.getUnitPrice() : BigDecimal.ZERO;
                     subTotal = subTotal.add(itemPrice.multiply(itemQty));
                     BigDecimal itemFinalPrice = item.getFinalPrice() != null ? item.getFinalPrice() : BigDecimal.ZERO;
@@ -193,6 +199,7 @@ public class EstimateService {
             dto.setTotalPrice(finalPrice);
             dto.setSubTotal(subTotal);
             dto.setTotalTaxAmount(totalTax);
+            fillSerialCodes(itemDtos);
             dto.setItems(itemDtos);
             dto.setPromotions(new ArrayList<>(prmotionIds));
             if (!oldPrice.equals(dto.getTotalPrice())) {
@@ -227,6 +234,7 @@ public class EstimateService {
 
         List<EstimateItem> items = resolveItems(request.getItems(), saved.getId(), request.getFallbackPricingConfigId(), request.getManualMarkupMultiplier(), request.getEstimateType());
         estimateItemRepository.saveAll(items);
+        syncSerialReservations(saved.getId());
 
         //todo: update total_price
         BigDecimal totalPrice = items.stream()
@@ -242,6 +250,7 @@ public class EstimateService {
         return getEstimateRespondDto(saved.getId());
     }
 
+    @Transactional
     public EstimateRespondDto updateEstimate(Integer estimateId, EstimateRequestDto request) {
         Estimate estimate = estimateRepository.findEstimateById(estimateId);
         if (estimate == null) throw new RuntimeException("Estimate not found");
@@ -261,6 +270,8 @@ public class EstimateService {
                 existing.setItemName(req.getItemName());
                 existing.setItemId(req.getItemId());
                 existing.setQuantity(req.getQuantity());
+                validateLineQuantity(req);
+                existing.setSerialIdsJson(itemSerialService.toJson(req.getSerialIds()));
                 
                 // Recalculate unit price using config if provided, otherwise use request unit price
                 // Dùng warehouseId mới nhất từ request (chưa được set vào existing ở dưới) để tra đúng lô hàng.
@@ -289,7 +300,7 @@ public class EstimateService {
                     wc = itemCategoryRepo.findById(req.getItemCategoryId());
                 }
                 
-                BigDecimal quantity = BigDecimal.valueOf(existing.getQuantity() != null ? existing.getQuantity() : 0);
+                BigDecimal quantity = Qty.nz(existing.getQuantity());
                 BigDecimal unitPrice = existing.getUnitPrice() != null ? existing.getUnitPrice() : BigDecimal.ZERO;
                 BigDecimal totalPrice = unitPrice.multiply(quantity);
                 existing.setTotalPrice(totalPrice);
@@ -334,6 +345,7 @@ public class EstimateService {
                 });
 
         estimateItemRepository.saveAll(toSave);
+        syncSerialReservations(estimateId);
         BigDecimal totalPrice = toSave.stream()
                 .filter(item -> Boolean.TRUE.equals(item.getIsChecked()))
                 .filter(item -> Boolean.FALSE.equals(item.getIsRemoved()))
@@ -361,6 +373,90 @@ public class EstimateService {
         item.setDiscountPercent(req.getDiscountPercent());
     }
 
+    /**
+     * Số lượng dòng báo giá phải đúng kiểu đo lường của sản phẩm: hàng đếm là số nguyên,
+     * hàng đo (lít, kg) đúng số chữ số lẻ, hàng chỉ bán nguyên hộp là bội số của hộp.
+     * Dòng gõ tay không gắn sản phẩm chỉ cần dương và tối đa 3 chữ số lẻ.
+     */
+    private void validateLineQuantity(EstimateItemReqDto req) {
+        if (req.getQuantity() == null || Boolean.TRUE.equals(req.getIsRemoved())) return;
+        if (req.getItemId() != null) {
+            itemQuantityPolicy.validateSaleQuantity(req.getItemId(), req.getQuantity(), req.getItemName());
+        } else if (req.getQuantity().signum() <= 0 || req.getQuantity().stripTrailingZeros().scale() > Qty.SCALE) {
+            throw new EstimateException((req.getItemName() != null ? req.getItemName() + ": " : "")
+                    + "số lượng phải lớn hơn 0 và tối đa " + Qty.SCALE + " chữ số thập phân", EstimateErrorCode.BAD_REQUEST);
+        }
+    }
+
+    /**
+     * Giữ đúng các serial mà dòng báo giá đã chọn (sau khi các dòng đã có id).
+     * Các bản báo giá cũ hơn của cùng phiếu coi như bị bản này thay thế.
+     */
+    private void syncSerialReservations(Integer estimateId) {
+        List<EstimateItem> items = estimateItemRepository.findByEstimateId(estimateId);
+        if (items.isEmpty()) return;
+
+        Set<Integer> superseded = new HashSet<>();
+        Estimate estimate = estimateRepository.findEstimateById(estimateId);
+        if (estimate != null && estimate.getServiceTicketId() != null) {
+            for (Estimate other : estimateRepository.getListOfEstimateByServiceTiketCode(estimate.getServiceTicketId())) {
+                if (other.getId() != null && !other.getId().equals(estimateId)) {
+                    estimateItemRepository.findByEstimateId(other.getId()).forEach(i -> superseded.add(i.getId()));
+                }
+            }
+        } else if (estimate != null) {
+            Integer previousId = estimate.getRevisedFromId();
+            int guard = 20;
+            while (previousId != null && guard-- > 0) {
+                estimateItemRepository.findByEstimateId(previousId).forEach(i -> superseded.add(i.getId()));
+                Estimate previous = estimateRepository.findEstimateById(previousId);
+                previousId = previous != null ? previous.getRevisedFromId() : null;
+            }
+        }
+
+        List<com.g42.platform.gms.warehouse.app.service.serial.ItemSerialService.EstimateSerialLine> lines = items.stream()
+                .map(i -> new com.g42.platform.gms.warehouse.app.service.serial.ItemSerialService.EstimateSerialLine(
+                        i.getId(), i.getItemId(), i.getWarehouseId(), i.getEntryItemId(), i.getQuantity(),
+                        itemSerialService.parseIds(i.getSerialIdsJson()), Boolean.TRUE.equals(i.getIsRemoved())))
+                .toList();
+        itemSerialService.syncEstimateReservations(lines, superseded);
+    }
+
+    /** Điền mã serial và cấu hình đo lường của sản phẩm cho các dòng, gom truy vấn cho cả báo giá. */
+    private void fillSerialCodes(List<EstimateItemDto> itemDtos) {
+        Set<Integer> catalogIds = itemDtos.stream().map(EstimateItemDto::getItemId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        if (!catalogIds.isEmpty()) {
+            Map<Integer, com.g42.platform.gms.warehouse.infrastructure.entity.CatalogItemJpa> catalogById =
+                    catalogItemJpaRepo.findAllById(catalogIds).stream()
+                            .collect(Collectors.toMap(c -> c.getItemId(), c -> c, (a, b) -> a));
+            for (EstimateItemDto dto : itemDtos) {
+                var catalog = dto.getItemId() == null ? null : catalogById.get(dto.getItemId());
+                if (catalog == null) continue;
+                dto.setMeasurementType(catalog.getMeasurementType());
+                dto.setDecimalScale(catalog.getDecimalScale());
+                dto.setPackagingUnit(catalog.getPackagingUnit());
+                dto.setConversionFactor(catalog.getConversionFactor());
+                dto.setSellByPackageOnly(catalog.getSellByPackageOnly());
+                dto.setTracksLot(catalog.getTracksLot());
+                dto.setTracksSerial(catalog.getTracksSerial());
+            }
+        }
+
+        Set<Integer> ids = itemDtos.stream()
+                .filter(d -> d.getSerialIds() != null)
+                .flatMap(d -> d.getSerialIds().stream())
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (ids.isEmpty()) return;
+        Map<Integer, String> codeById = itemSerialJpaRepo.findAllById(ids).stream()
+                .collect(Collectors.toMap(s -> s.getSerialId(), s -> s.getSerialCode()));
+        for (EstimateItemDto dto : itemDtos) {
+            if (dto.getSerialIds() == null || dto.getSerialIds().isEmpty()) continue;
+            dto.setSerialCodes(dto.getSerialIds().stream().map(codeById::get).filter(Objects::nonNull).toList());
+        }
+    }
+
     /** Nhãn hạng mục chỉ toàn khoảng trắng coi như không nhập, để không hiện ô trống trên phiếu. */
     private String normalizeCategoryLabel(String rawLabel) {
         if (rawLabel == null) return null;
@@ -386,6 +482,8 @@ public class EstimateService {
             item.setItemId(req.getItemId());
             item.setItemName(req.getItemName());
             item.setQuantity(req.getQuantity());
+            validateLineQuantity(req);
+            item.setSerialIdsJson(itemSerialService.toJson(req.getSerialIds()));
 
             // Recalculate unit price using config if provided, otherwise use request unit price
             BigDecimal calculatedUnitPrice = calculateMarkupUnitPrice(
@@ -428,7 +526,7 @@ public class EstimateService {
                 ruleId = req.getTaxRuleId();
             }
             //todo: vat calculate
-            BigDecimal quantity = BigDecimal.valueOf(req.getQuantity());
+            BigDecimal quantity = Qty.nz(req.getQuantity());
             BigDecimal unitPrice = req.getUnitPrice();
 
             BigDecimal totalPrice = unitPrice.multiply(quantity);
@@ -556,18 +654,20 @@ public class EstimateService {
             }
 
             // Cộng dồn tiền gốc (Đơn giá * Số lượng)
-            BigDecimal itemQty = BigDecimal.valueOf(item.getQuantity() != null ? item.getQuantity() : 0);
+            BigDecimal itemQty = Qty.nz(item.getQuantity());
             BigDecimal itemPrice = item.getUnitPrice() != null ? item.getUnitPrice() : BigDecimal.ZERO;
             subTotal = subTotal.add(itemPrice.multiply(itemQty));
 
             itemDtos.add(itemDto);
         }
+        fillSerialCodes(itemDtos);
         dto.setItems(itemDtos);
         dto.setTotalTaxAmount(totalTax);
         dto.setSubTotal(subTotal);
         return dto;
     }
 
+    @Transactional
     public EstimateItemReqDto updateEstimateItem(Integer estimateItemId, EstimateItemReqDto request) {
         EstimateItem estimateItem = estimateItemRepository.findByEstimateItemId(estimateItemId);
 
@@ -585,6 +685,13 @@ public class EstimateService {
         }
         if (request.getItemId() != null)estimateItem.setItemId(request.getItemId());
         if (request.getItemName() != null)estimateItem.setItemName(request.getItemName());
+        if (request.getQuantity() != null) {
+            Integer targetItemId = request.getItemId() != null ? request.getItemId() : estimateItem.getItemId();
+            if (targetItemId != null) {
+                itemQuantityPolicy.validateSaleQuantity(targetItemId, request.getQuantity(), estimateItem.getItemName());
+            }
+        }
+        if (request.getSerialIds() != null) estimateItem.setSerialIdsJson(itemSerialService.toJson(request.getSerialIds()));
         if (request.getQuantity() != null)estimateItem.setQuantity(request.getQuantity());
         if (request.getUnitPrice() != null)estimateItem.setUnitPrice(request.getUnitPrice());
         if (request.getIsChecked() != null)estimateItem.setIsChecked(request.getIsChecked());
@@ -592,7 +699,7 @@ public class EstimateService {
         if (request.getWarehouseId() != null) estimateItem.setWarehouseId(request.getWarehouseId());
         estimateItem.setEntryItemId(request.getEntryItemId());
 
-        BigDecimal quantity = BigDecimal.valueOf(estimateItem.getQuantity() != null ? estimateItem.getQuantity() : 0);
+        BigDecimal quantity = Qty.nz(estimateItem.getQuantity());
         BigDecimal unitPrice = estimateItem.getUnitPrice() != null ? estimateItem.getUnitPrice() : BigDecimal.ZERO;
         BigDecimal totalPriceVal = unitPrice.multiply(quantity);
         estimateItem.setTotalPrice(totalPriceVal);
@@ -639,6 +746,7 @@ public class EstimateService {
 
         EstimateItem saved = estimateItemRepository.save(estimateItem);
         //todo: recalculate
+        syncSerialReservations(saved.getEstimateId());
         List<EstimateItem> allItems = estimateItemRepository.findByEstimateId(saved.getEstimateId());
         BigDecimal totalPrice = allItems.stream()
                 .filter(i -> Boolean.TRUE.equals(i.getIsChecked()))
@@ -653,7 +761,7 @@ public class EstimateService {
 
     }
     private void applyTax(EstimateItem item,Integer taxRuleId) {
-        BigDecimal quantity = BigDecimal.valueOf(item.getQuantity() != null ? item.getQuantity() : 0);
+        BigDecimal quantity = Qty.nz(item.getQuantity());
         BigDecimal unitPrice = item.getUnitPrice() != null ? item.getUnitPrice() : BigDecimal.ZERO;
         BigDecimal subTotal = unitPrice.multiply(quantity);
         if (taxRuleId != null) {
@@ -770,7 +878,7 @@ public class EstimateService {
             giftItem.setEstimateId(estimateId);
             giftItem.setItemId(giftItemConfig.getCatalogItemId());
             giftItem.setItemName(catalogItem.getItemName());
-            giftItem.setQuantity(giftQuantity);
+            giftItem.setQuantity(Qty.of(giftQuantity));
             //before promotion
             //find price in db
 
@@ -809,12 +917,12 @@ public class EstimateService {
         }
         int multiplier = Integer.MAX_VALUE;
         for (PromotionBuyItem buyItem : buyItems) {
-            int purchasedQuantity = items.stream()
+            BigDecimal purchasedQuantity = Qty.sum(items.stream()
                     .filter(item -> !Boolean.TRUE.equals(item.getIsGift()))
                     .filter(item -> item.getItemId().equals(buyItem.getCatalogItemId()))
-                    .mapToInt(EstimateItem::getQuantity)
-                    .sum();
-            int ratio = purchasedQuantity / buyItem.getQuantity();
+                    .toList(), EstimateItem::getQuantity);
+            int ratio = buyItem.getQuantity() == null || buyItem.getQuantity() <= 0 ? 0
+                    : purchasedQuantity.divideToIntegralValue(Qty.of(buyItem.getQuantity())).intValue();
             multiplier = Math.min(multiplier, ratio);
         }
         return multiplier == Integer.MAX_VALUE ? 0 : multiplier;
@@ -824,13 +932,13 @@ public class EstimateService {
         //find by triggerItem warehouse
         if (triggerItem.getWarehouseId()!=null){
             Inventory inventory = warehouseInternalApi.findInventoryByWarehouseIdAndItemIds(triggerItem.getWarehouseId(),giftItem.getItemId());
-            if (inventory!=null&&inventory.getAvailableQuantity()>0){
+            if (inventory!=null&&Qty.isPositive(inventory.getAvailableQuantity())){
                 return triggerItem.getWarehouseId();
             }
         }
         //find another warehouse
         Inventory fallback = warehouseInternalApi.findItemAvailableInOtherWarehouse(giftItem.getItemId(),0);
-        if (fallback!=null&&fallback.getAvailableQuantity()>0){
+        if (fallback!=null&&Qty.isPositive(fallback.getAvailableQuantity())){
             return fallback.getItemId();
         }
         // not available
@@ -860,7 +968,7 @@ public class EstimateService {
                     .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP)
                     .setScale(2, RoundingMode.HALF_UP);
             estimateItem.setDiscountAmount(discount);
-            BigDecimal quantity = BigDecimal.valueOf(estimateItem.getQuantity());
+            BigDecimal quantity = Qty.nz(estimateItem.getQuantity());
             BigDecimal newTotalPrice = estimateItem.getUnitPrice().multiply(quantity);
             BigDecimal taxRate = estimateItem.getAppliedTaxRate()
                     .divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
@@ -961,7 +1069,7 @@ public class EstimateService {
             estimateItem.setDiscountAmount(null);
             estimateItem.setPromotionId(null);
 
-            BigDecimal quantity = BigDecimal.valueOf(estimateItem.getQuantity() != null ? estimateItem.getQuantity() : 0);
+            BigDecimal quantity = Qty.nz(estimateItem.getQuantity());
             BigDecimal unitPrice = estimateItem.getUnitPrice() != null ? estimateItem.getUnitPrice() : BigDecimal.ZERO;
             BigDecimal basePrice = unitPrice.multiply(quantity);
 
@@ -1079,7 +1187,7 @@ public class EstimateService {
                     totalTax = totalTax.add(item.getTaxAmount());
                 }
 
-                BigDecimal itemQty = BigDecimal.valueOf(item.getQuantity() != null ? item.getQuantity() : 0);
+                BigDecimal itemQty = Qty.nz(item.getQuantity());
                 BigDecimal itemPrice = item.getUnitPrice() != null ? item.getUnitPrice() : BigDecimal.ZERO;
                 subTotal = subTotal.add(itemPrice.multiply(itemQty));
 
@@ -1097,6 +1205,7 @@ public class EstimateService {
         dto.setTotalPrice(finalPrice);
         dto.setSubTotal(subTotal);
         dto.setTotalTaxAmount(totalTax);
+        fillSerialCodes(itemDtos);
         dto.setItems(itemDtos);
         dto.setPromotions(new ArrayList<>(promotionIds));
 
@@ -1212,7 +1321,7 @@ public class EstimateService {
                 item.setUnitPrice(nextPrice);
                 
                 // Recalculate subtotal and tax based on existing appliedTaxRate
-                BigDecimal quantity = BigDecimal.valueOf(item.getQuantity() != null ? item.getQuantity() : 0);
+                BigDecimal quantity = Qty.nz(item.getQuantity());
                 BigDecimal subTotal = nextPrice.multiply(quantity);
                 BigDecimal taxRate = item.getAppliedTaxRate();
                 if (taxRate != null && taxRate.compareTo(BigDecimal.ZERO) > 0) {

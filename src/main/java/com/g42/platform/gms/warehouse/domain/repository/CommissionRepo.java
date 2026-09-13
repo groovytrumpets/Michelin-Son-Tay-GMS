@@ -16,5 +16,5 @@ public interface CommissionRepo {
 
     List<CommissionRecord> findRecordsByPeriod(String periodMonth);
 
-    int sumQuantityByStaffAndItemAndPeriod(Integer staffId, Integer itemId, String periodMonth);
+    java.math.BigDecimal sumQuantityByStaffAndItemAndPeriod(Integer staffId, Integer itemId, String periodMonth);
 }

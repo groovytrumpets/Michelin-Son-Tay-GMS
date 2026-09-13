@@ -1,5 +1,7 @@
 package com.g42.platform.gms.warehouse.api.dto.request;
 
+
+import java.math.BigDecimal;
 import com.g42.platform.gms.warehouse.domain.enums.DefectCause;
 import com.g42.platform.gms.warehouse.domain.enums.ReturnReason;
 import jakarta.validation.constraints.Min;
@@ -21,8 +23,8 @@ public class ReturnEntryItemRequest {
     private Integer entryItemId;
 
     @NotNull
-    @Min(1)
-    private Integer quantity;
+    @jakarta.validation.constraints.DecimalMin(value = "0", inclusive = false)
+    private BigDecimal quantity;
 
     /** Mô tả tình trạng sản phẩm khi trả, bắt buộc với hàng trả */
     private String conditionNote;

@@ -1,5 +1,7 @@
 package com.g42.platform.gms.warehouse.domain.entity;
 
+
+import java.math.BigDecimal;
 import com.g42.platform.gms.warehouse.domain.enums.AllocationStatus;
 import lombok.Data;
 
@@ -16,7 +18,7 @@ public class StockAllocation {
     private Integer itemId;
     private Integer entryItemId;
     private String itemName;
-    private Integer quantity;
+    private BigDecimal quantity;
     private AllocationStatus status;
     private Integer createdBy;
     private LocalDateTime createdAt;

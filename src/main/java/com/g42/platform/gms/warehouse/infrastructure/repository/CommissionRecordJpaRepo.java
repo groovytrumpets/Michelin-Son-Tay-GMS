@@ -14,7 +14,7 @@ public interface CommissionRecordJpaRepo extends JpaRepository<CommissionRecordJ
     List<CommissionRecordJpa> findByPeriodMonth(String periodMonth);
 
     @Query("SELECT COALESCE(SUM(c.quantity), 0) FROM CommissionRecordJpa c WHERE c.staffId = :staffId AND c.itemId = :itemId AND c.periodMonth = :periodMonth")
-    Integer sumQuantityByStaffAndItemAndPeriod(
+    java.math.BigDecimal sumQuantityByStaffAndItemAndPeriod(
             @Param("staffId") Integer staffId,
             @Param("itemId") Integer itemId,
             @Param("periodMonth") String periodMonth);

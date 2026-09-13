@@ -105,4 +105,31 @@ public class CatalogItemJpa {
     @Column(name = "cost_price", precision = 12, scale = 2)
     private BigDecimal costPrice;
 
+    @Column(name = "measurement_type", length = 10, nullable = false)
+    private String measurementType = "COUNT";
+    @Column(name = "decimal_scale", nullable = false)
+    private Integer decimalScale = 0;
+    @Column(name = "packaging_unit", length = 50)
+    private String packagingUnit;
+    @Column(name = "conversion_factor", precision = 14, scale = 3, nullable = false)
+    private BigDecimal conversionFactor = BigDecimal.ONE;
+    @Column(name = "sell_by_package_only", nullable = false)
+    private Boolean sellByPackageOnly = false;
+    @Column(name = "tracks_lot", nullable = false)
+    private Boolean tracksLot = true;
+    @Column(name = "tracks_serial", nullable = false)
+    private Boolean tracksSerial = false;
+
+    /** Các cột cấu hình đo lường là NOT NULL; mapper copy null từ domain thì trả về mặc định. */
+    @PrePersist
+    @PreUpdate
+    void applyMeasurementDefaults() {
+        if (measurementType == null || measurementType.isBlank()) measurementType = "COUNT";
+        if (decimalScale == null) decimalScale = 0;
+        if (conversionFactor == null || conversionFactor.signum() <= 0) conversionFactor = BigDecimal.ONE;
+        if (sellByPackageOnly == null) sellByPackageOnly = false;
+        if (tracksLot == null) tracksLot = true;
+        if (tracksSerial == null) tracksSerial = false;
+    }
+
 }

@@ -1,5 +1,7 @@
 package com.g42.platform.gms.warehouse.infrastructure.repository.impl;
 
+
+import com.g42.platform.gms.common.util.Qty;
 import com.g42.platform.gms.warehouse.domain.entity.ItemProfitAggregate;
 import com.g42.platform.gms.warehouse.domain.entity.StockIssue;
 import com.g42.platform.gms.warehouse.domain.entity.StockIssueItem;

@@ -17,6 +17,15 @@ import java.util.List;
 public interface EstimateDtoMapper {
     @Mapping(target = "estimateItemId", source = "id")
     @Mapping(target = "itemCategory", ignore = true)
+    @Mapping(target = "serialIds", source = "serialIdsJson")
+    @Mapping(target = "measurementType", ignore = true)
+    @Mapping(target = "decimalScale", ignore = true)
+    @Mapping(target = "packagingUnit", ignore = true)
+    @Mapping(target = "conversionFactor", ignore = true)
+    @Mapping(target = "sellByPackageOnly", ignore = true)
+    @Mapping(target = "tracksLot", ignore = true)
+    @Mapping(target = "tracksSerial", ignore = true)
+    @Mapping(target = "serialCodes", ignore = true)
     @Mapping(target = "subTotal", source = "totalPrice")
     EstimateItemDto toEstimateItemDto(EstimateItem estimateItem);
     @Mapping(target = "subTotal", source = "totalPrice")
@@ -25,8 +34,22 @@ public interface EstimateDtoMapper {
     EstimateRespondDto toEstimateDto(Estimate estimate);
     @Mapping(target = "itemCategoryId", source = "id")
     ItemCateDto toItemCateDto(ItemCategory itemCategory);
+    @Mapping(target = "serialIds", source = "serialIdsJson")
     @Mapping(target = "estimateItemId", source = "id")
     EstimateItemReqDto toEstimateItemReqDto(EstimateItem estimateItem);
+    @Mapping(target = "serialIds", source = "serialIdsJson")
+    @Mapping(target = "serialCodes", ignore = true)
     @Mapping(target = "estimateItemId", source = "id")
     EstimateItemDto toEstimateItemDtoJpa(EstimateItemJpa estimateItem);
+
+    /** serial_ids lưu dạng mảng JSON trong một cột. */
+    default List<Integer> serialIdsFromJson(String json) {
+        if (json == null || json.isBlank()) return null;
+        try {
+            return new com.fasterxml.jackson.databind.ObjectMapper()
+                    .readValue(json, new com.fasterxml.jackson.core.type.TypeReference<List<Integer>>() {});
+        } catch (Exception e) {
+            return null;
+        }
+    }
 }

@@ -1,6 +1,8 @@
 package com.g42.platform.gms.warehouse.infrastructure.entity;
 
 
+
+import java.math.BigDecimal;
 import com.g42.platform.gms.warehouse.domain.enums.InventoryTransactionType;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
@@ -40,11 +42,11 @@ public class InventoryTransactionJpa {
 
     @NotNull
     @Column(name = "quantity", nullable = false)
-    private Integer quantity;
+    private BigDecimal quantity;
 
     @NotNull
     @Column(name = "balance_after", nullable = false)
-    private Integer balanceAfter;
+    private BigDecimal balanceAfter;
 
     @Size(max = 50)
     @Column(name = "reference_type", length = 50)

@@ -20,6 +20,8 @@ import com.g42.platform.gms.warehouse.infrastructure.repository.CatalogItemJpaRe
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.g42.platform.gms.common.util.Qty;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -36,6 +38,7 @@ public class StockAllocationService {
     private final InventoryService inventoryService;
     private final ComboItemRepoJpa comboItemRepoJpa;
     private final CatalogItemJpaRepo catalogItemJpaRepo;
+    private final com.g42.platform.gms.warehouse.app.service.serial.ItemSerialService itemSerialService;
 
     @Transactional
     public List<StockAllocationDto> createStockAllocation(Integer estimateId, Integer staffId) {
@@ -101,7 +104,7 @@ public class StockAllocationService {
                     List<ComboItemJpa> comboSubItems = newItem.getItemId() != null ? comboItemRepoJpa.findAllByComboId(newItem.getItemId()) : null;
                     if (comboSubItems != null && !comboSubItems.isEmpty()) {
                         Integer warehouseId = newItem.getWarehouseId() != null ? newItem.getWarehouseId() : 1;
-                        int parentQty = newItem.getQuantity() != null ? newItem.getQuantity() : 1;
+                        BigDecimal parentQty = newItem.getQuantity() != null ? newItem.getQuantity() : BigDecimal.ONE;
 
                         for (ComboItemJpa subItem : comboSubItems) {
                             if (subItem.getIncludedItemId() == null) continue;
@@ -114,7 +117,7 @@ public class StockAllocationService {
                             stockAllocation.setWarehouseId(warehouseId);
                             stockAllocation.setItemId(subItem.getIncludedItemId());
                             stockAllocation.setEntryItemId(subItem.getEntryItemId() != null ? subItem.getEntryItemId() : newItem.getEntryItemId());
-                            stockAllocation.setQuantity((subItem.getQuantity() != null ? subItem.getQuantity() : 1) * parentQty);
+                            stockAllocation.setQuantity(parentQty.multiply(BigDecimal.valueOf(subItem.getQuantity() != null ? subItem.getQuantity() : 1)));
                             stockAllocation.setEstimateId(estimateId);
                             stockAllocation.setStatus("RESERVED");
                             stockAllocation.setCreatedBy(staffId);
@@ -163,7 +166,7 @@ public class StockAllocationService {
                     List<ComboItemJpa> comboSubItems = comboItemRepoJpa.findAllByComboId(estimateItem.getItemId());
                     if (comboSubItems != null && !comboSubItems.isEmpty()) {
                         Integer warehouseId = estimateItem.getWarehouseId() != null ? estimateItem.getWarehouseId() : 1;
-                        int parentQty = estimateItem.getQuantity() != null ? estimateItem.getQuantity() : 1;
+                        BigDecimal parentQty = estimateItem.getQuantity() != null ? estimateItem.getQuantity() : BigDecimal.ONE;
 
                         for (ComboItemJpa subItem : comboSubItems) {
                             if (subItem.getIncludedItemId() == null) continue;
@@ -176,7 +179,7 @@ public class StockAllocationService {
                             stockAllocation.setWarehouseId(warehouseId);
                             stockAllocation.setItemId(subItem.getIncludedItemId());
                             stockAllocation.setEntryItemId(subItem.getEntryItemId() != null ? subItem.getEntryItemId() : estimateItem.getEntryItemId());
-                            stockAllocation.setQuantity((subItem.getQuantity() != null ? subItem.getQuantity() : 1) * parentQty);
+                            stockAllocation.setQuantity(parentQty.multiply(BigDecimal.valueOf(subItem.getQuantity() != null ? subItem.getQuantity() : 1)));
                             stockAllocation.setEstimateId(estimateId);
                             stockAllocation.setStatus("RESERVED");
                             stockAllocation.setCreatedBy(staffId);
@@ -257,13 +260,13 @@ public class StockAllocationService {
                     continue; // Đã chốt thì không cho sửa kho nữa
                 }
 
-                int difference = dto.getQuantity() - existingAlloc.getQuantity();
+                BigDecimal difference = Qty.sub(dto.getQuantity(), existingAlloc.getQuantity());
                 boolean entryItemIdChanged = !Objects.equals(dto.getEntryItemId(), existingAlloc.getEntryItemId());
-                if (difference != 0 || entryItemIdChanged) {
+                if (difference.signum() != 0 || entryItemIdChanged) {
                     existingAlloc.setQuantity(dto.getQuantity());
                     existingAlloc.setEntryItemId(dto.getEntryItemId());
                     stockAllocationRepository.save(existingAlloc);
-                    if (difference != 0) {
+                    if (difference.signum() != 0) {
                         inventoryService.updateReservedQuantityByDelta(dto.getItemId(), dto.getWarehouseId(), difference);
                     }
                 }
@@ -289,14 +292,14 @@ public class StockAllocationService {
                 oldMap.remove(dto.getAllocationId());
                 continue; // Bỏ qua mọi xử lý update bên dưới, nhảy sang dto tiếp theo
             }
-            int difference = dto.getQuantity() - oldAllocation.getQuantity();
+            BigDecimal difference = Qty.sub(dto.getQuantity(), oldAllocation.getQuantity());
             boolean entryItemIdChanged = !Objects.equals(dto.getEntryItemId(), oldAllocation.getEntryItemId());
-            if (difference != 0 || entryItemIdChanged) {
+            if (difference.signum() != 0 || entryItemIdChanged) {
                 oldAllocation.setQuantity(dto.getQuantity());
                 oldAllocation.setEntryItemId(dto.getEntryItemId());
                 stockAllocationRepository.save(oldAllocation);
 
-                if (difference != 0) {
+                if (difference.signum() != 0) {
                     inventoryService.updateReservedQuantityByDelta(dto.getItemId(),dto.getWarehouseId(),difference);
                 }
             }
@@ -309,6 +312,7 @@ public class StockAllocationService {
             }
             inventoryService.decreaseReservedQuantity(deletedAlloc.getItemId(),deletedAlloc.getWarehouseId(),deletedAlloc.getQuantity());
             stockAllocationRepository.delete(deletedAlloc);
+            itemSerialService.releaseByEstimateItems(Collections.singletonList(deletedAlloc.getEstimateItemId()));
         }
         return stockAllocationRepository.findByEstimateId(estimateId).stream().map(stockAllocationDtoMapper::toDto).toList();
     }

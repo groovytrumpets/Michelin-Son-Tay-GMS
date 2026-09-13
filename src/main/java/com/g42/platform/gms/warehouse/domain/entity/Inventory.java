@@ -1,5 +1,7 @@
 package com.g42.platform.gms.warehouse.domain.entity;
 
+
+import java.math.BigDecimal;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -18,16 +20,14 @@ public class Inventory {
     private Integer inventoryId;
     private Integer warehouseId;
     private Integer itemId;
-    private Integer quantity;
-    private Integer reservedQuantity;
+    private BigDecimal quantity;
+    private BigDecimal reservedQuantity;
     private Integer minStockLevel;
     private Integer maxStockLevel;
     private LocalDateTime lastUpdated;
 
     /** Tính số lượng khả dụng (không âm) */
-    public int getAvailableQuantity() {
-        int qty = quantity != null ? quantity : 0;
-        int reserved = reservedQuantity != null ? reservedQuantity : 0;
-        return Math.max(0, qty - reserved);
+    public BigDecimal getAvailableQuantity() {
+        return com.g42.platform.gms.common.util.Qty.subFloorZero(quantity, reservedQuantity);
     }
 }

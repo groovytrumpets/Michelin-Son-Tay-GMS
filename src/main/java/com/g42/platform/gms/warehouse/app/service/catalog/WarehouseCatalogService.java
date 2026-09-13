@@ -1,5 +1,9 @@
 package com.g42.platform.gms.warehouse.app.service.catalog;
 
+
+
+import java.math.BigDecimal;
+import com.g42.platform.gms.common.util.Qty;
 import com.g42.platform.gms.warehouse.api.dto.request.CreatePartRequest;
 import com.g42.platform.gms.warehouse.api.dto.response.PartResponse;
 import com.g42.platform.gms.warehouse.domain.entity.CatalogItem;
@@ -61,8 +65,8 @@ public class WarehouseCatalogService {
         Inventory inv = Inventory.builder()
                 .warehouseId(request.getWarehouseId())
                 .itemId(saved.getItemId())
-                .quantity(0)
-                .reservedQuantity(0)
+                .quantity(BigDecimal.ZERO)
+                .reservedQuantity(BigDecimal.ZERO)
                 .build();
         inventoryRepo.save(inv);
 

@@ -1,5 +1,7 @@
 package com.g42.platform.gms.warehouse.domain.repository;
 
+
+import com.g42.platform.gms.common.util.Qty;
 import com.g42.platform.gms.warehouse.domain.entity.StockEntry;
 import com.g42.platform.gms.warehouse.domain.entity.StockEntryItem;
 import com.g42.platform.gms.warehouse.domain.enums.StockEntryStatus;
@@ -134,7 +136,7 @@ public interface StockEntryRepo {
      * Return: 1 nếu thành công, 0 nếu không đủ hàng (remainingQuantity < qty)
      * Dùng bởi: StockIssueService.confirm()
      */
-    int decreaseRemainingQuantity(Integer entryItemId, int qty);
+    int decreaseRemainingQuantity(Integer entryItemId, BigDecimal qty);
 
     /**
      * Tăng remainingQuantity bằng UPDATE SQL trực tiếp — KHÔNG load entity.
@@ -146,7 +148,7 @@ public interface StockEntryRepo {
      *
      * Dùng bởi: ReturnEntryService.confirm() khi khách trả hàng về lô cũ.
      */
-    int increaseRemainingQuantity(Integer entryItemId, int qty);
+    int increaseRemainingQuantity(Integer entryItemId, BigDecimal qty);
 
     // ── Utility ──────────────────────────────────────────────────────────────
 

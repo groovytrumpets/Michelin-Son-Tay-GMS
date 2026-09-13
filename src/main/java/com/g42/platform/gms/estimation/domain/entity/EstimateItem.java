@@ -26,7 +26,7 @@ public class EstimateItem {
     private Integer estimateId;
     private String itemName;
     private Integer itemId;
-    private Integer quantity;
+    private BigDecimal quantity;
     private BigDecimal unitPrice;
     private Boolean isOverridden;
     private String overrideReason;
@@ -61,10 +61,12 @@ public class EstimateItem {
     private BigDecimal laborCost;
     private String note;
     private BigDecimal discountPercent;
+    /** Mảng JSON serial_id đã chọn cho dòng. */
+    private String serialIdsJson;
 
     public BigDecimal getSubTotal() {
         if (unitPrice == null || quantity == null) return BigDecimal.ZERO;
-        return unitPrice.multiply(BigDecimal.valueOf(quantity));
+        return unitPrice.multiply(quantity);
     }
 
 }

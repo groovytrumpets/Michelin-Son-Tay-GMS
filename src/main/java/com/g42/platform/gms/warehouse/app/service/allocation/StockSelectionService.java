@@ -1,5 +1,9 @@
 package com.g42.platform.gms.warehouse.app.service.allocation;
 
+
+
+import java.math.BigDecimal;
+import com.g42.platform.gms.common.util.Qty;
 import com.g42.platform.gms.warehouse.api.dto.StockSelectionConfigDto;
 import com.g42.platform.gms.warehouse.api.dto.StockSuggestionDto;
 import com.g42.platform.gms.warehouse.api.dto.WarehouseLotDto;
@@ -77,7 +81,7 @@ public class StockSelectionService {
      * @param quantity    số lượng dự kiến, dùng để ưu tiên lô còn đủ hàng
      * @param warehouseId kho người dùng đã chỉ định; để trống thì hệ thống tự chọn
      */
-    public StockSuggestionDto suggest(Integer itemId, Integer quantity, Integer warehouseId) {
+    public StockSuggestionDto suggest(Integer itemId, BigDecimal quantity, Integer warehouseId) {
         StockSelectionConfigJpa config = getActiveConfig();
         StockAllocationMethod method = config.getAllocationMethod() == null
                 ? StockAllocationMethod.FIFO
@@ -126,12 +130,12 @@ public class StockSelectionService {
      * Không lô nào đủ thì lấy lô đứng đầu — phần thiếu sẽ do luồng xuất kho
      * chia tiếp sang các lô sau.
      */
-    private WarehouseLotDto pickLot(List<WarehouseLotDto> lots, StockAllocationMethod method, Integer quantity) {
+    private WarehouseLotDto pickLot(List<WarehouseLotDto> lots, StockAllocationMethod method, BigDecimal quantity) {
         List<WarehouseLotDto> sorted = lots.stream().sorted(comparatorFor(method)).toList();
-        int needed = quantity == null || quantity <= 0 ? 1 : quantity;
+        BigDecimal needed = quantity == null || quantity.signum() <= 0 ? BigDecimal.ONE : quantity;
 
         return sorted.stream()
-                .filter(lot -> lot.getRemainingQuantity() != null && lot.getRemainingQuantity() >= needed)
+                .filter(lot -> lot.getRemainingQuantity() != null && !Qty.lt(lot.getRemainingQuantity(), needed))
                 .findFirst()
                 .orElse(sorted.get(0));
     }
@@ -161,24 +165,22 @@ public class StockSelectionService {
         Integer defaultWarehouseId = config.getDefaultWarehouseId();
         if (defaultWarehouseId != null) {
             Optional<InventoryJpa> inv = inventoryJpaRepo.findByWarehouseIdAndItemId(defaultWarehouseId, itemId);
-            if (inv.isPresent() && availableOf(inv.get()) > 0) return defaultWarehouseId;
+            if (inv.isPresent() && Qty.isPositive(availableOf(inv.get()))) return defaultWarehouseId;
             // Kho mặc định hết hàng mà không cho tìm kho khác thì vẫn trả kho mặc định,
             // để người dùng thấy đúng kho đã cấu hình và tự xử lý.
             if (!Boolean.TRUE.equals(config.getFallbackToAnyWarehouse())) return defaultWarehouseId;
         }
 
         return inventoryJpaRepo.findByItemIdOrderByQuantityDesc(itemId).stream()
-                .filter(inv -> availableOf(inv) > 0)
+                .filter(inv -> Qty.isPositive(availableOf(inv)))
                 .map(InventoryJpa::getWarehouseId)
                 .findFirst()
                 .orElse(defaultWarehouseId);
     }
 
     /** Tồn khả dụng = tồn kho trừ phần đang được giữ cho các phiếu khác. */
-    private int availableOf(InventoryJpa inventory) {
-        int quantity = inventory.getQuantity() == null ? 0 : inventory.getQuantity();
-        int reserved = inventory.getReservedQuantity() == null ? 0 : inventory.getReservedQuantity();
-        return Math.max(0, quantity - reserved);
+    private BigDecimal availableOf(InventoryJpa inventory) {
+        return Qty.subFloorZero(inventory.getQuantity(), inventory.getReservedQuantity());
     }
 
     private StockSelectionConfigDto toConfigDto(StockSelectionConfigJpa config) {

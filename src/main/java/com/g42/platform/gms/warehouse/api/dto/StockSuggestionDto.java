@@ -26,7 +26,7 @@ public class StockSuggestionDto {
     private String warehouseName;
     private Integer entryItemId;
     private String entryCode;
-    private Integer availableQuantity;
+    private BigDecimal availableQuantity;
     private BigDecimal importPrice;
     private LocalDate entryDate;
     private LocalDate expiryDate;

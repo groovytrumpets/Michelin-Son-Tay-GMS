@@ -1,5 +1,7 @@
 package com.g42.platform.gms.warehouse.app.service.discount;
 
+
+import com.g42.platform.gms.common.util.Qty;
 import com.g42.platform.gms.warehouse.domain.entity.DiscountConfig;
 import com.g42.platform.gms.warehouse.domain.enums.IssueType;
 import com.g42.platform.gms.warehouse.domain.repository.DiscountConfigRepo;
@@ -20,10 +22,10 @@ public class DiscountService {
     private final StockEntryRepo stockEntryRepo;
 
         @Transactional(readOnly = true)
-        public BigDecimal resolveDiscountRate(Integer itemId, IssueType issueType, int quantity) {
+        public BigDecimal resolveDiscountRate(Integer itemId, IssueType issueType, BigDecimal quantity) {
         return discountConfigRepo.findActiveByItemIdAndIssueType(itemId, issueType)
             .stream()
-            .filter(c -> c.getQuantityThreshold() == null || quantity >= c.getQuantityThreshold())
+            .filter(c -> c.getQuantityThreshold() == null || !Qty.lt(quantity, BigDecimal.valueOf(c.getQuantityThreshold())))
             .max(java.util.Comparator
                 .comparingInt(this::specificityScore)
                 .thenComparingInt(c -> c.getQuantityThreshold() != null ? c.getQuantityThreshold() : 0)
@@ -34,7 +36,7 @@ public class DiscountService {
 
     @Transactional(readOnly = true)
     public BigDecimal calculateFinalPrice(Integer itemId, IssueType issueType,
-                                          int quantity, BigDecimal exportPrice) {
+                                          BigDecimal quantity, BigDecimal exportPrice) {
         BigDecimal bestRate = resolveDiscountRate(itemId, issueType, quantity);
 
         if (bestRate.compareTo(BigDecimal.ZERO) == 0) return exportPrice;

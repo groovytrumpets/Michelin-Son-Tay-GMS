@@ -1,5 +1,7 @@
 package com.g42.platform.gms.warehouse.domain.entity;
 
+
+import java.math.BigDecimal;
 import com.g42.platform.gms.warehouse.domain.enums.InventoryTransactionType;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
@@ -22,8 +24,8 @@ public class InventoryTransaction {
     private Integer warehouseId;
     private Integer itemId;
     private InventoryTransactionType transactionType;
-    private Integer quantity;
-    private Integer balanceAfter;
+    private BigDecimal quantity;
+    private BigDecimal balanceAfter;
     private Integer entryItemId;
     private String referenceType;
     private Integer referenceId;

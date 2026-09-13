@@ -9,10 +9,10 @@ public interface WarehouseDetailProjection {
     String getWarehouseAddress();
     Integer getItemId();
     BigDecimal getSellingPrice();
-    Integer getQuantity();
-    Integer getReservedQuantity();
+    java.math.BigDecimal getQuantity();
+    java.math.BigDecimal getReservedQuantity();
     Integer getMinStockLevel();
     Integer getMaxStockLevel();
-    Integer getAvailableStockLevel();
+    java.math.BigDecimal getAvailableStockLevel();
     String getNotify();
 }

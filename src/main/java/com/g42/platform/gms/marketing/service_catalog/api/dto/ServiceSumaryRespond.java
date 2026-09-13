@@ -34,7 +34,7 @@ public class ServiceSumaryRespond {
     private String productLineName;
     private String compatibleCars;
     private Boolean inStock;
-    private Integer availableQty;
+    private java.math.BigDecimal availableQty;
 
     /** Slug bài viết item_post PUBLISHED gắn với catalogItemId — null nếu chưa có bài viết (FE fallback về id số). */
     private String slug;

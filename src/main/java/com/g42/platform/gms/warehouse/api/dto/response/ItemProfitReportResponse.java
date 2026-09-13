@@ -9,7 +9,7 @@ public class ItemProfitReportResponse {
     private Integer itemId;
     private String itemName;
     private String itemType;
-    private Integer quantity;
+    private BigDecimal quantity;
     private BigDecimal revenue;
     private BigDecimal cost;
     private BigDecimal grossProfit;

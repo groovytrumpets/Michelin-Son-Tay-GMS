@@ -1,5 +1,7 @@
 package com.g42.platform.gms.warehouse.app.service.commission;
 
+
+import com.g42.platform.gms.common.util.Qty;
 import com.g42.platform.gms.warehouse.api.dto.response.CommissionReportResponse;
 import com.g42.platform.gms.warehouse.domain.entity.CommissionRecord;
 import com.g42.platform.gms.warehouse.domain.repository.CommissionRepo;
@@ -38,13 +40,13 @@ public class CommissionService {
         for (StockIssueItem item : issue.getItems()) {
             commissionRepo.findActiveConfigByItem(item.getItemId())
                     .ifPresent(config -> {
-                        int totalQty = commissionRepo
+                        BigDecimal totalQty = commissionRepo
                                 .sumQuantityByStaffAndItemAndPeriod(staffId, item.getItemId(), periodMonth);
-                        int newTotal = totalQty + item.getQuantity();
+                        BigDecimal newTotal = Qty.add(totalQty, item.getQuantity());
 
-                        if (newTotal >= config.getCommissionQuantityThreshold()) {
+                        if (config.getCommissionQuantityThreshold() == null || !Qty.lt(newTotal, BigDecimal.valueOf(config.getCommissionQuantityThreshold()))) {
                             BigDecimal commissionValue = item.getFinalPrice()
-                                    .multiply(BigDecimal.valueOf(item.getQuantity()))
+                                    .multiply(Qty.nz(item.getQuantity()))
                                     .multiply(config.getCommissionRate())
                                     .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
 

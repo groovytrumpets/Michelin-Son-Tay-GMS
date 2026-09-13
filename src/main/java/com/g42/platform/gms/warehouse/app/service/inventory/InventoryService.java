@@ -1,5 +1,7 @@
 package com.g42.platform.gms.warehouse.app.service.inventory;
 
+
+import com.g42.platform.gms.common.util.Qty;
 import com.g42.platform.gms.estimation.domain.exception.EstimateErrorCode;
 import com.g42.platform.gms.estimation.domain.exception.EstimateException;
 import com.g42.platform.gms.warehouse.api.dto.response.InventoryResponse;
@@ -33,63 +35,64 @@ public class InventoryService {
     private final StockEntryRepo stockEntryRepo;
     private final WarehousePricingRepo pricingRepo;
     @Transactional(readOnly = true)
-    public int getAvailableQuantity(Integer warehouseId, Integer itemId) {
+    public BigDecimal getAvailableQuantity(Integer warehouseId, Integer itemId) {
         return inventoryRepo.findByWarehouseAndItem(warehouseId, itemId)
                 .map(Inventory::getAvailableQuantity)
-                .orElse(0);    }
+                .orElse(BigDecimal.ZERO);
+    }
 
     /** Tăng reserved_quantity — dùng khi tạo stock allocation */
     @Transactional
-    public void increaseReservedQuantity(Integer itemId, Integer warehouseId, Integer quantity) {
+    public void increaseReservedQuantity(Integer itemId, Integer warehouseId, BigDecimal quantity) {
 
         Inventory inv = inventoryRepo.findByWarehouseAndItemWithLock(warehouseId, itemId)
                 .orElseThrow(() -> new EstimateException("Không tìm thấy thông tin tồn kho cho sản phẩm này!", EstimateErrorCode.BAD_REQUEST));
-        if (inv.getAvailableQuantity() < quantity) {
+        if (Qty.lt(inv.getAvailableQuantity(), quantity)) {
             throw new EstimateException(
-                    "Sản phẩm không đủ tồn kho để giữ chỗ! Khả dụng: " + inv.getAvailableQuantity() + ", Yêu cầu: " + quantity,
+                    "Sản phẩm không đủ tồn kho để giữ chỗ! Khả dụng: " + Qty.text(inv.getAvailableQuantity()) + ", Yêu cầu: " + Qty.text(quantity),
                     EstimateErrorCode.OUT_OF_STOCK
             );
         }
-        int newReserved = (inv.getReservedQuantity() != null ? inv.getReservedQuantity() : 0) + quantity;
+        BigDecimal newReserved = Qty.add(inv.getReservedQuantity(), quantity);
         inv.setReservedQuantity(newReserved);
 
         inventoryRepo.save(inv);
 
 //        inventoryRepo.findByWarehouseAndItemWithLock(warehouseId, itemId).ifPresent(inv -> {
-//            int newReserved = (inv.getReservedQuantity() != null ? inv.getReservedQuantity() : 0) + quantity;
-//            inv.setReservedQuantity(Math.max(0, newReserved));
+//            BigDecimal newReserved = Qty.add(inv.getReservedQuantity(), quantity);
+//            inv.setReservedQuantity(newReserved.max(BigDecimal.ZERO));
 //            inventoryRepo.save(inv);
 //        });
     }
 
     /** Giảm reserved_quantity — dùng khi release stock allocation */
     @Transactional
-    public void decreaseReservedQuantity(Integer itemId, Integer warehouseId, Integer quantity) {
+    public void decreaseReservedQuantity(Integer itemId, Integer warehouseId, BigDecimal quantity) {
         inventoryRepo.findByWarehouseAndItemWithLock(warehouseId, itemId).ifPresent(inv -> {
-            int newReserved = (inv.getReservedQuantity() != null ? inv.getReservedQuantity() : 0) - quantity;
-            inv.setReservedQuantity(Math.max(0, newReserved));
+            BigDecimal newReserved = Qty.sub(inv.getReservedQuantity(), quantity);
+            inv.setReservedQuantity(newReserved.max(BigDecimal.ZERO));
             inventoryRepo.save(inv);
         });
     }
 
     /** Cập nhật reserved_quantity theo delta (dương = tăng, âm = giảm) */
     @Transactional
-    public void updateReservedQuantityByDelta(Integer itemId, Integer warehouseId, int delta) {
+    public void updateReservedQuantityByDelta(Integer itemId, Integer warehouseId, BigDecimal delta) {
         inventoryRepo.findByWarehouseAndItemWithLock(warehouseId, itemId).ifPresent(inv -> {
-            int newReserved = (inv.getReservedQuantity() != null ? inv.getReservedQuantity() : 0) + delta;
-            inv.setReservedQuantity(Math.max(0, newReserved));
+            BigDecimal newReserved = Qty.add(inv.getReservedQuantity(), delta);
+            inv.setReservedQuantity(newReserved.max(BigDecimal.ZERO));
             inventoryRepo.save(inv);
         });
     }
 
     /** Cập nhật inventory khi estimate được duyệt (trừ quantity thực tế) */
     @Transactional
-    public void updateInventoryByEstimate(Integer itemId, Integer warehouseId, Integer quantity) {
+    public void updateInventoryByEstimate(Integer itemId, Integer warehouseId, BigDecimal quantity) {
         inventoryRepo.findByWarehouseAndItemWithLock(warehouseId, itemId).ifPresent(inv -> {
-            int newQty = (inv.getQuantity() != null ? inv.getQuantity() : 0) - quantity;
-            int newReserved = (inv.getReservedQuantity() != null ? inv.getReservedQuantity() : 0) - quantity;
-            inv.setQuantity(Math.max(0, newQty));
-            inv.setReservedQuantity(Math.max(0, newReserved));
+            BigDecimal newQty = Qty.sub(inv.getQuantity(), quantity);
+            BigDecimal newReserved = Qty.sub(inv.getReservedQuantity(), quantity);
+            inv.setQuantity(newQty.max(BigDecimal.ZERO));
+            inv.setReservedQuantity(newReserved.max(BigDecimal.ZERO));
             inventoryRepo.save(inv);
         });
     }
@@ -97,8 +100,8 @@ public class InventoryService {
     public List<StockShortageInfo> checkAvailability(List<StockRequest> requests) {
         List<StockShortageInfo> shortages = new ArrayList<>();
         for (StockRequest req : requests) {
-            int available = getAvailableQuantity(req.getWarehouseId(), req.getItemId());
-            if (available < req.getQuantity()) {
+            BigDecimal available = getAvailableQuantity(req.getWarehouseId(), req.getItemId());
+            if (Qty.lt(available, req.getQuantity())) {
                 shortages.add(new StockShortageInfo(
                         req.getWarehouseId(), req.getItemId(), req.getQuantity(), available));
             }
@@ -169,11 +172,11 @@ public class InventoryService {
         List<Inventory> allInventory = inventoryRepo.findAll();
 
         // Group by itemId → tính tổng quantity và reservedQuantity
-        Map<Integer, Integer> totalQtyByItem = new java.util.LinkedHashMap<>();
-        Map<Integer, Integer> totalReservedByItem = new java.util.LinkedHashMap<>();
+        Map<Integer, BigDecimal> totalQtyByItem = new java.util.LinkedHashMap<>();
+        Map<Integer, BigDecimal> totalReservedByItem = new java.util.LinkedHashMap<>();
         for (Inventory inv : allInventory) {
-            totalQtyByItem.merge(inv.getItemId(), inv.getQuantity() != null ? inv.getQuantity() : 0, Integer::sum);
-            totalReservedByItem.merge(inv.getItemId(), inv.getReservedQuantity() != null ? inv.getReservedQuantity() : 0, Integer::sum);
+            totalQtyByItem.merge(inv.getItemId(), Qty.nz(inv.getQuantity()), BigDecimal::add);
+            totalReservedByItem.merge(inv.getItemId(), Qty.nz(inv.getReservedQuantity()), BigDecimal::add);
         }
 
         // Lấy tất cả catalog items (Part, Service, v.v)
@@ -181,8 +184,8 @@ public class InventoryService {
 
         List<InventoryResponse> result = new java.util.ArrayList<>();
         for (CatalogItem catalog : allItems) {
-            int qty = totalQtyByItem.getOrDefault(catalog.getItemId(), 0);
-            int reserved = totalReservedByItem.getOrDefault(catalog.getItemId(), 0);
+            BigDecimal qty = totalQtyByItem.getOrDefault(catalog.getItemId(), BigDecimal.ZERO);
+            BigDecimal reserved = totalReservedByItem.getOrDefault(catalog.getItemId(), BigDecimal.ZERO);
 
             InventoryResponse r = new InventoryResponse();
             r.setItemId(catalog.getItemId());
@@ -191,7 +194,7 @@ public class InventoryService {
             r.setUnit(catalog.getUnit());
             r.setQuantity(qty);
             r.setReservedQuantity(reserved);
-            r.setAvailableQuantity(Math.max(0, qty - reserved));
+            r.setAvailableQuantity(Qty.subFloorZero(qty, reserved));
             result.add(r);
         }
         return result;
@@ -222,11 +225,11 @@ public class InventoryService {
                         r.setInventoryId(inv.getInventoryId());
                         r.setQuantity(inv.getQuantity());
                         r.setReservedQuantity(inv.getReservedQuantity());
-                        r.setAvailableQuantity(Math.max(0, inv.getQuantity() - inv.getReservedQuantity()));
+                        r.setAvailableQuantity(Qty.subFloorZero(inv.getQuantity(), inv.getReservedQuantity()));
                     }, () -> {
-                        r.setQuantity(0);
-                        r.setReservedQuantity(0);
-                        r.setAvailableQuantity(0);
+                        r.setQuantity(BigDecimal.ZERO);
+                        r.setReservedQuantity(BigDecimal.ZERO);
+                        r.setAvailableQuantity(BigDecimal.ZERO);
                     });
 
             if (showImportPrice) {

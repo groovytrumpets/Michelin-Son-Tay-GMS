@@ -1,5 +1,7 @@
 package com.g42.platform.gms.warehouse.app.service.entry;
 
+
+import com.g42.platform.gms.common.util.Qty;
 import com.g42.platform.gms.common.service.ExcelService;
 import com.g42.platform.gms.warehouse.api.dto.entry.CreateStockEntryRequest;
 import com.g42.platform.gms.warehouse.api.dto.entry.StockEntryItemRequest;
@@ -124,8 +126,8 @@ public class StockEntryExcelService {
                 continue;
             }
 
-            Integer quantity = getCellInt(row, 3); // cột D
-            if (quantity == null || quantity <= 0) {
+            BigDecimal quantity = getCellQty(row, 3); // cột D
+            if (quantity == null || quantity.signum() <= 0) {
                 errors.add("Dòng " + rowNum + ": Số lượng phải là số nguyên dương (đọc được: " + getCellRaw(row, 3) + ")");
                 continue;
             }
@@ -184,6 +186,24 @@ public class StockEntryExcelService {
         if (cell == null) return null;
         if (cell.getCellType() == CellType.STRING) return cell.getStringCellValue().trim();
         if (cell.getCellType() == CellType.NUMERIC) return String.valueOf((long) cell.getNumericCellValue());
+        return null;
+    }
+
+    /** Số lượng có thể lẻ (lít, kg): đọc nguyên giá trị thập phân, không làm tròn. */
+    private BigDecimal getCellQty(Row row, int col) {
+        Cell cell = row.getCell(col);
+        if (cell == null) return null;
+        try {
+            if (cell.getCellType() == CellType.NUMERIC || cell.getCellType() == CellType.FORMULA) {
+                return Qty.normalize(BigDecimal.valueOf(cell.getNumericCellValue()));
+            }
+            if (cell.getCellType() == CellType.STRING) {
+                String s = cell.getStringCellValue().trim().replace(",", ".");
+                return s.isEmpty() ? null : Qty.normalize(new BigDecimal(s));
+            }
+        } catch (Exception e) {
+            return null;
+        }
         return null;
     }
 

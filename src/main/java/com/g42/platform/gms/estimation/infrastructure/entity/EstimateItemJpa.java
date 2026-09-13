@@ -35,7 +35,7 @@ public class EstimateItemJpa {
 
 
     @Column(name = "quantity", nullable = false)
-    private Integer quantity;
+    private BigDecimal quantity;
 
     @Column(name = "unit_price", precision = 12, scale = 2)
     private BigDecimal unitPrice;
@@ -116,4 +116,8 @@ public class EstimateItemJpa {
 
     @Column(name = "discount_percent", precision = 5, scale = 2)
     private BigDecimal discountPercent;
+
+    /** Mảng JSON serial_id đã chọn cho dòng (hàng theo dõi serial). */
+    @Column(name = "serial_ids", length = 2000)
+    private String serialIdsJson;
 }

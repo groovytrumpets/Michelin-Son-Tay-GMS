@@ -27,7 +27,7 @@ public class HomeCatalogItemInfoDto {
     private Integer productLineId;
     private String productLineName;
     private String compatibleCars;
-    private Integer availableQty;
+    private java.math.BigDecimal availableQty;
     /** Đường dẫn chữ tuỳ chỉnh (catalog_item.slug); item_post.slug (nếu có) vẫn được ưu tiên hơn. */
     private String slug;
 }

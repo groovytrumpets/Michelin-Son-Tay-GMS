@@ -7,6 +7,6 @@ import java.math.BigDecimal;
 /** Sửa từng dòng item trong phiếu xuất kho */
 @Data
 public class PatchIssueItemRequest {
-    private Integer quantity;
+    private BigDecimal quantity;
     private BigDecimal discountRate;
 }

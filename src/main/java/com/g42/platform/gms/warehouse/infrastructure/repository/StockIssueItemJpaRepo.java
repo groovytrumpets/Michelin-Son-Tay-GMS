@@ -29,7 +29,7 @@ public interface StockIssueItemJpaRepo extends JpaRepository<StockIssueItemJpa, 
      */
     @Query(value = """
             SELECT i.item_id AS itemId,
-                   CAST(SUM(i.quantity) AS SIGNED) AS totalQuantity,
+                   SUM(i.quantity) AS totalQuantity,
                    SUM(i.final_price * i.quantity) AS totalRevenue,
                    SUM(i.import_price * i.quantity) AS totalCost,
                    SUM(i.gross_profit) AS totalGrossProfit
@@ -49,7 +49,7 @@ public interface StockIssueItemJpaRepo extends JpaRepository<StockIssueItemJpa, 
 
     interface ItemProfitAggregateProjection {
         Integer getItemId();
-        Integer getTotalQuantity();
+        java.math.BigDecimal getTotalQuantity();
         BigDecimal getTotalRevenue();
         BigDecimal getTotalCost();
         BigDecimal getTotalGrossProfit();

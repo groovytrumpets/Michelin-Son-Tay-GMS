@@ -1,5 +1,7 @@
 package com.g42.platform.gms.estimation.api.dto;
 
+
+import java.math.BigDecimal;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -19,7 +21,7 @@ public class StockAllocationDto {
     private Integer itemId;
     private Integer entryItemId;
     private Integer estimateId;
-    private Integer quantity;
+    private BigDecimal quantity;
     private String status;
     private Integer createdBy;
     private Integer issueId;

@@ -23,4 +23,11 @@ public class ProductUnitJpa {
     @ColumnDefault("1")
     @Column(name = "is_active")
     private Byte isActive = 1;
+
+    /** Kiểu đo lường gợi ý cho sản phẩm chọn đơn vị này: COUNT hoặc MEASURE. */
+    @Column(name = "measurement_type", length = 10, nullable = false)
+    private String measurementType = "COUNT";
+
+    @Column(name = "decimal_scale", nullable = false)
+    private Integer decimalScale = 0;
 }

@@ -1,5 +1,7 @@
 package com.g42.platform.gms.warehouse.app.service.inventory;
 
+
+import com.g42.platform.gms.common.util.Qty;
 import com.g42.platform.gms.common.service.ExcelService;
 import com.g42.platform.gms.warehouse.domain.entity.*;
 import com.g42.platform.gms.warehouse.domain.enums.StockEntryStatus;
@@ -119,7 +121,7 @@ public class InventoryExcelService {
             Integer itemId = cat.getItemId();
             List<StockEntryItem> lots = lotsByItemId.getOrDefault(itemId, Collections.emptyList());
             Inventory inv = inventoryMap.get(itemId);
-            int totalStock = inv != null ? inv.getQuantity() : 0;
+            BigDecimal totalStock = inv != null ? Qty.nz(inv.getQuantity()) : BigDecimal.ZERO;
 
             String categoryName = cat.getItemCategoryId() != null ? categoryMap.get(cat.getItemCategoryId()) : "";
             String brandName = cat.getBrandId() != null ? brandMap.get(cat.getBrandId()) : "";
@@ -402,9 +404,9 @@ public class InventoryExcelService {
             }
 
             Integer itemId = catalogItem.getItemId();
-            Integer qty = getCellInt(row, COL_QTY);
+            BigDecimal qty = getCellQty(row, COL_QTY);
 
-            if (qty != null && qty > 0) {
+            if (qty != null && qty.signum() > 0) {
                 BigDecimal importPrice = getCellDecimal(row, COL_PRICE_BUY);
                 if (importPrice == null) importPrice = BigDecimal.ZERO;
 
@@ -521,6 +523,24 @@ public class InventoryExcelService {
         if (cell == null) return null;
         if (cell.getCellType() == CellType.STRING) return cell.getStringCellValue().trim();
         if (cell.getCellType() == CellType.NUMERIC) return String.valueOf((long) cell.getNumericCellValue());
+        return null;
+    }
+
+    /** Số lượng có thể lẻ (lít, kg): đọc nguyên giá trị thập phân, không làm tròn. */
+    private BigDecimal getCellQty(Row row, int col) {
+        Cell cell = row.getCell(col);
+        if (cell == null) return null;
+        try {
+            if (cell.getCellType() == CellType.NUMERIC || cell.getCellType() == CellType.FORMULA) {
+                return Qty.normalize(BigDecimal.valueOf(cell.getNumericCellValue()));
+            }
+            if (cell.getCellType() == CellType.STRING) {
+                String s = cell.getStringCellValue().trim().replace(",", ".");
+                return s.isEmpty() ? null : Qty.normalize(new BigDecimal(s));
+            }
+        } catch (Exception e) {
+            return null;
+        }
         return null;
     }
 

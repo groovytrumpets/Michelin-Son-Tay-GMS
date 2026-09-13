@@ -17,9 +17,9 @@ public class InventoryResponse {
     private String itemName;
     private String sku;
     private String unit;
-    private Integer quantity;
-    private Integer reservedQuantity;
-    private Integer availableQuantity;
+    private BigDecimal quantity;
+    private BigDecimal reservedQuantity;
+    private BigDecimal availableQuantity;
 
     /** Chỉ trả về cho ADVISOR, ACCOUNTANT, MANAGER, ADMIN */
     private BigDecimal sellingPrice;

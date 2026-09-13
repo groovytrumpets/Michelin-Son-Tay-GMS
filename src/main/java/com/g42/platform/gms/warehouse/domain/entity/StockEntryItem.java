@@ -15,10 +15,15 @@ public class StockEntryItem {
     private Integer entryItemId;
     private Integer entryId;
     private Integer itemId;
-    private Integer quantity;
+    private BigDecimal quantity;
     private BigDecimal importPrice;
     private BigDecimal markupMultiplier;
     private BigDecimal markupMultiplierWholesale;
-    private Integer remainingQuantity;
+    private BigDecimal remainingQuantity;
     private String notes;
+    private String inputUnit;
+    private BigDecimal inputQuantity;
+    private BigDecimal conversionFactor;
+    /** Mảng JSON serial nhập kèm (chỉ dùng khi phiếu còn nháp). */
+    private String serialCodes;
 }

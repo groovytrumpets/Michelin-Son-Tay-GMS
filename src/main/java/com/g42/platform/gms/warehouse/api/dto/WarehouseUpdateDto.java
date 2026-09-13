@@ -9,8 +9,8 @@ import java.util.List;
 @Setter
 public class WarehouseUpdateDto {
     private Integer warehouseId;
-    private Integer quantity;
-    private Integer reservedQuantity;
+    private BigDecimal quantity;
+    private BigDecimal reservedQuantity;
     private BigDecimal sellingPrice;
     private List<LotUpdateDto> lots;
 }

@@ -30,7 +30,7 @@ public class StockIssueItemJpa {
     private Integer entryItemId;
 
     @Column(name = "quantity", nullable = false)
-    private Integer quantity;
+    private BigDecimal quantity;
 
     @Column(name = "export_price", nullable = false, precision = 12, scale = 2)
     private BigDecimal exportPrice;

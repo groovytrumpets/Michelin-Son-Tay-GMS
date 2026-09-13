@@ -1,5 +1,7 @@
 package com.g42.platform.gms.warehouse.infrastructure.entity;
 
+
+import java.math.BigDecimal;
 import com.g42.platform.gms.warehouse.domain.enums.AllocationStatus;
 import jakarta.persistence.*;
 import lombok.Data;
@@ -44,7 +46,7 @@ public class StockAllocationJpa {
     private Integer entryItemId;
 
     @Column(name = "quantity", nullable = false)
-    private Integer quantity;
+    private BigDecimal quantity;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)

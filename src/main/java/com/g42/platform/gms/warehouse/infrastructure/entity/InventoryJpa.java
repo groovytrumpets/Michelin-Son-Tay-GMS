@@ -1,5 +1,7 @@
 package com.g42.platform.gms.warehouse.infrastructure.entity;
 
+
+import java.math.BigDecimal;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -23,10 +25,10 @@ public class InventoryJpa {
     private Integer itemId;
 
     @Column(name = "quantity", nullable = false)
-    private Integer quantity = 0;
+    private BigDecimal quantity = BigDecimal.ZERO;
 
     @Column(name = "reserved_quantity", nullable = false)
-    private Integer reservedQuantity = 0;
+    private BigDecimal reservedQuantity = BigDecimal.ZERO;
 
     @Column(name = "min_stock_level")
     private Integer minStockLevel = 0;

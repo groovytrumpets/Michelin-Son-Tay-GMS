@@ -1,5 +1,7 @@
 package com.g42.platform.gms.estimation.infrastructure;
 
+
+import com.g42.platform.gms.common.util.Qty;
 import com.g42.platform.gms.estimation.api.dto.UsedEstimateItemDto;
 import com.g42.platform.gms.estimation.api.internal.EstimateInternalApi;
 import com.g42.platform.gms.estimation.domain.entity.Estimate;
@@ -157,7 +159,7 @@ public class EstimateInternalApiImpl implements EstimateInternalApi {
     }
 
     @Override
-    public Integer releaseEstimate(Integer allocationId, Integer returnQuantity, Integer staffId) {
+    public Integer releaseEstimate(Integer allocationId, BigDecimal returnQuantity, Integer staffId) {
         StockAllocationJpa stockAllocation = stockAllocationJpaRepo.findById(allocationId).orElse(null);
         if (stockAllocation==null) {
             throw new EstimateException("Allocation:"+allocationId+" 404",EstimateErrorCode.BAD_REQUEST);
@@ -173,8 +175,8 @@ public class EstimateInternalApiImpl implements EstimateInternalApi {
         if (estimateItemJpa==null || estimateItemJpa.getQuantity()==null) {
             throw new EstimateException("EstimateItem of this Allocation:"+allocationId+" 404",EstimateErrorCode.BAD_REQUEST);
         }
-        Integer oldQty = estimateItemJpa.getQuantity();
-        if (oldQty.equals(returnQuantity)) {
+        BigDecimal oldQty = estimateItemJpa.getQuantity();
+        if (Qty.eq(oldQty, returnQuantity)) {
             estimateItemJpa.setIsChecked(false);
             EstimateItemJpa saved = estimateItemRepositoryJpa.save(estimateItemJpa);
             return saved.getId();
@@ -186,8 +188,8 @@ public class EstimateInternalApiImpl implements EstimateInternalApi {
 //                if (gift.getPromotionId()!=null) {
 //                    Promotion promotion = promotionInternalApi.findById(gift.getPromotionId());
 //                    if (promotion!=null) {
-//                        int newTriggerQty = oldQty - returnQuantity;
-//                        int validGiftQty = (newTriggerQty/promotion.getBuyQuantity())*promotion.getGetQuantity();
+//                        BigDecimal newTriggerQty = oldQty - returnQuantity;
+//                        BigDecimal validGiftQty = (newTriggerQty/promotion.getBuyQuantity())*promotion.getGetQuantity();
 //                        int giftToReturn = gift.getQuantity()-validGiftQty;
 //                        if (giftToReturn>0){
 //
@@ -200,7 +202,7 @@ public class EstimateInternalApiImpl implements EstimateInternalApi {
         EstimateItemJpa returnEstimate = new EstimateItemJpa();
         BeanUtils.copyProperties(estimateItemJpa,returnEstimate,"id");
 
-        estimateItemJpa.setQuantity(estimateItemJpa.getQuantity() - returnQuantity);
+        estimateItemJpa.setQuantity(Qty.sub(estimateItemJpa.getQuantity(), returnQuantity));
         recalculateItemPrices(estimateItemJpa,oldQty);
         estimateItemRepositoryJpa.save(estimateItemJpa);
 
@@ -242,7 +244,7 @@ public class EstimateInternalApiImpl implements EstimateInternalApi {
             }
 
             // 3. Tính toán tiền nong cho dòng này
-            BigDecimal quantity = BigDecimal.valueOf(item.getQuantity());
+            BigDecimal quantity = Qty.nz(item.getQuantity());
             BigDecimal totalCost = unitCost.multiply(quantity);
 
             // Lợi nhuận = Giá bán cuối cùng (đã trừ discount) - Tổng giá vốn
@@ -266,7 +268,7 @@ public class EstimateInternalApiImpl implements EstimateInternalApi {
 //        List<StockAllocationJpa> allocations = stockAllocationJpaRepo.findAllById(returnAllocationMap.keySet());
 //
 //        // Tạo Map chuyển đổi từ EstimateItemId -> Số lượng khách ĐANG MUỐN TRẢ
-//        Map<Integer, Integer> returningEstimateItemQtyMap = new HashMap<>();
+//        Map<Integer, BigDecimal> returningEstimateItemQtyMap = new HashMap<>();
 //        for (StockAllocationJpa alloc : allocations) {
 //            returningEstimateItemQtyMap.put(alloc.getEstimateItemId(), returnAllocationMap.get(alloc.getAllocationId()));
 //        }
@@ -274,7 +276,7 @@ public class EstimateInternalApiImpl implements EstimateInternalApi {
 //        // 2. Quét từng món hàng khách đang trả xem có phải là hàng mồi không
 //        for (Map.Entry<Integer, Integer> entry : returningEstimateItemQtyMap.entrySet()) {
 //            Integer estimateItemId = entry.getKey();
-//            Integer returnQty = entry.getValue();
+//            BigDecimal returnQty = entry.getValue();
 //
 //            EstimateItemJpa estimateItemJpa = estimateItemRepositoryJpa.findById(estimateItemId).orElse(null);
 //            if (estimateItemJpa == null) continue;
@@ -289,11 +291,11 @@ public class EstimateInternalApiImpl implements EstimateInternalApi {
 //                    if (gift.getPromotionId() != null) {
 //                        Promotion promotion = promotionInternalApi.findById(gift.getPromotionId());
 //                        if (promotion != null) {
-//                            int oldQty = estimateItemJpa.getQuantity();
-//                            int newTriggerQty = oldQty - returnQty;
+//                            BigDecimal oldQty = estimateItemJpa.getQuantity();
+//                            BigDecimal newTriggerQty = oldQty - returnQty;
 //
 //                            // Tính lượng quà khách ĐƯỢC PHÉP giữ lại
-//                            int validGiftQty = (newTriggerQty / promotion.getBuyQuantity()) * promotion.getGetQuantity();
+//                            BigDecimal validGiftQty = (newTriggerQty / promotion.getBuyQuantity()) * promotion.getGetQuantity();
 //
 //                            // Tính lượng quà BẮT BUỘC PHẢI TRẢ
 //                            int requiredGiftReturn = gift.getQuantity() - validGiftQty;
@@ -301,11 +303,11 @@ public class EstimateInternalApiImpl implements EstimateInternalApi {
 //                            if (requiredGiftReturn > 0) {
 //                                // 3. ĐỐI CHIẾU VỚI GIỎ TRẢ HÀNG
 //                                // Kiểm tra xem trong cái list khách trả, có cái quà này không?
-//                                int giftQtyInReturnRequest = returningEstimateItemQtyMap.getOrDefault(gift.getId(), 0);
+//                                BigDecimal giftQtyInReturnRequest = returningEstimateItemQtyMap.getOrDefault(gift.getId(), BigDecimal.ZERO);
 //
 //                                // Nếu lượng quà có trong giỏ trả hàng ÍT HƠN lượng quà bắt buộc phải trả -> Lỗi!
 //                                if (giftQtyInReturnRequest < requiredGiftReturn) {
-//                                    int missingQty = requiredGiftReturn - giftQtyInReturnRequest;
+//                                    BigDecimal missingQty = requiredGiftReturn - giftQtyInReturnRequest;
 //                                    throw new EstimateException(
 //                                            "Vi phạm khuyến mãi! Khách trả " + returnQty + " '" + estimateItemJpa.getItemName() +
 //                                                    "' nên bị rớt mốc nhận quà. Cố vấn dịch vụ cần yêu cầu khách trả thêm " + missingQty + " '" + gift.getItemName() + "' vào phiếu này!",
@@ -320,16 +322,16 @@ public class EstimateInternalApiImpl implements EstimateInternalApi {
 //        }
 //    }
 
-    private void recalculateItemPrices(EstimateItemJpa estimateItemJpa, Integer oldQuantity) {
+    private void recalculateItemPrices(EstimateItemJpa estimateItemJpa, BigDecimal oldQuantity) {
         if (estimateItemJpa.getUnitPrice()==null || estimateItemJpa.getQuantity()==null) return;
         //todo calculate price based on promotions, tax and quantity
-        BigDecimal totalPrice = estimateItemJpa.getUnitPrice().multiply(BigDecimal.valueOf(estimateItemJpa.getQuantity()));
+        BigDecimal totalPrice = estimateItemJpa.getUnitPrice().multiply(estimateItemJpa.getQuantity());
         estimateItemJpa.setTotalPrice(totalPrice);
         //discount
         BigDecimal newDiscount = BigDecimal.ZERO;
         if (estimateItemJpa.getDiscountAmount()!=null) {
-            BigDecimal unitDiscount = estimateItemJpa.getDiscountAmount().divide(BigDecimal.valueOf(oldQuantity),2, RoundingMode.HALF_UP);
-            newDiscount = unitDiscount.multiply(BigDecimal.valueOf(estimateItemJpa.getQuantity()));
+            BigDecimal unitDiscount = estimateItemJpa.getDiscountAmount().divide(oldQuantity, 2, RoundingMode.HALF_UP);
+            newDiscount = unitDiscount.multiply(estimateItemJpa.getQuantity());
         }
         estimateItemJpa.setDiscountAmount(newDiscount);
         BigDecimal finalPrice = totalPrice.subtract(newDiscount);

@@ -1,0 +1,525 @@
+# Hàng bán lẻ theo lít/kg, hàng đóng hộp và hàng theo dõi số serial.
+#
+# 1. Số lượng hàng hoá chuyển từ INT sang DECIMAL(14,3): tồn kho, lô, giữ hàng,
+#    xuất/hoàn kho, báo giá, lịch sử giao dịch kho. 3 chữ số lẻ đủ tới mililít/gam.
+#    Dữ liệu cũ là số nguyên nên đổi kiểu không làm mất gì.
+# 2. catalog_item thêm cấu hình đo lường:
+#    - measurement_type COUNT (đếm: cái, bộ, hộp — bắt buộc số nguyên) hoặc
+#      MEASURE (đo: lít, kg — cho phép số lẻ tới decimal_scale chữ số).
+#    - packaging_unit + conversion_factor: đơn vị nhập lớn và số đơn vị tồn trong
+#      một đơn vị nhập (can 20 lít, hộp 10 cái). sell_by_package_only: chỉ được bán
+#      theo bội số của conversion_factor (bugi bộ 4 không tách lẻ).
+#    - tracks_lot: cho người dùng chọn lô khi bán (tắt thì hệ thống tự lấy FIFO).
+#      tracks_serial: mỗi đơn vị hàng có một số serial riêng.
+#    Mặc định giữ đúng hành vi cũ: COUNT, hệ số 1, theo dõi lô, không serial.
+# 3. product_unit thêm measurement_type/decimal_scale mặc định cho đơn vị, để chọn
+#    đơn vị "Lít" là sản phẩm tự nhận kiểu đo lường.
+# 4. stock_entry_item lưu lại số lượng + đơn vị gốc lúc nhập (1 phuy) bên cạnh số đã
+#    quy đổi (200 lít), và danh sách serial nhập kèm khi phiếu còn nháp.
+# 5. Bảng item_serial: mỗi dòng là một đơn vị hàng có serial, luôn thuộc một lô.
+# 6. estimate_item.serial_ids: các serial đã chọn cho dòng báo giá.
+# 7. return_entry_item.serial_ids: serial đã đưa về kho khi xác nhận phiếu hoàn.
+databaseChangeLog:
+  # Mỗi bảng một changeset: DDL của MySQL không nằm trong transaction, lỗi giữa chừng
+  # thì các bảng đã đổi được đánh dấu chạy xong, lần khởi động sau chỉ chạy tiếp phần còn lại.
+  - changeSet:
+      id: 034-1a-inventory-quantity-decimal
+      author: gms
+      comment: Tồn kho theo DECIMAL(14,3)
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: 1
+            sql: >
+              SELECT COUNT(*) FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'inventory'
+                AND COLUMN_NAME = 'quantity' AND DATA_TYPE = 'int'
+      changes:
+        - sql:
+            sql: >
+              ALTER TABLE inventory MODIFY quantity DECIMAL(14,3) NOT NULL DEFAULT 0 COMMENT 'Số lượng tồn hiện tại', MODIFY reserved_quantity DECIMAL(14,3) NOT NULL DEFAULT 0 COMMENT 'Số lượng đang được giữ chỗ (RESERVED)'
+      rollback:
+        - sql:
+            sql: >
+              ALTER TABLE inventory MODIFY quantity INT NOT NULL DEFAULT 0, MODIFY reserved_quantity INT NOT NULL DEFAULT 0
+
+  - changeSet:
+      id: 034-1b-stock-entry-item-quantity-decimal
+      author: gms
+      comment: Số lượng lô nhập theo DECIMAL(14,3)
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: 1
+            sql: >
+              SELECT COUNT(*) FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'stock_entry_item'
+                AND COLUMN_NAME = 'quantity' AND DATA_TYPE = 'int'
+      changes:
+        - sql:
+            sql: >
+              ALTER TABLE stock_entry_item MODIFY quantity DECIMAL(14,3) NOT NULL, MODIFY remaining_quantity DECIMAL(14,3) NOT NULL DEFAULT 0 COMMENT 'Số lượng còn lại trong lô'
+      rollback:
+        - sql:
+            sql: >
+              ALTER TABLE stock_entry_item MODIFY quantity INT NOT NULL, MODIFY remaining_quantity INT NOT NULL DEFAULT 0
+
+  - changeSet:
+      id: 034-1c-stock-issue-item-quantity-decimal
+      author: gms
+      comment: Số lượng dòng xuất kho theo DECIMAL(14,3); gross_profit sinh từ quantity nên bỏ và tạo lại trong cùng một câu ALTER
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: 1
+            sql: >
+              SELECT COUNT(*) FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'stock_issue_item'
+                AND COLUMN_NAME = 'quantity' AND DATA_TYPE = 'int'
+      changes:
+        - sql:
+            sql: >
+              ALTER TABLE stock_issue_item DROP COLUMN gross_profit, MODIFY quantity DECIMAL(14,3) NOT NULL, ADD COLUMN gross_profit DECIMAL(14,2) GENERATED ALWAYS AS (((final_price - import_price) * quantity)) STORED COMMENT 'Lãi gộp = (final_price - import_price) × quantity'
+      rollback:
+        - sql:
+            sql: >
+              ALTER TABLE stock_issue_item DROP COLUMN gross_profit, MODIFY quantity INT NOT NULL, ADD COLUMN gross_profit DECIMAL(12,2) GENERATED ALWAYS AS (((final_price - import_price) * quantity)) STORED
+
+  - changeSet:
+      id: 034-1d-stock-allocation-quantity-decimal
+      author: gms
+      comment: Số lượng giữ hàng theo DECIMAL(14,3)
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: 1
+            sql: >
+              SELECT COUNT(*) FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'stock_allocation'
+                AND COLUMN_NAME = 'quantity' AND DATA_TYPE = 'int'
+      changes:
+        - sql:
+            sql: >
+              ALTER TABLE stock_allocation MODIFY quantity DECIMAL(14,3) NOT NULL
+      rollback:
+        - sql:
+            sql: >
+              ALTER TABLE stock_allocation MODIFY quantity INT NOT NULL
+
+  - changeSet:
+      id: 034-1e-estimate-item-quantity-decimal
+      author: gms
+      comment: Số lượng dòng báo giá theo DECIMAL(14,3)
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: 1
+            sql: >
+              SELECT COUNT(*) FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'estimate_item'
+                AND COLUMN_NAME = 'quantity' AND DATA_TYPE = 'int'
+      changes:
+        - sql:
+            sql: >
+              ALTER TABLE estimate_item MODIFY quantity DECIMAL(14,3) NULL
+      rollback:
+        - sql:
+            sql: >
+              ALTER TABLE estimate_item MODIFY quantity INT NULL
+
+  - changeSet:
+      id: 034-1f-inventory-transaction-quantity-decimal
+      author: gms
+      comment: Lịch sử giao dịch kho theo DECIMAL(14,3)
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: 1
+            sql: >
+              SELECT COUNT(*) FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'inventory_transaction'
+                AND COLUMN_NAME = 'quantity' AND DATA_TYPE = 'int'
+      changes:
+        - sql:
+            sql: >
+              ALTER TABLE inventory_transaction MODIFY quantity DECIMAL(14,3) NOT NULL COMMENT 'Số lượng (+ hoặc -)', MODIFY balance_after DECIMAL(14,3) NOT NULL COMMENT 'Tồn kho sau giao dịch'
+      rollback:
+        - sql:
+            sql: >
+              ALTER TABLE inventory_transaction MODIFY quantity INT NOT NULL, MODIFY balance_after INT NOT NULL
+
+  - changeSet:
+      id: 034-1g-return-entry-item-quantity-decimal
+      author: gms
+      comment: Số lượng dòng hoàn hàng theo DECIMAL(14,3)
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: 1
+            sql: >
+              SELECT COUNT(*) FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'return_entry_item'
+                AND COLUMN_NAME = 'quantity' AND DATA_TYPE = 'int'
+      changes:
+        - sql:
+            sql: >
+              ALTER TABLE return_entry_item MODIFY quantity DECIMAL(14,3) NOT NULL
+      rollback:
+        - sql:
+            sql: >
+              ALTER TABLE return_entry_item MODIFY quantity INT NOT NULL
+
+  - changeSet:
+      id: 034-1h-commission-record-quantity-decimal
+      author: gms
+      comment: Số lượng tính hoa hồng theo DECIMAL(14,3)
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: 1
+            sql: >
+              SELECT COUNT(*) FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'commission_record'
+                AND COLUMN_NAME = 'quantity' AND DATA_TYPE = 'int'
+      changes:
+        - sql:
+            sql: >
+              ALTER TABLE commission_record MODIFY quantity DECIMAL(14,3) NOT NULL
+      rollback:
+        - sql:
+            sql: >
+              ALTER TABLE commission_record MODIFY quantity INT NOT NULL
+
+  - changeSet:
+      id: 034-2-catalog-item-measurement
+      author: gms
+      comment: Cấu hình đo lường, đóng gói và cách theo dõi (lô/serial) cho sản phẩm
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: catalog_item
+                columnName: measurement_type
+      changes:
+        - addColumn:
+            tableName: catalog_item
+            columns:
+              - column:
+                  name: measurement_type
+                  type: VARCHAR(10)
+                  defaultValue: COUNT
+                  constraints:
+                    nullable: false
+                  remarks: COUNT = đếm (số nguyên), MEASURE = đo lường (cho phép số lẻ)
+              - column:
+                  name: decimal_scale
+                  type: TINYINT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+                  remarks: Số chữ số thập phân cho phép khi nhập số lượng (0-3); COUNT luôn là 0
+              - column:
+                  name: packaging_unit
+                  type: VARCHAR(50)
+                  remarks: Đơn vị nhập lớn (can, phuy, hộp); NULL nghĩa là nhập theo chính đơn vị tồn
+              - column:
+                  name: conversion_factor
+                  type: DECIMAL(14,3)
+                  defaultValueNumeric: 1
+                  constraints:
+                    nullable: false
+                  remarks: Số đơn vị tồn trong một đơn vị nhập (can 20 lít = 20)
+              - column:
+                  name: sell_by_package_only
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+                  remarks: Chỉ bán theo bội số của conversion_factor (không tách lẻ hộp)
+              - column:
+                  name: tracks_lot
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+                  remarks: Cho chọn lô khi bán; tắt thì hệ thống tự lấy lô theo FIFO
+              - column:
+                  name: tracks_serial
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+                  remarks: Mỗi đơn vị hàng có số serial riêng (bảng item_serial)
+      rollback:
+        - dropColumn:
+            tableName: catalog_item
+            columns:
+              - column:
+                  name: measurement_type
+              - column:
+                  name: decimal_scale
+              - column:
+                  name: packaging_unit
+              - column:
+                  name: conversion_factor
+              - column:
+                  name: sell_by_package_only
+              - column:
+                  name: tracks_lot
+              - column:
+                  name: tracks_serial
+
+  - changeSet:
+      id: 034-3-product-unit-measurement
+      author: gms
+      comment: Kiểu đo lường mặc định cho từng đơn vị tính
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: product_unit
+                columnName: measurement_type
+      changes:
+        - addColumn:
+            tableName: product_unit
+            columns:
+              - column:
+                  name: measurement_type
+                  type: VARCHAR(10)
+                  defaultValue: COUNT
+                  constraints:
+                    nullable: false
+                  remarks: Kiểu đo lường gợi ý khi sản phẩm chọn đơn vị này
+              - column:
+                  name: decimal_scale
+                  type: TINYINT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+                  remarks: Số chữ số thập phân gợi ý khi sản phẩm chọn đơn vị này
+        - sql:
+            comment: Các đơn vị đo lường phổ biến tự nhận kiểu MEASURE, 2 chữ số lẻ
+            sql: >
+              UPDATE product_unit SET measurement_type = 'MEASURE', decimal_scale = 2
+              WHERE LOWER(unit_name) IN ('lít', 'lit', 'l', 'ml', 'mililít', 'kg', 'kilogram', 'g', 'gam', 'gram', 'm', 'mét', 'met', 'cm', 'm2', 'm²', 'm3', 'm³')
+      rollback:
+        - dropColumn:
+            tableName: product_unit
+            columns:
+              - column:
+                  name: measurement_type
+              - column:
+                  name: decimal_scale
+
+  - changeSet:
+      id: 034-4-stock-entry-item-input-unit
+      author: gms
+      comment: Lưu số lượng/đơn vị gốc lúc nhập và serial nhập kèm
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: stock_entry_item
+                columnName: input_unit
+      changes:
+        - addColumn:
+            tableName: stock_entry_item
+            columns:
+              - column:
+                  name: input_unit
+                  type: VARCHAR(50)
+                  remarks: Đơn vị người dùng nhập (phuy, can); NULL nghĩa là nhập theo đơn vị tồn
+              - column:
+                  name: input_quantity
+                  type: DECIMAL(14,3)
+                  remarks: Số lượng theo input_unit; quantity = input_quantity × conversion_factor
+              - column:
+                  name: conversion_factor
+                  type: DECIMAL(14,3)
+                  remarks: Hệ số quy đổi tại thời điểm nhập (sản phẩm đổi hệ số sau này không làm sai lô cũ)
+              - column:
+                  name: serial_codes
+                  type: TEXT
+                  remarks: Mảng JSON các serial nhập kèm, dùng khi phiếu còn nháp; xác nhận phiếu mới sinh item_serial
+      rollback:
+        - dropColumn:
+            tableName: stock_entry_item
+            columns:
+              - column:
+                  name: input_unit
+              - column:
+                  name: input_quantity
+              - column:
+                  name: conversion_factor
+              - column:
+                  name: serial_codes
+
+  - changeSet:
+      id: 034-5-item-serial
+      author: gms
+      comment: Bảng số serial của từng đơn vị hàng
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: item_serial
+      changes:
+        - createTable:
+            tableName: item_serial
+            remarks: Mỗi dòng là một đơn vị hàng có số serial; luôn thuộc một lô (stock_entry_item)
+            columns:
+              - column:
+                  name: serial_id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: item_id
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: warehouse_id
+                  type: INT
+                  constraints:
+                    nullable: false
+                  remarks: Kho đang chứa (hoặc kho đã xuất ra)
+              - column:
+                  name: entry_item_id
+                  type: INT
+                  constraints:
+                    nullable: false
+                  remarks: Lô chứa serial này
+              - column:
+                  name: serial_code
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: VARCHAR(20)
+                  defaultValue: IN_STOCK
+                  constraints:
+                    nullable: false
+                  remarks: IN_STOCK / RESERVED / SOLD / DEFECTIVE
+              - column:
+                  name: estimate_item_id
+                  type: INT
+                  remarks: Dòng báo giá đang giữ serial (khi RESERVED)
+              - column:
+                  name: issue_id
+                  type: INT
+                  remarks: Phiếu xuất đã bán serial (khi SOLD)
+              - column:
+                  name: attributes_json
+                  type: TEXT
+                  remarks: Thông số mô tả riêng của từng đơn vị (ngày sản xuất, mã DOT...); không chứa số lượng
+              - column:
+                  name: notes
+                  type: VARCHAR(255)
+              - column:
+                  name: created_by
+                  type: INT
+              - column:
+                  name: created_at
+                  type: DATETIME
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: DATETIME
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addUniqueConstraint:
+            tableName: item_serial
+            columnNames: item_id, serial_code
+            constraintName: uk_item_serial_code
+        - createIndex:
+            tableName: item_serial
+            indexName: idx_item_serial_lot
+            columns:
+              - column:
+                  name: entry_item_id
+              - column:
+                  name: status
+        - createIndex:
+            tableName: item_serial
+            indexName: idx_item_serial_stock
+            columns:
+              - column:
+                  name: warehouse_id
+              - column:
+                  name: item_id
+              - column:
+                  name: status
+        - createIndex:
+            tableName: item_serial
+            indexName: idx_item_serial_estimate_item
+            columns:
+              - column:
+                  name: estimate_item_id
+        - addForeignKeyConstraint:
+            baseTableName: item_serial
+            baseColumnNames: item_id
+            referencedTableName: catalog_item
+            referencedColumnNames: item_id
+            constraintName: fk_item_serial_item
+        - addForeignKeyConstraint:
+            baseTableName: item_serial
+            baseColumnNames: entry_item_id
+            referencedTableName: stock_entry_item
+            referencedColumnNames: entry_item_id
+            constraintName: fk_item_serial_lot
+      rollback:
+        - dropTable:
+            tableName: item_serial
+
+  - changeSet:
+      id: 034-6-estimate-item-serial-ids
+      author: gms
+      comment: Serial đã chọn cho dòng báo giá
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: estimate_item
+                columnName: serial_ids
+      changes:
+        - addColumn:
+            tableName: estimate_item
+            columns:
+              - column:
+                  name: serial_ids
+                  type: VARCHAR(2000)
+                  remarks: Mảng JSON serial_id đã chọn; số phần tử phải bằng quantity
+      rollback:
+        - dropColumn:
+            tableName: estimate_item
+            columnName: serial_ids
+
+  - changeSet:
+      id: 034-7-return-entry-item-serial-ids
+      author: gms
+      comment: Serial đã được hoàn về kho theo dòng phiếu hoàn
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: return_entry_item
+                columnName: serial_ids
+      changes:
+        - addColumn:
+            tableName: return_entry_item
+            columns:
+              - column:
+                  name: serial_ids
+                  type: VARCHAR(2000)
+                  remarks: Mảng JSON serial_id đã đưa về kho khi xác nhận phiếu hoàn
+      rollback:
+        - dropColumn:
+            tableName: return_entry_item
+            columnName: serial_ids

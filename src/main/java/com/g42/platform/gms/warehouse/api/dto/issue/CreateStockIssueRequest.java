@@ -38,8 +38,8 @@ public class CreateStockIssueRequest {
         private Integer itemId;
 
         @NotNull
-        @Min(1)
-        private Integer quantity;
+        @jakarta.validation.constraints.DecimalMin(value = "0", inclusive = false)
+        private BigDecimal quantity;
 
         /** Discount rate % (0-100), optional */
         private BigDecimal discountRate = BigDecimal.ZERO;

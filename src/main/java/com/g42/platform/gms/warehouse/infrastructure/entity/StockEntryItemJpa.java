@@ -30,7 +30,7 @@ public class StockEntryItemJpa {
     private CatalogItemJpa catalogItem;
 
     @Column(name = "quantity", nullable = false)
-    private Integer quantity;
+    private BigDecimal quantity;
 
     @Column(name = "import_price", nullable = false, precision = 12, scale = 2)
     private BigDecimal importPrice;
@@ -47,7 +47,7 @@ public class StockEntryItemJpa {
 
     /** Số lượng còn lại trong lô này — giảm dần theo FIFO khi xuất */
     @Column(name = "remaining_quantity", nullable = false)
-    private Integer remainingQuantity = 0;
+    private BigDecimal remainingQuantity = BigDecimal.ZERO;
 
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
@@ -55,4 +55,20 @@ public class StockEntryItemJpa {
     /** Hạn dùng của lô; null nghĩa là không theo dõi hạn. Dùng cho chiến lược FEFO. */
     @Column(name = "expiry_date")
     private java.time.LocalDate expiryDate;
+
+    /** Đơn vị người dùng nhập (phuy, can); null = nhập theo đơn vị tồn. */
+    @Column(name = "input_unit", length = 50)
+    private String inputUnit;
+
+    /** Số lượng theo inputUnit; quantity = inputQuantity × conversionFactor. */
+    @Column(name = "input_quantity", precision = 14, scale = 3)
+    private BigDecimal inputQuantity;
+
+    /** Hệ số quy đổi chụp lại lúc nhập. */
+    @Column(name = "conversion_factor", precision = 14, scale = 3)
+    private BigDecimal conversionFactor;
+
+    /** Mảng JSON serial nhập kèm khi phiếu còn nháp. */
+    @Column(name = "serial_codes", columnDefinition = "TEXT")
+    private String serialCodes;
 }

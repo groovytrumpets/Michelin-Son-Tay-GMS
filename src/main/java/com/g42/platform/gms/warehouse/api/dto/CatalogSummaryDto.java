@@ -24,6 +24,13 @@ public class CatalogSummaryDto {
     private String description;
     private String imageUrl;
     private String unit;
+    private String measurementType;
+    private Integer decimalScale;
+    private String packagingUnit;
+    private BigDecimal conversionFactor;
+    private Boolean sellByPackageOnly;
+    private Boolean tracksLot;
+    private Boolean tracksSerial;
     private Boolean isRecurring;
     private String brand;
     private String productLine;

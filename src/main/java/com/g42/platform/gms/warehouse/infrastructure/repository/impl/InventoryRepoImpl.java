@@ -1,5 +1,9 @@
 package com.g42.platform.gms.warehouse.infrastructure.repository.impl;
 
+
+
+import java.math.BigDecimal;
+import com.g42.platform.gms.common.util.Qty;
 import com.g42.platform.gms.warehouse.domain.entity.Inventory;
 import com.g42.platform.gms.warehouse.domain.repository.InventoryRepo;
 import com.g42.platform.gms.warehouse.infrastructure.entity.InventoryJpa;
@@ -152,8 +156,8 @@ public class InventoryRepoImpl implements InventoryRepo {
         jpa.setInventoryId(domain.getInventoryId());
         jpa.setWarehouseId(domain.getWarehouseId());
         jpa.setItemId(domain.getItemId());
-        jpa.setQuantity(domain.getQuantity() != null ? domain.getQuantity() : 0);
-        jpa.setReservedQuantity(domain.getReservedQuantity() != null ? domain.getReservedQuantity() : 0);
+        jpa.setQuantity(Qty.nz(domain.getQuantity()));
+        jpa.setReservedQuantity(Qty.nz(domain.getReservedQuantity()));
         jpa.setMinStockLevel(domain.getMinStockLevel() != null ? domain.getMinStockLevel() : 0);
         jpa.setMaxStockLevel(domain.getMaxStockLevel() != null ? domain.getMaxStockLevel() : 0);
         return jpa;

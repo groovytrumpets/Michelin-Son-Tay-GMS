@@ -126,8 +126,17 @@ public class WarehouseController {
         return ResponseEntity.ok(ApiResponses.success(catalogItemService.getAllProductUnits()));
     }
     @PostMapping("/units")
-    public ResponseEntity<ApiResponse<ProductUnitJpa>> createUnit(@RequestParam String unitName) {
-        return ResponseEntity.ok(ApiResponses.success(catalogItemService.createProductUnit(unitName)));
+    public ResponseEntity<ApiResponse<ProductUnitJpa>> createUnit(@RequestParam String unitName,
+                                                                  @RequestParam(required = false) String measurementType,
+                                                                  @RequestParam(required = false) Integer decimalScale) {
+        return ResponseEntity.ok(ApiResponses.success(catalogItemService.createProductUnit(unitName, measurementType, decimalScale)));
+    }
+    /** Đổi kiểu đo lường mặc định của đơn vị (không đổi sản phẩm đã tạo). */
+    @PutMapping("/units/{unitId}")
+    public ResponseEntity<ApiResponse<ProductUnitJpa>> updateUnit(@PathVariable Integer unitId,
+                                                                  @RequestParam(required = false) String measurementType,
+                                                                  @RequestParam(required = false) Integer decimalScale) {
+        return ResponseEntity.ok(ApiResponses.success(catalogItemService.updateProductUnit(unitId, measurementType, decimalScale)));
     }
     @DeleteMapping("/units/{unitId}")
     public ResponseEntity<ApiResponse<Void>> deleteUnit(@PathVariable Integer unitId) {

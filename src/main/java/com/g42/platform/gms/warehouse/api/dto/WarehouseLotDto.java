@@ -14,8 +14,8 @@ public class WarehouseLotDto {
     private Integer entryItemId;
     private Integer entryId;
     private String entryCode;
-    private Integer quantity;
-    private Integer remainingQuantity;
+    private BigDecimal quantity;
+    private BigDecimal remainingQuantity;
     private BigDecimal importPrice;
     private BigDecimal markupMultiplier;
     private BigDecimal markupMultiplierWholesale;
@@ -25,13 +25,15 @@ public class WarehouseLotDto {
     /** Giá bán — được tính và set sau khi query, không lấy từ DB trực tiếp */
     private BigDecimal sellingPrice;
     private BigDecimal sellingPriceWholesale;
+    /** Số serial còn trong kho (IN_STOCK + RESERVED) của lô — chỉ có ý nghĩa với hàng theo serial. */
+    private Long serialCount;
 
     public WarehouseLotDto(
             Integer entryItemId,
             Integer entryId,
             String entryCode,
-            Integer quantity,
-            Integer remainingQuantity,
+            BigDecimal quantity,
+            BigDecimal remainingQuantity,
             BigDecimal importPrice,
             BigDecimal markupMultiplier,
             BigDecimal markupMultiplierWholesale,

@@ -48,9 +48,9 @@ public class CommissionRepoImpl implements CommissionRepo {
     }
 
     @Override
-    public int sumQuantityByStaffAndItemAndPeriod(Integer staffId, Integer itemId, String periodMonth) {
-        Integer result = recordJpaRepo.sumQuantityByStaffAndItemAndPeriod(staffId, itemId, periodMonth);
-        return result != null ? result : 0;
+    public java.math.BigDecimal sumQuantityByStaffAndItemAndPeriod(Integer staffId, Integer itemId, String periodMonth) {
+        java.math.BigDecimal result = recordJpaRepo.sumQuantityByStaffAndItemAndPeriod(staffId, itemId, periodMonth);
+        return result != null ? result : java.math.BigDecimal.ZERO;
     }
 
     private CommissionConfig toDomain(CommissionConfigJpa jpa) {

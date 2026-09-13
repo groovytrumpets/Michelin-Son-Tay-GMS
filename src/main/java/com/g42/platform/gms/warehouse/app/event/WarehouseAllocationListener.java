@@ -1,5 +1,9 @@
 package com.g42.platform.gms.warehouse.app.event;
 
+
+
+import java.math.BigDecimal;
+import com.g42.platform.gms.common.util.Qty;
 import com.g42.platform.gms.service_ticket_management.domain.event.EstimateApprovedEvent;
 import com.g42.platform.gms.service_ticket_management.domain.event.TicketCancelledEvent;
 import com.g42.platform.gms.service_ticket_management.domain.event.TicketPaidEvent;

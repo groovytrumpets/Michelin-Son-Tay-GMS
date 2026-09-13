@@ -18,7 +18,7 @@ public class ReturnEntryItemResponse {
     private Integer entryItemId;
     private String entryCode;
     private String entryLotCode;
-    private Integer quantity;
+    private BigDecimal quantity;
     private BigDecimal unitPrice;
     private BigDecimal totalPrice;
     private String conditionNote;
@@ -37,4 +37,6 @@ public class ReturnEntryItemResponse {
     /** Kho hàng lỗi đích đã nhận hàng (sau khi confirm) */
     private Integer defectiveWarehouseId;
     private String defectiveWarehouseName;
+    /** Mã serial đã đưa về kho khi xác nhận phiếu hoàn (hàng theo dõi serial). */
+    private java.util.List<String> serialCodes;
 }

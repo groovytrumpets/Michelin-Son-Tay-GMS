@@ -1,5 +1,9 @@
 package com.g42.platform.gms.warehouse.infrastructure.repository;
 
+
+
+import java.math.BigDecimal;
+import com.g42.platform.gms.common.util.Qty;
 import com.g42.platform.gms.warehouse.infrastructure.entity.StockEntryItemJpa;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -81,7 +85,7 @@ public interface StockEntryItemJpaRepo extends JpaRepository<StockEntryItemJpa, 
      */
     @Modifying
     @Query("UPDATE StockEntryItemJpa sei SET sei.remainingQuantity = sei.remainingQuantity - :qty WHERE sei.entryItemId = :id AND sei.remainingQuantity >= :qty")
-    int decreaseRemainingQuantity(@Param("id") Integer entryItemId, @Param("qty") int qty);
+    int decreaseRemainingQuantity(@Param("id") Integer entryItemId, @Param("qty") BigDecimal qty);
 
     /**
      * Tăng remainingQuantity bằng UPDATE SQL (không load entity).
@@ -93,7 +97,7 @@ public interface StockEntryItemJpaRepo extends JpaRepository<StockEntryItemJpa, 
      */
     @Modifying
     @Query("UPDATE StockEntryItemJpa sei SET sei.remainingQuantity = sei.remainingQuantity + :qty WHERE sei.entryItemId = :id")
-       int increaseRemainingQuantity(@Param("id") Integer entryItemId, @Param("qty") int qty);
+       int increaseRemainingQuantity(@Param("id") Integer entryItemId, @Param("qty") BigDecimal qty);
 
     /** Tất cả lô còn hàng trong kho — dùng để kiểm tra tổng quan FIFO */
     @Query("SELECT sei FROM StockEntryItemJpa sei " +

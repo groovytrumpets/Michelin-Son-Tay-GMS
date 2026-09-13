@@ -28,21 +28,21 @@ public class WarehouseDetailDto {
     //inventory
 
 
-    private Integer quantity;
-    private Integer reservedQuantity;
+    private BigDecimal quantity;
+    private BigDecimal reservedQuantity;
     private Integer minStockLevel;
     private Integer maxStockLevel;
-    private Integer availableStockLevel;
+    private BigDecimal availableStockLevel;
     private String notify;
     private java.util.List<WarehouseLotDto> lots;
     private Boolean hasCustomPricing = false;
 
-    public Integer getAvailableStockLevel() {
-        this.setAvailableStockLevel(this.quantity-this.reservedQuantity);
+    public BigDecimal getAvailableStockLevel() {
+        this.setAvailableStockLevel(com.g42.platform.gms.common.util.Qty.sub(this.quantity, this.reservedQuantity));
         return availableStockLevel;
     }
 
-    public WarehouseDetailDto(Integer warehouseId, String warehouseCode, String warehouseName, String warehouseAddress, Integer itemId, Integer quantity, Integer reservedQuantity, Integer minStockLevel, Integer maxStockLevel) {
+    public WarehouseDetailDto(Integer warehouseId, String warehouseCode, String warehouseName, String warehouseAddress, Integer itemId, BigDecimal quantity, BigDecimal reservedQuantity, Integer minStockLevel, Integer maxStockLevel) {
         this.warehouseId = warehouseId;
         this.warehouseCode = warehouseCode;
         this.warehouseName = warehouseName;
@@ -54,7 +54,7 @@ public class WarehouseDetailDto {
         this.maxStockLevel = maxStockLevel;
     }
 
-    public WarehouseDetailDto(Integer warehouseId, String warehouseCode, String warehouseName, String warehouseAddress, Integer itemId, BigDecimal sellingPrice, Integer quantity, Integer reservedQuantity, Integer minStockLevel, Integer maxStockLevel, Integer availableStockLevel, String notify) {
+    public WarehouseDetailDto(Integer warehouseId, String warehouseCode, String warehouseName, String warehouseAddress, Integer itemId, BigDecimal sellingPrice, BigDecimal quantity, BigDecimal reservedQuantity, Integer minStockLevel, Integer maxStockLevel, BigDecimal availableStockLevel, String notify) {
         this.warehouseId = warehouseId;
         this.warehouseCode = warehouseCode;
         this.warehouseName = warehouseName;

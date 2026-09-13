@@ -21,5 +21,5 @@ public class StaffDefectSummaryResponse {
     /** Số lần gây lỗi (số phiếu hoàn CONFIRMED) */
     private Long defectCount;
     /** Tổng số lượng hàng lỗi */
-    private Long defectQuantity;
+    private java.math.BigDecimal defectQuantity;
 }

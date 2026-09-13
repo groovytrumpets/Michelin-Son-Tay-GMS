@@ -1,5 +1,9 @@
 package com.g42.platform.gms.warehouse.app.service.returns;
 
+
+
+import java.math.BigDecimal;
+import com.g42.platform.gms.common.util.Qty;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.g42.platform.gms.auth.entity.StaffProfile;
@@ -133,6 +137,8 @@ public class ReturnEntryService {
     private final EstimateInternalApi estimateInternalApi;
     private final com.g42.platform.gms.warehouse.infrastructure.repository.ReturnEntryItemJpaRepo returnEntryItemJpaRepo;
     private final StaffNotifyService staffNotifyService;
+    private final com.g42.platform.gms.warehouse.app.service.serial.ItemSerialService itemSerialService;
+    private final com.g42.platform.gms.warehouse.app.service.catalog.ItemQuantityPolicy itemQuantityPolicy;
 
     @Transactional
     public ReturnEntryResponse create(CreateReturnEntryRequest request, Integer staffId) {
@@ -154,6 +160,7 @@ public class ReturnEntryService {
 
         // Xử lý từng dòng hàng trả
         for (ReturnEntryItemRequest itemReq : request.getItems()) {
+            itemQuantityPolicy.validateStockQuantity(itemReq.getItemId(), itemReq.getQuantity(), null);
             validateAllocation(request.getSourceIssueId(), itemReq); // kiểm tra qty không vượt allocation
             validateDuplicateAllocationOnCreate(itemReq.getAllocationId());
             validateDefectiveItem(itemReq); // kiểm tra thông tin lỗi nếu DEFECTIVE
@@ -164,6 +171,7 @@ public class ReturnEntryService {
         // Xử lý hàng đổi (cấp lại cho khách) — không ảnh hưởng allocation trả
         if (request.getExchangeItems() != null) {
             for (ReturnEntryItemRequest itemReq : request.getExchangeItems()) {
+                itemQuantityPolicy.validateStockQuantity(itemReq.getItemId(), itemReq.getQuantity(), null);
                 validateEntryItem(request.getWarehouseId(), itemReq);
                 saved.getItems().add(buildExchangeItem(itemReq, saved.getReturnId()));
             }
@@ -218,6 +226,7 @@ public class ReturnEntryService {
             StockAllocation allocation = stockAllocationRepo.findById(itemReq.getAllocationId())
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
                             "Không tìm thấy allocation id=" + itemReq.getAllocationId()));
+            itemQuantityPolicy.validateStockQuantity(allocation.getItemId(), itemReq.getQuantity(), null);
 
             // Validate allocation thuộc phiếu xuất này và COMMITTED
             if (allocation.getIssueId() == null || !allocation.getIssueId().equals(request.getIssueId())) {
@@ -411,6 +420,7 @@ public class ReturnEntryService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Không tìm thấy item id=" + returnItemId + " trong phiếu id=" + returnId));
 
+        if (request.getQuantity() != null) itemQuantityPolicy.validateStockQuantity(item.getItemId(), request.getQuantity(), null);
         if (request.getQuantity() != null) item.setQuantity(request.getQuantity());
         if (request.getConditionNote() != null) item.setConditionNote(request.getConditionNote());
 
@@ -432,6 +442,7 @@ public class ReturnEntryService {
             entry.getItems().clear();
             if (request.getItems() != null) {
                 for (ReturnEntryItemRequest itemReq : request.getItems()) {
+                    itemQuantityPolicy.validateStockQuantity(itemReq.getItemId(), itemReq.getQuantity(), null);
                     validateAllocation(entry.getSourceIssueId(), itemReq);
                     resolveIssueItemAndEntryFromAllocation(itemReq);
                     validateEntryItem(entry.getWarehouseId(), itemReq);
@@ -455,6 +466,7 @@ public class ReturnEntryService {
             }
             if (request.getExchangeItems() != null) {
                 for (ReturnEntryItemRequest itemReq : request.getExchangeItems()) {
+                    itemQuantityPolicy.validateStockQuantity(itemReq.getItemId(), itemReq.getQuantity(), null);
                     validateEntryItem(entry.getWarehouseId(), itemReq);
                     ReturnEntryItem item = new ReturnEntryItem();
                     item.setReturnId(returnId);
@@ -581,9 +593,9 @@ public class ReturnEntryService {
             // SUPPLIER_RETURN: trả về nhà cung cấp → giảm tồn kho (OUT)
             // CUSTOMER_RETURN: khách trả lại → tăng tồn kho (IN)
             boolean isSupplierReturn = type == ReturnType.SUPPLIER_RETURN;
-            int newQty = isSupplierReturn
-                    ? Math.max(0, inv.getQuantity() - item.getQuantity())
-                    : inv.getQuantity() + item.getQuantity();
+            BigDecimal newQty = isSupplierReturn
+                    ? Qty.subFloorZero(inv.getQuantity(), item.getQuantity())
+                    : Qty.add(inv.getQuantity(), item.getQuantity());
             InventoryTransactionType txType = isSupplierReturn
                     ? InventoryTransactionType.OUT
                     : InventoryTransactionType.IN;
@@ -599,17 +611,26 @@ public class ReturnEntryService {
             if (item.getEntryItemId() != null) {
                 stockEntryRepo.increaseRemainingQuantity(item.getEntryItemId(), item.getQuantity());
             }
+
+            // Hàng theo serial khách trả: serial đã bán ở phiếu xuất gốc quay về kho (hoặc kho lỗi)
+            if (!isSupplierReturn && item.getSourceIssueItemId() != null && item.getEntryItemId() != null) {
+                Integer sourceIssueId = stockIssueItemRepo.findById(item.getSourceIssueItemId())
+                        .map(StockIssueItem::getIssueId).orElse(null);
+                List<Integer> restored = itemSerialService.restoreForReturn(sourceIssueId, item.getItemId(),
+                        item.getEntryItemId(), item.getQuantity(), targetWarehouseId, isDefective);
+                item.setSerialIdsJson(itemSerialService.toJson(restored));
+            }
         }
 
         // Release allocation: gộp qty theo allocationId để tránh gọi nhiều lần
         // khi 1 allocation được split thành nhiều lot rows trong return_entry_item
-        Map<Integer, Integer> qtyByAllocationId = new java.util.LinkedHashMap<>();
+        Map<Integer, BigDecimal> qtyByAllocationId = new java.util.LinkedHashMap<>();
         for (ReturnEntryItem item : returnItems) {
             if (item.getAllocationId() != null) {
-                qtyByAllocationId.merge(item.getAllocationId(), item.getQuantity(), Integer::sum);
+                qtyByAllocationId.merge(item.getAllocationId(), item.getQuantity(), BigDecimal::add);
             }
         }
-        for (Map.Entry<Integer, Integer> e : qtyByAllocationId.entrySet()) {
+        for (Map.Entry<Integer, BigDecimal> e : qtyByAllocationId.entrySet()) {
             // Cập nhật estimate trước, lấy estimateItemId mới để gắn vào allocation RELEASED
             Integer savedEstimateItemId = estimateInternalApi.releaseEstimate(e.getKey(), e.getValue(), staffId);
             releaseAllocation(e.getKey(), e.getValue(), staffId, savedEstimateItemId);
@@ -619,7 +640,7 @@ public class ReturnEntryService {
         if (type == ReturnType.EXCHANGE) {
             for (ReturnEntryItem item : exchangeItems) {
                 Inventory inv = getOrCreateInventory(entry.getWarehouseId(), item.getItemId());
-                int newQty = Math.max(0, inv.getQuantity() - item.getQuantity());
+                BigDecimal newQty = Qty.subFloorZero(inv.getQuantity(), item.getQuantity());
                 inv.setQuantity(newQty);
                 inventoryRepo.save(inv);
                 saveTransaction(entry.getWarehouseId(), item.getItemId(), item.getEntryItemId(),
@@ -678,14 +699,14 @@ public class ReturnEntryService {
                 .orElseGet(() -> Inventory.builder()
                         .warehouseId(warehouseId)
                         .itemId(itemId)
-                        .quantity(0)
-                        .reservedQuantity(0)
+                        .quantity(BigDecimal.ZERO)
+                        .reservedQuantity(BigDecimal.ZERO)
                         .build());
     }
 
     /** Ghi audit log cho mỗi thay đổi tồn kho. */
     private void saveTransaction(Integer warehouseId, Integer itemId, Integer entryItemId,
-                                 InventoryTransactionType type, int qty, int balance,
+                                 InventoryTransactionType type, BigDecimal qty, BigDecimal balance,
                                  Integer returnId, Integer staffId) {
         InventoryTransaction tx = new InventoryTransaction();
         tx.setWarehouseId(warehouseId);
@@ -719,7 +740,7 @@ public class ReturnEntryService {
                     ? com.g42.platform.gms.warehouse.domain.enums.DefectCause.valueOf(r[1].toString())
                     : null;
             Long count = ((Number) r[2]).longValue();
-            Long qty   = ((Number) r[3]).longValue();
+            BigDecimal qty = r[3] == null ? BigDecimal.ZERO : Qty.of((Number) r[3]);
 
             String staffName = null;
             if (staffId != null) {
@@ -833,7 +854,7 @@ public class ReturnEntryService {
      * @param staffId id nhân viên thực hiện
      * @param savedEstimateItemId estimate item id trả về từ estimateInternalApi (có thể null)
      */
-    private void releaseAllocation(Integer allocationId, Integer returnQuantity, Integer staffId, Integer savedEstimateItemId) {
+    private void releaseAllocation(Integer allocationId, BigDecimal returnQuantity, Integer staffId, Integer savedEstimateItemId) {
         StockAllocation allocation = stockAllocationRepo.findById(allocationId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Không tìm thấy allocation id=" + allocationId));
@@ -845,20 +866,20 @@ public class ReturnEntryService {
         }
 
         // Số lượng hoàn không được vượt quá qty còn lại của allocation
-        if (allocation.getQuantity() == null || allocation.getQuantity() < returnQuantity) {
+        if (allocation.getQuantity() == null || Qty.lt(allocation.getQuantity(), returnQuantity)) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                     "Số lượng hoàn vượt quá allocation đã chọn");
         }
 
         // Hoàn toàn bộ → chuyển allocation sang RELEASED
-        if (allocation.getQuantity().equals(returnQuantity)) {
+        if (Qty.eq(allocation.getQuantity(), returnQuantity)) {
             allocation.setStatus(AllocationStatus.RELEASED);
             stockAllocationRepo.save(allocation);
             return;
         }
 
         // Hoàn một phần → giảm qty allocation gốc, tạo allocation RELEASED mới cho phần đã hoàn
-        allocation.setQuantity(allocation.getQuantity() - returnQuantity);
+        allocation.setQuantity(Qty.sub(allocation.getQuantity(), returnQuantity));
         stockAllocationRepo.save(allocation);
 
         // Resolve estimateId cho allocation mới
@@ -917,20 +938,20 @@ public class ReturnEntryService {
         }
 
         // Phân bổ số lượng trả theo thứ tự lô (FIFO theo thứ tự issue items)
-        int remaining = itemReq.getQuantity() != null ? itemReq.getQuantity() : 0;
+        BigDecimal remaining = Qty.nz(itemReq.getQuantity());
         for (StockIssueItem si : issueItems) {
-            if (remaining <= 0) break;
-            int consume = Math.min(remaining, si.getQuantity() != null ? si.getQuantity() : 0);
-            if (consume <= 0) continue;
+            if (remaining.signum() <= 0) break;
+            BigDecimal consume = Qty.min(remaining, si.getQuantity());
+            if (consume.signum() <= 0) continue;
             // Tạo 1 dòng hoàn gắn với lô cụ thể (entryItemId) và issueItemId
             ReturnEntryItem item = buildReturnItem(itemReq, returnId, itemReq.getAllocationId(), si.getIssueItemId(), consume);
             item.setEntryItemId(si.getEntryItemId());
             result.add(item);
-            remaining -= consume;
+            remaining = remaining.subtract(consume);
         }
 
         // Nếu còn dư (không đủ lô) → thêm 1 dòng không gắn lô
-        if (remaining > 0) {
+        if (remaining.signum() > 0) {
             result.add(buildReturnItem(itemReq, returnId, itemReq.getAllocationId(), null, remaining));
         }
 
@@ -939,7 +960,7 @@ public class ReturnEntryService {
 
     /** Tạo ReturnEntryItem từ request với các field cơ bản. */
     private ReturnEntryItem buildReturnItem(ReturnEntryItemRequest req, Integer returnId,
-                                             Integer allocationId, Integer sourceIssueItemId, int quantity) {
+                                             Integer allocationId, Integer sourceIssueItemId, BigDecimal quantity) {
         ReturnEntryItem item = new ReturnEntryItem();
         item.setReturnId(returnId);
         item.setItemId(req.getItemId());
@@ -1056,13 +1077,14 @@ public class ReturnEntryService {
             ir.setEntryItemId(i.getEntryItemId());
             ir.setQuantity(i.getQuantity());
             ir.setConditionNote(i.getConditionNote());
+            ir.setSerialCodes(itemSerialService.codesOf(itemSerialService.parseIds(i.getSerialIdsJson())));
 
             // Bổ sung giá từ issue item
             if (i.getSourceIssueItemId() != null) {
                 java.math.BigDecimal unitPrice = priceByIssueItemId.get(i.getSourceIssueItemId());
                 ir.setUnitPrice(unitPrice);
                 if (unitPrice != null && i.getQuantity() != null) {
-                    ir.setTotalPrice(unitPrice.multiply(java.math.BigDecimal.valueOf(i.getQuantity())));
+                    ir.setTotalPrice(unitPrice.multiply(i.getQuantity()));
                 }
             }
 
@@ -1169,14 +1191,14 @@ public class ReturnEntryService {
         // Khi hoàn một phần, allocation bị tách: qty giảm xuống, tạo allocation mới RELEASED.
         // Tổng gốc = qty hiện tại + tổng đã hoàn active trước đó.
         // Tính tổng đã hoàn trước đó (active) để đảm bảo không vượt quá tổng gốc
-        int alreadyReturned = returnEntryRepo.sumActiveReturnedQuantityByAllocationId(itemReq.getAllocationId());
-        int requestedQty = itemReq.getQuantity() != null ? itemReq.getQuantity() : 0;
-        int originalQty = allocation.getQuantity() + alreadyReturned; // tổng qty gốc
+        BigDecimal alreadyReturned = returnEntryRepo.sumActiveReturnedQuantityByAllocationId(itemReq.getAllocationId());
+        BigDecimal requestedQty = Qty.nz(itemReq.getQuantity());
+        BigDecimal originalQty = Qty.add(allocation.getQuantity(), alreadyReturned); // tổng qty gốc
         // Nếu tổng (đã hoàn + lần này) vượt quá tổng gốc -> lỗi
-        if (alreadyReturned + requestedQty > originalQty) {
+        if (Qty.gt(Qty.add(alreadyReturned, requestedQty), originalQty)) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
-                    "Tổng số lượng hoàn (" + (alreadyReturned + requestedQty) + ") vượt quá tổng allocation ("
-                            + originalQty + ")");
+                    "Tổng số lượng hoàn (" + Qty.text(Qty.add(alreadyReturned, requestedQty)) + ") vượt quá tổng allocation ("
+                            + Qty.text(originalQty) + ")");
         }
 
     }

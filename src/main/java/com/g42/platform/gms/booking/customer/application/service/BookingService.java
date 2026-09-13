@@ -408,8 +408,48 @@ public class BookingService {
         booking.setVehicleId(preAssignVehicleId);
         booking.setAdvisorId(request.getAdvisorId());
         booking.setTechnicianId(request.getTechnicianId());
-        if (request.getVehicleTypeNote() != null && !request.getVehicleTypeNote().isBlank()) {
-            booking.setVehicleTypeNote(request.getVehicleTypeNote().trim());
+
+        // === Loại xe (hãng/dòng/năm) lễ tân chọn lúc đặt lịch ===
+        // Lưu thành ghi chú tham khảo trên booking, đồng thời bổ sung luôn cho Vehicle thật
+        // (xe vừa tạo từ biển số, hoặc xe đã có nhưng đang thiếu brand/model) — không ghi đè
+        // dữ liệu đã có sẵn vì đó có thể chính xác hơn ghi chú qua điện thoại.
+        String vType = request.getVehicleBrand() == null ? "" : request.getVehicleBrand().trim();
+        String vModel = request.getVehicleModel() == null ? "" : request.getVehicleModel().trim();
+        Integer vYear = request.getVehicleYear();
+        StringBuilder noteBuilder = new StringBuilder();
+        for (String part : new String[]{vType, vModel, vYear == null ? "" : String.valueOf(vYear)}) {
+            if (!part.isBlank()) {
+                if (noteBuilder.length() > 0) noteBuilder.append(' ');
+                noteBuilder.append(part);
+            }
+        }
+        if (noteBuilder.length() > 0) {
+            booking.setVehicleTypeNote(noteBuilder.toString());
+        }
+
+        if ((!vType.isBlank() || !vModel.isBlank() || vYear != null) && preAssignVehicleId != null) {
+            Vehicle vehicleToEnrich = (resolvedVehicle != null && resolvedVehicle.getVehicleId().equals(preAssignVehicleId))
+                    ? resolvedVehicle
+                    : vehicleRepository.findById(preAssignVehicleId).orElse(null);
+            if (vehicleToEnrich != null) {
+                boolean changed = false;
+                if (!vType.isBlank() && (vehicleToEnrich.getBrand() == null || vehicleToEnrich.getBrand().isBlank())) {
+                    vehicleToEnrich.setBrand(vType);
+                    changed = true;
+                }
+                if (!vModel.isBlank() && (vehicleToEnrich.getModel() == null || vehicleToEnrich.getModel().isBlank())) {
+                    vehicleToEnrich.setModel(vModel);
+                    changed = true;
+                }
+                if (vYear != null && vehicleToEnrich.getManufactureYear() == null) {
+                    vehicleToEnrich.setManufactureYear(vYear);
+                    changed = true;
+                }
+                if (changed) {
+                    vehicleRepository.save(vehicleToEnrich);
+                    log.info("Enriched vehicle brand/model/year from booking note: vehicleId={}", vehicleToEnrich.getVehicleId());
+                }
+            }
         }
 
         if (request.getSelectedServiceIds() != null && !request.getSelectedServiceIds().isEmpty()) {

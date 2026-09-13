@@ -18,7 +18,7 @@ public class EstimateItemDto {
     private String categoryLabel;
     private Integer warehouseId;
     private Integer itemId;
-    private Integer quantity;
+    private BigDecimal quantity;
     private BigDecimal unitPrice;
     private BigDecimal subTotal;
     private BigDecimal taxAmount;
@@ -51,4 +51,15 @@ public class EstimateItemDto {
     private BigDecimal laborCost;
     private String note;
     private BigDecimal discountPercent;
+    private java.util.List<Integer> serialIds;
+    /** Mã serial tương ứng serialIds, để hiển thị không cần gọi thêm API. */
+    private java.util.List<String> serialCodes;
+    /** Cấu hình đo lường của sản phẩm (đọc từ danh mục) để màn báo giá kiểm tra số lượng. */
+    private String measurementType;
+    private Integer decimalScale;
+    private String packagingUnit;
+    private BigDecimal conversionFactor;
+    private Boolean sellByPackageOnly;
+    private Boolean tracksLot;
+    private Boolean tracksSerial;
 }

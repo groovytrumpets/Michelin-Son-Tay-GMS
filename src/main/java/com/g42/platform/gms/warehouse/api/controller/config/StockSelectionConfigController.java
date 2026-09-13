@@ -39,7 +39,7 @@ public class StockSelectionConfigController {
     @GetMapping("/suggest")
     public ResponseEntity<ApiResponse<StockSuggestionDto>> suggest(
             @RequestParam Integer itemId,
-            @RequestParam(required = false) Integer quantity,
+            @RequestParam(required = false) java.math.BigDecimal quantity,
             @RequestParam(required = false) Integer warehouseId) {
         return ResponseEntity.ok(ApiResponses.success(
                 stockSelectionService.suggest(itemId, quantity, warehouseId)));

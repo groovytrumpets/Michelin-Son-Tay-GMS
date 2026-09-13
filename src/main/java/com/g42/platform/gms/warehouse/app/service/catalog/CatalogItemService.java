@@ -1,5 +1,7 @@
 package com.g42.platform.gms.warehouse.app.service.catalog;
 
+
+import com.g42.platform.gms.common.util.Qty;
 import com.g42.platform.gms.estimation.api.internal.TaxRuleInternalApi;
 import com.g42.platform.gms.estimation.api.mapper.TaxRuleDtoMapper;
 import com.g42.platform.gms.marketing.service_catalog.domain.enums.ServiceStatus;
@@ -95,6 +97,10 @@ public class CatalogItemService {
     private WarehouseDtoMapper warehouseDtoMapper;
     @Autowired
     private ItemColorDtoMapper itemColorDtoMapper;
+    @Autowired
+    private ItemQuantityPolicy itemQuantityPolicy;
+    @Autowired
+    private ItemSerialJpaRepo itemSerialJpaRepo;
 
     public List<BrandHintDto> getAllBrands() {
         List<Brand> brandList = catalogItemRepo.getAllBrands();
@@ -130,6 +136,7 @@ public class CatalogItemService {
         if (domain.getIsActive() == null) {
             domain.setIsActive(true);
         }
+        applyMeasurementConfig(domain, createDto, null);
         String normalizedSlug = normalizeSlug(createDto.getSlug());
         if (normalizedSlug != null && catalogItemRepo.exitBySlug(normalizedSlug)) {
             throw new WarehouseException("Đường dẫn đã được dùng cho mặt hàng khác, hãy chọn đường dẫn khác",
@@ -503,6 +510,16 @@ public class CatalogItemService {
                 }
                 lot.setSellingPriceWholesale(lotSellingPriceWholesale);
             }
+            if (Boolean.TRUE.equals(catalogItem.getTracksSerial()) && !lots.isEmpty()) {
+                java.util.Map<Integer, Long> serialCounts = new java.util.HashMap<>();
+                for (Object[] row : itemSerialJpaRepo.countByLots(
+                        lots.stream().map(WarehouseLotDto::getEntryItemId).toList(),
+                        List.of(com.g42.platform.gms.warehouse.domain.enums.SerialStatus.IN_STOCK,
+                                com.g42.platform.gms.warehouse.domain.enums.SerialStatus.RESERVED))) {
+                    serialCounts.put((Integer) row[0], ((Number) row[1]).longValue());
+                }
+                lots.forEach(lot -> lot.setSerialCount(serialCounts.getOrDefault(lot.getEntryItemId(), 0L)));
+            }
             warehouseDetailDto.setLots(lots);
         }
 
@@ -585,6 +602,8 @@ public class CatalogItemService {
         if (updateDto.getCostPrice() != null) {
             catalogItem.setCostPrice(updateDto.getCostPrice());
         }
+        applyMeasurementConfig(catalogItem, updateDto, itemId);
+        ItemQuantityPolicy.Rules quantityRules = ItemQuantityPolicy.Rules.of(catalogItem);
         replaceCompatibilities(itemId, updateDto.getCompatibilities());
 
         // Brand/productLine/itemCategory ids on catalogItem are already the final (updated) values at this point.
@@ -622,6 +641,11 @@ public class CatalogItemService {
                     inventory.setItemId(itemId);
                     inventory.setWarehouseId(whDto.getWarehouseId());
                 }
+                itemQuantityPolicy.validateScale(quantityRules, whDto.getQuantity(), "Tồn kho");
+                itemQuantityPolicy.validateScale(quantityRules, whDto.getReservedQuantity(), "Hàng giữ");
+                if (Boolean.TRUE.equals(catalogItem.getTracksSerial())) {
+                    guardSerialStockEdit(inventory, whDto);
+                }
                 if (whDto.getQuantity() != null) {
                     inventory.setQuantity(whDto.getQuantity());
                 }
@@ -644,6 +668,8 @@ public class CatalogItemService {
                 // Update Lots
                 if (whDto.getLots() != null) {
                     for (LotUpdateDto lotDto : whDto.getLots()) {
+                        itemQuantityPolicy.validateScale(quantityRules, lotDto.getRemainingQuantity(), "Lô " +
+                                (lotDto.getEntryCode() != null ? lotDto.getEntryCode() : ""));
                         if (lotDto.getEntryItemId() == null) {
                             // Lô mới người dùng thêm tay ở popup. Trước đây nhánh này bị bỏ qua
                             // nên bấm "Thêm lô" xong lưu lại là lô biến mất.
@@ -688,6 +714,105 @@ public class CatalogItemService {
         return catalogDtoMapper.toDto(saved);
     }
 
+    // ─── Cấu hình đo lường / đóng gói / serial ─────────────────────────────────
+
+    /**
+     * Gộp cấu hình gửi lên với cấu hình đang có (field null = giữ nguyên), chuẩn hoá
+     * rồi gán vào sản phẩm. itemId null nghĩa là đang tạo mới: chưa có tồn nên không
+     * cần kiểm tra dữ liệu cũ, và đơn vị tính được dùng làm gợi ý kiểu đo lường.
+     */
+    private void applyMeasurementConfig(CatalogItem target, CatalogCreateDto dto, Integer itemId) {
+        String requestedType = dto.getMeasurementType();
+        Integer requestedScale = dto.getDecimalScale();
+        if (itemId == null && requestedType == null && target.getUnit() != null) {
+            ProductUnitJpa unit = productUnitJpaRepo.findByUnitName(target.getUnit().trim());
+            if (unit != null) {
+                requestedType = unit.getMeasurementType();
+                if (requestedScale == null) requestedScale = unit.getDecimalScale();
+            }
+        }
+
+        String previousType = target.getMeasurementType();
+        Integer previousScale = target.getDecimalScale();
+        boolean previousSerial = Boolean.TRUE.equals(target.getTracksSerial());
+
+        ItemQuantityPolicy.MeasurementConfig config = itemQuantityPolicy.normalizeConfig(
+                new ItemQuantityPolicy.MeasurementConfig(
+                        requestedType != null ? requestedType : previousType,
+                        requestedScale != null ? requestedScale : previousScale,
+                        dto.getPackagingUnit() != null ? dto.getPackagingUnit() : target.getPackagingUnit(),
+                        dto.getConversionFactor() != null ? dto.getConversionFactor() : target.getConversionFactor(),
+                        dto.getSellByPackageOnly() != null ? dto.getSellByPackageOnly() : target.getSellByPackageOnly(),
+                        dto.getTracksLot() != null ? dto.getTracksLot() : target.getTracksLot(),
+                        dto.getTracksSerial() != null ? dto.getTracksSerial() : target.getTracksSerial()));
+
+        if (itemId != null) {
+            ItemQuantityPolicy.Rules newRules = new ItemQuantityPolicy.Rules(target.getItemName(), target.getUnit(),
+                    config.measurementType(), config.decimalScale(), config.packagingUnit(),
+                    config.conversionFactor(), config.sellByPackageOnly());
+            boolean scaleShrinks = !config.measurementType().equals(ItemQuantityPolicy.measurementOf(previousType).name())
+                    || (previousScale != null && config.decimalScale() < previousScale);
+            if (scaleShrinks) {
+                ensureStockFitsScale(itemId, newRules);
+            }
+            if (previousSerial && !config.tracksSerial()
+                    && itemSerialJpaRepo.existsByItemIdAndStatus(itemId, com.g42.platform.gms.warehouse.domain.enums.SerialStatus.RESERVED)) {
+                throw new WarehouseException("Đang có serial được giữ cho báo giá — bỏ chọn serial ở các báo giá đó rồi mới tắt theo dõi serial",
+                        WarehouseErrorCode.INVALID_MEASUREMENT_CONFIG);
+            }
+        }
+
+        target.setMeasurementType(config.measurementType());
+        target.setDecimalScale(config.decimalScale());
+        target.setPackagingUnit(config.packagingUnit());
+        target.setConversionFactor(config.conversionFactor());
+        target.setSellByPackageOnly(config.sellByPackageOnly());
+        target.setTracksLot(config.tracksLot());
+        target.setTracksSerial(config.tracksSerial());
+    }
+
+    /** Đổi sang ít chữ số lẻ hơn thì tồn kho và lô hiện có phải còn khớp cấu hình mới. */
+    private void ensureStockFitsScale(Integer itemId, ItemQuantityPolicy.Rules rules) {
+        for (InventoryJpa inventory : inventoryJpaRepo.findByItemIdOrderByQuantityDesc(itemId)) {
+            boolean lotsFit = stockEntryItemJpaRepo.findFifoLots(inventory.getWarehouseId(), itemId).stream()
+                    .noneMatch(lot -> ItemQuantityPolicy.exceedsScale(rules, lot.getRemainingQuantity()));
+            if (ItemQuantityPolicy.exceedsScale(rules, inventory.getQuantity())
+                    || ItemQuantityPolicy.exceedsScale(rules, inventory.getReservedQuantity())
+                    || !lotsFit) {
+                throw new WarehouseException("Không đổi được kiểu đo lường: tồn kho hiện có số lẻ ("
+                        + Qty.text(inventory.getQuantity()) + ") không khớp cấu hình mới — điều chỉnh tồn trước",
+                        WarehouseErrorCode.INVALID_MEASUREMENT_CONFIG);
+            }
+        }
+    }
+
+    /**
+     * Hàng theo serial không được sửa số lượng tồn/lô bằng tay: số serial còn trong kho
+     * phải khớp số còn lại của lô, nên tăng giảm hàng phải đi qua phiếu nhập/xuất/hoàn.
+     */
+    private void guardSerialStockEdit(InventoryJpa inventory, WarehouseUpdateDto whDto) {
+        boolean quantityChanged = whDto.getQuantity() != null
+                && !Qty.eq(whDto.getQuantity(), inventory.getQuantity());
+        boolean lotChanged = false;
+        if (whDto.getLots() != null) {
+            for (LotUpdateDto lotDto : whDto.getLots()) {
+                if (lotDto.getEntryItemId() == null) {
+                    lotChanged = lotChanged || Qty.isPositive(lotDto.getRemainingQuantity());
+                    continue;
+                }
+                if (lotDto.getRemainingQuantity() == null) continue;
+                BigDecimal current = stockEntryItemJpaRepo.findById(lotDto.getEntryItemId())
+                        .map(StockEntryItemJpa::getRemainingQuantity).orElse(null);
+                lotChanged = lotChanged || !Qty.eq(current, lotDto.getRemainingQuantity());
+            }
+        }
+        if (quantityChanged || lotChanged) {
+            throw new WarehouseException("Sản phẩm theo dõi serial không sửa tay số lượng tồn/lô được — "
+                    + "hãy nhập kho, xuất kho hoặc hoàn hàng để số serial luôn khớp tồn kho",
+                    WarehouseErrorCode.INVALID_SERIAL);
+        }
+    }
+
     // ─── Tồn kho luôn đi kèm lô ────────────────────────────────────────────────
     //
     // Giá vốn, lãi gộp và FIFO đều đọc từ stock_entry_item. Tồn kho khai báo tay ở
@@ -703,8 +828,8 @@ public class CatalogItemService {
 
     /** Tạo lô mới do người dùng thêm tay ở popup sửa tồn kho. */
     private void createManualLot(Integer itemId, Integer warehouseId, LotUpdateDto lotDto, Integer staffId) {
-        int quantity = lotDto.getRemainingQuantity() != null ? lotDto.getRemainingQuantity() : 0;
-        if (warehouseId == null || quantity <= 0) {
+        BigDecimal quantity = Qty.nz(lotDto.getRemainingQuantity());
+        if (warehouseId == null || quantity.signum() <= 0) {
             return;
         }
 
@@ -740,28 +865,26 @@ public class CatalogItemService {
         if (warehouseId == null || inventory == null) {
             return;
         }
-        int target = inventory.getQuantity() != null ? inventory.getQuantity() : 0;
+        BigDecimal target = Qty.nz(inventory.getQuantity());
         List<StockEntryItemJpa> lots = stockEntryItemJpaRepo.findFifoLots(warehouseId, itemId);
-        int lotTotal = lots.stream()
-                .mapToInt(l -> l.getRemainingQuantity() != null ? l.getRemainingQuantity() : 0)
-                .sum();
+        BigDecimal lotTotal = Qty.sum(lots, StockEntryItemJpa::getRemainingQuantity);
 
-        int diff = target - lotTotal;
-        if (diff == 0) {
+        BigDecimal diff = target.subtract(lotTotal);
+        if (diff.signum() == 0) {
             return;
         }
 
-        if (diff > 0) {
+        if (diff.signum() > 0) {
             addToAdjustmentLot(itemId, warehouseId, diff, staffId);
         } else {
-            reduceLots(lots, -diff);
+            reduceLots(lots, diff.negate());
         }
 
         logInventoryAdjustment(warehouseId, itemId, diff, target, staffId);
     }
 
     /** Dồn phần tồn dôi ra vào một lô điều chỉnh mới của kho. */
-    private void addToAdjustmentLot(Integer itemId, Integer warehouseId, int quantity, Integer staffId) {
+    private void addToAdjustmentLot(Integer itemId, Integer warehouseId, BigDecimal quantity, Integer staffId) {
         BigDecimal importPrice = BigDecimal.ZERO;
         BigDecimal markup = null;
         BigDecimal markupWholesale = null;
@@ -791,19 +914,19 @@ public class CatalogItemService {
      * Trừ từ lô mới nhất trở về trước để lô cũ nhất (đang đứng đầu hàng FIFO)
      * giữ nguyên số lượng và giá vốn.
      */
-    private void reduceLots(List<StockEntryItemJpa> fifoLots, int quantityToRemove) {
-        int remain = quantityToRemove;
+    private void reduceLots(List<StockEntryItemJpa> fifoLots, BigDecimal quantityToRemove) {
+        BigDecimal remain = quantityToRemove;
         List<StockEntryItemJpa> newestFirst = new ArrayList<>(fifoLots);
         java.util.Collections.reverse(newestFirst);
 
         for (StockEntryItemJpa lot : newestFirst) {
-            if (remain <= 0) break;
-            int available = lot.getRemainingQuantity() != null ? lot.getRemainingQuantity() : 0;
-            if (available <= 0) continue;
-            int take = Math.min(available, remain);
-            lot.setRemainingQuantity(available - take);
+            if (remain.signum() <= 0) break;
+            BigDecimal available = Qty.nz(lot.getRemainingQuantity());
+            if (available.signum() <= 0) continue;
+            BigDecimal take = Qty.min(available, remain);
+            lot.setRemainingQuantity(available.subtract(take));
             stockEntryItemJpaRepo.save(lot);
-            remain -= take;
+            remain = remain.subtract(take);
         }
     }
 
@@ -868,7 +991,7 @@ public class CatalogItemService {
     }
 
     /** Ghi vết mọi lần tồn kho bị sửa tay — trước đây thao tác này không để lại dấu nào. */
-    private void logInventoryAdjustment(Integer warehouseId, Integer itemId, int diff, int balanceAfter, Integer staffId) {
+    private void logInventoryAdjustment(Integer warehouseId, Integer itemId, BigDecimal diff, BigDecimal balanceAfter, Integer staffId) {
         if (staffId == null) {
             // inventory_transaction.created_by là NOT NULL; không xác định được người
             // thao tác thì bỏ qua phần ghi log chứ không làm hỏng cả thao tác sửa.
@@ -975,7 +1098,7 @@ public class CatalogItemService {
     }
 
     @Transactional
-    public ProductUnitJpa createProductUnit(String unitName) {
+    public ProductUnitJpa createProductUnit(String unitName, String measurementType, Integer decimalScale) {
         String trimmed = unitName != null ? unitName.trim() : "";
         if (trimmed.isEmpty()) {
             throw new WarehouseException("Unit name cannot be empty", WarehouseErrorCode.INVALID_CATEGORY);
@@ -984,6 +1107,7 @@ public class CatalogItemService {
             ProductUnitJpa existing = productUnitJpaRepo.findByUnitName(trimmed);
             if (existing.getIsActive() == 0) {
                 existing.setIsActive((byte) 1);
+                applyUnitMeasurement(existing, measurementType, decimalScale);
                 return productUnitJpaRepo.save(existing);
             }
             throw new WarehouseException("Unit name already exists", WarehouseErrorCode.INVALID_CATEGORY);
@@ -991,7 +1115,27 @@ public class CatalogItemService {
         ProductUnitJpa unit = new ProductUnitJpa();
         unit.setUnitName(trimmed);
         unit.setIsActive((byte) 1);
+        applyUnitMeasurement(unit, measurementType, decimalScale);
         return productUnitJpaRepo.save(unit);
+    }
+
+    @Transactional
+    public ProductUnitJpa updateProductUnit(Integer unitId, String measurementType, Integer decimalScale) {
+        ProductUnitJpa unit = productUnitJpaRepo.findById(unitId)
+                .orElseThrow(() -> new WarehouseException("Unit not found", WarehouseErrorCode.INVALID_CATEGORY));
+        applyUnitMeasurement(unit, measurementType, decimalScale);
+        return productUnitJpaRepo.save(unit);
+    }
+
+    private void applyUnitMeasurement(ProductUnitJpa unit, String measurementType, Integer decimalScale) {
+        if (measurementType == null && decimalScale == null) return;
+        ItemQuantityPolicy.MeasurementConfig normalized = itemQuantityPolicy.normalizeConfig(
+                new ItemQuantityPolicy.MeasurementConfig(
+                        measurementType != null ? measurementType : unit.getMeasurementType(),
+                        decimalScale != null ? decimalScale : unit.getDecimalScale(),
+                        null, null, false, true, false));
+        unit.setMeasurementType(normalized.measurementType());
+        unit.setDecimalScale(normalized.decimalScale());
     }
 
     @Transactional

@@ -1,5 +1,7 @@
 package com.g42.platform.gms.warehouse.infrastructure.repository.impl;
 
+
+import com.g42.platform.gms.common.util.Qty;
 import com.g42.platform.gms.warehouse.domain.entity.StockEntry;
 import com.g42.platform.gms.warehouse.domain.entity.StockEntryItem;
 import com.g42.platform.gms.warehouse.domain.enums.StockEntryStatus;
@@ -132,6 +134,10 @@ public class StockEntryRepoImpl implements StockEntryRepo {
                 .markupMultiplierWholesale(jpa.getMarkupMultiplierWholesale())
                 .remainingQuantity(jpa.getRemainingQuantity())
                 .notes(jpa.getNotes())
+                .inputUnit(jpa.getInputUnit())
+                .inputQuantity(jpa.getInputQuantity())
+                .conversionFactor(jpa.getConversionFactor())
+                .serialCodes(jpa.getSerialCodes())
                 .build();
     }
 
@@ -145,9 +151,12 @@ public class StockEntryRepoImpl implements StockEntryRepo {
         jpa.setImportPrice(domain.getImportPrice());
         jpa.setMarkupMultiplier(domain.getMarkupMultiplier());
         jpa.setMarkupMultiplierWholesale(domain.getMarkupMultiplierWholesale());
-        jpa.setRemainingQuantity(domain.getRemainingQuantity() != null
-                ? domain.getRemainingQuantity() : 0);
+        jpa.setRemainingQuantity(Qty.nz(domain.getRemainingQuantity()));
         jpa.setNotes(domain.getNotes());
+        jpa.setInputUnit(domain.getInputUnit());
+        jpa.setInputQuantity(domain.getInputQuantity());
+        jpa.setConversionFactor(domain.getConversionFactor());
+        jpa.setSerialCodes(domain.getSerialCodes());
         return jpa;
     }
 
@@ -318,7 +327,7 @@ public class StockEntryRepoImpl implements StockEntryRepo {
      * Service phải check return value để biết có đủ hàng không.
      */
     @Override
-    public int decreaseRemainingQuantity(Integer entryItemId, int qty) {
+    public int decreaseRemainingQuantity(Integer entryItemId, BigDecimal qty) {
         return itemJpaRepo.decreaseRemainingQuantity(entryItemId, qty);
     }
 
@@ -327,7 +336,7 @@ public class StockEntryRepoImpl implements StockEntryRepo {
      * SQL: UPDATE stock_entry_item SET remaining_quantity = remaining_quantity + :qty WHERE entry_item_id = :id
      */
     @Override
-    public int increaseRemainingQuantity(Integer entryItemId, int qty) {
+    public int increaseRemainingQuantity(Integer entryItemId, BigDecimal qty) {
         return itemJpaRepo.increaseRemainingQuantity(entryItemId, qty);
     }
 

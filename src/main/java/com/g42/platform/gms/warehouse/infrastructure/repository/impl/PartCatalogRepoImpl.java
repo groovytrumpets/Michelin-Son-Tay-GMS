@@ -182,6 +182,13 @@ public class PartCatalogRepoImpl implements PartCatalogRepo {
         domain.setBarcode(jpa.getBarcode());
         domain.setColor(jpa.getColor());
         domain.setCompatibleCars(jpa.getCompatibleCars());
+        domain.setMeasurementType(jpa.getMeasurementType());
+        domain.setDecimalScale(jpa.getDecimalScale());
+        domain.setPackagingUnit(jpa.getPackagingUnit());
+        domain.setConversionFactor(jpa.getConversionFactor());
+        domain.setSellByPackageOnly(jpa.getSellByPackageOnly());
+        domain.setTracksLot(jpa.getTracksLot());
+        domain.setTracksSerial(jpa.getTracksSerial());
         return domain;
     }
 
@@ -212,6 +219,13 @@ public class PartCatalogRepoImpl implements PartCatalogRepo {
         jpa.setBarcode(domain.getBarcode());
         jpa.setColor(domain.getColor());
         jpa.setCompatibleCars(domain.getCompatibleCars());
+        jpa.setMeasurementType(domain.getMeasurementType());
+        jpa.setDecimalScale(domain.getDecimalScale());
+        jpa.setPackagingUnit(domain.getPackagingUnit());
+        jpa.setConversionFactor(domain.getConversionFactor());
+        jpa.setSellByPackageOnly(domain.getSellByPackageOnly());
+        jpa.setTracksLot(domain.getTracksLot());
+        jpa.setTracksSerial(domain.getTracksSerial());
         return jpa;
     }
 }
