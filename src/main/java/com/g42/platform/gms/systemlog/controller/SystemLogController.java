@@ -1,5 +1,6 @@
 package com.g42.platform.gms.systemlog.controller;
 
+import com.g42.platform.gms.authz.PermissionCodes;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.systemlog.dto.SystemLogDto;
@@ -23,7 +24,7 @@ import java.time.format.DateTimeFormatter;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/admin/system-logs")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAuthority('" + PermissionCodes.SYSTEM_LOG_VIEW + "')")
 public class SystemLogController {
 
     private final SystemLogQueryService systemLogQueryService;

@@ -1,5 +1,6 @@
 package com.g42.platform.gms.marketing.recruitment.api.controller;
 
+import com.g42.platform.gms.authz.PermissionCodes;
 import com.g42.platform.gms.auth.entity.StaffPrincipal;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
@@ -28,7 +29,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/admin/recruitment/jobs")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('MANAGER', 'ADMIN', 'RECEPTIONIST')")
+@PreAuthorize("hasAuthority('" + PermissionCodes.RECRUITMENT_VIEW + "')")
 public class AdminJobPositionController {
 
     private static final String IMAGE_FOLDER = "garage/recruitment";
@@ -64,6 +65,7 @@ public class AdminJobPositionController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('" + PermissionCodes.RECRUITMENT_EDIT + "')")
     public ResponseEntity<ApiResponse<RecruitmentDtos.JobAdminDetailDto>> create(
             @Valid @RequestBody RecruitmentDtos.JobSaveRequest request,
             @AuthenticationPrincipal StaffPrincipal principal) {
@@ -73,6 +75,7 @@ public class AdminJobPositionController {
     }
 
     @PutMapping("/{jobId}")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.RECRUITMENT_EDIT + "')")
     public ResponseEntity<ApiResponse<RecruitmentDtos.JobAdminDetailDto>> update(
             @PathVariable Long jobId,
             @Valid @RequestBody RecruitmentDtos.JobSaveRequest request) {
@@ -82,6 +85,7 @@ public class AdminJobPositionController {
 
     /** Duyệt, trả lại, đóng hoặc lưu trữ tin. */
     @PatchMapping("/{jobId}/status")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.RECRUITMENT_EDIT + "')")
     public ResponseEntity<ApiResponse<RecruitmentDtos.JobAdminDetailDto>> changeStatus(
             @PathVariable Long jobId,
             @RequestBody RecruitmentDtos.JobStatusChangeRequest request,
@@ -92,6 +96,7 @@ public class AdminJobPositionController {
     }
 
     @DeleteMapping("/{jobId}")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.RECRUITMENT_EDIT + "')")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long jobId) {
         jobService.softDelete(jobId);
         return ResponseEntity.ok(ApiResponses.successMessage("Đã xoá tin tuyển dụng"));
@@ -99,6 +104,7 @@ public class AdminJobPositionController {
 
     /** Ảnh bìa và ảnh chèn trong nội dung tin. */
     @PostMapping("/upload-image")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.RECRUITMENT_EDIT + "')")
     public ResponseEntity<ApiResponse<Map<String, String>>> uploadImage(@RequestParam("file") MultipartFile file) {
         try {
             String url = imageUploadService.uploadImage(file, IMAGE_FOLDER);

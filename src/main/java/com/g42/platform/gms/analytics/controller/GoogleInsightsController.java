@@ -1,5 +1,6 @@
 package com.g42.platform.gms.analytics.controller;
 
+import com.g42.platform.gms.authz.PermissionCodes;
 import com.g42.platform.gms.analytics.dto.*;
 import com.g42.platform.gms.analytics.service.GoogleAnalyticsDataService;
 import com.g42.platform.gms.analytics.service.GoogleSearchConsoleService;
@@ -23,7 +24,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/admin/analytics")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+@PreAuthorize("hasAuthority('" + PermissionCodes.GOOGLE_INSIGHTS_VIEW + "')")
 public class GoogleInsightsController {
 
     private final GoogleAnalyticsDataService gaDataService;

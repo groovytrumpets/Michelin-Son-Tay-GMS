@@ -1,5 +1,6 @@
 package com.g42.platform.gms.marketing.siteheader.api.controller;
 
+import com.g42.platform.gms.authz.PermissionCodes;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.g42.platform.gms.auth.entity.StaffPrincipal;
 import com.g42.platform.gms.common.dto.ApiResponse;
@@ -19,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/admin/site-header")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+@PreAuthorize("hasAuthority('" + PermissionCodes.SITE_CONFIG_VIEW + "')")
 public class AdminSiteHeaderController {
 
     private final SiteHeaderService siteHeaderService;
@@ -31,6 +32,7 @@ public class AdminSiteHeaderController {
     }
 
     @PutMapping
+    @PreAuthorize("hasAuthority('" + PermissionCodes.SITE_CONFIG_EDIT + "')")
     public ResponseEntity<ApiResponse<JsonNode>> saveConfig(
             @AuthenticationPrincipal StaffPrincipal principal,
             @RequestBody JsonNode config) {

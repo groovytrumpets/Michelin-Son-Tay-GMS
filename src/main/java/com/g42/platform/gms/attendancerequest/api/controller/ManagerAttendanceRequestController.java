@@ -1,5 +1,6 @@
 package com.g42.platform.gms.attendancerequest.api.controller;
 
+import com.g42.platform.gms.authz.PermissionCodes;
 import com.g42.platform.gms.attendancerequest.api.dto.AttendanceRequestResponse;
 import com.g42.platform.gms.attendancerequest.api.dto.AttendanceRequestReviewRequest;
 import com.g42.platform.gms.attendancerequest.application.service.AttendanceRequestService;
@@ -17,7 +18,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/manager/attendance-requests")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+@PreAuthorize("hasAuthority('" + PermissionCodes.ATTENDANCE_REQUEST_VIEW + "')")
 public class ManagerAttendanceRequestController {
 
     private final AttendanceRequestService service;
@@ -30,6 +31,7 @@ public class ManagerAttendanceRequestController {
     }
 
     @PutMapping("/{requestId}/approve")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.ATTENDANCE_REQUEST_APPROVE + "')")
     public ResponseEntity<ApiResponse<AttendanceRequestResponse>> approve(
             @AuthenticationPrincipal StaffPrincipal principal,
             @PathVariable Integer requestId,
@@ -40,6 +42,7 @@ public class ManagerAttendanceRequestController {
     }
 
     @PutMapping("/{requestId}/reject")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.ATTENDANCE_REQUEST_APPROVE + "')")
     public ResponseEntity<ApiResponse<AttendanceRequestResponse>> reject(
             @AuthenticationPrincipal StaffPrincipal principal,
             @PathVariable Integer requestId,

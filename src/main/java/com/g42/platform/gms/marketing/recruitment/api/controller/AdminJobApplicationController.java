@@ -1,5 +1,6 @@
 package com.g42.platform.gms.marketing.recruitment.api.controller;
 
+import com.g42.platform.gms.authz.PermissionCodes;
 import com.g42.platform.gms.auth.entity.StaffPrincipal;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
@@ -27,7 +28,7 @@ import java.time.LocalTime;
 @RestController
 @RequestMapping("/api/admin/recruitment/applications")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('MANAGER', 'ADMIN', 'RECEPTIONIST')")
+@PreAuthorize("hasAuthority('" + PermissionCodes.RECRUITMENT_VIEW + "')")
 public class AdminJobApplicationController {
 
     private final JobApplicationService applicationService;
@@ -65,6 +66,7 @@ public class AdminJobApplicationController {
     }
 
     @PatchMapping("/{applicationId}")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.RECRUITMENT_EDIT + "')")
     public ResponseEntity<ApiResponse<RecruitmentDtos.ApplicationDetailDto>> update(
             @PathVariable Long applicationId,
             @RequestBody RecruitmentDtos.ApplicationUpdateRequest request,
@@ -81,6 +83,7 @@ public class AdminJobApplicationController {
      * cấu hình rồi thì phải lấy lại được thư mà không cần nhờ ứng viên nộp lại.
      */
     @PostMapping("/{applicationId}/resend-notification")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.RECRUITMENT_EDIT + "')")
     public ResponseEntity<ApiResponse<Void>> resendNotification(@PathVariable Long applicationId) {
         NotifyStatus result = mailService.notifyManagers(applicationId);
         return switch (result) {
@@ -93,6 +96,7 @@ public class AdminJobApplicationController {
     }
 
     @DeleteMapping("/{applicationId}")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.RECRUITMENT_EDIT + "')")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long applicationId) {
         applicationService.delete(applicationId);
         return ResponseEntity.ok(ApiResponses.successMessage("Đã xoá hồ sơ"));

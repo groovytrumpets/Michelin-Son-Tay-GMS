@@ -1,5 +1,6 @@
 package com.g42.platform.gms.analytics.controller;
 
+import com.g42.platform.gms.authz.PermissionCodes;
 import com.g42.platform.gms.analytics.dto.GoogleConnectionStatusResponse;
 import com.g42.platform.gms.analytics.entity.GoogleOAuthToken;
 import com.g42.platform.gms.analytics.service.GoogleAnalyticsDataService;
@@ -36,7 +37,7 @@ public class GoogleOAuthController {
     private final GoogleSearchConsoleService searchConsoleService;
 
     @GetMapping("/connect")
-    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.GOOGLE_INSIGHTS_CONFIG + "')")
     public ResponseEntity<ApiResponse<Map<String, String>>> connect(@AuthenticationPrincipal StaffPrincipal principal) {
         String url = googleOAuthService.buildAuthorizeUrl(principal.getStaffId());
         return ResponseEntity.ok(ApiResponses.success(Map.of("authorizeUrl", url)));
@@ -55,14 +56,14 @@ public class GoogleOAuthController {
     }
 
     @PostMapping("/disconnect")
-    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.GOOGLE_INSIGHTS_CONFIG + "')")
     public ResponseEntity<ApiResponse<Void>> disconnect() {
         googleOAuthService.disconnect();
         return ResponseEntity.ok(ApiResponses.successMessage("Đã ngắt kết nối tài khoản Google"));
     }
 
     @GetMapping("/status")
-    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.GOOGLE_INSIGHTS_VIEW + "')")
     public ResponseEntity<ApiResponse<GoogleConnectionStatusResponse>> status() {
         GoogleOAuthToken token = googleOAuthService.getCurrentToken();
         boolean connected = token != null && "CONNECTED".equals(token.getStatus());

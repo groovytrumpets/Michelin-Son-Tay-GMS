@@ -1,5 +1,6 @@
 package com.g42.platform.gms.service_ticket_management.api.controller;
 
+import com.g42.platform.gms.authz.PermissionCodes;
 import com.g42.platform.gms.auth.entity.StaffPrincipal;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
@@ -87,7 +88,7 @@ public class TicketBackfillController {
     }
 
     @GetMapping("/stats")
-    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.TICKET_BACKFILL_VIEW + "')")
     public ResponseEntity<ApiResponse<List<BackfillStaffStatDto>>> stats(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
@@ -103,7 +104,7 @@ public class TicketBackfillController {
     }
 
     @PostMapping("/{serviceTicketId}/approve")
-    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.TICKET_BACKFILL_EDIT + "')")
     @Auditable(action = "UPDATE", module = "SERVICE_TICKET", severity = "CRITICAL",
             description = "Duyệt phiếu nhập bù (xuất kho + ghi thanh toán)", targetType = "SERVICE_TICKET")
     public ResponseEntity<ApiResponse<BackfillTicketDto>> approve(
@@ -115,7 +116,7 @@ public class TicketBackfillController {
     }
 
     @PostMapping("/{serviceTicketId}/reject")
-    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.TICKET_BACKFILL_EDIT + "')")
     @Auditable(action = "UPDATE", module = "SERVICE_TICKET", severity = "WARNING",
             description = "Từ chối phiếu nhập bù (nhả hàng, huỷ phiếu)", targetType = "SERVICE_TICKET")
     public ResponseEntity<ApiResponse<BackfillTicketDto>> reject(

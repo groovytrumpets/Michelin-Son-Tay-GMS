@@ -1,5 +1,6 @@
 package com.g42.platform.gms.marketing.navmenu.api.controller;
 
+import com.g42.platform.gms.authz.PermissionCodes;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.common.service.ImageUploadService;
@@ -22,7 +23,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/admin/nav-menu")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+@PreAuthorize("hasAuthority('" + PermissionCodes.SITE_CONFIG_VIEW + "')")
 public class AdminNavMenuController {
 
     private static final String IMAGE_FOLDER = "garage/nav-menu";
@@ -41,6 +42,7 @@ public class AdminNavMenuController {
     }
 
     @PostMapping("/{locationCode}")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.SITE_CONFIG_EDIT + "')")
     public ResponseEntity<ApiResponse<NavMenuItemDto.ItemDto>> create(
             @PathVariable String locationCode,
             @Valid @RequestBody NavMenuItemDto.SaveRequest request) {
@@ -49,6 +51,7 @@ public class AdminNavMenuController {
     }
 
     @PutMapping("/items/{navItemId}")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.SITE_CONFIG_EDIT + "')")
     public ResponseEntity<ApiResponse<NavMenuItemDto.ItemDto>> update(
             @PathVariable Integer navItemId,
             @Valid @RequestBody NavMenuItemDto.SaveRequest request) {
@@ -58,6 +61,7 @@ public class AdminNavMenuController {
 
     /** Áp kết quả kéo thả cho cả cây trong một lần gọi. */
     @PutMapping("/{locationCode}/reorder")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.SITE_CONFIG_EDIT + "')")
     public ResponseEntity<ApiResponse<List<NavMenuItemDto.ItemDto>>> reorder(
             @PathVariable String locationCode,
             @RequestBody NavMenuItemDto.ReorderRequest request) {
@@ -66,12 +70,14 @@ public class AdminNavMenuController {
     }
 
     @DeleteMapping("/items/{navItemId}")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.SITE_CONFIG_EDIT + "')")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Integer navItemId) {
         navMenuService.delete(navItemId);
         return ResponseEntity.ok(ApiResponses.successMessage("Đã xoá mục menu"));
     }
 
     @PostMapping("/upload-image")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.SITE_CONFIG_EDIT + "')")
     public ResponseEntity<ApiResponse<Map<String, String>>> uploadImage(@RequestParam("file") MultipartFile file) {
         try {
             return ResponseEntity.ok(ApiResponses.success(

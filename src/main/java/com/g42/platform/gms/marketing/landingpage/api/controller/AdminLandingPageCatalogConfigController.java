@@ -1,5 +1,6 @@
 package com.g42.platform.gms.marketing.landingpage.api.controller;
 
+import com.g42.platform.gms.authz.PermissionCodes;
 import com.g42.platform.gms.marketing.landingpage.api.dto.LandingPageConfigDto;
 import com.g42.platform.gms.marketing.landingpage.api.dto.LandingPageConfigUpdateRequest;
 import com.g42.platform.gms.marketing.landingpage.app.service.LandingPageCatalogConfigService;
@@ -14,7 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/admin/landing-page-catalog")
-@PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+@PreAuthorize("hasAuthority('" + PermissionCodes.SITE_CONFIG_VIEW + "')")
 public class AdminLandingPageCatalogConfigController {
     private final LandingPageCatalogConfigService configService;
 
@@ -28,6 +29,7 @@ public class AdminLandingPageCatalogConfigController {
     }
 
     @PutMapping
+    @PreAuthorize("hasAuthority('" + PermissionCodes.SITE_CONFIG_EDIT + "')")
     public ResponseEntity<LandingPageConfigDto> updateConfiguration(
             @Valid @RequestBody LandingPageConfigUpdateRequest request
     ) {

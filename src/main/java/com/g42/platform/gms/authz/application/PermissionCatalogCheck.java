@@ -8,8 +8,6 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.TreeSet;
@@ -41,7 +39,7 @@ public class PermissionCatalogCheck {
             return;
         }
 
-        Set<String> inCode = codeConstants();
+        Set<String> inCode = PermissionCodes.all();
 
         Set<String> missingInDb = new TreeSet<>(inCode);
         missingInDb.removeAll(inDb);
@@ -62,16 +60,4 @@ public class PermissionCatalogCheck {
         }
     }
 
-    private Set<String> codeConstants() {
-        Set<String> codes = new LinkedHashSet<>();
-        for (Field field : PermissionCodes.class.getDeclaredFields()) {
-            if (!Modifier.isStatic(field.getModifiers()) || field.getType() != String.class) continue;
-            try {
-                codes.add((String) field.get(null));
-            } catch (IllegalAccessException ignored) {
-                // hằng số public static final, không vào nhánh này
-            }
-        }
-        return codes;
-    }
 }

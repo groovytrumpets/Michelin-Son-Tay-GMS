@@ -1,5 +1,6 @@
 package com.g42.platform.gms.common.api;
 
+import com.g42.platform.gms.authz.PermissionCodes;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.common.service.MediaLibraryService;
@@ -31,7 +32,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/admin/media-library")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('RECEPTIONIST', 'MANAGER', 'ADMIN')")
+@PreAuthorize("hasAuthority('" + PermissionCodes.MEDIA_VIEW + "')")
 public class MediaLibraryController {
 
     private final MediaLibraryService mediaLibraryService;
@@ -67,6 +68,7 @@ public class MediaLibraryController {
     }
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAuthority('" + PermissionCodes.MEDIA_UPLOAD + "')")
     public ResponseEntity<ApiResponse<?>> upload(
             @RequestParam("files") List<MultipartFile> files,
             @RequestParam(defaultValue = "garage/media-library") String folder) {
@@ -81,7 +83,7 @@ public class MediaLibraryController {
     }
 
     @DeleteMapping
-    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.MEDIA_DELETE + "')")
     public ResponseEntity<ApiResponse<?>> delete(@RequestBody DeleteMediaRequest request) {
         try {
             DeleteResult result = mediaLibraryService.deleteImage(request == null ? null : request.publicId());

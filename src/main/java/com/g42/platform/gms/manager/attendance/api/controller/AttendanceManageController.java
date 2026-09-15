@@ -1,5 +1,6 @@
 package com.g42.platform.gms.manager.attendance.api.controller;
 
+import com.g42.platform.gms.authz.PermissionCodes;
 import com.g42.platform.gms.manager.attendance.api.dto.StaffShiftAttendanceResponse;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
@@ -31,7 +32,7 @@ public class AttendanceManageController {
      * Dùng cho màn điểm danh thủ công: chọn nhân viên → hiển thị các ca → check-in/out từng ca.
      */
     @GetMapping("/staff/{staffId}/shifts")
-    @PreAuthorize("hasAnyRole('MANAGER', 'ADVISOR')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.ATTENDANCE_VIEW + "')")
     public ResponseEntity<ApiResponse<StaffShiftAttendanceResponse>> getStaffShiftAttendance(
             @PathVariable Integer staffId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
@@ -42,7 +43,7 @@ public class AttendanceManageController {
      * Lấy danh sách điểm danh theo khoảng ngày, có thể filter theo staffId
      */
     @GetMapping
-    @PreAuthorize("hasAnyRole('MANAGER', 'ADVISOR')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.ATTENDANCE_VIEW + "')")
     public ResponseEntity<ApiResponse<List<AttendanceCheckinResponse>>> getAttendance(
             @RequestParam(required = false) Integer staffId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -54,7 +55,7 @@ public class AttendanceManageController {
      * Lấy điểm danh theo ngày cụ thể (mặc định hôm nay)
      */
     @GetMapping("/today")
-    @PreAuthorize("hasAnyRole('MANAGER', 'ADVISOR')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.ATTENDANCE_VIEW + "')")
     public ResponseEntity<ApiResponse<List<AttendanceCheckinResponse>>> getToday(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         LocalDate target = date != null ? date : LocalDate.now();
@@ -65,7 +66,7 @@ public class AttendanceManageController {
      * Tổng hợp điểm danh hôm nay — ai đã check-in, ai chưa
      */
     @GetMapping("/today-summary")
-    @PreAuthorize("hasAnyRole('MANAGER', 'ADVISOR')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.ATTENDANCE_VIEW + "')")
     public ResponseEntity<ApiResponse<TodaySummaryResponse>> getTodaySummary(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return ResponseEntity.ok(ApiResponses.success(service.getTodaySummary(date)));
@@ -75,7 +76,7 @@ public class AttendanceManageController {
      * Check-in nhân viên vào ca
      */
     @PostMapping("/check-in")
-    @PreAuthorize("hasRole('MANAGER')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.ATTENDANCE_EDIT + "')")
     public ResponseEntity<ApiResponse<AttendanceCheckinResponse>> checkIn(
             @Valid @RequestBody CheckinRequest request) {
         return ResponseEntity.ok(ApiResponses.success(service.checkIn(request)));
@@ -85,7 +86,7 @@ public class AttendanceManageController {
      * Check-out nhân viên
      */
     @PutMapping("/{checkinId}/check-out")
-    @PreAuthorize("hasRole('MANAGER')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.ATTENDANCE_EDIT + "')")
     public ResponseEntity<ApiResponse<AttendanceCheckinResponse>> checkOut(
             @PathVariable Integer checkinId,
             @RequestBody CheckoutRequest request) {
@@ -97,7 +98,7 @@ public class AttendanceManageController {
      * Notes tự động set "Edited by manager" nếu không truyền
      */
     @PutMapping("/{checkinId}")
-    @PreAuthorize("hasRole('MANAGER')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.ATTENDANCE_EDIT + "')")
     public ResponseEntity<ApiResponse<AttendanceCheckinResponse>> updateAttendance(
             @PathVariable Integer checkinId,
             @RequestBody UpdateAttendanceRequest request) {
@@ -108,7 +109,7 @@ public class AttendanceManageController {
      * Xóa bản ghi điểm danh (sửa nhầm)
      */
     @DeleteMapping("/{checkinId}")
-    @PreAuthorize("hasRole('MANAGER')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.ATTENDANCE_EDIT + "')")
     public ResponseEntity<ApiResponse<String>> deleteCheckin(@PathVariable Integer checkinId) {
         service.deleteCheckin(checkinId);
         return ResponseEntity.ok(ApiResponses.success("Đã xóa bản ghi điểm danh"));

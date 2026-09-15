@@ -1,5 +1,6 @@
 package com.g42.platform.gms.customermerge.api.controller;
 
+import com.g42.platform.gms.authz.PermissionCodes;
 import com.g42.platform.gms.auth.entity.StaffPrincipal;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
@@ -28,7 +29,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/admin/customer-merge")
-@PreAuthorize("hasAnyRole('RECEPTIONIST','MANAGER','ADMIN')")
+@PreAuthorize("hasAuthority('" + PermissionCodes.CUSTOMER_MERGE + "')")
 @RequiredArgsConstructor
 public class CustomerMergeController {
 

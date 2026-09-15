@@ -1,5 +1,6 @@
 package com.g42.platform.gms.dashboard.api.controller;
 
+import com.g42.platform.gms.authz.PermissionCodes;
 import com.g42.platform.gms.auth.entity.StaffPrincipal;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
@@ -25,7 +26,7 @@ public class KpiController {
     private final KpiConfigRepository kpiConfigRepository;
 
     @GetMapping("/dashboard")
-    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.KPI_VIEW + "')")
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getKpiDashboard(
             @RequestParam(required = false) Integer month,
             @RequestParam(required = false) Integer year) {
@@ -45,10 +46,14 @@ public class KpiController {
             @RequestParam(required = false) Integer year,
             @AuthenticationPrincipal StaffPrincipal principal) {
         
-        boolean isManagerOrAdmin = principal.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER") || a.getAuthority().equals("ROLE_ADMIN"));
-        
-        if (!isManagerOrAdmin && !principal.getStaffId().equals(staffId)) {
+        // Xem KPI của người khác thì cần quyền KPI_VIEW; xem của chính mình thì
+        // không. Trước đây chỗ này so chuỗi ROLE_MANAGER/ROLE_ADMIN nên nằm ngoài
+        // tầm với của màn cấu hình phân quyền — sửa quyền ở /role-permission-config
+        // mà endpoint này vẫn chặn theo vai trò cũ.
+        boolean canViewOthers = principal.getAuthorities().stream()
+                .anyMatch(a -> PermissionCodes.KPI_VIEW.equals(a.getAuthority()));
+
+        if (!canViewOthers && !principal.getStaffId().equals(staffId)) {
             return ResponseEntity.status(403).body(ApiResponses.error("Forbidden", "Bạn không có quyền xem KPI của nhân viên khác."));
         }
 
@@ -75,14 +80,14 @@ public class KpiController {
     }
 
     @GetMapping("/configs")
-    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.KPI_VIEW + "')")
     public ResponseEntity<ApiResponse<List<KpiConfigJpa>>> getKpiConfigs() {
         List<KpiConfigJpa> configs = kpiConfigRepository.findAll();
         return ResponseEntity.ok(ApiResponses.success(configs));
     }
 
     @PutMapping("/configs/{configId}")
-    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.KPI_EDIT + "')")
     public ResponseEntity<ApiResponse<KpiConfigJpa>> updateKpiConfig(
             @PathVariable Integer configId,
             @RequestBody KpiConfigJpa configRequest) {
@@ -110,7 +115,7 @@ public class KpiController {
     }
 
     @PostMapping("/recalculate")
-    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.KPI_EDIT + "')")
     public ResponseEntity<ApiResponse<Map<String, Object>>> recalculateKpi(
             @RequestParam Integer staffId,
             @RequestParam int month,
@@ -122,7 +127,7 @@ public class KpiController {
     }
 
     @PostMapping("/recalculate-all")
-    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.KPI_EDIT + "')")
     public ResponseEntity<ApiResponse<String>> recalculateAllKpi(
             @RequestParam int month,
             @RequestParam int year) {

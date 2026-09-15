@@ -1,5 +1,6 @@
 package com.g42.platform.gms.marketing.recruitment.api.controller;
 
+import com.g42.platform.gms.authz.PermissionCodes;
 import com.g42.platform.gms.auth.entity.StaffPrincipal;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
@@ -25,7 +26,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/admin/recruitment/settings")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+@PreAuthorize("hasAuthority('" + PermissionCodes.RECRUITMENT_VIEW + "')")
 public class AdminRecruitmentSettingController {
 
     private final RecruitmentSettingService settingService;
@@ -36,6 +37,7 @@ public class AdminRecruitmentSettingController {
     }
 
     @PutMapping
+    @PreAuthorize("hasAuthority('" + PermissionCodes.RECRUITMENT_EDIT + "')")
     public ResponseEntity<ApiResponse<RecruitmentDtos.SettingDto>> save(
             @Valid @RequestBody RecruitmentDtos.SettingDto request,
             @AuthenticationPrincipal StaffPrincipal principal) {
@@ -50,6 +52,7 @@ public class AdminRecruitmentSettingController {
 
     /** Gửi thư thử để biết SMTP và danh sách người nhận có chạy hay không. */
     @PostMapping("/test-mail")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.RECRUITMENT_EDIT + "')")
     public ResponseEntity<ApiResponse<Void>> sendTestMail(
             @Valid @RequestBody(required = false) RecruitmentDtos.TestMailRequest request) {
         try {

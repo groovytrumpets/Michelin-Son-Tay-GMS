@@ -1,5 +1,6 @@
 package com.g42.platform.gms.service_ticket_management.api.controller;
 
+import com.g42.platform.gms.authz.PermissionCodes;
 import com.g42.platform.gms.auth.entity.StaffPrincipal;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
@@ -39,7 +40,7 @@ public class ServiceTicketTechnicianController {
      * @return Page of TechnicianTicketListResponse
      */
     @GetMapping("/tickets")
-    @PreAuthorize("hasRole('TECHNICIAN')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.TECHNICIAN_TASK_VIEW + "')")
     public ResponseEntity<ApiResponse<Page<TechnicianTicketListResponse>>> getTechnicianTicketList(
             @AuthenticationPrincipal StaffPrincipal principal,
             @RequestParam(defaultValue = "0") int page,

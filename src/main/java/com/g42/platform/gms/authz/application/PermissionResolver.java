@@ -1,11 +1,11 @@
 package com.g42.platform.gms.authz.application;
 
+import com.g42.platform.gms.authz.PermissionCodes;
 import com.g42.platform.gms.authz.infrastructure.repository.PermissionJpaRepo;
 import com.g42.platform.gms.authz.infrastructure.repository.RolePermissionJpaRepo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -87,18 +87,35 @@ public class PermissionResolver {
         log.info("Bộ nhớ đệm phân quyền đã được xoá, sẽ nạp lại ở request kế tiếp");
     }
 
-    @Transactional(readOnly = true)
+    /**
+     * Mọi mã quyền đang tồn tại = HỢP của bảng permission và hằng số trong
+     * {@link PermissionCodes}. Đây cũng là bộ quyền của ADMIN.
+     *
+     * <p>Lấy hợp chứ không lấy riêng bảng, vì đây là bộ quyền của ADMIN và không
+     * được phép rỗng. Chỉ đọc bảng thì có hai đường dẫn tới thảm hoạ: bảng trống
+     * (ai đó xoá, hoặc DB chưa chạy migration) là ADMIN mất sạch quyền kể cả
+     * quyền vào lại màn cấu hình để sửa; và thêm hằng số mới mà quên seed thì
+     * ADMIN bị chặn ở đúng endpoint mới, triệu chứng nhìn rất khó hiểu.
+     * Lấy hợp thì cả hai trường hợp ADMIN vẫn đi được, còn
+     * {@code PermissionCatalogCheck} lo phần cảnh báo cho người sửa.
+     */
     public Set<String> allPermissionCodes() {
         Set<String> cached = allPermissionCodes;
         if (cached == null) {
-            cached = new LinkedHashSet<>(permissionRepo.findAll().stream().map(p -> p.getCode()).toList());
+            Set<String> built = new LinkedHashSet<>(PermissionCodes.all());
+            try {
+                permissionRepo.findAll().forEach(p -> built.add(p.getCode()));
+            } catch (Exception e) {
+                // Chưa chạy migration, mất kết nối... — vẫn còn danh sách từ code.
+                log.warn("Không đọc được bảng permission, tạm dùng danh mục trong code: {}", e.getMessage());
+            }
+            cached = built;
             allPermissionCodes = cached;
         }
         return cached;
     }
 
-    @Transactional(readOnly = true)
-    protected Map<String, Set<String>> snapshot() {
+    private Map<String, Set<String>> snapshot() {
         Map<String, Set<String>> cached = snapshot;
         if (cached != null) {
             return cached;

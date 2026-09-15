@@ -52,11 +52,15 @@ public class StaffPrincipal implements UserDetails {
 
     /**
      * Trả về hai loại authority cùng lúc:
-     *   - ROLE_<mã vai trò> cho các @PreAuthorize("hasRole(...)") chưa chuyển đổi
-     *   - <MÃ QUYỀN>        cho các @PreAuthorize("hasAuthority(...)") đã chuyển
+     *   - ROLE_<mã vai trò> — phía nhân viên đã chuyển hết sang mã quyền, nhưng
+     *     vẫn giữ vì code nghiệp vụ tra vai trò theo tên (TicketAssignmentService,
+     *     CheckInService tìm "ai là KTV", "ai là cố vấn"), và vì phía khách hàng
+     *     còn dùng hasRole('CUSTOMER').
+     *   - <MÃ QUYỀN>        cho các @PreAuthorize("hasAuthority(...)").
      *
-     * Giữ cả hai để việc chuyển từng module sang phân quyền động không phải làm
-     * một lượt trên toàn bộ 49 controller.
+     * Quy tắc khi thêm endpoint mới cho nhân viên: chặn bằng hasAuthority với một
+     * hằng số trong PermissionCodes, đừng quay lại hasRole — hasRole nằm ngoài
+     * tầm với của màn /role-permission-config.
      */
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {

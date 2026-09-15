@@ -1,5 +1,6 @@
 package com.g42.platform.gms.marketing.itempost.api.controller;
 
+import com.g42.platform.gms.authz.PermissionCodes;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.marketing.itempost.api.dto.ItemPostDtos;
@@ -16,7 +17,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/admin/item-post-categories")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+@PreAuthorize("hasAuthority('" + PermissionCodes.ITEM_POST_VIEW + "')")
 public class AdminItemPostCategoryController {
 
     private final ItemPostCategoryService categoryService;
@@ -27,12 +28,14 @@ public class AdminItemPostCategoryController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('" + PermissionCodes.ITEM_POST_EDIT + "')")
     public ResponseEntity<ApiResponse<ItemPostDtos.CategoryDto>> create(
             @Valid @RequestBody ItemPostDtos.CategorySaveRequest request) {
         return ResponseEntity.ok(ApiResponses.success(categoryService.create(request), "Đã tạo danh mục"));
     }
 
     @PutMapping("/{categoryId}")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.ITEM_POST_EDIT + "')")
     public ResponseEntity<ApiResponse<ItemPostDtos.CategoryDto>> update(
             @PathVariable Integer categoryId,
             @Valid @RequestBody ItemPostDtos.CategorySaveRequest request) {
@@ -41,6 +44,7 @@ public class AdminItemPostCategoryController {
     }
 
     @DeleteMapping("/{categoryId}")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.ITEM_POST_EDIT + "')")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Integer categoryId) {
         categoryService.delete(categoryId);
         return ResponseEntity.ok(ApiResponses.successMessage("Đã xoá danh mục"));

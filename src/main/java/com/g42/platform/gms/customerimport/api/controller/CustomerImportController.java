@@ -1,5 +1,6 @@
 package com.g42.platform.gms.customerimport.api.controller;
 
+import com.g42.platform.gms.authz.PermissionCodes;
 import com.g42.platform.gms.auth.entity.StaffPrincipal;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
@@ -27,7 +28,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/admin/customer-import")
-@PreAuthorize("hasAnyRole('MANAGER','ADMIN')")
+@PreAuthorize("hasAuthority('" + PermissionCodes.CUSTOMER_IMPORT + "')")
 public class CustomerImportController {
 
     @Autowired

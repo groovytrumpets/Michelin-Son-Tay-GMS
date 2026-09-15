@@ -579,3 +579,57 @@ databaseChangeLog:
               INSERT INTO role_permission_default (role_id, permission_code)
               SELECT r.role_id, 'SERVICE_TICKET_ASSIGN' FROM role r
               WHERE r.role_code = 'RECEPTIONIST'
+
+  # Siết lại hai quyền mà quy tắc "lấy hợp FE + BE" ở changeset 038-5 cấp rộng
+  # quá tay. Phát hiện khi chuyển nốt các controller còn lại sang hasAuthority:
+  # lúc quyền mới thật sự có hiệu lực ở backend thì hai chỗ này hoá ra nới quyền
+  # so với trước, chứ không phải giữ nguyên.
+  #
+  # 1. RECEPTIONIST / TICKET_BACKFILL_EDIT
+  #    Sidebar cho lễ tân vào /ticket-backfill nên 038-5 cấp cả VIEW lẫn EDIT.
+  #    Nhưng ở backend, EDIT của module này là DUYỆT phiếu nhập bù, mà
+  #    TicketBackfillController.approve/reject xưa nay chỉ MANAGER/ADMIN.
+  #    Để lễ tân vừa nhập vừa tự duyệt là phá đúng cái hàng rào mà phiếu nhập bù
+  #    sinh ra để dựng. Giữ VIEW (xem phiếu mình đã nhập), bỏ EDIT.
+  #
+  # 2. ADVISOR / ATTENDANCE_EDIT
+  #    AttendanceManageController cho MANAGER+ADVISOR *xem* chấm công, nhưng
+  #    sửa/xoá/chấm hộ thì chỉ MANAGER. 038-5 gộp cả hai thành VIEW+EDIT.
+  #    Giữ VIEW, bỏ EDIT.
+  #
+  # Sửa ở cả role_permission lẫn role_permission_default, nếu không bấm
+  # "Khôi phục mặc định" là quyền rộng quay lại.
+  - changeSet:
+      id: 038-8-tighten-overgranted
+      author: gms
+      comment: Bỏ TICKET_BACKFILL_EDIT của lễ tân và ATTENDANCE_EDIT của cố vấn — 038-5 cấp rộng hơn hiện trạng
+      changes:
+        - sql:
+            comment: Gỡ khỏi bộ quyền đang dùng
+            sql: >-
+              DELETE rp FROM role_permission rp
+              JOIN role r ON r.role_id = rp.role_id
+              WHERE (r.role_code = 'RECEPTIONIST' AND rp.permission_code = 'TICKET_BACKFILL_EDIT')
+                 OR (r.role_code = 'ADVISOR'      AND rp.permission_code = 'ATTENDANCE_EDIT')
+        - sql:
+            comment: Gỡ khỏi cả bản mặc định
+            sql: >-
+              DELETE rpd FROM role_permission_default rpd
+              JOIN role r ON r.role_id = rpd.role_id
+              WHERE (r.role_code = 'RECEPTIONIST' AND rpd.permission_code = 'TICKET_BACKFILL_EDIT')
+                 OR (r.role_code = 'ADVISOR'      AND rpd.permission_code = 'ATTENDANCE_EDIT')
+      rollback:
+        - sql:
+            sql: >-
+              INSERT INTO role_permission (role_id, permission_code)
+              SELECT r.role_id, v.code FROM role r
+              JOIN (          SELECT 'RECEPTIONIST' AS role_code, 'TICKET_BACKFILL_EDIT' AS code
+                    UNION ALL SELECT 'ADVISOR',                   'ATTENDANCE_EDIT'
+              ) v ON v.role_code = r.role_code
+        - sql:
+            sql: >-
+              INSERT INTO role_permission_default (role_id, permission_code)
+              SELECT r.role_id, v.code FROM role r
+              JOIN (          SELECT 'RECEPTIONIST' AS role_code, 'TICKET_BACKFILL_EDIT' AS code
+                    UNION ALL SELECT 'ADVISOR',                   'ATTENDANCE_EDIT'
+              ) v ON v.role_code = r.role_code

@@ -1,5 +1,6 @@
 package com.g42.platform.gms.report.api.controller;
 
+import com.g42.platform.gms.authz.PermissionCodes;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.report.api.dto.CustomerReportResponse;
@@ -27,7 +28,7 @@ import java.time.LocalDate;
 @RestController
 @RequestMapping("/api/reports")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('RECEPTIONIST', 'ACCOUNTANT', 'MANAGER', 'ADMIN')")
+@PreAuthorize("hasAuthority('" + PermissionCodes.REPORT_CUSTOMER_VIEW + "')")
 public class CustomerReportController {
 
     private final CustomerReportService customerReportService;

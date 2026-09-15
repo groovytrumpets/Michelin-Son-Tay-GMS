@@ -1,5 +1,6 @@
 package com.g42.platform.gms.marketing.news.api.controller;
 
+import com.g42.platform.gms.authz.PermissionCodes;
 import com.g42.platform.gms.auth.entity.StaffPrincipal;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
@@ -27,7 +28,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/admin/posts")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('MANAGER', 'ADMIN', 'RECEPTIONIST')")
+@PreAuthorize("hasAuthority('" + PermissionCodes.POST_VIEW + "')")
 public class AdminPostController {
 
     private static final String IMAGE_FOLDER = "garage/posts";
@@ -63,6 +64,7 @@ public class AdminPostController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('" + PermissionCodes.POST_CREATE + "')")
     public ResponseEntity<ApiResponse<PostDtos.AdminDetailDto>> create(
             @Valid @RequestBody PostDtos.SaveRequest request,
             @AuthenticationPrincipal StaffPrincipal principal) {
@@ -72,6 +74,7 @@ public class AdminPostController {
     }
 
     @PutMapping("/{postId}")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.POST_EDIT + "')")
     public ResponseEntity<ApiResponse<PostDtos.AdminDetailDto>> update(
             @PathVariable Long postId,
             @Valid @RequestBody PostDtos.SaveRequest request) {
@@ -81,6 +84,7 @@ public class AdminPostController {
 
     /** Duyệt, trả lại, hẹn giờ hoặc lưu trữ bài. */
     @PatchMapping("/{postId}/status")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.POST_PUBLISH + "')")
     public ResponseEntity<ApiResponse<PostDtos.AdminDetailDto>> changeStatus(
             @PathVariable Long postId,
             @RequestBody PostDtos.StatusChangeRequest request,
@@ -91,6 +95,7 @@ public class AdminPostController {
     }
 
     @DeleteMapping("/{postId}")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.POST_DELETE + "')")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long postId) {
         postService.softDelete(postId);
         return ResponseEntity.ok(ApiResponses.successMessage("Đã xoá bài viết"));
@@ -98,6 +103,7 @@ public class AdminPostController {
 
     /** Ảnh chèn trong bài và ảnh bìa — đẩy thẳng lên Cloudinary như các phân hệ khác. */
     @PostMapping("/upload-image")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.POST_EDIT + "')")
     public ResponseEntity<ApiResponse<Map<String, String>>> uploadImage(@RequestParam("file") MultipartFile file) {
         try {
             String url = imageUploadService.uploadImage(file, IMAGE_FOLDER);

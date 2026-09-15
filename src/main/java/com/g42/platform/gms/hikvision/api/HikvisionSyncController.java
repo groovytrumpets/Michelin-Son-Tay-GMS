@@ -1,5 +1,6 @@
 package com.g42.platform.gms.hikvision.api;
 
+import com.g42.platform.gms.authz.PermissionCodes;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.hikvision.sync.HikvisionSyncScheduler;
@@ -28,7 +29,7 @@ public class HikvisionSyncController {
      * @param date date to sync in format yyyy-MM-dd (default: today)
      */
     @PostMapping("/sync")
-    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.ATTENDANCE_EDIT + "')")
     public ResponseEntity<ApiResponse<String>> triggerSync(
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {

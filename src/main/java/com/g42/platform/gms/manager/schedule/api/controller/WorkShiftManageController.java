@@ -1,5 +1,6 @@
 package com.g42.platform.gms.manager.schedule.api.controller;
 
+import com.g42.platform.gms.authz.PermissionCodes;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.manager.schedule.api.dto.WorkShiftRequest;
@@ -21,32 +22,32 @@ public class WorkShiftManageController {
     private final WorkShiftManageService service;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('MANAGER', 'ADVISOR')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.SHIFT_VIEW + "')")
     public ResponseEntity<ApiResponse<List<WorkShiftResponse>>> getAllShifts() {
         return ResponseEntity.ok(ApiResponses.success(service.getAllShifts()));
     }
 
     @GetMapping("/{shiftId}")
-    @PreAuthorize("hasAnyRole('MANAGER', 'ADVISOR')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.SHIFT_VIEW + "')")
     public ResponseEntity<ApiResponse<WorkShiftResponse>> getShift(@PathVariable Integer shiftId) {
         return ResponseEntity.ok(ApiResponses.success(service.getShiftById(shiftId)));
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('MANAGER')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.SHIFT_EDIT + "')")
     public ResponseEntity<ApiResponse<WorkShiftResponse>> createShift(@Valid @RequestBody WorkShiftRequest request) {
         return ResponseEntity.ok(ApiResponses.success(service.createShift(request)));
     }
 
     @PutMapping("/{shiftId}")
-    @PreAuthorize("hasRole('MANAGER')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.SHIFT_EDIT + "')")
     public ResponseEntity<ApiResponse<WorkShiftResponse>> updateShift(
             @PathVariable Integer shiftId, @Valid @RequestBody WorkShiftRequest request) {
         return ResponseEntity.ok(ApiResponses.success(service.updateShift(shiftId, request)));
     }
 
     @DeleteMapping("/{shiftId}")
-    @PreAuthorize("hasRole('MANAGER')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.SHIFT_EDIT + "')")
     public ResponseEntity<ApiResponse<String>> deleteShift(@PathVariable Integer shiftId) {
         service.deleteShift(shiftId);
         return ResponseEntity.ok(ApiResponses.success("Đã vô hiệu hóa ca làm việc"));

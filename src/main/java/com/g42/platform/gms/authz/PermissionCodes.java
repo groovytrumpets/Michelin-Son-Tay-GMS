@@ -18,6 +18,31 @@ public final class PermissionCodes {
     private PermissionCodes() {
     }
 
+    /** Toàn bộ mã quyền code biết tới, đọc bằng reflection từ chính các hằng số bên dưới. */
+    public static java.util.Set<String> all() {
+        return Holder.ALL;
+    }
+
+    /** Dựng một lần, lúc lớp được nạp. */
+    private static final class Holder {
+        private static final java.util.Set<String> ALL = scan();
+
+        private static java.util.Set<String> scan() {
+            java.util.Set<String> codes = new java.util.LinkedHashSet<>();
+            for (java.lang.reflect.Field field : PermissionCodes.class.getDeclaredFields()) {
+                if (!java.lang.reflect.Modifier.isStatic(field.getModifiers())) continue;
+                if (field.getType() != String.class) continue;
+                try {
+                    Object value = field.get(null);
+                    if (value != null) codes.add((String) value);
+                } catch (IllegalAccessException ignored) {
+                    // hằng số public static final, không vào nhánh này
+                }
+            }
+            return java.util.Collections.unmodifiableSet(codes);
+        }
+    }
+
     // ---- Khách hàng & Lịch hẹn ----
     public static final String CUSTOMER_VIEW = "CUSTOMER_VIEW";
     public static final String CUSTOMER_CREATE = "CUSTOMER_CREATE";

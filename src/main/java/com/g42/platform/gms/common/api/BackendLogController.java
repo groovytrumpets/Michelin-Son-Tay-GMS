@@ -1,5 +1,6 @@
 package com.g42.platform.gms.common.api;
 
+import com.g42.platform.gms.authz.PermissionCodes;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.common.logging.InMemoryLogAppender;
@@ -20,7 +21,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/admin/backend-logs")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAuthority('" + PermissionCodes.BACKEND_LOG_VIEW + "')")
 public class BackendLogController {
 
     private static final int DEFAULT_LIMIT = 500;

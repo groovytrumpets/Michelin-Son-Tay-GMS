@@ -2,6 +2,8 @@ package com.g42.platform.gms.service_ticket_management.application.service;
 
 import com.g42.platform.gms.auth.entity.CustomerProfile;
 import com.g42.platform.gms.auth.entity.StaffPrincipal;
+import com.g42.platform.gms.authz.PermissionCodes;
+import com.g42.platform.gms.authz.application.PermissionResolver;
 import com.g42.platform.gms.auth.repository.CustomerProfileRepository;
 import com.g42.platform.gms.billing.api.dto.PaymentProofCreateDto;
 import com.g42.platform.gms.billing.api.dto.ServiceBillCreateDto;
@@ -87,8 +89,6 @@ public class TicketBackfillService {
     private static final long FUTURE_TOLERANCE_MINUTES = 5;
     private static final int REASON_MAX_LENGTH = 500;
     private static final Set<String> PAYMENT_METHODS = Set.of("CASH", "TRANSFER");
-    private static final String ROLE_MANAGER = "ROLE_MANAGER";
-    private static final String ROLE_ADMIN = "ROLE_ADMIN";
 
     private final ServiceTicketRepo serviceTicketRepo;
     private final ServiceTicketRepository serviceTicketJpaRepo;
@@ -206,7 +206,11 @@ public class TicketBackfillService {
     public BackfillTicketDto approve(Integer serviceTicketId, String note, StaffPrincipal principal) {
         Integer reviewerId = requireReviewer(principal);
         ServiceTicket ticket = requirePendingTicket(serviceTicketId);
-        if (Objects.equals(ticket.getCreatedBy(), reviewerId) && !hasRole(principal, ROLE_ADMIN)) {
+        // Cấm tự duyệt phiếu do chính mình nhập. Chỗ này CỐ Ý vẫn xét vai trò
+        // ADMIN chứ không xét quyền: đây là quy tắc tách trách nhiệm, và lối
+        // thoát dành cho quản trị viên. Nếu buộc vào một mã quyền thì ai đó
+        // tick nhầm là quy tắc bốc hơi mà không ai để ý.
+        if (Objects.equals(ticket.getCreatedBy(), reviewerId) && !isSuperAdmin(principal)) {
             throw new IllegalArgumentException("Không được tự duyệt phiếu nhập bù do chính mình nhập — nhờ quản lý khác hoặc admin duyệt.");
         }
         if (paymentProofJpaRepo.countByServiceTicketId(serviceTicketId) < 1) {
@@ -665,16 +669,22 @@ public class TicketBackfillService {
         return staffId;
     }
 
+    /** Ai được duyệt phiếu nhập bù — nay do phân quyền quyết định, không cứng theo vai trò. */
     private boolean isReviewer(StaffPrincipal principal) {
-        return hasRole(principal, ROLE_MANAGER) || hasRole(principal, ROLE_ADMIN);
+        return hasAuthority(principal, PermissionCodes.TICKET_BACKFILL_EDIT);
     }
 
-    private boolean hasRole(StaffPrincipal principal, String role) {
+    private boolean isSuperAdmin(StaffPrincipal principal) {
+        return principal != null
+                && principal.getRoleCodes().contains(PermissionResolver.SUPER_ROLE);
+    }
+
+    private boolean hasAuthority(StaffPrincipal principal, String authority) {
         if (principal == null || principal.getAuthorities() == null) {
             return false;
         }
-        for (GrantedAuthority authority : principal.getAuthorities()) {
-            if (role.equals(authority.getAuthority())) {
+        for (GrantedAuthority granted : principal.getAuthorities()) {
+            if (authority.equals(granted.getAuthority())) {
                 return true;
             }
         }

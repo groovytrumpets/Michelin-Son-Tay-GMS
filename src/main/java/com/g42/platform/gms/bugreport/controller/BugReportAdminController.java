@@ -1,5 +1,6 @@
 package com.g42.platform.gms.bugreport.controller;
 
+import com.g42.platform.gms.authz.PermissionCodes;
 import com.g42.platform.gms.bugreport.dto.BugReportDto;
 import com.g42.platform.gms.bugreport.dto.BugReportStatsDto;
 import com.g42.platform.gms.bugreport.dto.BugReportUpdateRequest;
@@ -24,7 +25,7 @@ import java.time.format.DateTimeFormatter;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/admin/bug-reports")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAuthority('" + PermissionCodes.BUG_REPORT_VIEW + "')")
 public class BugReportAdminController {
 
     private final BugReportQueryService bugReportQueryService;
@@ -65,6 +66,7 @@ public class BugReportAdminController {
     }
 
     @PutMapping("/{reportId}")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.BUG_REPORT_EDIT + "')")
     public ResponseEntity<ApiResponse<BugReportDto>> updateReport(@PathVariable Long reportId,
                                                                   @Valid @RequestBody BugReportUpdateRequest request) {
         return ResponseEntity.ok(ApiResponses.success(

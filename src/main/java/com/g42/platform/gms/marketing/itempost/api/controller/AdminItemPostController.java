@@ -1,5 +1,6 @@
 package com.g42.platform.gms.marketing.itempost.api.controller;
 
+import com.g42.platform.gms.authz.PermissionCodes;
 import com.g42.platform.gms.auth.entity.StaffPrincipal;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
@@ -28,7 +29,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/admin/item-posts")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('MANAGER', 'ADMIN', 'RECEPTIONIST')")
+@PreAuthorize("hasAuthority('" + PermissionCodes.ITEM_POST_VIEW + "')")
 public class AdminItemPostController {
 
     private static final String IMAGE_FOLDER = "garage/item-posts";
@@ -72,6 +73,7 @@ public class AdminItemPostController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('" + PermissionCodes.ITEM_POST_CREATE + "')")
     public ResponseEntity<ApiResponse<ItemPostDtos.AdminDetailDto>> create(
             @Valid @RequestBody ItemPostDtos.SaveRequest request,
             @AuthenticationPrincipal StaffPrincipal principal) {
@@ -81,6 +83,7 @@ public class AdminItemPostController {
     }
 
     @PutMapping("/{itemPostId}")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.ITEM_POST_EDIT + "')")
     public ResponseEntity<ApiResponse<ItemPostDtos.AdminDetailDto>> update(
             @PathVariable Long itemPostId,
             @Valid @RequestBody ItemPostDtos.SaveRequest request) {
@@ -90,6 +93,7 @@ public class AdminItemPostController {
 
     /** Duyệt, trả lại, hẹn giờ hoặc lưu trữ bài. */
     @PatchMapping("/{itemPostId}/status")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.ITEM_POST_EDIT + "')")
     public ResponseEntity<ApiResponse<ItemPostDtos.AdminDetailDto>> changeStatus(
             @PathVariable Long itemPostId,
             @RequestBody ItemPostDtos.StatusChangeRequest request,
@@ -100,6 +104,7 @@ public class AdminItemPostController {
     }
 
     @DeleteMapping("/{itemPostId}")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.ITEM_POST_DELETE + "')")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long itemPostId) {
         itemPostService.delete(itemPostId);
         return ResponseEntity.ok(ApiResponses.successMessage("Đã xoá bài viết"));
@@ -111,6 +116,7 @@ public class AdminItemPostController {
      * Idempotent: gọi lại nhiều lần chỉ tạo thêm cho những item mới xuất hiện.
      */
     @PostMapping("/backfill")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.ITEM_POST_EDIT + "')")
     public ResponseEntity<ApiResponse<ItemPostDtos.BackfillResultDto>> backfill() {
         return ResponseEntity.ok(ApiResponses.success(
                 itemPostService.backfillFromCatalogItems(), "Đã backfill bài viết cho catalog item"));
@@ -118,6 +124,7 @@ public class AdminItemPostController {
 
     /** Ảnh chèn trong bài và ảnh bìa — đẩy thẳng lên Cloudinary như các phân hệ khác. */
     @PostMapping("/upload-image")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.ITEM_POST_EDIT + "')")
     public ResponseEntity<ApiResponse<Map<String, String>>> uploadImage(@RequestParam("file") MultipartFile file) {
         try {
             String url = imageUploadService.uploadImage(file, IMAGE_FOLDER);
