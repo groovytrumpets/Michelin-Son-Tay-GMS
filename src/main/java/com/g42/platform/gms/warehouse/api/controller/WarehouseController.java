@@ -1,5 +1,6 @@
 package com.g42.platform.gms.warehouse.api.controller;
 
+import com.g42.platform.gms.authz.PermissionCodes;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.warehouse.api.dto.*;
@@ -87,13 +88,13 @@ public class WarehouseController {
         return ResponseEntity.ok(ApiResponses.success(catalogItemService.updateCatalog(updateDto, itemId, staffId)));
     }
     @DeleteMapping("/catalog-item/{itemId}")
-    @PreAuthorize("hasAnyRole('WAREHOUSE_MANAGER','MANAGER','ADMIN')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.ITEM_DELETE + "')")
     public ResponseEntity<ApiResponse<Void>> deactivateCatalogItem(@PathVariable Integer itemId) {
         catalogItemService.deactivateCatalogItem(itemId);
         return ResponseEntity.ok(ApiResponses.success(null));
     }
     @PostMapping("/catalog-item/{itemId}/activate")
-    @PreAuthorize("hasAnyRole('WAREHOUSE_MANAGER','MANAGER','ADMIN')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.ITEM_EDIT + "')")
     public ResponseEntity<ApiResponse<Void>> activateCatalogItem(@PathVariable Integer itemId) {
         catalogItemService.activateCatalogItem(itemId);
         return ResponseEntity.ok(ApiResponses.success(null));
@@ -159,7 +160,7 @@ public class WarehouseController {
      * WAREHOUSE_KEEPER / WAREHOUSE_MANAGER / MANAGER / ADMIN đều được xem.
      */
     @GetMapping("/warehouse/all")
-    @PreAuthorize("hasAnyRole('WAREHOUSE_KEEPER','WAREHOUSE_MANAGER','MANAGER','ADMIN')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.WAREHOUSE_CONFIG_VIEW + "')")
     public ResponseEntity<ApiResponse<List<WarehouseDto>>> getAllWarehouse(
             @RequestParam(required = false) Boolean isActive) {
         return ResponseEntity.ok(ApiResponses.success(warehouseService.listWarehouses(isActive)));
@@ -167,17 +168,17 @@ public class WarehouseController {
 
     /** Chi tiết 1 kho. */
     @GetMapping("/warehouse/{id}")
-    @PreAuthorize("hasAnyRole('WAREHOUSE_KEEPER','WAREHOUSE_MANAGER','MANAGER','ADMIN')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.WAREHOUSE_CONFIG_VIEW + "')")
     public ResponseEntity<ApiResponse<WarehouseDto>> getWarehouse(@PathVariable Integer id) {
         return ResponseEntity.ok(ApiResponses.success(warehouseService.getWarehouse(id)));
     }
 
     /**
      * Tạo kho mới (MASTER / BRANCH / DEFECTIVE).
-     * Chỉ WAREHOUSE_MANAGER / MANAGER / ADMIN.
+     * Cần quyền Cấu hình kho — Sửa (WAREHOUSE_CONFIG_EDIT).
      */
     @PostMapping("/warehouse")
-    @PreAuthorize("hasAnyRole('WAREHOUSE_MANAGER','MANAGER','ADMIN')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.WAREHOUSE_CONFIG_EDIT + "')")
     public ResponseEntity<ApiResponse<WarehouseDto>> createWarehouse(
             @Valid @RequestBody CreateWarehouseRequest request) {
         return ResponseEntity.ok(ApiResponses.success(warehouseService.createWarehouse(request)));
@@ -185,10 +186,10 @@ public class WarehouseController {
 
     /**
      * Cập nhật tên / địa chỉ / manager của kho.
-     * Chỉ WAREHOUSE_MANAGER / MANAGER / ADMIN.
+     * Cần quyền Cấu hình kho — Sửa (WAREHOUSE_CONFIG_EDIT).
      */
     @PutMapping("/warehouse/{id}")
-    @PreAuthorize("hasAnyRole('WAREHOUSE_MANAGER','MANAGER','ADMIN')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.WAREHOUSE_CONFIG_EDIT + "')")
     public ResponseEntity<ApiResponse<WarehouseDto>> updateWarehouse(
             @PathVariable Integer id,
             @Valid @RequestBody UpdateWarehouseRequest request) {
@@ -197,20 +198,20 @@ public class WarehouseController {
 
     /**
      * Bật kho (isActive = true).
-     * Chỉ WAREHOUSE_MANAGER / MANAGER / ADMIN.
+     * Cần quyền Cấu hình kho — Sửa (WAREHOUSE_CONFIG_EDIT).
      */
     @PostMapping("/warehouse/{id}/activate")
-    @PreAuthorize("hasAnyRole('WAREHOUSE_MANAGER','MANAGER','ADMIN')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.WAREHOUSE_CONFIG_EDIT + "')")
     public ResponseEntity<ApiResponse<WarehouseDto>> activateWarehouse(@PathVariable Integer id) {
         return ResponseEntity.ok(ApiResponses.success(warehouseService.setWarehouseActive(id, true)));
     }
 
     /**
      * Tắt kho (isActive = false).
-     * Chỉ WAREHOUSE_MANAGER / MANAGER / ADMIN.
+     * Cần quyền Cấu hình kho — Sửa (WAREHOUSE_CONFIG_EDIT).
      */
     @PostMapping("/warehouse/{id}/deactivate")
-    @PreAuthorize("hasAnyRole('WAREHOUSE_MANAGER','MANAGER','ADMIN')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.WAREHOUSE_CONFIG_EDIT + "')")
     public ResponseEntity<ApiResponse<WarehouseDto>> deactivateWarehouse(@PathVariable Integer id) {
         return ResponseEntity.ok(ApiResponses.success(warehouseService.setWarehouseActive(id, false)));
     }
@@ -218,7 +219,7 @@ public class WarehouseController {
     // ─── Legacy defective endpoint (giữ nguyên để không breaking change) ─────
 
     @PostMapping("/warehouse/defective/create/{branchWarehouseId}")
-    @PreAuthorize("hasAnyRole('WAREHOUSE_MANAGER','MANAGER','ADMIN')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.WAREHOUSE_EDIT + "')")
     public ResponseEntity<ApiResponse<String>> createDefectiveWarehouse(@PathVariable Integer branchWarehouseId) {
         try {
             warehouseService.createDefectiveWarehouse(branchWarehouseId);

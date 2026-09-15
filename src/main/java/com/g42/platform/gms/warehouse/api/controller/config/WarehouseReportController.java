@@ -1,5 +1,6 @@
 package com.g42.platform.gms.warehouse.api.controller.config;
 
+import com.g42.platform.gms.authz.PermissionCodes;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.warehouse.api.dto.response.ItemProfitReportResponse;
@@ -21,7 +22,7 @@ public class WarehouseReportController {
     private final WarehouseReportService warehouseReportService;
 
     @GetMapping("/profit-by-item")
-    @PreAuthorize("hasAnyRole('MANAGER','ADMIN','ACCOUNTANT')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.WAREHOUSE_REPORT_VIEW + "')")
     public ResponseEntity<ApiResponse<List<ItemProfitReportResponse>>> getProfitByItem(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,

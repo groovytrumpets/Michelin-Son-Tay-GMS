@@ -5,6 +5,7 @@ import com.g42.platform.gms.auth.entity.StaffAuth;
 import com.g42.platform.gms.auth.repository.StaffAuthRepo;
 import com.g42.platform.gms.auth.service.JWTService;
 import com.g42.platform.gms.auth.service.StaffAuthDetailsService;
+import com.g42.platform.gms.authz.application.PermissionResolver;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
@@ -30,6 +31,8 @@ public class StaffJwtFilter extends OncePerRequestFilter {
     ApplicationContext context;
     @Autowired
     StaffAuthRepo staffAuthRepo;
+    @Autowired
+    PermissionResolver permissionResolver;
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
         String path = request.getRequestURI();
@@ -81,7 +84,14 @@ public class StaffJwtFilter extends OncePerRequestFilter {
                 if (subject != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                     // tạo staff principal từ staff auth
                     StaffPrincipal staffPrincipal = new StaffPrincipal(staffauth);
-                    
+
+                    // nạp mã quyền của các vai trò nhân viên đang giữ, để các
+                    // @PreAuthorize("hasAuthority('...')") có cái mà kiểm tra.
+                    // resolver đọc từ bộ nhớ đệm nên không thêm truy vấn DB;
+                    // admin sửa phân quyền là ăn ngay ở request kế tiếp, không
+                    // phải đăng nhập lại.
+                    staffPrincipal.setPermissionCodes(permissionResolver.resolve(staffPrincipal.getRoleCodes()));
+
                     // validate token
                     if (jwtService.validateToken(token)) {
                         // tạo authentication object với authorities từ staff principal

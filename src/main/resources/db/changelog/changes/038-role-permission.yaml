@@ -1,0 +1,581 @@
+# Phân quyền động: tách "quyền" ra khỏi "vai trò".
+#
+# Trước đây quyền nằm cứng trong code — @PreAuthorize("hasAnyRole('MANAGER','ADMIN')")
+# ở backend và mảng roles: [...] trong SideBar.jsx/App.jsx ở frontend. Muốn cho
+# một vai trò chỉ-đọc một màn hình nào đó thì phải sửa code và build lại.
+#
+# Kể từ changeset này:
+#   - permission        = DANH MỤC MÃ QUYỀN, cố định theo code. Chỉ seed ở đây,
+#                         không có màn thêm/xoá. Lý do: code phải kiểm tra theo
+#                         một cái tên có sẵn, admin tự đặt tên mới thì không có
+#                         chỗ nào kiểm tra nó cả.
+#   - role_permission   = VAI TRÒ CÓ NHỮNG QUYỀN NÀO. Đây mới là phần động,
+#                         admin chỉnh được ở màn /role-permission-config.
+#
+# ADMIN cố ý KHÔNG có dòng nào trong role_permission: quyền của ADMIN được suy ra
+# trong code là "tất cả" (PermissionResolver). Nhờ vậy thêm mã quyền mới về sau
+# không bao giờ khoá mất chính người đang cấu hình.
+#
+# Bộ quyền mặc định bên dưới = HỢP của những gì hôm nay đã cho phép: sidebar FE
+# cho thấy gì, và @PreAuthorize BE cho gọi gì. Lấy hợp chứ không lấy giao để
+# không vai trò nào mất quyền đang dùng sau khi nâng cấp. Chỗ nào rộng hơn mong
+# muốn thì bỏ tick trong màn cấu hình, không cần sửa code.
+databaseChangeLog:
+  - changeSet:
+      id: 038-1-permission-catalog
+      author: gms
+      comment: Bảng danh mục mã quyền — cố định theo code, seed sẵn, không cho thêm/xoá qua UI
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: permission
+      changes:
+        - createTable:
+            tableName: permission
+            remarks: Danh mục mã quyền cố định; code phải khớp hằng số trong PermissionCodes.java
+            columns:
+              - column:
+                  name: code
+                  type: VARCHAR(64)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+                  remarks: Mã quyền dùng trong @PreAuthorize("hasAuthority('...')") và can() ở FE
+              - column:
+                  name: module_code
+                  type: VARCHAR(48)
+                  constraints:
+                    nullable: false
+                  remarks: Nhóm chức năng — một hàng trong ma trận phân quyền
+              - column:
+                  name: module_label
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: group_label
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
+                  remarks: Nhóm lớn để gom hàng trong ma trận, đặt trùng tên nhóm ở sidebar
+              - column:
+                  name: action_code
+                  type: VARCHAR(24)
+                  constraints:
+                    nullable: false
+                  remarks: VIEW / CREATE / EDIT / DELETE / và vài hành động riêng như APPROVE, PAYMENT
+              - column:
+                  name: label
+                  type: VARCHAR(120)
+                  constraints:
+                    nullable: false
+                  remarks: Nhãn ngắn của hành động, hiện ở đầu cột ma trận
+              - column:
+                  name: description
+                  type: VARCHAR(255)
+              - column:
+                  name: sort_order
+                  type: INT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: permission
+            indexName: idx_permission_module
+            columns:
+              - column:
+                  name: module_code
+              - column:
+                  name: sort_order
+      rollback:
+        - dropTable:
+            tableName: permission
+
+  - changeSet:
+      id: 038-2-role-permission
+      author: gms
+      comment: Bảng nối vai trò với quyền — phần duy nhất admin được sửa
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: role_permission
+      changes:
+        - createTable:
+            tableName: role_permission
+            remarks: Vai trò nào có quyền nào; ADMIN không lưu ở đây vì luôn được suy ra là toàn quyền
+            columns:
+              - column:
+                  name: role_id
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: permission_code
+                  type: VARCHAR(64)
+                  constraints:
+                    nullable: false
+        - addPrimaryKey:
+            tableName: role_permission
+            columnNames: role_id, permission_code
+            constraintName: pk_role_permission
+        - addForeignKeyConstraint:
+            baseTableName: role_permission
+            baseColumnNames: role_id
+            referencedTableName: role
+            referencedColumnNames: role_id
+            constraintName: fk_role_permission_role
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: role_permission
+            baseColumnNames: permission_code
+            referencedTableName: permission
+            referencedColumnNames: code
+            constraintName: fk_role_permission_permission
+            onDelete: CASCADE
+      rollback:
+        - dropTable:
+            tableName: role_permission
+
+  - changeSet:
+      id: 038-3-role-metadata
+      author: gms
+      comment: Đánh dấu vai trò hệ thống để UI không cho xoá, và thêm chỗ mô tả vai trò tự tạo
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: role
+                columnName: is_system
+      changes:
+        - addColumn:
+            tableName: role
+            columns:
+              - column:
+                  name: is_system
+                  type: TINYINT(1)
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+                  remarks: Vai trò gốc của hệ thống — code nghiệp vụ tra cứu theo role_code nên không được xoá/đổi mã
+              - column:
+                  name: description
+                  type: VARCHAR(255)
+        # TECHNICIAN/ADVISOR còn được dùng làm dữ liệu nghiệp vụ, không chỉ để phân
+        # quyền: TicketAssignmentService, CheckInService, TicketBackfillService tra
+        # "ai là KTV", "ai là cố vấn" theo đúng mã này. Xoá hoặc đổi mã là hỏng việc
+        # gán phiếu, nên khoá lại ngay từ dữ liệu.
+        - sql:
+            comment: Các vai trò đang có đều là vai trò gốc
+            sql: >-
+              UPDATE role SET is_system = 1
+              WHERE role_code IN ('ADMIN','MANAGER','ADVISOR','RECEPTIONIST','TECHNICIAN',
+                                  'WAREHOUSE_KEEPER','WAREHOUSE_MANAGER','ACCOUNTANT','CUSTOMER')
+      rollback:
+        - dropColumn:
+            tableName: role
+            columnName: is_system
+        - dropColumn:
+            tableName: role
+            columnName: description
+
+  - changeSet:
+      id: 038-4-seed-permission-catalog
+      author: gms
+      comment: Seed toàn bộ mã quyền; danh sách này phải khớp PermissionCodes.java
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: "0"
+            sql: SELECT COUNT(*) FROM permission
+      changes:
+        - sql:
+            comment: Khách hàng & Lịch hẹn
+            sql: >-
+              INSERT INTO permission (code, module_code, module_label, group_label, action_code, label, description, sort_order) VALUES
+              ('CUSTOMER_VIEW','CUSTOMER','Danh bạ khách hàng','Khách hàng & Lịch hẹn','VIEW','Xem','Mở /customer-manager và xem hồ sơ khách',101),
+              ('CUSTOMER_CREATE','CUSTOMER','Danh bạ khách hàng','Khách hàng & Lịch hẹn','CREATE','Thêm mới','Thêm khách hàng, đối tác mới',102),
+              ('CUSTOMER_EDIT','CUSTOMER','Danh bạ khách hàng','Khách hàng & Lịch hẹn','EDIT','Sửa','Sửa thông tin khách đã có',103),
+              ('CUSTOMER_DELETE','CUSTOMER','Danh bạ khách hàng','Khách hàng & Lịch hẹn','DELETE','Xoá','Xoá hồ sơ khách',104),
+              ('CUSTOMER_MERGE','CUSTOMER','Danh bạ khách hàng','Khách hàng & Lịch hẹn','MERGE','Gộp trùng','Gộp hai hồ sơ khách bị trùng (/customer-merge)',105),
+              ('CUSTOMER_IMPORT','CUSTOMER','Danh bạ khách hàng','Khách hàng & Lịch hẹn','IMPORT','Nhập sổ cũ','Nhập lô sổ dịch vụ cũ (/customer-legacy-import)',106),
+              ('VEHICLE_VIEW','VEHICLE','Xe khách hàng','Khách hàng & Lịch hẹn','VIEW','Xem','Xem danh sách xe (/vehicle-management)',111),
+              ('VEHICLE_CREATE','VEHICLE','Xe khách hàng','Khách hàng & Lịch hẹn','CREATE','Thêm mới','Thêm xe cho khách',112),
+              ('VEHICLE_EDIT','VEHICLE','Xe khách hàng','Khách hàng & Lịch hẹn','EDIT','Sửa','Sửa biển số, hãng, dòng xe',113),
+              ('VEHICLE_DELETE','VEHICLE','Xe khách hàng','Khách hàng & Lịch hẹn','DELETE','Xoá','Xoá xe chưa có lịch sử sửa chữa',114),
+              ('BOOKING_VIEW','BOOKING','Lịch hẹn sửa xe','Khách hàng & Lịch hẹn','VIEW','Xem','Xem lịch hẹn, yêu cầu đặt lịch, hàng chờ',121),
+              ('BOOKING_CREATE','BOOKING','Lịch hẹn sửa xe','Khách hàng & Lịch hẹn','CREATE','Thêm mới','Tạo lịch hẹn cho khách (/create-booking)',122),
+              ('BOOKING_EDIT','BOOKING','Lịch hẹn sửa xe','Khách hàng & Lịch hẹn','EDIT','Sửa','Đổi giờ, đổi nhân sự, duyệt yêu cầu đặt lịch',123),
+              ('BOOKING_DELETE','BOOKING','Lịch hẹn sửa xe','Khách hàng & Lịch hẹn','DELETE','Huỷ','Huỷ lịch hẹn',124),
+              ('PARTS_SALE_VIEW','PARTS_SALE','Bán hàng phụ tùng','Khách hàng & Lịch hẹn','VIEW','Xem','Xem màn bán hàng và phiếu bán hàng',131),
+              ('PARTS_SALE_CREATE','PARTS_SALE','Bán hàng phụ tùng','Khách hàng & Lịch hẹn','CREATE','Thêm mới','Lập phiếu bán hàng mới (/parts-sales)',132),
+              ('PARTS_SALE_EDIT','PARTS_SALE','Bán hàng phụ tùng','Khách hàng & Lịch hẹn','EDIT','Sửa','Sửa, giữ hàng, huỷ phiếu bán hàng',133)
+
+        - sql:
+            comment: Dịch vụ & Xưởng
+            sql: >-
+              INSERT INTO permission (code, module_code, module_label, group_label, action_code, label, description, sort_order) VALUES
+              ('SERVICE_TICKET_VIEW','SERVICE_TICKET','Phiếu dịch vụ','Dịch vụ & Xưởng','VIEW','Xem','Mở /service-ticket-management và chi tiết phiếu',201),
+              ('SERVICE_TICKET_CREATE','SERVICE_TICKET','Phiếu dịch vụ','Dịch vụ & Xưởng','CREATE','Thêm mới','Tiếp nhận xe, tạo phiếu dịch vụ',202),
+              ('SERVICE_TICKET_EDIT','SERVICE_TICKET','Phiếu dịch vụ','Dịch vụ & Xưởng','EDIT','Sửa','Sửa báo giá, hạng mục, tiến độ phiếu',203),
+              ('SERVICE_TICKET_DELETE','SERVICE_TICKET','Phiếu dịch vụ','Dịch vụ & Xưởng','DELETE','Huỷ','Huỷ phiếu dịch vụ',204),
+              ('SERVICE_TICKET_ASSIGN','SERVICE_TICKET','Phiếu dịch vụ','Dịch vụ & Xưởng','ASSIGN','Điều phối','Gán cố vấn/KTV cho phiếu (/advisor/inspection)',205),
+              ('SERVICE_TICKET_PAYMENT','SERVICE_TICKET','Phiếu dịch vụ','Dịch vụ & Xưởng','PAYMENT','Thu tiền','Thanh toán và tải chứng từ thanh toán',206),
+              ('TICKET_BACKFILL_VIEW','TICKET_BACKFILL','Phiếu nhập bù','Dịch vụ & Xưởng','VIEW','Xem','Xem phiếu nhập bù (/ticket-backfill)',211),
+              ('TICKET_BACKFILL_EDIT','TICKET_BACKFILL','Phiếu nhập bù','Dịch vụ & Xưởng','EDIT','Sửa','Tạo và sửa phiếu nhập bù',212),
+              ('TECHNICIAN_TASK_VIEW','TECHNICIAN_TASK','Công việc kỹ thuật viên','Dịch vụ & Xưởng','VIEW','Xem','Xem việc được giao (/technician/my-tasks)',221),
+              ('TECHNICIAN_TASK_EDIT','TECHNICIAN_TASK','Công việc kỹ thuật viên','Dịch vụ & Xưởng','EDIT','Cập nhật','Cập nhật tiến độ, kiểm tra an toàn',222),
+              ('SERVICE_CATALOG_VIEW','SERVICE_CATALOG','Dịch vụ & gói combo','Dịch vụ & Xưởng','VIEW','Xem','Xem danh mục dịch vụ và gói combo',231),
+              ('SERVICE_CATALOG_CREATE','SERVICE_CATALOG','Dịch vụ & gói combo','Dịch vụ & Xưởng','CREATE','Thêm mới','Thêm dịch vụ, thêm gói combo',232),
+              ('SERVICE_CATALOG_EDIT','SERVICE_CATALOG','Dịch vụ & gói combo','Dịch vụ & Xưởng','EDIT','Sửa','Sửa tên, giá, định mức dịch vụ',233),
+              ('SERVICE_CATALOG_DELETE','SERVICE_CATALOG','Dịch vụ & gói combo','Dịch vụ & Xưởng','DELETE','Xoá','Xoá dịch vụ hoặc gói combo',234)
+
+        - sql:
+            comment: Kho & Phụ tùng
+            sql: >-
+              INSERT INTO permission (code, module_code, module_label, group_label, action_code, label, description, sort_order) VALUES
+              ('WAREHOUSE_VIEW','WAREHOUSE','Kho & tồn kho','Kho & Phụ tùng','VIEW','Xem','Xem kho, tồn kho, kho hàng lỗi',301),
+              ('WAREHOUSE_EDIT','WAREHOUSE','Kho & tồn kho','Kho & Phụ tùng','EDIT','Sửa','Chỉnh tồn, điều chuyển, xử lý hàng lỗi',302),
+              ('WAREHOUSE_CONFIG_VIEW','WAREHOUSE_CONFIG','Cấu hình kho','Kho & Phụ tùng','VIEW','Xem','Xem danh sách kho và cấu hình kho',311),
+              ('WAREHOUSE_CONFIG_EDIT','WAREHOUSE_CONFIG','Cấu hình kho','Kho & Phụ tùng','EDIT','Sửa','Thêm/sửa/xoá kho, quy tắc dịch vụ, chiết khấu, hoa hồng',312),
+              ('ITEM_VIEW','ITEM','Phụ tùng & hàng hóa','Kho & Phụ tùng','VIEW','Xem','Xem danh mục phụ tùng (/part-management)',321),
+              ('ITEM_CREATE','ITEM','Phụ tùng & hàng hóa','Kho & Phụ tùng','CREATE','Thêm mới','Thêm mặt hàng mới',322),
+              ('ITEM_EDIT','ITEM','Phụ tùng & hàng hóa','Kho & Phụ tùng','EDIT','Sửa','Sửa thông tin, đơn vị tính, quy cách đóng gói',323),
+              ('ITEM_DELETE','ITEM','Phụ tùng & hàng hóa','Kho & Phụ tùng','DELETE','Xoá','Xoá mặt hàng',324),
+              ('STOCK_ENTRY_VIEW','STOCK_ENTRY','Phiếu nhập kho','Kho & Phụ tùng','VIEW','Xem','Xem phiếu nhập (/warehouse-stock-entries)',331),
+              ('STOCK_ENTRY_CREATE','STOCK_ENTRY','Phiếu nhập kho','Kho & Phụ tùng','CREATE','Thêm mới','Lập phiếu nhập kho',332),
+              ('STOCK_ENTRY_EDIT','STOCK_ENTRY','Phiếu nhập kho','Kho & Phụ tùng','EDIT','Sửa','Sửa và xác nhận phiếu nhập',333),
+              ('STOCK_ENTRY_DELETE','STOCK_ENTRY','Phiếu nhập kho','Kho & Phụ tùng','DELETE','Huỷ','Huỷ phiếu nhập',334),
+              ('STOCK_ISSUE_VIEW','STOCK_ISSUE','Phiếu xuất kho','Kho & Phụ tùng','VIEW','Xem','Xem phiếu xuất (/warehouse-stock-issues)',341),
+              ('STOCK_ISSUE_CREATE','STOCK_ISSUE','Phiếu xuất kho','Kho & Phụ tùng','CREATE','Thêm mới','Lập phiếu xuất kho',342),
+              ('STOCK_ISSUE_EDIT','STOCK_ISSUE','Phiếu xuất kho','Kho & Phụ tùng','EDIT','Sửa','Sửa và xác nhận phiếu xuất',343),
+              ('STOCK_ISSUE_DELETE','STOCK_ISSUE','Phiếu xuất kho','Kho & Phụ tùng','DELETE','Huỷ','Huỷ phiếu xuất',344),
+              ('STOCK_RETURN_VIEW','STOCK_RETURN','Phiếu trả hàng','Kho & Phụ tùng','VIEW','Xem','Xem phiếu trả hàng (/warehouse-return-entries)',351),
+              ('STOCK_RETURN_CREATE','STOCK_RETURN','Phiếu trả hàng','Kho & Phụ tùng','CREATE','Thêm mới','Lập phiếu trả hàng nhà cung cấp',352),
+              ('STOCK_RETURN_EDIT','STOCK_RETURN','Phiếu trả hàng','Kho & Phụ tùng','EDIT','Sửa','Sửa và xác nhận phiếu trả',353),
+              ('STOCK_RETURN_DELETE','STOCK_RETURN','Phiếu trả hàng','Kho & Phụ tùng','DELETE','Huỷ','Huỷ phiếu trả',354),
+              ('PRICING_VIEW','PRICING','Giá bán & markup','Kho & Phụ tùng','VIEW','Xem','Xem giá theo kho và markup mặc định',361),
+              ('PRICING_EDIT','PRICING','Giá bán & markup','Kho & Phụ tùng','EDIT','Sửa','Sửa giá theo kho, markup mặc định',362),
+              ('WAREHOUSE_REPORT_VIEW','WAREHOUSE_REPORT','Báo cáo kho','Kho & Phụ tùng','VIEW','Xem','Báo cáo tồn, báo cáo lỗi & trách nhiệm',371)
+
+        - sql:
+            comment: Nhân sự
+            sql: >-
+              INSERT INTO permission (code, module_code, module_label, group_label, action_code, label, description, sort_order) VALUES
+              ('STAFF_VIEW','STAFF','Tài khoản nhân viên','Nhân sự','VIEW','Xem','Mở /staff-manager, xem danh sách tài khoản',401),
+              ('STAFF_CREATE','STAFF','Tài khoản nhân viên','Nhân sự','CREATE','Thêm mới','Tạo tài khoản nhân viên',402),
+              ('STAFF_EDIT','STAFF','Tài khoản nhân viên','Nhân sự','EDIT','Sửa','Sửa thông tin, gán vai trò, khoá/mở tài khoản',403),
+              ('STAFF_DELETE','STAFF','Tài khoản nhân viên','Nhân sự','DELETE','Xoá','Xoá tài khoản nhân viên',404),
+              ('EMPLOYEE_VIEW','EMPLOYEE','Hồ sơ nhân viên','Nhân sự','VIEW','Xem','Xem hồ sơ và hiệu suất (/employee-manager)',411),
+              ('EMPLOYEE_EDIT','EMPLOYEE','Hồ sơ nhân viên','Nhân sự','EDIT','Sửa','Sửa hồ sơ nhân sự',412),
+              ('ROLE_PERMISSION_VIEW','ROLE_PERMISSION','Vai trò & phân quyền','Nhân sự','VIEW','Xem','Xem ma trận phân quyền (/role-permission-config)',421),
+              ('ROLE_PERMISSION_EDIT','ROLE_PERMISSION','Vai trò & phân quyền','Nhân sự','EDIT','Sửa','Bật/tắt quyền của vai trò, tạo vai trò mới',422),
+              ('STAFF_NOTIFICATION_VIEW','STAFF_NOTIFICATION','Thông báo nhân viên','Nhân sự','VIEW','Xem','Xem thông báo đã gửi cho nhân viên',431),
+              ('STAFF_NOTIFICATION_SEND','STAFF_NOTIFICATION','Thông báo nhân viên','Nhân sự','SEND','Gửi','Gửi thông báo tới nhân viên',432)
+
+        - sql:
+            comment: Ca làm & Chấm công
+            sql: >-
+              INSERT INTO permission (code, module_code, module_label, group_label, action_code, label, description, sort_order) VALUES
+              ('SHIFT_VIEW','SHIFT','Ca làm việc','Ca làm & Chấm công','VIEW','Xem','Xem lịch ca làm việc',501),
+              ('SHIFT_EDIT','SHIFT','Ca làm việc','Ca làm & Chấm công','EDIT','Sửa','Xếp ca, sửa ca, xoá ca',502),
+              ('ATTENDANCE_VIEW','ATTENDANCE','Chấm công','Ca làm & Chấm công','VIEW','Xem','Xem bảng chấm công nhân viên',511),
+              ('ATTENDANCE_EDIT','ATTENDANCE','Chấm công','Ca làm & Chấm công','EDIT','Sửa','Sửa công, chốt công',512),
+              ('ATTENDANCE_LOCATION_VIEW','ATTENDANCE_LOCATION','Vị trí chấm công','Ca làm & Chấm công','VIEW','Xem','Xem các điểm chấm công QR',521),
+              ('ATTENDANCE_LOCATION_EDIT','ATTENDANCE_LOCATION','Vị trí chấm công','Ca làm & Chấm công','EDIT','Sửa','Thêm/sửa/xoá điểm chấm công QR',522),
+              ('ATTENDANCE_REQUEST_VIEW','ATTENDANCE_REQUEST','Đơn chấm công','Ca làm & Chấm công','VIEW','Xem','Xem đơn chấm công bù, đơn xin nghỉ',531),
+              ('ATTENDANCE_REQUEST_APPROVE','ATTENDANCE_REQUEST','Đơn chấm công','Ca làm & Chấm công','APPROVE','Duyệt','Duyệt hoặc từ chối đơn',532)
+
+        - sql:
+            comment: Marketing & CSKH
+            sql: >-
+              INSERT INTO permission (code, module_code, module_label, group_label, action_code, label, description, sort_order) VALUES
+              ('PROMOTION_VIEW','PROMOTION','Khuyến mãi','Marketing & CSKH','VIEW','Xem','Xem chương trình khuyến mãi',601),
+              ('PROMOTION_CREATE','PROMOTION','Khuyến mãi','Marketing & CSKH','CREATE','Thêm mới','Tạo chương trình khuyến mãi',602),
+              ('PROMOTION_EDIT','PROMOTION','Khuyến mãi','Marketing & CSKH','EDIT','Sửa','Sửa điều kiện, thời gian áp dụng',603),
+              ('PROMOTION_DELETE','PROMOTION','Khuyến mãi','Marketing & CSKH','DELETE','Xoá','Xoá chương trình khuyến mãi',604),
+              ('POST_VIEW','POST','Tin tức & bài viết','Marketing & CSKH','VIEW','Xem','Xem danh sách bài viết',611),
+              ('POST_CREATE','POST','Tin tức & bài viết','Marketing & CSKH','CREATE','Thêm mới','Soạn bài mới',612),
+              ('POST_EDIT','POST','Tin tức & bài viết','Marketing & CSKH','EDIT','Sửa','Sửa nội dung bài viết',613),
+              ('POST_DELETE','POST','Tin tức & bài viết','Marketing & CSKH','DELETE','Xoá','Xoá bài viết',614),
+              ('POST_PUBLISH','POST','Tin tức & bài viết','Marketing & CSKH','PUBLISH','Đăng','Duyệt và cho hiển thị ra trang khách',615),
+              ('ITEM_POST_VIEW','ITEM_POST','Bài viết phụ tùng','Marketing & CSKH','VIEW','Xem','Xem bài viết gắn với phụ tùng',621),
+              ('ITEM_POST_CREATE','ITEM_POST','Bài viết phụ tùng','Marketing & CSKH','CREATE','Thêm mới','Soạn bài viết phụ tùng',622),
+              ('ITEM_POST_EDIT','ITEM_POST','Bài viết phụ tùng','Marketing & CSKH','EDIT','Sửa','Sửa bài viết phụ tùng',623),
+              ('ITEM_POST_DELETE','ITEM_POST','Bài viết phụ tùng','Marketing & CSKH','DELETE','Xoá','Xoá bài viết phụ tùng',624),
+              ('MEDIA_VIEW','MEDIA','Thư viện ảnh','Marketing & CSKH','VIEW','Xem','Mở thư viện ảnh',631),
+              ('MEDIA_UPLOAD','MEDIA','Thư viện ảnh','Marketing & CSKH','UPLOAD','Tải lên','Tải ảnh/video lên thư viện',632),
+              ('MEDIA_DELETE','MEDIA','Thư viện ảnh','Marketing & CSKH','DELETE','Xoá','Xoá tệp khỏi thư viện',633),
+              ('SITE_CONFIG_VIEW','SITE_CONFIG','Giao diện trang khách','Marketing & CSKH','VIEW','Xem','Xem cấu hình banner, menu, thanh bên, sản phẩm trang chủ',641),
+              ('SITE_CONFIG_EDIT','SITE_CONFIG','Giao diện trang khách','Marketing & CSKH','EDIT','Sửa','Sửa banner, thanh menu, thanh bên, sản phẩm trang chủ',642),
+              ('RECRUITMENT_VIEW','RECRUITMENT','Tuyển dụng','Marketing & CSKH','VIEW','Xem','Xem vị trí tuyển dụng và hồ sơ ứng tuyển',651),
+              ('RECRUITMENT_EDIT','RECRUITMENT','Tuyển dụng','Marketing & CSKH','EDIT','Sửa','Đăng tin, xử lý hồ sơ, đổi cấu hình nhận thư',652),
+              ('FEEDBACK_VIEW','FEEDBACK','Đánh giá khách hàng','Marketing & CSKH','VIEW','Xem','Xem feedback khách gửi lên',661),
+              ('FEEDBACK_EDIT','FEEDBACK','Đánh giá khách hàng','Marketing & CSKH','EDIT','Sửa','Phản hồi, ẩn/hiện feedback',662),
+              ('CAMPAIGN_VIEW','CAMPAIGN','Chiến dịch & nhắc lịch','Marketing & CSKH','VIEW','Xem','Xem chiến dịch thông báo, nhắc lịch bảo dưỡng',671),
+              ('CAMPAIGN_SEND','CAMPAIGN','Chiến dịch & nhắc lịch','Marketing & CSKH','SEND','Gửi','Gửi thông báo hàng loạt tới khách',672),
+              ('LOYALTY_VIEW','LOYALTY','Điểm & hạng thành viên','Marketing & CSKH','VIEW','Xem','Xem cấu hình điểm và hạng',681),
+              ('LOYALTY_EDIT','LOYALTY','Điểm & hạng thành viên','Marketing & CSKH','EDIT','Sửa','Sửa quy tắc tích điểm, ngưỡng hạng',682)
+
+        - sql:
+            comment: Báo cáo & Tài chính
+            sql: >-
+              INSERT INTO permission (code, module_code, module_label, group_label, action_code, label, description, sort_order) VALUES
+              ('REPORT_CUSTOMER_VIEW','REPORT_CUSTOMER','Báo cáo khách hàng','Báo cáo & Tài chính','VIEW','Xem','Mở /customer-report và xuất Excel',701),
+              ('REVENUE_VIEW','REVENUE','Doanh thu','Báo cáo & Tài chính','VIEW','Xem','Mở /revenue-management',711),
+              ('KPI_VIEW','KPI','KPI nhân viên','Báo cáo & Tài chính','VIEW','Xem','Xem KPI nhân viên',721),
+              ('KPI_EDIT','KPI','KPI nhân viên','Báo cáo & Tài chính','EDIT','Sửa','Đặt chỉ tiêu, sửa cấu hình KPI',722),
+              ('GOOGLE_INSIGHTS_VIEW','GOOGLE_INSIGHTS','Google Analytics & Search Console','Báo cáo & Tài chính','VIEW','Xem','Xem số liệu Google (/google-insights)',731),
+              ('GOOGLE_INSIGHTS_CONFIG','GOOGLE_INSIGHTS','Google Analytics & Search Console','Báo cáo & Tài chính','CONFIG','Kết nối','Kết nối/ngắt tài khoản Google',732)
+
+        - sql:
+            comment: Hệ thống
+            sql: >-
+              INSERT INTO permission (code, module_code, module_label, group_label, action_code, label, description, sort_order) VALUES
+              ('MASTER_DATA_VIEW','MASTER_DATA','Danh mục & cấu hình chung','Hệ thống','VIEW','Xem','Xem hãng xe, danh mục hàng hoá, đầu mục an toàn, giờ hoạt động',801),
+              ('MASTER_DATA_EDIT','MASTER_DATA','Danh mục & cấu hình chung','Hệ thống','EDIT','Sửa','Sửa các danh mục và cấu hình dùng chung',802),
+              ('SYSTEM_LOG_VIEW','SYSTEM_LOG','Nhật ký hệ thống','Hệ thống','VIEW','Xem','Mở /system-log-management',811),
+              ('BACKEND_LOG_VIEW','BACKEND_LOG','Log backend','Hệ thống','VIEW','Xem','Mở /backend-logs',821),
+              ('BUG_REPORT_VIEW','BUG_REPORT','Báo lỗi phần mềm','Hệ thống','VIEW','Xem','Xem báo lỗi nhân viên gửi lên',831),
+              ('BUG_REPORT_EDIT','BUG_REPORT','Báo lỗi phần mềm','Hệ thống','EDIT','Sửa','Đổi trạng thái, xoá báo lỗi',832)
+      rollback:
+        - delete:
+            tableName: permission
+
+  - changeSet:
+      id: 038-5-seed-default-grants
+      author: gms
+      comment: Bộ quyền mặc định của từng vai trò — dựng lại đúng những gì code đang cho phép hôm nay
+      # Bản đầu của changeset này có cấp thêm SERVICE_TICKET_ASSIGN cho lễ tân,
+      # và đã kịp chạy trên máy dev trước khi bị sửa lại. Giữ checksum cũ ở đây
+      # để DB đó vẫn khởi động được; phần sửa nằm ở changeset 038-7 bên dưới.
+      validCheckSum:
+        - 9:79c0c696e593e3fcff799656905f5ec3
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: "0"
+            sql: SELECT COUNT(*) FROM role_permission
+      changes:
+        # MANAGER viết theo kiểu loại trừ cho gọn: quản lý đang đụng gần hết hệ
+        # thống, chỉ trừ mấy màn dành riêng cho ADMIN.
+        - sql:
+            comment: MANAGER — toàn bộ trừ nhật ký hệ thống, log backend, báo lỗi và chính màn phân quyền
+            sql: >-
+              INSERT INTO role_permission (role_id, permission_code)
+              SELECT r.role_id, p.code
+              FROM role r CROSS JOIN permission p
+              WHERE r.role_code = 'MANAGER'
+                AND p.module_code NOT IN ('SYSTEM_LOG','BACKEND_LOG','BUG_REPORT','ROLE_PERMISSION')
+
+        - sql:
+            comment: Các vai trò còn lại — liệt kê thẳng từng quyền
+            sql: >-
+              INSERT INTO role_permission (role_id, permission_code)
+              SELECT r.role_id, v.code
+              FROM role r
+              JOIN (
+                          SELECT 'RECEPTIONIST' AS role_code, 'CUSTOMER_VIEW' AS code
+                UNION ALL SELECT 'RECEPTIONIST','CUSTOMER_CREATE'
+                UNION ALL SELECT 'RECEPTIONIST','CUSTOMER_EDIT'
+                UNION ALL SELECT 'RECEPTIONIST','CUSTOMER_DELETE'
+                UNION ALL SELECT 'RECEPTIONIST','CUSTOMER_MERGE'
+                UNION ALL SELECT 'RECEPTIONIST','VEHICLE_VIEW'
+                UNION ALL SELECT 'RECEPTIONIST','VEHICLE_CREATE'
+                UNION ALL SELECT 'RECEPTIONIST','VEHICLE_EDIT'
+                UNION ALL SELECT 'RECEPTIONIST','VEHICLE_DELETE'
+                UNION ALL SELECT 'RECEPTIONIST','BOOKING_VIEW'
+                UNION ALL SELECT 'RECEPTIONIST','BOOKING_CREATE'
+                UNION ALL SELECT 'RECEPTIONIST','BOOKING_EDIT'
+                UNION ALL SELECT 'RECEPTIONIST','BOOKING_DELETE'
+                UNION ALL SELECT 'RECEPTIONIST','PARTS_SALE_VIEW'
+                UNION ALL SELECT 'RECEPTIONIST','PARTS_SALE_CREATE'
+                UNION ALL SELECT 'RECEPTIONIST','PARTS_SALE_EDIT'
+                UNION ALL SELECT 'RECEPTIONIST','SERVICE_TICKET_VIEW'
+                UNION ALL SELECT 'RECEPTIONIST','SERVICE_TICKET_CREATE'
+                UNION ALL SELECT 'RECEPTIONIST','SERVICE_TICKET_EDIT'
+                UNION ALL SELECT 'RECEPTIONIST','SERVICE_TICKET_PAYMENT'
+                UNION ALL SELECT 'RECEPTIONIST','TICKET_BACKFILL_VIEW'
+                UNION ALL SELECT 'RECEPTIONIST','TICKET_BACKFILL_EDIT'
+                UNION ALL SELECT 'RECEPTIONIST','STAFF_NOTIFICATION_VIEW'
+                UNION ALL SELECT 'RECEPTIONIST','STAFF_NOTIFICATION_SEND'
+                UNION ALL SELECT 'RECEPTIONIST','MEDIA_VIEW'
+                UNION ALL SELECT 'RECEPTIONIST','MEDIA_UPLOAD'
+                UNION ALL SELECT 'RECEPTIONIST','POST_VIEW'
+                UNION ALL SELECT 'RECEPTIONIST','POST_CREATE'
+                UNION ALL SELECT 'RECEPTIONIST','POST_EDIT'
+                UNION ALL SELECT 'RECEPTIONIST','POST_DELETE'
+                UNION ALL SELECT 'RECEPTIONIST','POST_PUBLISH'
+                UNION ALL SELECT 'RECEPTIONIST','ITEM_POST_VIEW'
+                UNION ALL SELECT 'RECEPTIONIST','ITEM_POST_CREATE'
+                UNION ALL SELECT 'RECEPTIONIST','ITEM_POST_EDIT'
+                UNION ALL SELECT 'RECEPTIONIST','ITEM_POST_DELETE'
+                UNION ALL SELECT 'RECEPTIONIST','RECRUITMENT_VIEW'
+                UNION ALL SELECT 'RECEPTIONIST','RECRUITMENT_EDIT'
+                UNION ALL SELECT 'RECEPTIONIST','CAMPAIGN_VIEW'
+                UNION ALL SELECT 'RECEPTIONIST','CAMPAIGN_SEND'
+                UNION ALL SELECT 'RECEPTIONIST','REPORT_CUSTOMER_VIEW'
+
+                /* SERVICE_TICKET_ASSIGN chỉ cấp cho cố vấn (và quản lý, vốn có tất):
+                   /advisor/inspection hôm nay chặn đúng ADVISOR ở cả route guard
+                   lẫn sidebar. Lễ tân vẫn gán được nhân sự lúc check-in, nhưng
+                   đường đó đi qua quyền BOOKING_EDIT chứ không phải quyền này. */
+                UNION ALL SELECT 'ADVISOR','SERVICE_TICKET_VIEW'
+                UNION ALL SELECT 'ADVISOR','SERVICE_TICKET_CREATE'
+                UNION ALL SELECT 'ADVISOR','SERVICE_TICKET_EDIT'
+                UNION ALL SELECT 'ADVISOR','SERVICE_TICKET_ASSIGN'
+                UNION ALL SELECT 'ADVISOR','TECHNICIAN_TASK_VIEW'
+                UNION ALL SELECT 'ADVISOR','WAREHOUSE_VIEW'
+                UNION ALL SELECT 'ADVISOR','ITEM_VIEW'
+                UNION ALL SELECT 'ADVISOR','EMPLOYEE_VIEW'
+                UNION ALL SELECT 'ADVISOR','EMPLOYEE_EDIT'
+                UNION ALL SELECT 'ADVISOR','SHIFT_VIEW'
+                UNION ALL SELECT 'ADVISOR','ATTENDANCE_VIEW'
+                UNION ALL SELECT 'ADVISOR','ATTENDANCE_EDIT'
+
+                UNION ALL SELECT 'TECHNICIAN','TECHNICIAN_TASK_VIEW'
+                UNION ALL SELECT 'TECHNICIAN','TECHNICIAN_TASK_EDIT'
+                UNION ALL SELECT 'TECHNICIAN','SERVICE_TICKET_VIEW'
+
+                UNION ALL SELECT 'ACCOUNTANT','SERVICE_TICKET_VIEW'
+                UNION ALL SELECT 'ACCOUNTANT','SERVICE_TICKET_EDIT'
+                UNION ALL SELECT 'ACCOUNTANT','SERVICE_TICKET_PAYMENT'
+                UNION ALL SELECT 'ACCOUNTANT','PARTS_SALE_VIEW'
+                UNION ALL SELECT 'ACCOUNTANT','PARTS_SALE_EDIT'
+                UNION ALL SELECT 'ACCOUNTANT','SERVICE_CATALOG_VIEW'
+                UNION ALL SELECT 'ACCOUNTANT','SERVICE_CATALOG_CREATE'
+                UNION ALL SELECT 'ACCOUNTANT','SERVICE_CATALOG_EDIT'
+                UNION ALL SELECT 'ACCOUNTANT','SERVICE_CATALOG_DELETE'
+                UNION ALL SELECT 'ACCOUNTANT','WAREHOUSE_VIEW'
+                UNION ALL SELECT 'ACCOUNTANT','ITEM_VIEW'
+                UNION ALL SELECT 'ACCOUNTANT','STOCK_ENTRY_VIEW'
+                UNION ALL SELECT 'ACCOUNTANT','WAREHOUSE_REPORT_VIEW'
+                UNION ALL SELECT 'ACCOUNTANT','REVENUE_VIEW'
+                UNION ALL SELECT 'ACCOUNTANT','REPORT_CUSTOMER_VIEW'
+
+                UNION ALL SELECT 'WAREHOUSE_KEEPER','WAREHOUSE_VIEW'
+                UNION ALL SELECT 'WAREHOUSE_KEEPER','WAREHOUSE_EDIT'
+                UNION ALL SELECT 'WAREHOUSE_KEEPER','ITEM_VIEW'
+                UNION ALL SELECT 'WAREHOUSE_KEEPER','ITEM_CREATE'
+                UNION ALL SELECT 'WAREHOUSE_KEEPER','ITEM_EDIT'
+                UNION ALL SELECT 'WAREHOUSE_KEEPER','ITEM_DELETE'
+                UNION ALL SELECT 'WAREHOUSE_KEEPER','STOCK_ENTRY_VIEW'
+                UNION ALL SELECT 'WAREHOUSE_KEEPER','STOCK_ENTRY_CREATE'
+                UNION ALL SELECT 'WAREHOUSE_KEEPER','STOCK_ENTRY_EDIT'
+                UNION ALL SELECT 'WAREHOUSE_KEEPER','STOCK_ENTRY_DELETE'
+                UNION ALL SELECT 'WAREHOUSE_KEEPER','STOCK_ISSUE_VIEW'
+                UNION ALL SELECT 'WAREHOUSE_KEEPER','STOCK_ISSUE_CREATE'
+                UNION ALL SELECT 'WAREHOUSE_KEEPER','STOCK_ISSUE_EDIT'
+                UNION ALL SELECT 'WAREHOUSE_KEEPER','STOCK_ISSUE_DELETE'
+                UNION ALL SELECT 'WAREHOUSE_KEEPER','STOCK_RETURN_VIEW'
+                UNION ALL SELECT 'WAREHOUSE_KEEPER','STOCK_RETURN_CREATE'
+                UNION ALL SELECT 'WAREHOUSE_KEEPER','STOCK_RETURN_EDIT'
+                UNION ALL SELECT 'WAREHOUSE_KEEPER','STOCK_RETURN_DELETE'
+                UNION ALL SELECT 'WAREHOUSE_KEEPER','PRICING_VIEW'
+                UNION ALL SELECT 'WAREHOUSE_KEEPER','PRICING_EDIT'
+                UNION ALL SELECT 'WAREHOUSE_KEEPER','ITEM_POST_VIEW'
+
+                UNION ALL SELECT 'WAREHOUSE_MANAGER','WAREHOUSE_VIEW'
+                UNION ALL SELECT 'WAREHOUSE_MANAGER','WAREHOUSE_EDIT'
+                UNION ALL SELECT 'WAREHOUSE_MANAGER','WAREHOUSE_CONFIG_VIEW'
+                UNION ALL SELECT 'WAREHOUSE_MANAGER','WAREHOUSE_CONFIG_EDIT'
+                UNION ALL SELECT 'WAREHOUSE_MANAGER','ITEM_VIEW'
+                UNION ALL SELECT 'WAREHOUSE_MANAGER','ITEM_CREATE'
+                UNION ALL SELECT 'WAREHOUSE_MANAGER','ITEM_EDIT'
+                UNION ALL SELECT 'WAREHOUSE_MANAGER','ITEM_DELETE'
+                UNION ALL SELECT 'WAREHOUSE_MANAGER','STOCK_ENTRY_VIEW'
+                UNION ALL SELECT 'WAREHOUSE_MANAGER','STOCK_ISSUE_VIEW'
+                UNION ALL SELECT 'WAREHOUSE_MANAGER','STOCK_RETURN_VIEW'
+                UNION ALL SELECT 'WAREHOUSE_MANAGER','PRICING_VIEW'
+                UNION ALL SELECT 'WAREHOUSE_MANAGER','PRICING_EDIT'
+              ) v ON v.role_code = r.role_code
+              JOIN permission p ON p.code = v.code
+      rollback:
+        - delete:
+            tableName: role_permission
+
+  # Nút "Khôi phục mặc định" cần biết mặc định là gì. Chép lại đúng bộ vừa seed
+  # thay vì viết lại danh sách lần thứ hai — hai bản chép tay sẽ lệch nhau ngay
+  # lần sửa đầu tiên.
+  - changeSet:
+      id: 038-6-default-grants-snapshot
+      author: gms
+      comment: Lưu bản gốc của bộ quyền mặc định để màn cấu hình khôi phục lại được
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: role_permission_default
+      changes:
+        - createTable:
+            tableName: role_permission_default
+            remarks: Ảnh chụp bộ quyền mặc định lúc cài đặt; chỉ đọc, dùng cho nút khôi phục mặc định
+            columns:
+              - column:
+                  name: role_id
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: permission_code
+                  type: VARCHAR(64)
+                  constraints:
+                    nullable: false
+        - addPrimaryKey:
+            tableName: role_permission_default
+            columnNames: role_id, permission_code
+            constraintName: pk_role_permission_default
+        - sql:
+            comment: Chép nguyên bộ vừa seed sang bảng mặc định
+            sql: >-
+              INSERT INTO role_permission_default (role_id, permission_code)
+              SELECT role_id, permission_code FROM role_permission
+      rollback:
+        - dropTable:
+            tableName: role_permission_default
+
+  # Sửa lại một dòng của bộ mặc định.
+  #
+  # Bản seed đầu cấp SERVICE_TICKET_ASSIGN cho cả lễ tân, vì sidebar có liệt kê
+  # lễ tân ở mục "Điều phối phiếu dịch vụ". Nhưng đọc kỹ thì cả route guard lẫn
+  # filterItemsByRoles đều đè lại thành ADVISOR, nên thực tế /advisor/inspection
+  # hôm nay chỉ cố vấn vào được. Cấp cho lễ tân là nới rộng quyền so với trước,
+  # không phải giữ nguyên như chủ trương của đợt chuyển đổi này.
+  #
+  # Lễ tân vẫn gán được cố vấn/KTV lúc check-in — đường đó đi qua BOOKING_EDIT.
+  #
+  # Xoá ở cả hai bảng: role_permission (đang dùng) và role_permission_default
+  # (bản gốc cho nút "Khôi phục mặc định"), nếu không bấm khôi phục là quyền cũ
+  # quay lại. DB cài mới thì hai câu này không xoá gì cả, vì 038-5 bản hiện tại
+  # đã không cấp nữa.
+  - changeSet:
+      id: 038-7-fix-receptionist-assign
+      author: gms
+      comment: Gỡ SERVICE_TICKET_ASSIGN khỏi lễ tân — bản seed đầu cấp rộng hơn hiện trạng
+      changes:
+        - sql:
+            comment: Gỡ khỏi bộ quyền đang dùng
+            sql: >-
+              DELETE rp FROM role_permission rp
+              JOIN role r ON r.role_id = rp.role_id
+              WHERE r.role_code = 'RECEPTIONIST'
+                AND rp.permission_code = 'SERVICE_TICKET_ASSIGN'
+        - sql:
+            comment: Gỡ khỏi cả bản mặc định để nút khôi phục không mang nó trở lại
+            sql: >-
+              DELETE rpd FROM role_permission_default rpd
+              JOIN role r ON r.role_id = rpd.role_id
+              WHERE r.role_code = 'RECEPTIONIST'
+                AND rpd.permission_code = 'SERVICE_TICKET_ASSIGN'
+      rollback:
+        - sql:
+            sql: >-
+              INSERT INTO role_permission (role_id, permission_code)
+              SELECT r.role_id, 'SERVICE_TICKET_ASSIGN' FROM role r
+              WHERE r.role_code = 'RECEPTIONIST'
+        - sql:
+            sql: >-
+              INSERT INTO role_permission_default (role_id, permission_code)
+              SELECT r.role_id, 'SERVICE_TICKET_ASSIGN' FROM role r
+              WHERE r.role_code = 'RECEPTIONIST'

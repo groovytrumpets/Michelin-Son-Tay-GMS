@@ -1,4 +1,5 @@
 package com.g42.platform.gms.warehouse.api.controller.config;
+import com.g42.platform.gms.authz.PermissionCodes;
 
 import com.g42.platform.gms.auth.entity.StaffPrincipal;
 import com.g42.platform.gms.common.dto.ApiResponse;
@@ -33,7 +34,7 @@ public class ServiceRuleController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('MANAGER')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.WAREHOUSE_CONFIG_EDIT + "')")
     public ResponseEntity<ApiResponse<ServiceSuggestion>> create(
             @Valid @RequestBody CreateServiceRuleRequest request,
             @AuthenticationPrincipal StaffPrincipal principal) {
@@ -42,7 +43,7 @@ public class ServiceRuleController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('MANAGER')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.WAREHOUSE_CONFIG_EDIT + "')")
     public ResponseEntity<ApiResponse<ServiceSuggestion>> update(
             @PathVariable Integer id,
             @RequestBody UpdateServiceRuleRequest request) {
@@ -50,7 +51,7 @@ public class ServiceRuleController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('MANAGER')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.WAREHOUSE_CONFIG_EDIT + "')")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Integer id) {
         serviceRuleService.delete(id);
         return ResponseEntity.ok(ApiResponses.success(null));

@@ -1,6 +1,7 @@
 package com.g42.platform.gms.warehouse.api.controller.entry;
 
 import com.g42.platform.gms.auth.entity.StaffPrincipal;
+import com.g42.platform.gms.authz.PermissionCodes;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.warehouse.api.dto.entry.CreateStockEntryRequest;
@@ -147,7 +148,7 @@ public class StockEntryController {
 
     /** Xuất danh sách phiếu nhập ra Excel. */
     @GetMapping("/excel/export")
-    @PreAuthorize("hasAnyRole('WAREHOUSE_KEEPER','MANAGER','ADMIN','ACCOUNTANT')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.STOCK_ENTRY_VIEW + "')")
     public ResponseEntity<byte[]> exportStockEntries(
             @RequestParam Integer warehouseId,
             @RequestParam(required = false) StockEntryStatus status) {
@@ -202,7 +203,7 @@ public class StockEntryController {
      * Params: file, warehouseId, supplierName
      */
     @PostMapping(value = "/excel/import", consumes = "multipart/form-data")
-    @PreAuthorize("hasAnyRole('WAREHOUSE_KEEPER','MANAGER','ADMIN')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.STOCK_ENTRY_CREATE + "')")
     public ResponseEntity<ApiResponse<StockEntryImportResponse>> importFromExcel(
             @RequestParam("file") MultipartFile file,
             @RequestParam Integer warehouseId,

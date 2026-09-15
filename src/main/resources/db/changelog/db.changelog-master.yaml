@@ -121,3 +121,6 @@ databaseChangeLog:
   - include:
       file: changes/037-customer-multi-phone-plate-unique.yaml
       relativeToChangelogFile: true
+  - include:
+      file: changes/038-role-permission.yaml
+      relativeToChangelogFile: true

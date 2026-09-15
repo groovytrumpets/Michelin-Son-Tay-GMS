@@ -1,4 +1,5 @@
 package com.g42.platform.gms.warehouse.api.controller.catalog;
+import com.g42.platform.gms.authz.PermissionCodes;
 
 import com.g42.platform.gms.auth.entity.StaffPrincipal;
 import com.g42.platform.gms.common.dto.ApiResponse;
@@ -40,7 +41,7 @@ public class WarehouseCatalogController {
      * Chỉ MANAGER / ADMIN / WAREHOUSE_KEEPER mới được tạo.
      */
     @PostMapping("/parts")
-    @PreAuthorize("hasAnyRole('MANAGER','ADMIN','WAREHOUSE_KEEPER')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.ITEM_CREATE + "')")
     public ResponseEntity<ApiResponse<PartResponse>> createPart(
             @Valid @RequestBody CreatePartRequest request,
             @AuthenticationPrincipal StaffPrincipal principal) {

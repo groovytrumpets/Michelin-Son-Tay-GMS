@@ -1,4 +1,5 @@
 package com.g42.platform.gms.warehouse.api.controller.pricing;
+import com.g42.platform.gms.authz.PermissionCodes;
 
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
@@ -36,7 +37,7 @@ public class WarehousePricingController {
 
     /** Tạo hoặc cập nhật giá thị trường cho 1 item */
     @PostMapping
-    @PreAuthorize("hasAnyRole('MANAGER','ADMIN')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.PRICING_EDIT + "')")
     public ResponseEntity<ApiResponse<PricingResponse>> upsert(
             @Valid @RequestBody UpsertPricingRequest request) {
         return ResponseEntity.ok(ApiResponses.success(pricingService.upsert(request)));
@@ -44,7 +45,7 @@ public class WarehousePricingController {
 
     /** Deactivate giá (xóa mềm) */
     @DeleteMapping("/{pricingId}")
-    @PreAuthorize("hasAnyRole('MANAGER','ADMIN')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.PRICING_EDIT + "')")
     public ResponseEntity<ApiResponse<Void>> deactivate(@PathVariable Integer pricingId) {
         pricingService.deactivate(pricingId);
         return ResponseEntity.ok(ApiResponses.success(null));

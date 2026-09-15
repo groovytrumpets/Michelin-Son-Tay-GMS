@@ -26,5 +26,16 @@ public class RoleJpa {
     @Column(name = "role_name", nullable = false, length = 100)
     private String roleName;
 
+    /**
+     * Vai trò gốc của hệ thống. Không cho xoá hay đổi role_code, vì ngoài việc
+     * phân quyền thì mã này còn là dữ liệu nghiệp vụ: TicketAssignmentService,
+     * CheckInService, TicketBackfillService tra "ai là KTV", "ai là cố vấn"
+     * đúng bằng chuỗi "TECHNICIAN"/"ADVISOR".
+     */
+    @Column(name = "is_system", nullable = false)
+    private Boolean isSystem = Boolean.FALSE;
 
+    @Size(max = 255)
+    @Column(name = "description", length = 255)
+    private String description;
 }

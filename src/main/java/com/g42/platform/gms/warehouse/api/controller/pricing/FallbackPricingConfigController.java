@@ -1,5 +1,6 @@
 package com.g42.platform.gms.warehouse.api.controller.pricing;
 
+import com.g42.platform.gms.authz.PermissionCodes;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.warehouse.api.dto.request.UpsertFallbackPricingRequest;
@@ -33,7 +34,7 @@ public class FallbackPricingConfigController {
 
     /** Tạo cấu hình markup fallback mới */
     @PostMapping
-    @PreAuthorize("hasAnyRole('MANAGER','ADMIN')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.PRICING_EDIT + "')")
     public ResponseEntity<ApiResponse<FallbackPricingResponse>> create(
             @Valid @RequestBody UpsertFallbackPricingRequest request) {
         return ResponseEntity.ok(ApiResponses.success(fallbackService.create(request)));
@@ -41,7 +42,7 @@ public class FallbackPricingConfigController {
 
     /** Cập nhật cấu hình markup fallback */
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('MANAGER','ADMIN')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.PRICING_EDIT + "')")
     public ResponseEntity<ApiResponse<FallbackPricingResponse>> update(
             @PathVariable Integer id,
             @Valid @RequestBody UpsertFallbackPricingRequest request) {
@@ -50,7 +51,7 @@ public class FallbackPricingConfigController {
 
     /** Xóa/Deactivate cấu hình markup fallback */
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('MANAGER','ADMIN')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.PRICING_EDIT + "')")
     public ResponseEntity<ApiResponse<Void>> deactivate(@PathVariable Integer id) {
         fallbackService.deactivate(id);
         return ResponseEntity.ok(ApiResponses.success(null));
@@ -58,7 +59,7 @@ public class FallbackPricingConfigController {
 
     /** Kích hoạt cấu hình markup fallback */
     @PutMapping("/{id}/activate")
-    @PreAuthorize("hasAnyRole('MANAGER','ADMIN')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.PRICING_EDIT + "')")
     public ResponseEntity<ApiResponse<Void>> activate(@PathVariable Integer id) {
         fallbackService.activate(id);
         return ResponseEntity.ok(ApiResponses.success(null));

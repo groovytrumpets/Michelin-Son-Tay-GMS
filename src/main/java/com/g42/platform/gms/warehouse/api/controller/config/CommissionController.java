@@ -1,4 +1,5 @@
 package com.g42.platform.gms.warehouse.api.controller.config;
+import com.g42.platform.gms.authz.PermissionCodes;
 
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
@@ -19,7 +20,7 @@ public class CommissionController {
     private final CommissionService commissionService;
 
     @GetMapping
-    @PreAuthorize("hasRole('MANAGER')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.WAREHOUSE_CONFIG_EDIT + "')")
     public ResponseEntity<ApiResponse<List<CommissionReportResponse>>> getReport(
             @RequestParam String periodMonth,
             @RequestParam(required = false) Integer staffId) {

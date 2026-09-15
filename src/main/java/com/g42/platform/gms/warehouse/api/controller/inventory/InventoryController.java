@@ -1,4 +1,5 @@
 package com.g42.platform.gms.warehouse.api.controller.inventory;
+import com.g42.platform.gms.authz.PermissionCodes;
 
 
 
@@ -37,7 +38,7 @@ public class InventoryController {
      * - ACCOUNTANT / MANAGER / ADMIN: thấy tất cả kể cả giá nhập
      */
     @GetMapping("/{warehouseId}")
-    @PreAuthorize("hasAnyRole('WAREHOUSE_KEEPER','ADVISOR','ACCOUNTANT','MANAGER','ADMIN')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.WAREHOUSE_VIEW + "')")
     public ResponseEntity<ApiResponse<List<InventoryResponse>>> listByWarehouse(
             @PathVariable Integer warehouseId,
             @AuthenticationPrincipal StaffPrincipal principal) {
@@ -66,7 +67,7 @@ public class InventoryController {
      * WAREHOUSE_KEEPER / MANAGER / ADMIN thấy importPrice.
      */
     @GetMapping("/{warehouseId}/search")
-    @PreAuthorize("hasAnyRole('WAREHOUSE_KEEPER','MANAGER','ADMIN','ACCOUNTANT')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.WAREHOUSE_VIEW + "')")
     public ResponseEntity<ApiResponse<List<InventoryResponse>>> search(
             @PathVariable Integer warehouseId,
             @RequestParam String keyword,
@@ -81,7 +82,7 @@ public class InventoryController {
      * Item chưa có trong kho sẽ có quantity=0.
      */
     @GetMapping("/{warehouseId}/parts")
-    @PreAuthorize("hasAnyRole('WAREHOUSE_KEEPER','MANAGER','ADMIN','ACCOUNTANT')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.WAREHOUSE_VIEW + "')")
     public ResponseEntity<ApiResponse<List<InventoryResponse>>> listAllParts(
             @PathVariable Integer warehouseId,
             @AuthenticationPrincipal StaffPrincipal principal) {
@@ -97,7 +98,7 @@ public class InventoryController {
      * Lưu ý: phải khai báo TRƯỚC /{warehouseId}/export để Spring không nhầm route.
      */
     @GetMapping("/export-all")
-    @PreAuthorize("hasAnyRole('WAREHOUSE_KEEPER','MANAGER','ADMIN','ACCOUNTANT')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.WAREHOUSE_VIEW + "')")
     public ResponseEntity<byte[]> exportInventoryAllWarehouses(
             @AuthenticationPrincipal StaffPrincipal principal) {
 
@@ -131,7 +132,7 @@ public class InventoryController {
      * Xuất TẤT CẢ phụ tùng trong catalog — sản phẩm chưa có trong kho sẽ có số lượng = 0.
      */
     @GetMapping("/{warehouseId}/export")
-    @PreAuthorize("hasAnyRole('WAREHOUSE_KEEPER','MANAGER','ADMIN','ACCOUNTANT')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.WAREHOUSE_VIEW + "')")
     public ResponseEntity<byte[]> exportInventory(
             @PathVariable Integer warehouseId,
             @AuthenticationPrincipal StaffPrincipal principal) {
@@ -176,7 +177,7 @@ public class InventoryController {
      * GET /api/warehouse/inventory/{warehouseId}/excel/sync-template
      */
     @GetMapping("/{warehouseId}/excel/sync-template")
-    @PreAuthorize("hasAnyRole('WAREHOUSE_KEEPER','MANAGER','ADMIN')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.WAREHOUSE_EDIT + "')")
     public ResponseEntity<byte[]> exportForSync(@PathVariable Integer warehouseId) {
         byte[] bytes = inventoryExcelService.exportForSync(warehouseId);
         return ResponseEntity.ok()
@@ -193,7 +194,7 @@ public class InventoryController {
      * POST /api/warehouse/inventory/{warehouseId}/excel/sync
      */
     @PostMapping(value = "/{warehouseId}/excel/sync", consumes = "multipart/form-data")
-    @PreAuthorize("hasAnyRole('WAREHOUSE_KEEPER','MANAGER','ADMIN')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.WAREHOUSE_EDIT + "')")
     public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> syncInventory(
             @PathVariable Integer warehouseId,
             @RequestParam("file") org.springframework.web.multipart.MultipartFile file,
@@ -217,7 +218,7 @@ public class InventoryController {
      * GET /api/warehouse/inventory/{warehouseId}/{itemId}/lots
      */
     @GetMapping("/{warehouseId}/{itemId}/lots")
-    @PreAuthorize("hasAnyRole('WAREHOUSE_KEEPER','MANAGER','ADMIN','ACCOUNTANT')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.WAREHOUSE_VIEW + "')")
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getLots(
             @PathVariable Integer warehouseId,
             @PathVariable Integer itemId) {
@@ -248,7 +249,7 @@ public class InventoryController {
      * GET /api/warehouse/inventory/{warehouseId}/lots
      */
     @GetMapping("/{warehouseId}/lots")
-    @PreAuthorize("hasAnyRole('WAREHOUSE_KEEPER','MANAGER','ADMIN','ACCOUNTANT')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.WAREHOUSE_VIEW + "')")
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getAllLots(
             @PathVariable Integer warehouseId) {
 

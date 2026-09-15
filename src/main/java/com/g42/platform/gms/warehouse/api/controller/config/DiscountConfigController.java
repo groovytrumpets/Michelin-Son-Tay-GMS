@@ -1,4 +1,5 @@
 package com.g42.platform.gms.warehouse.api.controller.config;
+import com.g42.platform.gms.authz.PermissionCodes;
 
 import com.g42.platform.gms.auth.entity.StaffPrincipal;
 import com.g42.platform.gms.common.dto.ApiResponse;
@@ -25,7 +26,7 @@ public class DiscountConfigController {
     private final DiscountService discountService;
 
     @PostMapping
-    @PreAuthorize("hasRole('MANAGER')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.WAREHOUSE_CONFIG_EDIT + "')")
     public ResponseEntity<ApiResponse<DiscountConfig>> create(
             @Valid @RequestBody CreateDiscountConfigRequest request,
             @AuthenticationPrincipal StaffPrincipal principal) {

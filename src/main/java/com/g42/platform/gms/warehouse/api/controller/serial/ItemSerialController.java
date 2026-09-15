@@ -1,5 +1,6 @@
 package com.g42.platform.gms.warehouse.api.controller.serial;
 
+import com.g42.platform.gms.authz.PermissionCodes;
 import com.g42.platform.gms.auth.entity.StaffPrincipal;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
@@ -42,7 +43,7 @@ public class ItemSerialController {
 
     /** Khai báo serial cho hàng đã có trong một lô (tồn từ trước khi bật theo dõi serial). */
     @PostMapping("/register")
-    @PreAuthorize("hasAnyRole('WAREHOUSE_KEEPER','WAREHOUSE_MANAGER','MANAGER','ADMIN')")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.ITEM_EDIT + "')")
     public ResponseEntity<ApiResponse<List<ItemSerialDto>>> register(
             @Valid @RequestBody RegisterSerialsRequest request,
             @AuthenticationPrincipal StaffPrincipal principal) {
