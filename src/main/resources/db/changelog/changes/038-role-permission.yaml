@@ -633,3 +633,36 @@ databaseChangeLog:
               JOIN (          SELECT 'RECEPTIONIST' AS role_code, 'TICKET_BACKFILL_EDIT' AS code
                     UNION ALL SELECT 'ADVISOR',                   'ATTENDANCE_EDIT'
               ) v ON v.role_code = r.role_code
+
+  # ĐÍNH CHÍNH — changeset dưới đây KHÔNG sửa lỗi gì cả, nó là câu lệnh thừa.
+  #
+  # Nó được viết vì tưởng rằng `addColumn` ở 038-3 tạo role.description không có
+  # utf8mb4, khiến mô tả tiếng Việt bị MySQL từ chối. Kiểm chứng sau đó bằng
+  # information_schema cho thấy cột VỐN ĐÃ là utf8mb4/utf8mb4_unicode_ci, và
+  # INSERT thẳng bằng JDBC với chữ có dấu chạy bình thường.
+  #
+  # Thủ phạm thật nằm ở phía người gọi: bộ kiểm thử gửi JSON không mã hoá UTF-8
+  # nên Jackson ném HttpMessageNotReadableException ("Invalid UTF-8 middle byte").
+  # Nhìn ra 500 SYSTEM_ERROR chứ không phải 400 là vì
+  # GlobalExceptionHandler bắt luôn Exception.class, nuốt mất thông tin thật —
+  # đó mới là chỗ đáng sửa nếu sau này có ai đụng tới.
+  #
+  # Giữ nguyên changeset (đã EXECUTED trên DB dev, sửa nội dung là vỡ checksum).
+  # Câu ALTER chỉ ghi lại đúng định nghĩa cột đang có nên chạy lại vô hại. Thuộc
+  # tính `comment:` bên dưới cũng để nguyên vì lý do checksum — đọc phần đính
+  # chính này thay cho nó.
+  - changeSet:
+      id: 038-9-role-description-utf8mb4
+      author: gms
+      comment: Sửa bảng mã cột role.description — addColumn ở 038-3 không đặt utf8mb4 nên mô tả có dấu bị từ chối
+      changes:
+        - sql:
+            sql: >-
+              ALTER TABLE role
+              MODIFY description VARCHAR(255)
+              CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL
+              COMMENT 'Mô tả vai trò, hiện ở màn /role-permission-config'
+      rollback:
+        - sql:
+            sql: >-
+              ALTER TABLE role MODIFY description VARCHAR(255) DEFAULT NULL
