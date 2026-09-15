@@ -11,6 +11,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
+import com.g42.platform.gms.vehicle.support.PlateKeys;
+
 /**
  * Quy tắc làm sạch dữ liệu sổ cũ.
  *
@@ -67,11 +69,12 @@ public final class ImportNormalizer {
 
     /* ============================== Biển số =============================== */
 
-    /** Khoá so khớp biển số: viết hoa, bỏ mọi ký tự không phải chữ và số. */
+    /**
+     * Khoá so khớp biển số: viết hoa, bỏ mọi ký tự không phải chữ và số.
+     * Phải trùng khít với vehicle.plate_key nên chỉ uỷ quyền cho {@link PlateKeys}.
+     */
     public static String normalizePlate(String raw) {
-        if (raw == null) return null;
-        String cleaned = raw.toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]", "");
-        return cleaned.isEmpty() ? null : cleaned;
+        return PlateKeys.normalize(raw);
     }
 
     /** Biển số Việt Nam: 2 số đầu là mã tỉnh, tổng 7-9 ký tự sau khi bỏ dấu. */

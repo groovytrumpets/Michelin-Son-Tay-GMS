@@ -5,6 +5,8 @@ import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.customer.api.dto.CustomerCreateDto;
 import com.g42.platform.gms.customer.api.dto.CustomerDuplicateCheckDto;
+import com.g42.platform.gms.customer.api.dto.CustomerPhonesDto;
+import com.g42.platform.gms.customer.application.service.CustomerPhoneService;
 import com.g42.platform.gms.customer.api.dto.CustomerUpdateDto;
 import com.g42.platform.gms.customer.api.dto.TaxLookupDto;
 import com.g42.platform.gms.customer.application.service.CustomerService;
@@ -27,6 +29,8 @@ public class CustomerController {
     CustomerService customerService;
     @Autowired
     TaxLookupService taxLookupService;
+    @Autowired
+    CustomerPhoneService customerPhoneService;
 
     /** Tra cứu doanh nghiệp theo mã số thuế để tự động điền hồ sơ đối tác. */
     @GetMapping("tax-lookup")
@@ -66,6 +70,20 @@ public class CustomerController {
     public ResponseEntity<ApiResponse<CustomerCreateDto>> updateProfile(@PathVariable Integer customerId,@RequestBody CustomerUpdateDto customerUpdateDto) {
         return ResponseEntity.ok(ApiResponses.success(customerService.updateCustomer(customerId, customerUpdateDto)));
     }
+    /** Số chính + các số phụ của khách (một khách nhiều số, changeset 037). */
+    @GetMapping("{customerId}/phones")
+    public ResponseEntity<ApiResponse<CustomerPhonesDto>> getPhones(@PathVariable Integer customerId) {
+        return ResponseEntity.ok(ApiResponses.success(customerPhoneService.getPhones(customerId)));
+    }
+
+    /** Ghi đè toàn bộ danh sách số của khách; số nào đã thuộc khách khác thì chặn. */
+    @PutMapping("{customerId}/phones")
+    @Auditable(action = "UPDATE", module = "CUSTOMER", description = "Cập nhật số điện thoại của khách hàng", targetType = "CUSTOMER")
+    public ResponseEntity<ApiResponse<CustomerPhonesDto>> replacePhones(@PathVariable Integer customerId,
+                                                                        @RequestBody CustomerPhonesDto request) {
+        return ResponseEntity.ok(ApiResponses.success(customerPhoneService.replacePhones(customerId, request)));
+    }
+
     @GetMapping("{customerId}")
     public ResponseEntity<ApiResponse<CustomerProfile>> getCustomerProfile(@PathVariable Integer customerId) {
         return ResponseEntity.ok(ApiResponses.success(customerService.findByCustomerId(customerId)));

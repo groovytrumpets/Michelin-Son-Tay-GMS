@@ -4,12 +4,25 @@ import com.g42.platform.gms.booking_management.infrastructure.entity.BookingRequ
 import com.g42.platform.gms.customer.infrastructure.entity.CustomerProfileJpa;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface CustomerProfileJpaRepo extends JpaRepository<CustomerProfileJpa,Integer> , JpaSpecificationExecutor<CustomerProfileJpa> {
 
     CustomerProfileJpa findByCustomerId(Integer customerId);
     
-    CustomerProfileJpa findByPhone(String phone);
+    /**
+     * Tra khách theo số chính HOẶC số phụ (customer_phone, changeset 037). Mọi chỗ kiểm tra
+     * "số này đã có khách chưa" đi qua đây nên số phụ cũng được tính là đã có chủ.
+     */
+    @Query(nativeQuery = true, value = """
+            SELECT p.* FROM customer_profile p
+            WHERE p.phone = :phone
+               OR p.customer_id = (SELECT cp.customer_id FROM customer_phone cp WHERE cp.phone = :phone)
+            ORDER BY (p.phone = :phone) DESC
+            LIMIT 1
+            """)
+    CustomerProfileJpa findByPhone(@Param("phone") String phone);
 
     java.util.Optional<CustomerProfileJpa> findByCustomerCodeIgnoreCase(String customerCode);
 

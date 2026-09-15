@@ -1,0 +1,122 @@
+# Nhập bù phiếu (phiếu bị miss hoặc thiếu dòng của ngày trước) cho /create-booking và /parts-sales.
+#
+# Phiếu nhập bù vẫn nằm trong service_ticket và đi đúng vòng đời bình thường
+# (HOLDING → COMPLETED → PAID), chỉ đánh dấu thêm entry_mode = BACKFILL cùng trạng
+# thái duyệt riêng. Hàng được giữ ngay lúc nhập, quản lý duyệt mới xuất kho thật và
+# ghi thanh toán (paid_at = ngày thực tế), từ chối thì nhả hàng + huỷ phiếu.
+#
+# received_at của phiếu nhập bù là NGÀY THỰC TẾ khách tới (để báo cáo rơi đúng ngày),
+# còn created_at vẫn là lúc bấm nhập — chênh lệch giữa hai cột chính là dấu vết nhập bù.
+#
+# Dùng VARCHAR thay vì MySQL ENUM để thêm giá trị sau này không phải ALTER cột
+# (xem rắc rối của ticket_status ở changeset 032).
+databaseChangeLog:
+  - changeSet:
+      id: 036-1-service-ticket-add-backfill-columns
+      author: gms
+      comment: Thêm các cột đánh dấu phiếu nhập bù + trạng thái duyệt vào service_ticket
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: service_ticket
+                columnName: entry_mode
+      changes:
+        - addColumn:
+            tableName: service_ticket
+            columns:
+              - column:
+                  name: entry_mode
+                  type: VARCHAR(20)
+                  defaultValue: NORMAL
+                  constraints:
+                    nullable: false
+                  remarks: NORMAL = phiếu tạo theo luồng thường; BACKFILL = phiếu nhập bù ngày trước
+              - column:
+                  name: backfill_kind
+                  type: VARCHAR(20)
+                  remarks: MISSED = phiếu bị miss hoàn toàn (nhập lại); SUPPLEMENT = bổ sung dòng thiếu cho phiếu đã có (nhập thiếu)
+              - column:
+                  name: backfill_parent_ticket_id
+                  type: INT
+                  remarks: Phiếu gốc được bổ sung (chỉ có với backfill_kind = SUPPLEMENT)
+              - column:
+                  name: backfill_reason
+                  type: VARCHAR(500)
+                  remarks: Lý do nhập bù nhân viên ghi lại
+              - column:
+                  name: backfill_payment_method
+                  type: VARCHAR(20)
+                  remarks: Hình thức khách đã trả (CASH/TRANSFER), ghi vào payment_transaction lúc duyệt
+              - column:
+                  name: backfill_advisor_id
+                  type: INT
+                  remarks: Cố vấn đã làm phiếu (phân công lúc duyệt, không phân công sớm để khỏi hiện vào việc cần làm)
+              - column:
+                  name: backfill_technician_id
+                  type: INT
+                  remarks: Kỹ thuật viên đã làm phiếu (phân công lúc duyệt)
+              - column:
+                  name: backfill_review_status
+                  type: VARCHAR(20)
+                  remarks: PENDING_REVIEW / APPROVED / REJECTED
+              - column:
+                  name: backfill_reviewed_by
+                  type: INT
+                  remarks: Quản lý duyệt hoặc từ chối
+              - column:
+                  name: backfill_reviewed_at
+                  type: DATETIME
+              - column:
+                  name: backfill_review_note
+                  type: VARCHAR(500)
+      rollback:
+        - dropColumn:
+            tableName: service_ticket
+            columns:
+              - column:
+                  name: entry_mode
+              - column:
+                  name: backfill_kind
+              - column:
+                  name: backfill_parent_ticket_id
+              - column:
+                  name: backfill_reason
+              - column:
+                  name: backfill_payment_method
+              - column:
+                  name: backfill_advisor_id
+              - column:
+                  name: backfill_technician_id
+              - column:
+                  name: backfill_review_status
+              - column:
+                  name: backfill_reviewed_by
+              - column:
+                  name: backfill_reviewed_at
+              - column:
+                  name: backfill_review_note
+
+  - changeSet:
+      id: 036-2-service-ticket-backfill-index
+      author: gms
+      comment: Index cho màn duyệt phiếu nhập bù (lọc theo trạng thái duyệt)
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - indexExists:
+                tableName: service_ticket
+                indexName: idx_service_ticket_backfill_review
+      changes:
+        - createIndex:
+            tableName: service_ticket
+            indexName: idx_service_ticket_backfill_review
+            columns:
+              - column:
+                  name: entry_mode
+              - column:
+                  name: backfill_review_status
+      rollback:
+        - dropIndex:
+            tableName: service_ticket
+            indexName: idx_service_ticket_backfill_review

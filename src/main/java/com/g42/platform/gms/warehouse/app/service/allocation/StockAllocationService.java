@@ -194,6 +194,10 @@ public class StockAllocationService {
      */
     @Transactional
     public List<StockIssueResponse> requestIssueDraft(Integer serviceTicketId, Integer staffId) {
+        // Phiếu nhập bù chưa duyệt không được xuất kho — xuất kho chỉ chạy lúc quản lý duyệt
+        com.g42.platform.gms.service_ticket_management.domain.entity.BackfillGuard
+                .requireNotUnapprovedBackfill(serviceTicketRepo.findByServiceTicketId(serviceTicketId));
+
         // Lấy tất cả allocation RESERVED cho service ticket này
         List<StockAllocation> reserved = allocationRepo
                 .findByTicketAndStatus(serviceTicketId, AllocationStatus.RESERVED);

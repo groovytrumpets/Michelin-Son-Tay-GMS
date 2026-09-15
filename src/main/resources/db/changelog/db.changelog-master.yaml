@@ -115,3 +115,9 @@ databaseChangeLog:
   - include:
       file: changes/035-booking-odometer-estimate.yaml
       relativeToChangelogFile: true
+  - include:
+      file: changes/036-service-ticket-backfill.yaml
+      relativeToChangelogFile: true
+  - include:
+      file: changes/037-customer-multi-phone-plate-unique.yaml
+      relativeToChangelogFile: true

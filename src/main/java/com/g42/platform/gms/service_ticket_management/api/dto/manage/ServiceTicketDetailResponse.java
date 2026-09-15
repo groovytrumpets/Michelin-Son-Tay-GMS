@@ -1,5 +1,8 @@
 package com.g42.platform.gms.service_ticket_management.api.dto.manage;
 
+import com.g42.platform.gms.service_ticket_management.domain.enums.BackfillKind;
+import com.g42.platform.gms.service_ticket_management.domain.enums.BackfillReviewStatus;
+import com.g42.platform.gms.service_ticket_management.domain.enums.EntryMode;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketType;
 import lombok.AllArgsConstructor;
@@ -75,7 +78,14 @@ public class ServiceTicketDetailResponse {
     private Boolean immutable;
     private Boolean isGuest;
     private Boolean safetyInspectionEnabled;
-    
+
+    // Nhập bù phiếu ngày trước
+    private EntryMode entryMode;
+    private BackfillKind backfillKind;
+    private BackfillReviewStatus backfillReviewStatus;
+    private Integer backfillParentTicketId;
+    private String backfillReason;
+
     @Data
     @NoArgsConstructor
     @AllArgsConstructor

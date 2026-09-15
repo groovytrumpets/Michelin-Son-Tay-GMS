@@ -1,5 +1,8 @@
 package com.g42.platform.gms.service_ticket_management.api.dto.manage;
 
+import com.g42.platform.gms.service_ticket_management.domain.enums.BackfillKind;
+import com.g42.platform.gms.service_ticket_management.domain.enums.BackfillReviewStatus;
+import com.g42.platform.gms.service_ticket_management.domain.enums.EntryMode;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketType;
 import lombok.AllArgsConstructor;
@@ -54,4 +57,9 @@ public class ServiceTicketListResponse {
     private Integer queueNumber;
     private Boolean hasBill;
     private Integer billId;
+
+    // Nhập bù phiếu ngày trước — FE gắn nhãn "Nhập bù" / "Chờ duyệt"
+    private EntryMode entryMode;
+    private BackfillKind backfillKind;
+    private BackfillReviewStatus backfillReviewStatus;
 }

@@ -50,9 +50,13 @@ public class CustomerRepoImpl implements CustomerRepo {
     @Autowired
     private CustomerPointsJpaRepo customerPointsJpaRepo;
     @Autowired
+    private com.g42.platform.gms.customer.infrastructure.repository.CustomerPhoneJpaRepo customerPhoneJpaRepo;
+    @Autowired
     private com.g42.platform.gms.customer.infrastructure.repository.CustomerPointsHistoryJpaRepo customerPointsHistoryJpaRepo;
     @Autowired
     private com.g42.platform.gms.customer.infrastructure.repository.CustomerGroupJpaRepo customerGroupJpaRepo;
+    @Autowired
+    private com.g42.platform.gms.vehicle.repository.VehicleRepository vehicleRepository;
 
     @Override
     public CustomerProfile createNewCustomerProfile(CustomerCreateDto customerDto) {
@@ -304,6 +308,16 @@ public class CustomerRepoImpl implements CustomerRepo {
                         .collect(java.util.stream.Collectors.toMap(
                                 CustomerPointsJpa::getCustomerId, p -> p, (a, b) -> a));
 
+        // Số điện thoại phụ (một khách nhiều số, changeset 037)
+        java.util.Map<Integer, java.util.List<String>> otherPhonesByCustomer = pageIds.isEmpty()
+                ? java.util.Collections.emptyMap()
+                : customerPhoneJpaRepo.findByCustomerIdIn(pageIds).stream()
+                        .collect(java.util.stream.Collectors.groupingBy(
+                                com.g42.platform.gms.customer.infrastructure.entity.CustomerPhoneJpa::getCustomerId,
+                                java.util.stream.Collectors.mapping(
+                                        com.g42.platform.gms.customer.infrastructure.entity.CustomerPhoneJpa::getPhone,
+                                        java.util.stream.Collectors.toList())));
+
         java.util.Map<Integer, Long> bookingCountByCustomer = new java.util.HashMap<>();
         if (!pageIds.isEmpty()) {
             for (Object[] row : customerPointsHistoryJpaRepo
@@ -311,6 +325,25 @@ public class CustomerRepoImpl implements CustomerRepo {
                 bookingCountByCustomer.put((Integer) row[0], (Long) row[1]);
             }
         }
+
+        // Khách sổ cũ không có cả tên lẫn SĐT thì định danh theo biển số (từ 2026-09-08) —
+        // nạp biển số cho riêng nhóm này để danh bạ/list có gì đó hiển thị thay vì trống trơn.
+        java.util.List<Integer> plateFallbackIds = customerProfileJpas.getContent().stream()
+                .filter(jpa -> (jpa.getFullName() == null || jpa.getFullName().isBlank())
+                        && (jpa.getPhone() == null || jpa.getPhone().isBlank()))
+                .map(CustomerProfileJpa::getCustomerId)
+                .filter(java.util.Objects::nonNull)
+                .toList();
+
+        java.util.Map<Integer, String> plateByCustomer = plateFallbackIds.isEmpty()
+                ? java.util.Collections.emptyMap()
+                : vehicleRepository.findByCustomer_CustomerIdIn(plateFallbackIds).stream()
+                        .filter(v -> v.getCustomer() != null && v.getLicensePlate() != null)
+                        .collect(java.util.stream.Collectors.groupingBy(
+                                v -> v.getCustomer().getCustomerId(),
+                                java.util.stream.Collectors.mapping(
+                                        com.g42.platform.gms.vehicle.entity.Vehicle::getLicensePlate,
+                                        java.util.stream.Collectors.joining(", "))));
 
         return customerProfileJpas.map(jpa -> {
             CustomerProfile profile = customerJpaMapper.toDomain(jpa);
@@ -338,6 +371,12 @@ public class CustomerRepoImpl implements CustomerRepo {
             // Số lần đặt lịch = số lượt cộng điểm lý do SERVICE_PAYMENT.
             profile.setTotalBookings(
                     bookingCountByCustomer.getOrDefault(jpa.getCustomerId(), 0L).intValue());
+
+            String plates = plateByCustomer.get(jpa.getCustomerId());
+            if (plates != null && !plates.isBlank()) profile.setLicensePlate(plates);
+
+            profile.setOtherPhones(otherPhonesByCustomer.getOrDefault(jpa.getCustomerId(), java.util.List.of()));
+
             return profile;
         });
     }
@@ -413,6 +452,9 @@ public class CustomerRepoImpl implements CustomerRepo {
         // Tính số lần đặt lịch
         long bookings = customerPointsHistoryJpaRepo.countByCustomerIdAndReason(customerId, "SERVICE_PAYMENT");
         profile.setTotalBookings((int) bookings);
+        profile.setOtherPhones(customerPhoneJpaRepo.findByCustomerIdOrderByCustomerPhoneIdAsc(customerId).stream()
+                .map(com.g42.platform.gms.customer.infrastructure.entity.CustomerPhoneJpa::getPhone)
+                .toList());
         return profile;
     }
 

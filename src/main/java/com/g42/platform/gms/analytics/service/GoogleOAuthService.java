@@ -14,9 +14,13 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
@@ -47,7 +51,11 @@ public class GoogleOAuthService {
     private static final String SCOPES = "https://www.googleapis.com/auth/analytics.readonly "
             + "https://www.googleapis.com/auth/webmasters.readonly openid email";
 
+    /** Trạng thái token: cần người vào bấm Kết nối lại (Google đã thu hồi/hết hạn refresh_token). */
+    public static final String STATUS_RECONNECT_REQUIRED = "RECONNECT_REQUIRED";
+
     private final GoogleOAuthTokenRepository tokenRepository;
+    private final PlatformTransactionManager transactionManager;
     private final RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -186,7 +194,15 @@ public class GoogleOAuthService {
         body.add("refresh_token", token.getRefreshToken());
         body.add("grant_type", "refresh_token");
 
-        JsonNode json = postForm(TOKEN_ENDPOINT, body);
+        JsonNode json;
+        try {
+            json = postForm(TOKEN_ENDPOINT, body);
+        } catch (GoogleAnalyticsException e) {
+            // refresh_token chết hẳn thì đánh dấu luôn, nếu không bộ làm mới định kỳ sẽ gọi lại
+            // mỗi 15 phút và trang quản trị vẫn tưởng đang kết nối.
+            if (e.getErrorCode() == GoogleAnalyticsErrorCode.RECONNECT_REQUIRED) markNeedsReconnect();
+            throw e;
+        }
 
         String accessToken = json.path("access_token").asText(null);
         if (accessToken == null) {
@@ -216,12 +232,41 @@ public class GoogleOAuthService {
         return tokenRepository.findTopByOrderByIdAsc().orElse(null);
     }
 
+    /**
+     * Đánh dấu kết nối phải làm lại bằng tay. Chạy trong GIAO DỊCH RIÊNG vì phía gọi sắp ném
+     * lỗi — nằm chung giao dịch thì trạng thái này cũng bị cuốn theo rollback.
+     */
+    private void markNeedsReconnect() {
+        TransactionTemplate tx = new TransactionTemplate(transactionManager);
+        tx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        tx.executeWithoutResult(status -> tokenRepository.findTopByOrderByIdAsc().ifPresent(token -> {
+            if (STATUS_RECONNECT_REQUIRED.equals(token.getStatus())) return;
+            token.setStatus(STATUS_RECONNECT_REQUIRED);
+            token.setAccessToken(null);
+            token.setTokenExpiresAt(null);
+            tokenRepository.save(token);
+            log.warn("[GoogleOAuth] Google đã thu hồi/hết hạn refresh_token của {} — dừng tự làm mới,"
+                            + " cần vào /google-insights bấm Kết nối lại",
+                    token.getConnectedEmail() == null ? "tài khoản đã kết nối" : token.getConnectedEmail());
+        }));
+    }
+
     private JsonNode postForm(String url, MultiValueMap<String, String> body) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
         try {
             ResponseEntity<String> response = restTemplate.postForEntity(url, new HttpEntity<>(body, headers), String.class);
             return objectMapper.readTree(response.getBody());
+        } catch (HttpStatusCodeException e) {
+            // invalid_grant = refresh_token hỏng hẳn, gọi lại bao nhiêu lần cũng vậy: báo lỗi riêng
+            // để phía trên đánh dấu cần kết nối lại, và log ở mức WARN chứ không phải ERROR.
+            String responseBody = e.getResponseBodyAsString();
+            if (responseBody.contains("invalid_grant")) {
+                log.warn("[GoogleOAuth] Google từ chối refresh_token ({}): {}", url, responseBody);
+                throw new GoogleAnalyticsException(GoogleAnalyticsErrorCode.RECONNECT_REQUIRED);
+            }
+            log.error("[GoogleOAuth] Lỗi gọi {}: {} {}", url, e.getStatusCode(), responseBody);
+            throw new GoogleAnalyticsException(GoogleAnalyticsErrorCode.UPSTREAM_ERROR);
         } catch (RestClientException e) {
             log.error("[GoogleOAuth] Lỗi gọi {}: {}", url, e.getMessage());
             throw new GoogleAnalyticsException(GoogleAnalyticsErrorCode.UPSTREAM_ERROR);

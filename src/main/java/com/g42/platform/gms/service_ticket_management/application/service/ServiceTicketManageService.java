@@ -199,6 +199,11 @@ public class ServiceTicketManageService {
         response.setUpdatedAt(ticket.getUpdatedAt());
         response.setImmutable(ticket.getImmutable());
         response.setSafetyInspectionEnabled(ticket.getSafetyInspectionEnabled());
+        response.setEntryMode(ticket.getEntryMode());
+        response.setBackfillKind(ticket.getBackfillKind());
+        response.setBackfillReviewStatus(ticket.getBackfillReviewStatus());
+        response.setBackfillParentTicketId(ticket.getBackfillParentTicketId());
+        response.setBackfillReason(ticket.getBackfillReason());
 
         // Customer info
         CustomerProfile customer = customerRepository.findById(ticket.getCustomerId())
@@ -441,6 +446,7 @@ public class ServiceTicketManageService {
 
     public ServiceTicketListResponse updateServiceTicketStatus(Integer serviceTicketId, TicketStatus status) {
         ServiceTicket serviceTicket = serviceTicketRepo.findByServiceTicketId(serviceTicketId);
+        com.g42.platform.gms.service_ticket_management.domain.entity.BackfillGuard.requireNotUnapprovedBackfill(serviceTicket);
         serviceTicket.setTicketStatus(status);
         ServiceTicket savedServiceTicket = serviceTicketRepo.save(serviceTicket);
         return serviceTicketDtoMapper.toDto(savedServiceTicket);

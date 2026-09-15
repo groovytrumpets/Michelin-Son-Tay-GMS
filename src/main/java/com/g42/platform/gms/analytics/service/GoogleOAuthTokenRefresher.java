@@ -6,7 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import com.g42.platform.gms.analytics.exception.GoogleAnalyticsException;
 
 import java.time.Instant;
 
@@ -23,8 +23,13 @@ public class GoogleOAuthTokenRefresher {
     private final GoogleOAuthTokenRepository tokenRepository;
     private final GoogleOAuthService googleOAuthService;
 
+    /**
+     * KHÔNG bọc @Transactional ở đây: refreshAccessToken() đã tự mở giao dịch riêng. Bọc thêm
+     * một giao dịch ngoài thì khi làm mới thất bại, giao dịch chung bị đánh dấu rollback-only,
+     * lệnh catch bên dưới nuốt mất lỗi và Spring ném UnexpectedRollbackException lúc commit —
+     * biến một cảnh báo thành cả vệt stack trace ERROR mỗi 15 phút.
+     */
     @Scheduled(fixedRate = 15 * 60 * 1000)
-    @Transactional
     public void refreshIfNeeded() {
         GoogleOAuthToken token = tokenRepository.findTopByOrderByIdAsc().orElse(null);
         if (token == null || !"CONNECTED".equals(token.getStatus()) || token.getRefreshToken() == null) {
@@ -36,6 +41,10 @@ public class GoogleOAuthTokenRefresher {
         try {
             googleOAuthService.refreshAccessToken(token);
             log.info("[GoogleOAuth] Đã tự làm mới access_token định kỳ");
+        } catch (GoogleAnalyticsException e) {
+            // RECONNECT_REQUIRED: GoogleOAuthService đã chuyển token sang trạng thái cần kết nối
+            // lại nên lần chạy sau sẽ tự bỏ qua, không lặp lại cảnh báo này nữa.
+            log.warn("[GoogleOAuth] Tự làm mới access_token thất bại: {}", e.getMessage());
         } catch (Exception e) {
             log.warn("[GoogleOAuth] Tự làm mới access_token thất bại: {}", e.getMessage());
         }

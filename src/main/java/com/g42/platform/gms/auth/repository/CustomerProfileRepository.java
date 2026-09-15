@@ -11,7 +11,15 @@ import java.util.Optional;
 public interface CustomerProfileRepository
         extends JpaRepository<CustomerProfile, Integer> {
 
-    Optional<CustomerProfile> findByPhone(String phone);
+    /** Tra khách theo số chính HOẶC số phụ (customer_phone, changeset 037) — xem CustomerProfileJpaRepo#findByPhone. */
+    @Query(nativeQuery = true, value = """
+            SELECT p.* FROM customer_profile p
+            WHERE p.phone = :phone
+               OR p.customer_id = (SELECT cp.customer_id FROM customer_phone cp WHERE cp.phone = :phone)
+            ORDER BY (p.phone = :phone) DESC
+            LIMIT 1
+            """)
+    Optional<CustomerProfile> findByPhone(@Param("phone") String phone);
 
     /** Đăng nhập bằng email — email lưu chữ thường, xem CustomerAuthService#normalizeEmail. */
     Optional<CustomerProfile> findByEmailIgnoreCase(String email);

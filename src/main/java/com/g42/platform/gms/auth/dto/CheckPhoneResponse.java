@@ -35,6 +35,25 @@ public class CheckPhoneResponse {
     private String maskedEmail;
     private String maskedPhone;
 
+    /**
+     * Mọi số điện thoại của khách (số chính + số phụ, changeset 037), đã che bớt. Khách có từ
+     * 2 số trở lên thì màn đăng nhập/kích hoạt bắt chọn 1 số: số nhận OTP, và là số của phiên
+     * đăng nhập / số chính của tài khoản. Chỉ trả key để chọn, không trả số đầy đủ.
+     */
+    private java.util.List<PhoneOption> phones = new java.util.ArrayList<>();
+
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class PhoneOption {
+        /** "primary" cho số chính, id customer_phone cho số phụ. */
+        private String key;
+        private String maskedPhone;
+        private boolean primary;
+        /** Đúng số khách vừa gõ ở bước nhập định danh. */
+        private boolean matched;
+    }
+
     public CheckPhoneResponse(Status status, boolean hasPin) {
         this.status = status;
         this.hasPin = hasPin;

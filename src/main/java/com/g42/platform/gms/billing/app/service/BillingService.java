@@ -30,6 +30,8 @@ import com.g42.platform.gms.promotion.domain.repository.PromotionRepo;
 import com.g42.platform.gms.service_ticket_management.api.internal.ServiceTicketInternalApi;
 import com.g42.platform.gms.service_ticket_management.application.service.ServiceTicketManageService;
 import com.g42.platform.gms.service_ticket_management.application.service.TicketAssignmentService;
+import com.g42.platform.gms.service_ticket_management.domain.entity.BackfillGuard;
+import com.g42.platform.gms.service_ticket_management.domain.enums.EntryMode;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketType;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
@@ -88,6 +90,10 @@ public class BillingService {
         Estimate estimate = estimateRepository.findEstimateByServiceIdAndLatestVerson(serviceBillDto.getServiceTicketId());
         System.out.println("DEBUG: Estimate: " + estimate.getId());
         ServiceTicketJpa serviceTicket = serviceTicketRepository.findByServiceTicketId(serviceBillDto.getServiceTicketId());
+        if (serviceTicket != null) {
+            BackfillGuard.requireNotUnapprovedBackfill(serviceTicket.getEntryMode(),
+                    serviceTicket.getBackfillReviewStatus(), serviceTicket.getTicketCode());
+        }
         validateBillingRequest(estimate, serviceTicket);
         serviceBill.setSubTotal(estimate.getTotalPrice());
         serviceBill.setEstimateId(estimate.getId());
@@ -157,6 +163,14 @@ public class BillingService {
     @Transactional
     public PaymentTransactionDto createNewPayment(PaymentTransactionDto dto, Integer staffId) {
         ServiceBill serviceBill = billingRepository.getBillingByBillingId(dto.getBillId());
+        ServiceTicketJpa ticketToPay = serviceTicketRepository.findByServiceTicketId(serviceBill.getServiceTicketId());
+        if (ticketToPay != null) {
+            // Phiếu nhập bù ghi thanh toán qua recordBackfillPayment lúc quản lý duyệt, không thu tiền ở quầy
+            if (ticketToPay.getEntryMode() == EntryMode.BACKFILL) {
+                throw new IllegalArgumentException("Phiếu nhập bù " + ticketToPay.getTicketCode()
+                        + " được ghi thanh toán khi quản lý duyệt, không thu tiền lại ở màn thanh toán.");
+            }
+        }
         PaymentTransaction paymentTransactionDto = serviceBillDtoMapper.mapPaymentToEntity(dto);
         paymentTransactionDto.setPaidAt(Instant.now());
         paymentTransactionDto.setAmount(serviceBill.getFinalAmount());
@@ -213,6 +227,46 @@ public class BillingService {
         //todo: calculate gross-profit
 //        estimateInternalApi.calculateAndLockGrossProfit(serviceBill.getServiceTicketId());
         return serviceBillDtoMapper.mapPaymentToDto(paymentTransaction);
+    }
+
+    /**
+     * Ghi thanh toán cho phiếu nhập bù lúc quản lý duyệt (TicketBackfillService.approve).
+     *
+     * Khác createNewPayment ở chỗ: tiền đã thu từ ngày thực tế nên paid_at/delivered_at
+     * lấy theo ngày đó (báo cáo doanh thu rơi đúng ngày), và KHÔNG gửi thông báo mời
+     * đánh giá hay thưởng người giới thiệu — khách đã về từ hôm trước, nhắn lúc này
+     * chỉ gây khó hiểu. Luôn xuất kho ngay (cả phiếu sửa xe), vì hàng thực tế đã rời
+     * kho từ hôm đó, không còn khâu kho duyệt phiếu xuất nữa.
+     */
+    @Transactional
+    public PaymentTransactionDto recordBackfillPayment(Integer billId, String method,
+                                                       LocalDateTime paidAt, Integer staffId) {
+        ServiceBill serviceBill = billingRepository.getBillingByBillingId(billId);
+        if (serviceBill == null) {
+            throw new BillingException("Bill not found!", BillingErrorCode.ESTIMATE_404);
+        }
+        Instant paidInstant = paidAt.atZone(java.time.ZoneId.systemDefault()).toInstant();
+
+        PaymentTransactionDto dto = new PaymentTransactionDto();
+        dto.setBillId(billId);
+        dto.setMethod(method);
+        PaymentTransaction payment = serviceBillDtoMapper.mapPaymentToEntity(dto);
+        payment.setPaidAt(paidInstant);
+        payment.setAmount(serviceBill.getFinalAmount());
+        PaymentTransaction saved = paymentTransationRepo.createNewPayment(payment);
+
+        ServiceTicketJpa ticket = serviceTicketRepository.findByServiceTicketId(serviceBill.getServiceTicketId());
+        ticket.setTicketStatus(TicketStatus.PAID);
+        ticket.setDeliveredAt(paidAt);
+        serviceTicketRepository.save(ticket);
+
+        serviceBill.setPaymentStatus(PaymentStatus.PAID.name());
+        serviceBill.setPaidAt(paidInstant);
+        billingRepository.save(serviceBill);
+
+        warehouseStockAllocationService.issueAndConfirmOnPaid(serviceBill.getServiceTicketId(), staffId);
+        ticketAssignmentService.markAssignmentDone(serviceBill.getServiceTicketId());
+        return serviceBillDtoMapper.mapPaymentToDto(saved);
     }
 
     public BillEstimateDto getBillWithEstimate(Integer serviceTicketId) {

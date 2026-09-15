@@ -78,4 +78,14 @@ public class CustomerProfile {
     private String contactPhone;
     private String contactEmail;
     private String contactAddress;
+
+    /**
+     * Biển số xe hiển thị thay thế khi khách không có cả tên lẫn SĐT (khách sổ cũ định danh
+     * theo biển số — xem CustomerImportService, quy tắc từ 2026-09-08). Chỉ nạp ở
+     * {@code getListOfCustomers}, không phải cột thật của customer_profile.
+     */
+    private String licensePlate;
+
+    /** Các số điện thoại phụ (bảng customer_phone, changeset 037); số chính vẫn là {@link #phone}. */
+    private java.util.List<String> otherPhones;
 }

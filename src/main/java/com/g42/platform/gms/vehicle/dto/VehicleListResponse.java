@@ -14,6 +14,8 @@ import java.util.List;
 public class VehicleListResponse {
     
     private Integer customerId;
+    private String customerName;
+    private String customerPhone;
     private List<VehicleInfo> vehicles = new ArrayList<>();
     
     @Data

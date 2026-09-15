@@ -13,6 +13,7 @@ import com.g42.platform.gms.service_ticket_management.api.dto.assign.AssignStaff
 import com.g42.platform.gms.service_ticket_management.api.dto.assign.AvailableStaffDto;
 import com.g42.platform.gms.service_ticket_management.api.dto.parts_sale.PartsSaleCreateDto;
 import com.g42.platform.gms.service_ticket_management.api.dto.parts_sale.PartsSaleTicketDto;
+import com.g42.platform.gms.service_ticket_management.domain.entity.BackfillGuard;
 import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicket;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketType;
@@ -169,6 +170,7 @@ public class PartsSaleService {
         if (ticket.getTicketType() != TicketType.PARTS_SALE) {
             throw new RuntimeException("Phiếu " + ticket.getTicketCode() + " không phải phiếu bán linh kiện");
         }
+        BackfillGuard.requireNotUnapprovedBackfill(ticket);
 
         Estimate estimate = estimateInternalApi.findLatestByServiceTicketId(serviceTicketId);
         if (estimate == null) {
@@ -200,6 +202,7 @@ public class PartsSaleService {
         if (ticket.getTicketStatus() == TicketStatus.CANCELLED) {
             return;
         }
+        BackfillGuard.requireNotUnapprovedBackfill(ticket);
         if (ticket.getTicketStatus() != TicketStatus.HOLDING) {
             throw new RuntimeException("Chỉ huỷ được phiếu đang giữ hàng. Hiện tại: " + ticket.getTicketStatus());
         }
@@ -314,6 +317,7 @@ public class PartsSaleService {
         if (linkedTicketId != null) {
             ServiceTicket linked = serviceTicketRepo.findByServiceTicketId(linkedTicketId);
             if (linked != null) {
+                BackfillGuard.requireNotUnapprovedBackfill(linked);
                 if (linked.getTicketStatus() == TicketStatus.HOLDING
                         || linked.getTicketStatus() == TicketStatus.COMPLETED) {
                     attachBookingIfNeeded(linked, dto.getBookingId());

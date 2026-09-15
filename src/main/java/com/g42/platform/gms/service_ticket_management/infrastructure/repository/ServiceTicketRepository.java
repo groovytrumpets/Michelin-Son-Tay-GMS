@@ -73,11 +73,63 @@ public interface ServiceTicketRepository extends JpaRepository<ServiceTicketJpa,
 
     List<ServiceTicketJpa> findAllByCustomerIdOrderByReceivedAtDesc(Integer customerId);
 
+    Optional<ServiceTicketJpa> findFirstByVehicleIdOrderByCreatedAtDesc(Integer vehicleId);
+
     List<ServiceTicketJpa> findByTicketStatusAndTicketTypeAndReceivedAtBefore(
             TicketStatus ticketStatus, TicketType ticketType, LocalDateTime receivedAt);
 
     @Query("select count(st) from ServiceTicketManagement st where st.customerId = :customerId and (st.isDeleted is null or st.isDeleted = false)")
     long countActiveTicketsByCustomerId(@Param("customerId") Integer customerId);
+
+    // ===== Nhập bù phiếu ngày trước (TicketBackfillService) =====
+
+    /**
+     * Danh sách phiếu nhập bù cho màn duyệt. Tham số null = không lọc.
+     * Lọc theo created_at (lúc bấm nhập) chứ không theo received_at (ngày thực tế).
+     */
+    @Query("""
+        select st from ServiceTicketManagement st
+        where st.entryMode = com.g42.platform.gms.service_ticket_management.domain.enums.EntryMode.BACKFILL
+          and (:reviewStatus is null or st.backfillReviewStatus = :reviewStatus)
+          and (:createdBy is null or st.createdBy = :createdBy)
+          and (:createdFrom is null or st.createdAt >= :createdFrom)
+          and (:createdTo is null or st.createdAt < :createdTo)
+        order by st.createdAt desc
+        """)
+    org.springframework.data.domain.Page<ServiceTicketJpa> findBackfillTickets(
+            @Param("reviewStatus") com.g42.platform.gms.service_ticket_management.domain.enums.BackfillReviewStatus reviewStatus,
+            @Param("createdBy") Integer createdBy,
+            @Param("createdFrom") LocalDateTime createdFrom,
+            @Param("createdTo") LocalDateTime createdTo,
+            org.springframework.data.domain.Pageable pageable);
+
+    /** Toàn bộ phiếu nhập bù tạo trong khoảng — để thống kê theo nhân viên. */
+    @Query("""
+        select st from ServiceTicketManagement st
+        where st.entryMode = com.g42.platform.gms.service_ticket_management.domain.enums.EntryMode.BACKFILL
+          and (:createdFrom is null or st.createdAt >= :createdFrom)
+          and (:createdTo is null or st.createdAt < :createdTo)
+        """)
+    List<ServiceTicketJpa> findBackfillTicketsCreatedBetween(
+            @Param("createdFrom") LocalDateTime createdFrom,
+            @Param("createdTo") LocalDateTime createdTo);
+
+    /** Phiếu chưa huỷ của một khách trong một ngày thực tế — cảnh báo nhập trùng. */
+    @Query("""
+        select st from ServiceTicketManagement st
+        where st.customerId = :customerId
+          and st.receivedAt >= :from and st.receivedAt < :to
+          and (st.isDeleted is null or st.isDeleted = false)
+          and st.ticketStatus <> com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus.CANCELLED
+        order by st.receivedAt asc
+        """)
+    List<ServiceTicketJpa> findActiveByCustomerReceivedBetween(
+            @Param("customerId") Integer customerId,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to);
+
+    /** Phiếu nhập thiếu đã gắn vào một phiếu gốc (để đánh số mã phiếu con). */
+    long countByBackfillParentTicketId(Integer backfillParentTicketId);
 
     long countByCustomerIdAndTicketStatus(Integer customerId, com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus ticketStatus);
 

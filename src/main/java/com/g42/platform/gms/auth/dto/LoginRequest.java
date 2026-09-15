@@ -13,4 +13,10 @@ public class LoginRequest {
     )
     private String phone;
     private String pin;
+
+    /**
+     * Chỉ dùng cho khách: khách có nhiều số thì chọn số của phiên đăng nhập này
+     * (key lấy từ CheckPhoneResponse.phones). Bỏ trống = số chính.
+     */
+    private String phoneKey;
 }

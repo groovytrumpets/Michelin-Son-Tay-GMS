@@ -68,6 +68,8 @@ public class CustomerImportService {
     @Autowired private ObjectMapper objectMapper;
     /** Chỉ để hiện tên người đã chạy lô nhập trên màn xem chi tiết. */
     @Autowired private com.g42.platform.gms.staff.profile.infrastructure.repository.StaffProileJpaRepo staffProfileRepo;
+    /** Chỉ để biết một khách đã nhận dữ liệu gộp từ hồ sơ khác chưa (bảng customer_merge_log). */
+    @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     /* =============================== API ================================== */
 
@@ -1052,6 +1054,16 @@ public class CustomerImportService {
 
         int customersRemoved = 0;
         for (Integer customerId : counts.createdCustomerIds) {
+            CustomerProfileJpa stillThere = customerProfileRepo.findByCustomerId(customerId);
+            if (stillThere == null) {
+                // Hồ sơ đã bị gộp vào khách khác ở /customer-merge — không còn gì để gỡ
+                continue;
+            }
+            if (wasMergeTarget(customerId)) {
+                report.add(ImportIssueDto.warning(null, "customer",
+                        "Giữ lại khách mã " + customerId + " vì hồ sơ này đã được gộp dữ liệu từ hồ sơ khác."));
+                continue;
+            }
             if (legacyVisitRepo.countByCustomerId(customerId) > 0) {
                 report.add(ImportIssueDto.warning(null, "customer",
                         "Giữ lại khách mã " + customerId + " vì còn lượt dịch vụ từ lô nhập khác."));
@@ -1073,6 +1085,18 @@ public class CustomerImportService {
         batch.setStatus(ImportBatchJpa.STATUS_ROLLED_BACK);
         importBatchRepo.save(batch);
         return report;
+    }
+
+    /** Khách từng là hồ sơ được giữ lại trong một lần gộp — dữ liệu của khách khác đã đổ vào đây. */
+    private boolean wasMergeTarget(Integer customerId) {
+        try {
+            Integer count = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM customer_merge_log WHERE merge_type = 'CUSTOMER' AND kept_customer_id = ?",
+                    Integer.class, customerId);
+            return count != null && count > 0;
+        } catch (org.springframework.dao.DataAccessException e) {
+            return false;
+        }
     }
 
     @Transactional(readOnly = true)

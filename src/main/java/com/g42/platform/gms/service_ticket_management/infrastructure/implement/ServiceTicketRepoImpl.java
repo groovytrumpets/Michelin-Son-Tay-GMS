@@ -1,6 +1,7 @@
 package com.g42.platform.gms.service_ticket_management.infrastructure.implement;
 
 import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicket;
+import com.g42.platform.gms.service_ticket_management.domain.enums.EntryMode;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketType;
 import com.g42.platform.gms.service_ticket_management.domain.repository.ServiceTicketRepo;
@@ -146,6 +147,9 @@ public class ServiceTicketRepoImpl implements ServiceTicketRepo {
                 .findByTicketStatusAndTicketTypeAndReceivedAtBefore(TicketStatus.HOLDING, ticketType, createdBefore)
                 .stream()
                 .filter(t -> t.getIsDeleted() == null || !t.getIsDeleted())
+                // Phiếu nhập bù cũng HOLDING nhưng received_at là ngày thực tế (đã qua) —
+                // không loại ra thì job quét quá hạn huỷ mất phiếu đang chờ quản lý duyệt.
+                .filter(t -> t.getEntryMode() != EntryMode.BACKFILL)
                 .map(mapper::toDomain).toList();
     }
 }

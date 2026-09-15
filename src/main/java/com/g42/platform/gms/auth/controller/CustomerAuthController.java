@@ -54,7 +54,7 @@ public class CustomerAuthController {
      */
     @PostMapping("/request-otp")
     public ResponseEntity<ApiResponse<OtpSentResponse>> requestOtp(@RequestBody Map<String, String> body) {
-        NotificationChannel sentVia = customerAuthService.requestOtp(readIdentifier(body), readChannel(body));
+        NotificationChannel sentVia = customerAuthService.requestOtp(readIdentifier(body), readChannel(body), body.get("phoneKey"));
         return ResponseEntity.ok(ApiResponses.success(new OtpSentResponse(sentVia)));
     }
 

@@ -27,6 +27,8 @@ public class CustomerService {
     CustomerDtoMapper customerDtoMapper;
     @Autowired
     CustomerRankingService customerRankingService;
+    @Autowired
+    CustomerPhoneService customerPhoneService;
     private PasswordEncoder passwordEncoder;
     
     @Transactional
@@ -61,7 +63,14 @@ public class CustomerService {
         CustomerProfile customerProfile = customerRepo.findProflieById(customerId);
         CustomerAuth customerAuth = customerRepo.findAuthById(customerId);
         if (customerUpdateDto.getFullName() != null) customerProfile.setFullName(customerUpdateDto.getFullName());
-        if (customerUpdateDto.getPhone() != null) customerProfile.setPhone(customerUpdateDto.getPhone());
+        if (customerUpdateDto.getPhone() != null && !customerUpdateDto.getPhone().equals(customerProfile.getPhone())) {
+            // Một số chỉ thuộc một khách (tính cả số phụ). Số mới đang là số phụ của chính khách
+            // này thì coi như đôn lên làm số chính.
+            String newPhone = customerUpdateDto.getPhone().isBlank() ? null : customerUpdateDto.getPhone().trim();
+            customerPhoneService.ensurePhoneFree(newPhone, customerId);
+            customerPhoneService.detachOtherPhone(customerId, newPhone);
+            customerProfile.setPhone(newPhone);
+        }
         if (customerUpdateDto.getEmail() != null) customerProfile.setEmail(customerUpdateDto.getEmail());
         if (customerUpdateDto.getGender() != null) customerProfile.setGender(customerUpdateDto.getGender());
         if (customerUpdateDto.getAvatar() != null) customerProfile.setAvatar(customerUpdateDto.getAvatar());
@@ -147,10 +156,18 @@ public class CustomerService {
         return customerRepo.findCustomerById(customerId);
     }
 
+    /**
+     * Xóa mềm (không ai được khôi phục trừ can thiệp DB trực tiếp). Xóa nghĩa là giải phóng
+     * SĐT/email để dùng lại — nếu để nguyên, hồ sơ đã xóa vẫn chiếm định danh và chặn tạo mới
+     * vĩnh viễn (ensurePhoneAvailable/ensureEmailAvailable không loại trừ khách DELETED, và
+     * email còn có ràng buộc UNIQUE thật ở DB nên không thể chỉ bỏ qua ở tầng service).
+     */
     public CustomerProfile deleteCustomer(Integer customerId) {
         CustomerProfile customerProfile = customerRepo.findProflieById(customerId);
         CustomerAuth customerAuth = customerRepo.findAuthById(customerId);
         customerAuth.setStatus(CustomerStatus.DELETED);
+        customerProfile.setPhone(null);
+        customerProfile.setEmail(null);
         if (!customerRepo.updateCustomer(customerId,customerProfile,customerAuth)){
             throw new CustomerException("Update fail!", CustomerErrorCode.INVALID_CUSTOMER_PROFILE);
         }

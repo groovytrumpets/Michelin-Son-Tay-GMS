@@ -291,7 +291,8 @@ public class GlobalExceptionHandler {
         System.err.println("Google Analytics Error: " + ex.getErrorCode().getCode() + " - " + ex.getMessage());
         HttpStatus status = switch (ex.getErrorCode()) {
             case NOT_CONFIGURED, PROPERTY_NOT_CONFIGURED, SITE_NOT_CONFIGURED -> HttpStatus.SERVICE_UNAVAILABLE;
-            case NOT_CONNECTED -> HttpStatus.CONFLICT;
+            // Cần người vào bấm Kết nối lại — cùng nhóm "chưa kết nối" với NOT_CONNECTED
+            case NOT_CONNECTED, RECONNECT_REQUIRED -> HttpStatus.CONFLICT;
             case INVALID_STATE -> HttpStatus.BAD_REQUEST;
             case UPSTREAM_ERROR -> HttpStatus.BAD_GATEWAY;
         };

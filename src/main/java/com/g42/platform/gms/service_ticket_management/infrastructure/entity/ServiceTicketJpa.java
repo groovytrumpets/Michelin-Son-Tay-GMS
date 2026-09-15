@@ -1,5 +1,8 @@
 package com.g42.platform.gms.service_ticket_management.infrastructure.entity;
 
+import com.g42.platform.gms.service_ticket_management.domain.enums.BackfillKind;
+import com.g42.platform.gms.service_ticket_management.domain.enums.BackfillReviewStatus;
+import com.g42.platform.gms.service_ticket_management.domain.enums.EntryMode;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketType;
 import jakarta.persistence.*;
@@ -100,14 +103,61 @@ public class ServiceTicketJpa {
     @Column(name = "queue_number")
     private Integer queueNumber;
 
+    // ===== Nhập bù phiếu ngày trước (Liquibase 036) =====
+    @Enumerated(EnumType.STRING)
+    @Column(name = "entry_mode", length = 20, nullable = false)
+    private EntryMode entryMode = EntryMode.NORMAL;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "backfill_kind", length = 20)
+    private BackfillKind backfillKind;
+
+    @Column(name = "backfill_parent_ticket_id")
+    private Integer backfillParentTicketId;
+
+    @Column(name = "backfill_reason", length = 500)
+    private String backfillReason;
+
+    @Column(name = "backfill_payment_method", length = 20)
+    private String backfillPaymentMethod;
+
+    @Column(name = "backfill_advisor_id")
+    private Integer backfillAdvisorId;
+
+    @Column(name = "backfill_technician_id")
+    private Integer backfillTechnicianId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "backfill_review_status", length = 20)
+    private BackfillReviewStatus backfillReviewStatus;
+
+    @Column(name = "backfill_reviewed_by")
+    private Integer backfillReviewedBy;
+
+    @Column(name = "backfill_reviewed_at")
+    private LocalDateTime backfillReviewedAt;
+
+    @Column(name = "backfill_review_note", length = 500)
+    private String backfillReviewNote;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
+        ensureEntryMode();
     }
-    
+
     @PreUpdate
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
+        ensureEntryMode();
+    }
+
+    // Domain → JPA (MapStruct) copy cả giá trị null: các luồng cũ không biết tới
+    // entryMode sẽ ghi NULL vào cột NOT NULL nếu không chặn ở đây.
+    private void ensureEntryMode() {
+        if (entryMode == null) {
+            entryMode = EntryMode.NORMAL;
+        }
     }
 }

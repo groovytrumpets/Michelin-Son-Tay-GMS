@@ -1,5 +1,8 @@
 package com.g42.platform.gms.service_ticket_management.domain.entity;
 
+import com.g42.platform.gms.service_ticket_management.domain.enums.BackfillKind;
+import com.g42.platform.gms.service_ticket_management.domain.enums.BackfillReviewStatus;
+import com.g42.platform.gms.service_ticket_management.domain.enums.EntryMode;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketType;
 import lombok.Data;
@@ -38,7 +41,20 @@ public class ServiceTicket {
     private LocalDateTime updatedAt;
     private LocalDateTime completedAt;
     private Integer queueNumber;
-    
+
+    // Nhập bù phiếu ngày trước (xem TicketBackfillService). Phiếu thường: entryMode = NORMAL, còn lại null.
+    private EntryMode entryMode;
+    private BackfillKind backfillKind;
+    private Integer backfillParentTicketId;
+    private String backfillReason;
+    private String backfillPaymentMethod;
+    private Integer backfillAdvisorId;
+    private Integer backfillTechnicianId;
+    private BackfillReviewStatus backfillReviewStatus;
+    private Integer backfillReviewedBy;
+    private LocalDateTime backfillReviewedAt;
+    private String backfillReviewNote;
+
     // List of photo IDs (not full objects - MapStruct will handle conversion)
     private List<Integer> photoIds = new ArrayList<>();
     

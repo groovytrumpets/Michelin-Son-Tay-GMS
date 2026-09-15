@@ -1,0 +1,265 @@
+# Một khách được có NHIỀU số điện thoại, còn một biển số chỉ thuộc về MỘT xe.
+#
+# Trước đây customer_profile chỉ có một cột phone, nên người dùng 2 số bị tạo thành
+# 2 hồ sơ khách — mỗi hồ sơ lại có một dòng xe mang cùng biển số (viết lệch nhau kiểu
+# "30K-86694" / "30K86694", vì cột license_plate chỉ UNIQUE theo chuỗi nguyên văn).
+#
+# - customer_phone: các số PHỤ của khách. Số chính (số đăng nhập, số nhận Zalo) vẫn là
+#   customer_profile.phone để không phải sửa hàng chục chỗ đang đọc cột đó.
+#   Tầng ứng dụng đảm bảo một số chỉ thuộc về một khách trên cả hai bảng.
+# - vehicle.plate_key: biển số đã bỏ mọi ký tự không phải chữ/số, in hoa. Đây mới là
+#   khoá để so trùng biển số (Vehicle#syncPlateKey tự cập nhật khi lưu).
+# - customer_merge_log / customer_duplicate_dismissal: phục vụ màn gộp hồ sơ /customer-merge.
+# - 037-5 (Java) điền plate_key cho xe cũ và TỰ GỘP các dòng xe trùng biển số khi chúng
+#   cùng một chủ (hoặc chưa có chủ) — gộp kiểu này không mất thông tin gì, có ghi log.
+#   Các cặp trùng biển số mà KHÁC chủ thì KHÔNG tự gộp, vì hai hồ sơ khách có tên và
+#   thông tin khác nhau: nhân viên so sánh và gộp ở màn /customer-merge.
+# - 037-6 thêm UNIQUE cho plate_key. Còn cặp trùng nào thì bỏ qua (onFail: CONTINUE) và
+#   TỰ THỬ LẠI mỗi lần khởi động, cho tới khi đã gộp hết ở /customer-merge.
+#
+# Xem các biển số đang trùng:
+#   SELECT plate_key, COUNT(*) FROM vehicle WHERE plate_key IS NOT NULL
+#   GROUP BY plate_key HAVING COUNT(*) > 1;
+databaseChangeLog:
+  - changeSet:
+      id: 037-1-create-customer-phone
+      author: gms
+      comment: Bảng số điện thoại phụ của khách hàng (số chính vẫn ở customer_profile.phone)
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: customer_phone
+      changes:
+        - createTable:
+            tableName: customer_phone
+            remarks: Số điện thoại phụ của khách — một khách nhiều số, một số chỉ thuộc một khách
+            columns:
+              - column:
+                  name: customer_phone_id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: customer_id
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: phone
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uk_customer_phone_phone
+              - column:
+                  name: note
+                  type: VARCHAR(100)
+                  remarks: Ghi chú ngắn, VD "số vợ", "số công ty"
+              - column:
+                  name: created_at
+                  type: DATETIME
+                  defaultValueComputed: CURRENT_TIMESTAMP
+        - createIndex:
+            tableName: customer_phone
+            indexName: idx_customer_phone_customer
+            columns:
+              - column:
+                  name: customer_id
+        - addForeignKeyConstraint:
+            baseTableName: customer_phone
+            baseColumnNames: customer_id
+            constraintName: fk_customer_phone_customer
+            referencedTableName: customer_profile
+            referencedColumnNames: customer_id
+            onDelete: CASCADE
+      rollback:
+        - dropTable:
+            tableName: customer_phone
+
+  - changeSet:
+      id: 037-2-vehicle-add-plate-key
+      author: gms
+      comment: Thêm cột biển số chuẩn hoá để so trùng biển số không phụ thuộc cách viết
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: vehicle
+                columnName: plate_key
+      changes:
+        - addColumn:
+            tableName: vehicle
+            columns:
+              - column:
+                  name: plate_key
+                  type: VARCHAR(32)
+                  remarks: Biển số in hoa, bỏ mọi ký tự không phải chữ/số — khoá so trùng biển số
+        - createIndex:
+            tableName: vehicle
+            indexName: idx_vehicle_plate_key
+            columns:
+              - column:
+                  name: plate_key
+      rollback:
+        - dropIndex:
+            tableName: vehicle
+            indexName: idx_vehicle_plate_key
+        - dropColumn:
+            tableName: vehicle
+            columnName: plate_key
+
+  - changeSet:
+      id: 037-3-create-customer-merge-log
+      author: gms
+      comment: Nhật ký gộp hồ sơ khách hàng / gộp xe, kèm bản chụp hồ sơ bị gộp để tra cứu lại
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: customer_merge_log
+      changes:
+        - createTable:
+            tableName: customer_merge_log
+            columns:
+              - column:
+                  name: merge_log_id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: merge_type
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+                  remarks: CUSTOMER = gộp hồ sơ khách; VEHICLE = chỉ gộp các dòng xe trùng biển số
+              - column:
+                  name: kept_customer_id
+                  type: INT
+                  remarks: Hồ sơ được giữ lại (không có khoá ngoại — log phải sống sót kể cả khi hồ sơ bị xoá sau này)
+              - column:
+                  name: merged_customer_ids
+                  type: VARCHAR(255)
+                  remarks: Các hồ sơ đã bị gộp vào và xoá, cách nhau dấu phẩy
+              - column:
+                  name: kept_vehicle_id
+                  type: INT
+              - column:
+                  name: merged_vehicle_ids
+                  type: VARCHAR(255)
+              - column:
+                  name: snapshot_json
+                  type: LONGTEXT
+                  remarks: Nguyên văn các dòng customer_profile / số phụ / xe trước khi gộp
+              - column:
+                  name: summary
+                  type: TEXT
+                  remarks: Tóm tắt bằng lời những gì đã chuyển (bao nhiêu phiếu, lịch hẹn...)
+              - column:
+                  name: note
+                  type: VARCHAR(500)
+              - column:
+                  name: merged_by_staff_id
+                  type: INT
+              - column:
+                  name: merged_at
+                  type: DATETIME
+                  defaultValueComputed: CURRENT_TIMESTAMP
+        - createIndex:
+            tableName: customer_merge_log
+            indexName: idx_customer_merge_log_kept
+            columns:
+              - column:
+                  name: kept_customer_id
+      rollback:
+        - dropTable:
+            tableName: customer_merge_log
+
+  - changeSet:
+      id: 037-4-create-customer-duplicate-dismissal
+      author: gms
+      comment: Nhóm nghi trùng đã được nhân viên xác nhận "không phải cùng một khách" — không gợi ý lại
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: customer_duplicate_dismissal
+      changes:
+        - createTable:
+            tableName: customer_duplicate_dismissal
+            columns:
+              - column:
+                  name: dismissal_id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: group_key
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uk_customer_duplicate_dismissal_group
+                  remarks: "plate:<biển số chuẩn hoá>|<các customer_id tăng dần> — thêm khách mới vào nhóm thì nhóm hiện lại"
+              - column:
+                  name: note
+                  type: VARCHAR(500)
+              - column:
+                  name: dismissed_by_staff_id
+                  type: INT
+              - column:
+                  name: dismissed_at
+                  type: DATETIME
+                  defaultValueComputed: CURRENT_TIMESTAMP
+      rollback:
+        - dropTable:
+            tableName: customer_duplicate_dismissal
+
+  - changeSet:
+      id: 037-5-vehicle-backfill-plate-key-merge-same-owner
+      author: gms
+      comment: >-
+        Điền plate_key cho xe cũ (chuẩn hoá bằng Java cho khớp đúng lúc chạy) và gộp các dòng xe
+        trùng biển số của cùng một chủ. Trùng biển số khác chủ để lại cho màn /customer-merge.
+      changes:
+        - customChange:
+            class: com.g42.platform.gms.customermerge.infrastructure.liquibase.VehiclePlateKeyBackfillChange
+      rollback:
+        - empty
+
+  - changeSet:
+      id: 037-6-vehicle-plate-key-unique
+      author: gms
+      comment: Biển số là duy nhất. Bỏ qua và thử lại lần khởi động sau nếu còn biển số trùng chưa gộp.
+      preConditions:
+        - onFail: CONTINUE
+        - onFailMessage: >-
+            Chưa thêm được UNIQUE cho vehicle.plate_key vì vẫn còn biển số trùng giữa các khách khác nhau
+            (hoặc ràng buộc đã có sẵn). Gộp ở màn /customer-merge rồi khởi động lại để áp dụng.
+        - not:
+            - indexExists:
+                tableName: vehicle
+                indexName: uk_vehicle_plate_key
+        - sqlCheck:
+            expectedResult: 0
+            sql: >-
+              SELECT COUNT(*) FROM (
+                SELECT plate_key FROM vehicle
+                WHERE plate_key IS NOT NULL
+                GROUP BY plate_key HAVING COUNT(*) > 1
+              ) duplicated_plates
+      changes:
+        - addUniqueConstraint:
+            tableName: vehicle
+            columnNames: plate_key
+            constraintName: uk_vehicle_plate_key
+      rollback:
+        - dropUniqueConstraint:
+            tableName: vehicle
+            constraintName: uk_vehicle_plate_key
