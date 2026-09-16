@@ -3,9 +3,11 @@ package com.g42.platform.gms.vehicle.controller;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.systemlog.annotation.Auditable;
+import com.g42.platform.gms.vehicle.dto.PlateOwnerDto;
 import com.g42.platform.gms.vehicle.dto.VehicleCreateRequest;
 import com.g42.platform.gms.vehicle.dto.VehicleUpdateRequest;
 import com.g42.platform.gms.vehicle.dto.VehicleUpdateResponse;
+import com.g42.platform.gms.vehicle.service.SharedPlateException;
 import com.g42.platform.gms.vehicle.service.VehicleService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +16,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 /**
  * Staff-only vehicle management endpoints.
@@ -32,12 +36,27 @@ public class VehicleAdminController {
      * Thêm xe cho khách hàng từ màn /vehicle-management.
      * POST /api/admin/vehicles
      */
+    /**
+     * Các hồ sơ khách đang gắn biển số này. Một biển số dùng chung được cho nhiều khách
+     * (vợ chồng, gia đình, công ty) nên trả về danh sách để màn hình cho chọn đúng người.
+     * GET /api/admin/vehicles/by-plate?licensePlate=30K-86694
+     */
+    @GetMapping("/by-plate")
+    public ResponseEntity<ApiResponse<List<PlateOwnerDto>>> findByPlate(@RequestParam String licensePlate) {
+        return ResponseEntity.ok(ApiResponses.success(vehicleService.findOwnersByPlate(licensePlate)));
+    }
+
     @PostMapping
     @Auditable(action = "CREATE", module = "CUSTOMER", description = "Thêm xe cho khách hàng", targetType = "VEHICLE")
-    public ResponseEntity<ApiResponse<VehicleUpdateResponse>> createVehicle(
+    public ResponseEntity<ApiResponse<?>> createVehicle(
             @Valid @RequestBody VehicleCreateRequest request) {
         try {
             return ResponseEntity.ok(ApiResponses.success(vehicleService.createVehicle(request)));
+        } catch (SharedPlateException e) {
+            // Chưa phải lỗi: hỏi lại nhân viên rồi gửi kèm allowSharedPlate = true là ghi được
+            log.info("Create vehicle needs shared-plate confirmation: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponses.error(SharedPlateException.CODE, e.getMessage(), e.getOwners()));
         } catch (RuntimeException e) {
             log.error("Create vehicle failed: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -73,12 +92,16 @@ public class VehicleAdminController {
      */
     @PutMapping("/{vehicleId}")
     @Auditable(action = "UPDATE", module = "CUSTOMER", description = "Cập nhật thông tin xe của khách hàng", targetType = "VEHICLE")
-    public ResponseEntity<ApiResponse<VehicleUpdateResponse>> updateVehicle(
+    public ResponseEntity<ApiResponse<?>> updateVehicle(
             @PathVariable Integer vehicleId,
             @Valid @RequestBody VehicleUpdateRequest request) {
         try {
             VehicleUpdateResponse updated = vehicleService.updateVehicle(vehicleId, request);
             return ResponseEntity.ok(ApiResponses.success(updated));
+        } catch (SharedPlateException e) {
+            log.info("Update vehicle needs shared-plate confirmation: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponses.error(SharedPlateException.CODE, e.getMessage(), e.getOwners()));
         } catch (RuntimeException e) {
             log.error("Update vehicle failed: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)

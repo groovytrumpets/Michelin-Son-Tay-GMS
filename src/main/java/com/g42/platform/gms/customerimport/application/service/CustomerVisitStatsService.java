@@ -4,8 +4,10 @@ import com.g42.platform.gms.customerimport.api.dto.CustomerVisitStatsDto;
 import com.g42.platform.gms.customerimport.api.dto.ImportItemDto;
 import com.g42.platform.gms.customerimport.api.dto.LegacyVisitDetailDto;
 import com.g42.platform.gms.customerimport.api.dto.VisitAggregateDto;
+import com.g42.platform.gms.customerimport.infrastructure.entity.ImportBatchJpa;
 import com.g42.platform.gms.customerimport.infrastructure.entity.LegacyVisitItemJpa;
 import com.g42.platform.gms.customerimport.infrastructure.entity.LegacyVisitJpa;
+import com.g42.platform.gms.customerimport.infrastructure.repository.ImportBatchRepository;
 import com.g42.platform.gms.customerimport.infrastructure.repository.LegacyVisitItemRepository;
 import com.g42.platform.gms.customerimport.infrastructure.repository.LegacyVisitRepository;
 import com.g42.platform.gms.vehicle.repository.VehicleRepository;
@@ -36,6 +38,9 @@ public class CustomerVisitStatsService {
 
     @Autowired
     private LegacyVisitItemRepository legacyVisitItemRepo;
+
+    @Autowired
+    private ImportBatchRepository importBatchRepo;
 
     @Autowired
     private VehicleRepository vehicleRepo;
@@ -106,6 +111,17 @@ public class CustomerVisitStatsService {
                             item.getQuantity(), item.getUnitPrice(), item.getAmount()));
         }
 
+        // Tên file của lô nhập, lấy một lần cho cả danh sách — khối lịch sử hiển thị nút
+        // "Sửa lại lô" nên cần biết lượt này đến từ lần nhập nào.
+        Set<Integer> batchIds = new LinkedHashSet<>();
+        for (LegacyVisitJpa visit : visits) {
+            if (visit.getImportBatchId() != null) batchIds.add(visit.getImportBatchId());
+        }
+        Map<Integer, String> fileNameByBatch = new HashMap<>();
+        for (ImportBatchJpa batch : importBatchRepo.findAllById(batchIds)) {
+            fileNameByBatch.put(batch.getImportBatchId(), batch.getFileName());
+        }
+
         Map<Integer, String> plateByVehicle = new HashMap<>();
         List<LegacyVisitDetailDto> result = new ArrayList<>();
         for (LegacyVisitJpa visit : visits) {
@@ -124,6 +140,8 @@ public class CustomerVisitStatsService {
             dto.setCalled(visit.getCalled());
             dto.setCallSuccess(visit.getCallSuccess());
             dto.setCallNote(visit.getCallNote());
+            dto.setImportBatchId(visit.getImportBatchId());
+            dto.setImportFileName(fileNameByBatch.get(visit.getImportBatchId()));
             dto.setItems(itemsByVisit.getOrDefault(visit.getLegacyVisitId(), List.of()));
             if (visit.getVehicleId() != null) {
                 dto.setLicensePlate(plateByVehicle.computeIfAbsent(visit.getVehicleId(),

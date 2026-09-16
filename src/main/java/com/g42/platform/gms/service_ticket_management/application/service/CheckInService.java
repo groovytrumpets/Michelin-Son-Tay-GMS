@@ -108,8 +108,10 @@ public class CheckInService {
         customerRepository.findById(request.getCustomerId())
             .orElseThrow(() -> new CheckInException("Không tìm thấy khách hàng"));
 
-        if (vehicleRepository.findByLicensePlate(request.getLicensePlate()).isPresent()) {
-            throw new CheckInException("Biển số xe đã tồn tại: " + request.getLicensePlate());
+        // Trùng biển số với khách KHÁC là hợp lệ (xe dùng chung — changeset 039); chỉ chặn khi
+        // chính khách này đã có xe mang biển đó, vì đó là nhập trùng.
+        if (vehicleRepository.findByPlateForCustomer(request.getLicensePlate(), request.getCustomerId()).isPresent()) {
+            throw new CheckInException("Khách hàng này đã có xe biển số " + request.getLicensePlate());
         }
 
         Vehicle vehicle = new Vehicle();

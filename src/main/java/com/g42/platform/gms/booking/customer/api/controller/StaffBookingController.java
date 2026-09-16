@@ -21,6 +21,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Controller cho Staff/Receptionist tạo booking trực tiếp
  * 
@@ -65,10 +68,20 @@ public class StaffBookingController {
                 ? null
                 : customerRepository.findByPhone(normalizedPhone).orElse(null);
 
-        if (customer == null && !normalizedPlate.isBlank()) {
-            customer = vehicleRepository.findByLicensePlate(normalizedPlate)
-                    .map(Vehicle::getCustomer)
-                    .orElse(null);
+        // Xe dùng chung: một biển số có thể gắn với nhiều hồ sơ (changeset 039). Trả về đủ để
+        // lễ tân chọn đúng người; hồ sơ đầu tiên chỉ là gợi ý điền sẵn.
+        List<CustomerLookupResponse.PlateOwner> plateOwners = new ArrayList<>();
+        if (!normalizedPlate.isBlank()) {
+            for (Vehicle vehicle : vehicleRepository.findAllByPlate(normalizedPlate)) {
+                CustomerProfile owner = vehicle.getCustomer();
+                if (owner == null) continue;
+                plateOwners.add(new CustomerLookupResponse.PlateOwner(
+                        owner.getCustomerId(), owner.getFullName(), owner.getPhone(), owner.getEmail(),
+                        vehicle.getVehicleId(), vehicle.getLicensePlate()));
+            }
+            if (customer == null && !plateOwners.isEmpty()) {
+                customer = customerRepository.findById(plateOwners.get(0).getCustomerId()).orElse(null);
+            }
         }
 
         CustomerLookupResponse response;
@@ -91,6 +104,7 @@ public class StaffBookingController {
                     false
             );
         }
+        response.setPlateOwners(plateOwners);
 
         return ResponseEntity.ok(ApiResponses.success(response));
     }

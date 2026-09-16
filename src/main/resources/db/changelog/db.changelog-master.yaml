@@ -124,3 +124,6 @@ databaseChangeLog:
   - include:
       file: changes/038-role-permission.yaml
       relativeToChangelogFile: true
+  - include:
+      file: changes/039-vehicle-plate-shared.yaml
+      relativeToChangelogFile: true

@@ -1,0 +1,27 @@
+# Một biển số được phép thuộc về NHIỀU hồ sơ khách hàng.
+#
+# Đảo lại quyết định của changeset 037 (biển số là duy nhất). Thực tế ở xưởng: vợ chồng,
+# gia đình, công ty dùng chung một xe nhưng mỗi người có hồ sơ riêng — chặn cứng thì lễ tân
+# không tạo nổi hồ sơ cho người thứ hai, đành nhập sai biển hoặc gộp nhầm hai người làm một.
+#
+# Từ đây:
+# - Trùng biển số giữa HAI KHÁCH KHÁC NHAU là hợp lệ; tra cứu theo biển số trả về tất cả
+#   hồ sơ đang gắn biển đó để lễ tân chọn đúng người.
+# - Trùng biển số trong CÙNG MỘT KHÁCH vẫn bị chặn ở tầng ứng dụng (đó là nhập trùng).
+# - Màn /customer-merge giữ nguyên, nhưng giờ chỉ là GỢI Ý: nhân viên tự quyết "cùng một
+#   người" (gộp) hay "hai người dùng chung xe" (bỏ qua). Không còn ràng buộc nào ép phải gộp.
+#
+# Cột vehicle.plate_key (changeset 037) vẫn giữ và vẫn là khoá so khớp biển số không phụ
+# thuộc cách viết ("30K-86694" = "30k86694"), chỉ là không còn UNIQUE.
+databaseChangeLog:
+  - changeSet:
+      id: 039-1-vehicle-plate-drop-unique
+      author: gms
+      comment: >-
+        Gỡ mọi ràng buộc duy nhất trên vehicle.license_plate / vehicle.plate_key để một biển số
+        dùng chung được cho nhiều hồ sơ khách; giữ index thường để tra cứu theo biển số vẫn nhanh.
+      changes:
+        - customChange:
+            class: com.g42.platform.gms.customermerge.infrastructure.liquibase.DropVehiclePlateUniqueChange
+      rollback:
+        - empty

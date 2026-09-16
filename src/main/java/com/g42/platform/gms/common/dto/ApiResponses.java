@@ -22,6 +22,14 @@ public class ApiResponses {
         return new ApiResponse<>(false, code, message, null);
     }
 
+    /**
+     * Lỗi kèm dữ liệu để phía gọi xử lý tiếp, VD biển số xe đã thuộc về khách khác thì trả
+     * kèm danh sách chủ xe hiện tại để màn hình hỏi "vẫn thêm vào hồ sơ này chứ?".
+     */
+    public static <T> ApiResponse<T> error(String code, String message, T data) {
+        return new ApiResponse<>(false, code, message, data);
+    }
+
     public static ApiResponse<?> errorBill(String code, String message) {
         return new ApiResponse<>(true, code, message, null);
     }

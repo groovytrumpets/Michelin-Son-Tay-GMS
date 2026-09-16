@@ -116,7 +116,14 @@ public class CustomerMergeService {
                     k -> newGroup(k, DuplicateGroupDto.REASON_DUPLICATE_VEHICLE));
             addVehicle(group, row, "customer_id");
             Integer owner = toInt(row.get("customer_id"));
-            if (owner != null) membersByPlate.computeIfAbsent(plateKey, k -> new LinkedHashMap<>()).put(owner, true);
+            if (owner != null) {
+                // Cùng một khách mà có hai dòng xe cùng biển số là nhập trùng thật, không phải
+                // xe dùng chung — đánh dấu để xếp lên đầu danh sách.
+                if (membersByPlate.computeIfAbsent(plateKey, k -> new LinkedHashMap<>()).put(owner, true) != null) {
+                    group.setReason(DuplicateGroupDto.REASON_SAME_OWNER_DUPLICATE);
+                    group.setNeedsAttention(true);
+                }
+            }
         }
 
         try {
@@ -154,7 +161,8 @@ public class CustomerMergeService {
             LinkedHashMap<Integer, Boolean> members = membersByPlate.getOrDefault(group.getPlateKey(), new LinkedHashMap<>());
             List<Integer> ids = members.keySet().stream().filter(Objects::nonNull).sorted().toList();
             group.setGroupKey(groupKey(group.getPlateKey(), ids));
-            if (!group.isBlocksUniquePlate() && dismissed.contains(group.getGroupKey())) continue;
+            // Trùng biển số giờ là chuyện hợp lệ (xe dùng chung) nên nhóm nào cũng bỏ qua được
+            if (dismissed.contains(group.getGroupKey())) continue;
 
             for (Map.Entry<Integer, Boolean> member : members.entrySet()) {
                 DuplicateGroupDto.CustomerSummary base = summaries.get(member.getKey());
@@ -163,10 +171,10 @@ public class CustomerMergeService {
                 summary.setVehicleOwner(Boolean.TRUE.equals(member.getValue()));
                 group.getCustomers().add(summary);
             }
-            if (group.getCustomers().size() < 2 && !group.isBlocksUniquePlate()) continue;
+            if (group.getCustomers().size() < 2 && !group.isNeedsAttention()) continue;
             result.add(group);
         }
-        result.sort(Comparator.comparing((DuplicateGroupDto g) -> !g.isBlocksUniquePlate())
+        result.sort(Comparator.comparing((DuplicateGroupDto g) -> !g.isNeedsAttention())
                 .thenComparing(DuplicateGroupDto::getPlateKey));
         return result;
     }
@@ -551,7 +559,7 @@ public class CustomerMergeService {
         DuplicateGroupDto group = new DuplicateGroupDto();
         group.setPlateKey(plateKey);
         group.setReason(reason);
-        group.setBlocksUniquePlate(DuplicateGroupDto.REASON_DUPLICATE_VEHICLE.equals(reason));
+        group.setNeedsAttention(DuplicateGroupDto.REASON_SAME_OWNER_DUPLICATE.equals(reason));
         return group;
     }
 

@@ -29,4 +29,10 @@ public class VehicleCreateRequest {
     @Min(value = 1900, message = "Năm sản xuất phải từ 1900 trở lên")
     @Max(value = 2100, message = "Năm sản xuất không hợp lệ")
     private Integer manufactureYear;
+
+    /**
+     * Nhân viên đã nhìn thấy biển số này đang thuộc khách khác và xác nhận đây là xe dùng chung
+     * (vợ chồng, gia đình, công ty). Bỏ trống = lần lưu đầu, backend sẽ hỏi lại.
+     */
+    private Boolean allowSharedPlate;
 }

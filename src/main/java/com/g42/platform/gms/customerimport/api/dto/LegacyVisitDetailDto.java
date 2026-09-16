@@ -33,6 +33,10 @@ public class LegacyVisitDetailDto {
     /** Tổng tiền trong sổ lệch tổng các dòng — hiển thị dấu hiệu để người dùng biết mà rà lại. */
     private Boolean amountMismatch;
 
+    /** Lô nhập đã sinh ra lượt này — để mở lại lô đó mà sửa từ ngay hồ sơ khách. */
+    private Integer importBatchId;
+    private String importFileName;
+
     private Boolean called;
     private Boolean callSuccess;
     private String callNote;

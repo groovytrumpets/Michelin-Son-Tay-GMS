@@ -5,6 +5,7 @@ import com.g42.platform.gms.auth.repository.CustomerProfileRepository;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.OdometerHistoryJpa;
 import com.g42.platform.gms.service_ticket_management.infrastructure.repository.OdometerHistoryRepository;
 import com.g42.platform.gms.service_ticket_management.infrastructure.repository.ServiceTicketRepository;
+import com.g42.platform.gms.vehicle.dto.PlateOwnerDto;
 import com.g42.platform.gms.vehicle.dto.VehicleCreateRequest;
 import com.g42.platform.gms.vehicle.dto.VehicleListResponse;
 import com.g42.platform.gms.vehicle.dto.VehicleUpdateRequest;
@@ -44,8 +45,14 @@ public class VehicleService {
     private final ServiceTicketRepository serviceTicketRepository;
     private final JdbcTemplate jdbcTemplate;
 
+    /**
+     * Xe mang biển số này CỦA CHÍNH khách đó, chưa có thì tạo mới cho khách.
+     * Không "mượn" xe cùng biển của khách khác: từ changeset 039 một biển số dùng chung được
+     * cho nhiều hồ sơ, mỗi hồ sơ giữ lịch sử của riêng mình.
+     */
     public Vehicle findOrCreateVehicle(String licensePlate, String brand, String model, CustomerProfile owner) {
-        return vehicleRepo.findByLicensePlate(licensePlate)
+        return vehicleRepo
+                .findByPlateForCustomer(licensePlate, owner == null ? null : owner.getCustomerId())
                 .orElseGet(() -> {
                     Vehicle v = new Vehicle();
                     v.setLicensePlate(licensePlate);
@@ -119,9 +126,7 @@ public class VehicleService {
             .orElseThrow(() -> new RuntimeException("Không tìm thấy khách hàng"));
 
         String plate = request.getLicensePlate().trim().toUpperCase();
-        vehicleRepo.findByLicensePlate(plate).ifPresent(existing -> {
-            throw new RuntimeException("Biển số xe đã tồn tại: " + plate + describeOwner(existing));
-        });
+        checkPlateUsage(plate, request.getCustomerId(), null, Boolean.TRUE.equals(request.getAllowSharedPlate()));
 
         Vehicle vehicle = new Vehicle();
         vehicle.setLicensePlate(plate);
@@ -146,11 +151,8 @@ public class VehicleService {
             .orElseThrow(() -> new RuntimeException("Không tìm thấy xe"));
 
         String newPlate = request.getLicensePlate().trim().toUpperCase();
-        vehicleRepo.findByLicensePlate(newPlate).ifPresent(other -> {
-            if (!other.getVehicleId().equals(vehicleId)) {
-                throw new RuntimeException("Biển số xe đã tồn tại: " + newPlate + describeOwner(other));
-            }
-        });
+        Integer ownerId = vehicle.getCustomer() == null ? null : vehicle.getCustomer().getCustomerId();
+        checkPlateUsage(newPlate, ownerId, vehicleId, Boolean.TRUE.equals(request.getAllowSharedPlate()));
 
         vehicle.setLicensePlate(newPlate);
         vehicle.setBrand(request.getBrand() != null ? request.getBrand().trim() : null);
@@ -196,12 +198,57 @@ public class VehicleService {
         }
     }
 
-    private static String describeOwner(Vehicle vehicle) {
+    /**
+     * Mọi hồ sơ khách đang gắn biển số này (không phân biệt cách viết biển số).
+     * Dùng cho màn tra cứu theo biển số: xe dùng chung thì lễ tân phải thấy đủ để chọn đúng người.
+     */
+    @Transactional(readOnly = true)
+    public List<PlateOwnerDto> findOwnersByPlate(String licensePlate) {
+        return vehicleRepo.findAllByPlate(licensePlate).stream().map(VehicleService::toPlateOwner).toList();
+    }
+
+    /**
+     * Quy tắc trùng biển số (changeset 039):
+     * - Cùng một khách có hai xe cùng biển số = nhập trùng → chặn hẳn.
+     * - Khác khách = xe dùng chung (vợ chồng, gia đình, công ty) → cho phép, nhưng lần đầu trả
+     *   {@link SharedPlateException} kèm danh sách chủ hiện tại để nhân viên xác nhận, tránh
+     *   trường hợp thật ra chỉ là gõ nhầm biển số.
+     */
+    private void checkPlateUsage(String plate, Integer customerId, Integer selfVehicleId, boolean allowShared) {
+        List<Vehicle> existing = vehicleRepo.findAllByPlate(plate).stream()
+                .filter(v -> selfVehicleId == null || !selfVehicleId.equals(v.getVehicleId()))
+                .toList();
+        if (existing.isEmpty()) return;
+
+        boolean sameCustomer = customerId != null && existing.stream()
+                .anyMatch(v -> v.getCustomer() != null && customerId.equals(v.getCustomer().getCustomerId()));
+        if (sameCustomer) {
+            throw new RuntimeException("Khách hàng này đã có xe biển số " + plate + " trong hệ thống.");
+        }
+        if (allowShared) return;
+
+        List<PlateOwnerDto> owners = existing.stream().map(VehicleService::toPlateOwner).toList();
+        String names = owners.stream()
+                .map(o -> o.getCustomerName() == null || o.getCustomerName().isBlank()
+                        ? "khách #" + o.getCustomerId() : o.getCustomerName())
+                .collect(java.util.stream.Collectors.joining(", "));
+        throw new SharedPlateException("Biển số " + plate + " đang thuộc về " + names
+                + ". Nếu là xe dùng chung thì xác nhận để thêm vào hồ sơ này, còn không hãy kiểm tra lại biển số.",
+                owners);
+    }
+
+    private static PlateOwnerDto toPlateOwner(Vehicle vehicle) {
         CustomerProfile owner = vehicle.getCustomer();
-        if (owner == null) return "";
-        String name = owner.getFullName() != null && !owner.getFullName().isBlank()
-            ? owner.getFullName() : "#" + owner.getCustomerId();
-        return " (đang thuộc khách " + name + ")";
+        return new PlateOwnerDto(
+                vehicle.getVehicleId(),
+                vehicle.getLicensePlate(),
+                vehicle.getBrand(),
+                vehicle.getModel(),
+                vehicle.getManufactureYear(),
+                owner == null ? null : owner.getCustomerId(),
+                owner == null ? null : owner.getFullName(),
+                owner == null ? null : owner.getPhone(),
+                null);
     }
 
     private static String trimToNull(String value) {

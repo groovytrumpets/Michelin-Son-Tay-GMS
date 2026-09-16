@@ -318,11 +318,18 @@ public class BookingService {
         CustomerProfile customer = phone.isBlank() ? null : customerRepository.findByPhone(phone).orElse(null);
 
         // Không có/không tìm thấy theo phone thì thử tra theo biển số xe đã có trong hệ thống.
+        // Một biển số dùng chung được cho nhiều hồ sơ (changeset 039): đã biết khách thì lấy đúng
+        // xe của khách đó, chưa biết thì lấy chủ xe đầu tiên làm gợi ý (lễ tân xác nhận ở màn hình).
         Vehicle resolvedVehicle = null;
-        if (customer == null && !licensePlate.isBlank()) {
-            resolvedVehicle = vehicleRepository.findByLicensePlate(licensePlate).orElse(null);
-            if (resolvedVehicle != null) {
-                customer = resolvedVehicle.getCustomer();
+        if (!licensePlate.isBlank()) {
+            if (customer != null) {
+                resolvedVehicle = vehicleRepository
+                        .findByPlateForCustomer(licensePlate, customer.getCustomerId()).orElse(null);
+            } else {
+                resolvedVehicle = vehicleRepository.findByLicensePlate(licensePlate).orElse(null);
+                if (resolvedVehicle != null) {
+                    customer = resolvedVehicle.getCustomer();
+                }
             }
         }
 
@@ -381,6 +388,18 @@ public class BookingService {
 
             if (updated) {
                 customerRepository.save(customer);
+            }
+
+            // Khách đã có hồ sơ nhưng chưa có dòng xe mang biển này thì tạo cho chính khách đó,
+            // KHÔNG mượn xe cùng biển của người khác — mỗi hồ sơ giữ lịch sử xe của mình.
+            // Lễ tân đã tự chọn xe (request.vehicleId) thì tôn trọng lựa chọn đó, không tạo thêm.
+            if (!licensePlate.isBlank() && resolvedVehicle == null && request.getVehicleId() == null) {
+                Vehicle newVehicle = new Vehicle();
+                newVehicle.setLicensePlate(licensePlate);
+                newVehicle.setCustomer(customer);
+                resolvedVehicle = vehicleRepository.save(newVehicle);
+                log.info("Created vehicle for existing customer: vehicleId={}, licensePlate={}, customerId={}",
+                        resolvedVehicle.getVehicleId(), licensePlate, customerId);
             }
         }
 

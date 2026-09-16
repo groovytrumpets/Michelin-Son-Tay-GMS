@@ -201,9 +201,13 @@ public class ServiceTicketAdvisorService {
                     throw new CheckInException("Biển số xe không được để trống");
                 }
                 String newPlate = request.getLicensePlate().trim();
-                java.util.Optional<com.g42.platform.gms.vehicle.entity.Vehicle> existingVehicle = vehicleRepository.findByLicensePlate(newPlate);
-                if (existingVehicle.isPresent() && !existingVehicle.get().getVehicleId().equals(vehicle.getVehicleId())) {
-                    throw new CheckInException("Biển số xe đã được sử dụng bởi xe khác");
+                // Xe dùng chung (vợ chồng, công ty) được phép trùng biển giữa các hồ sơ khác nhau
+                // — xem changeset 039. Chỉ chặn khi chính chủ xe này đã có một xe khác cùng biển.
+                Integer ownerId = vehicle.getCustomer() == null ? null : vehicle.getCustomer().getCustomerId();
+                java.util.Optional<com.g42.platform.gms.vehicle.entity.Vehicle> sameOwnerVehicle =
+                        vehicleRepository.findByPlateForCustomer(newPlate, ownerId);
+                if (sameOwnerVehicle.isPresent() && !sameOwnerVehicle.get().getVehicleId().equals(vehicle.getVehicleId())) {
+                    throw new CheckInException("Khách hàng này đã có xe biển số " + newPlate);
                 }
                 vehicle.setLicensePlate(newPlate);
             }

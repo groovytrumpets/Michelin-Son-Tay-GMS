@@ -480,7 +480,14 @@ public class TicketBackfillService {
             vehicle = vehicleRepository.findById(req.getVehicleId())
                     .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy xe: " + req.getVehicleId()));
         } else if (plate != null) {
-            vehicle = vehicleRepository.findByLicensePlate(plate).orElse(null);
+            // Biển số dùng chung được cho nhiều hồ sơ (changeset 039): đã biết khách thì lấy đúng
+            // xe của khách đó, chưa biết khách thì lấy xe đầu tiên mang biển này.
+            if (customer != null) {
+                vehicle = vehicleRepository.findByPlateForCustomer(plate, customer.getCustomerId()).orElse(null);
+            }
+            if (vehicle == null) {
+                vehicle = vehicleRepository.findByLicensePlate(plate).orElse(null);
+            }
         }
 
         if (customer == null && vehicle != null) {

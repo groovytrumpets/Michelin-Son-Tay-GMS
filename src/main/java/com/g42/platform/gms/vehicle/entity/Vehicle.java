@@ -13,13 +13,19 @@ public class Vehicle {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer vehicleId;
 
-    // Biển số xe nguyên văn như người dùng nhập
-    @Column(nullable = false, unique = true)
+    /**
+     * Biển số xe nguyên văn như người dùng nhập.
+     *
+     * KHÔNG duy nhất (changeset 039): vợ chồng / gia đình / công ty dùng chung một xe thì mỗi
+     * người có hồ sơ riêng và mỗi hồ sơ có một dòng xe mang cùng biển số. Chặn trùng trong
+     * CÙNG một khách là việc của tầng ứng dụng (VehicleService).
+     */
+    @Column(nullable = false)
     private String licensePlate;
 
     /**
-     * Biển số chuẩn hoá (in hoa, bỏ dấu/khoảng trắng) — khoá DUY NHẤT thật sự của xe
-     * (UNIQUE từ changeset 037). Tự tính lại mỗi lần lưu, không set tay.
+     * Biển số chuẩn hoá (in hoa, bỏ dấu/khoảng trắng) — khoá so khớp biển số không phụ thuộc
+     * cách viết ("30K-86694" = "30k86694"). Tự tính lại mỗi lần lưu, không set tay.
      */
     @Column(name = "plate_key", length = 32)
     private String plateKey;

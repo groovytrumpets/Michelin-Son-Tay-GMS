@@ -25,4 +25,7 @@ public class VehicleUpdateRequest {
     @Min(value = 1900, message = "Năm sản xuất phải từ 1900 trở lên")
     @Max(value = 2100, message = "Năm sản xuất không hợp lệ")
     private Integer manufactureYear;
+
+    /** Xác nhận biển số này dùng chung với hồ sơ khách khác — xem VehicleCreateRequest. */
+    private Boolean allowSharedPlate;
 }
