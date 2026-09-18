@@ -229,7 +229,9 @@ public class CatalogItemService {
     private void validateCatalogItemDto(CatalogCreateDto createDto) {
         if (createDto.getBrandId() != null) {
             Brand brand = catalogItemRepo.getBrandById(createDto.getBrandId());
-            if (brand == null||brand.getIsActive().equals((byte)0)) {
+            // is_active để trống là hãng cũ nhập trước khi có cột này — coi như đang dùng.
+            // Gọi thẳng brand.getIsActive().equals(...) sẽ ném NPE và biến thành lỗi 500.
+            if (brand == null || Byte.valueOf((byte) 0).equals(brand.getIsActive())) {
                 throw new WarehouseException("Brand suggetion is unavailable! please create new brand",
                         WarehouseErrorCode.INVALID_BRAND);
             }
@@ -269,7 +271,9 @@ public class CatalogItemService {
             displayName.append(productLine.getLineName()).append(" ");
         }
 
-        if (displayName.isEmpty() && itemCategory.getCategoryName() != null && !itemCategory.getCategoryName().isBlank()) {
+        // itemCategory có thể null (hàng chưa xếp danh mục), phải kiểm tra lại ở đây
+        if (displayName.isEmpty() && itemCategory != null
+                && itemCategory.getCategoryName() != null && !itemCategory.getCategoryName().isBlank()) {
             displayName.append(itemCategory.getCategoryName());
         }
         return displayName.toString().trim();

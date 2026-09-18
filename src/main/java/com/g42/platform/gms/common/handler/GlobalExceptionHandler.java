@@ -35,6 +35,9 @@ import java.util.Arrays;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    private static final org.slf4j.Logger log =
+            org.slf4j.LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
     @ExceptionHandler(AuthException.class)
     public ResponseEntity<ApiResponse<?>> handleAuthException(AuthException ex) {
         System.err.println("Auth Error: " + ex.getCode() + " - " + ex.getMessage());
@@ -82,8 +85,11 @@ public class GlobalExceptionHandler {
      * Xử lý lỗi hệ thống không mong muốn (NullPointer, DB Connection...)
      */
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiResponse<?>> handleException(Exception ex) {
-        ex.printStackTrace(); // In stack trace để debug server
+    public ResponseEntity<ApiResponse<?>> handleException(Exception ex, jakarta.servlet.http.HttpServletRequest request) {
+        // Phải log qua SLF4J chứ không dùng printStackTrace(): stack trace in thẳng ra
+        // System.err không đi qua Logback nên không lọt vào InMemoryLogAppender, khiến
+        // trang /backend-logs chỉ thấy câu SQL mà không bao giờ thấy nguyên nhân lỗi 500.
+        log.error("Lỗi không xử lý ở {} {}", request.getMethod(), request.getRequestURI(), ex);
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponses.error(

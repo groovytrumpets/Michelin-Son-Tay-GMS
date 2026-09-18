@@ -27,6 +27,9 @@ public class BackendLogController {
     private static final int DEFAULT_LIMIT = 500;
     private static final int MAX_LIMIT = 2000;
 
+    /** Thứ tự nặng dần; dùng để lọc "từ mức này trở lên". */
+    private static final List<String> SEVERITY = List.of("TRACE", "DEBUG", "INFO", "WARN", "ERROR");
+
     @GetMapping
     public ResponseEntity<ApiResponse<Map<String, Object>>> getBackendLogs(
             @RequestParam(required = false) String level,
@@ -37,13 +40,19 @@ public class BackendLogController {
         int effectiveLimit = limit == null ? DEFAULT_LIMIT : Math.max(1, Math.min(limit, MAX_LIMIT));
         String levelFilter = level == null ? "" : level.trim().toUpperCase(Locale.ROOT);
         String searchFilter = search == null ? "" : search.trim().toLowerCase(Locale.ROOT);
+        int minSeverity = SEVERITY.indexOf(levelFilter);
 
-        List<InMemoryLogAppender.LogEntry> all = InMemoryLogAppender.snapshot();
-        long lastId = all.isEmpty() ? (afterId != null ? afterId : 0) : all.get(all.size() - 1).id();
+        // Lọc WARN/ERROR thì đọc buffer lỗi riêng: buffer chung chỉ giữ 2000 dòng gần
+        // nhất nên một đợt log DEBUG là đủ đẩy lỗi ra ngoài trước khi kịp mở trang.
+        List<InMemoryLogAppender.LogEntry> source = minSeverity >= SEVERITY.indexOf("WARN")
+                ? InMemoryLogAppender.problemSnapshot()
+                : InMemoryLogAppender.snapshot();
 
-        List<InMemoryLogAppender.LogEntry> filtered = all.stream()
+        long lastId = source.isEmpty() ? (afterId != null ? afterId : 0) : source.get(source.size() - 1).id();
+
+        List<InMemoryLogAppender.LogEntry> filtered = source.stream()
                 .filter(entry -> afterId == null || entry.id() > afterId)
-                .filter(entry -> levelFilter.isEmpty() || levelFilter.equals(entry.level()))
+                .filter(entry -> minSeverity < 0 || SEVERITY.indexOf(entry.level()) >= minSeverity)
                 .filter(entry -> searchFilter.isEmpty()
                         || entry.message().toLowerCase(Locale.ROOT).contains(searchFilter)
                         || entry.logger().toLowerCase(Locale.ROOT).contains(searchFilter))
