@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 
@@ -21,6 +22,9 @@ public interface LegacyVisitRepository extends JpaRepository<LegacyVisitJpa, Int
     List<LegacyVisitJpa> findByImportBatchId(Integer importBatchId);
 
     List<LegacyVisitJpa> findByCustomerIdOrderByVisitedAtDesc(Integer customerId);
+
+    /** Các lượt sổ cũ rơi vào một khoảng ngày, cho báo cáo khách hàng. */
+    List<LegacyVisitJpa> findByVisitedAtBetweenOrderByVisitedAtAsc(LocalDateTime start, LocalDateTime end);
 
     long countByCustomerId(Integer customerId);
 

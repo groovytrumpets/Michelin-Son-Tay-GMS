@@ -23,7 +23,9 @@ import java.time.LocalDate;
  *  - GET /api/reports/customer         → JSON tổng hợp (số khách, tổng thu, phân rã theo khách + phiếu)
  *  - GET /api/reports/customer/export  → file Excel (.xlsx) 3 sheet
  *
- * Mặc định {@code from}/{@code to} là ngày hôm nay.
+ * Mặc định {@code from}/{@code to} là ngày hôm nay, và {@code includeLegacy} = true nên báo cáo
+ * gộp cả lượt khách nhập từ sổ Excel cũ. Truyền {@code includeLegacy=false} để chỉ lấy phiếu
+ * phát sinh trong phần mềm.
  */
 @RestController
 @RequestMapping("/api/reports")
@@ -36,15 +38,18 @@ public class CustomerReportController {
     @GetMapping("/customer")
     public ResponseEntity<ApiResponse<CustomerReportResponse>> getCustomerReport(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return ResponseEntity.ok(ApiResponses.success(customerReportService.buildReport(from, to)));
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(defaultValue = "true") boolean includeLegacy) {
+        return ResponseEntity.ok(ApiResponses.success(
+                customerReportService.buildReport(from, to, includeLegacy)));
     }
 
     @GetMapping("/customer/export")
     public ResponseEntity<byte[]> exportCustomerReport(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        byte[] content = customerReportService.exportReport(from, to);
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(defaultValue = "true") boolean includeLegacy) {
+        byte[] content = customerReportService.exportReport(from, to, includeLegacy);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.parseMediaType(
