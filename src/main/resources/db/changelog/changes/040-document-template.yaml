@@ -1,0 +1,232 @@
+# ĐỌC 041 TRƯỚC KHI SỬA FILE NÀY.
+#
+# File này giữ NGUYÊN VĂN bản đã chạy trên cơ sở dữ liệu thật. Sửa bất kỳ dòng
+# nào bên trong `changes:` sẽ làm lệch mã kiểm tra và backend không khởi động
+# được nữa ("Validation Failed: changesets check sum"). Chỉ sửa được phần chú
+# thích — `comment:` và các dòng bắt đầu bằng dấu thăng — vì Liquibase không tính
+# chúng vào mã kiểm tra.
+#
+# Phần mô tả bên dưới nói về hướng dựng mẫu bằng pdfme (kéo thả theo toạ độ).
+# Hướng đó ĐÃ BỊ BỎ; bản đang dùng dựng mẫu bằng khối nội dung. Changeset 041 là
+# chỗ chuyển đổi: gỡ mấy cột riêng của pdfme và thêm cột đếm khối.
+#
+# ---------------------------------------------------------------------------
+#
+# Biểu mẫu chứng từ (hợp đồng, phiếu dịch vụ khi in, phiếu thanh toán, phiếu kho).
+#
+# Bối cảnh: trước đây mỗi loại giấy tờ in ra là một component React viết cứng
+# (Receipt.jsx, AccountingInvoicePrint.jsx). Thêm một mẫu mới hay sửa một dòng
+# chữ đều phải gọi lập trình viên. Từ đây mẫu là DỮ LIỆU, người dùng tự dựng
+# bằng trình thiết kế kéo thả ở /document-template.
+#
+# Ba khái niệm, đừng lẫn:
+#
+#   data_source  — NGUỒN DỮ LIỆU, do code định nghĩa (enum DataSourceType).
+#                  Quyết định mẫu có những trường nào để kéo vào. Rất ít khi
+#                  thêm mới, vì thêm nguồn nghĩa là phải viết code lấy dữ liệu.
+#
+#   document_kind — DẠNG CHỨNG TỪ, là DỮ LIỆU. Người dùng tự tạo bao nhiêu dạng
+#                  cũng được ("Hợp đồng sửa chữa", "Phiếu bảo hành"...), mỗi dạng
+#                  trỏ vào một nguồn dữ liệu và một giai đoạn in.
+#
+#   document_template — BỐ CỤC, cũng là dữ liệu. Một dạng có thể có nhiều mẫu
+#                  (mẫu cho khách lẻ, mẫu cho khách doanh nghiệp...), một trong
+#                  số đó được đánh dấu mặc định.
+#
+# Vì sao nền PDF nằm luôn trong layout_json thay vì lưu file riêng: bố cục là
+# JSON Template của pdfme, và pdfme nhận basePdf dạng chuỗi base64 ngay trong
+# JSON đó. Nhét chung một chỗ thì mẫu là một khối tự chứa — sao chép, khôi phục
+# hay xuất ra file đều chỉ đụng một cột, không lo file nền mồ côi.
+databaseChangeLog:
+  - changeSet:
+      id: 040-1-company-profile
+      author: gms
+      comment: >-
+        Hồ sơ công ty dùng chung cho phần đầu trang của mọi chứng từ. Trước đây tên công ty,
+        mã số thuế, số tài khoản nằm rải rác trong mã nguồn JSX; đưa vào DB để sửa được mà
+        không phải build lại giao diện. Bảng luôn chỉ có đúng một hàng (id = 1).
+      changes:
+        - createTable:
+            tableName: company_profile
+            columns:
+              - column: { name: id, type: INT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: name, type: VARCHAR(255), constraints: { nullable: false } }
+              - column: { name: short_name, type: VARCHAR(255) }
+              - column: { name: tax_code, type: VARCHAR(50) }
+              - column: { name: address, type: VARCHAR(500) }
+              - column: { name: representative, type: VARCHAR(255) }
+              - column: { name: representative_title, type: VARCHAR(100) }
+              - column: { name: phone, type: VARCHAR(50) }
+              - column: { name: email, type: VARCHAR(255) }
+              - column: { name: website, type: VARCHAR(255) }
+              - column: { name: bank_accounts, type: TEXT }
+              - column: { name: logo_url, type: VARCHAR(500) }
+              - column: { name: updated_at, type: DATETIME }
+      rollback:
+        - dropTable: { tableName: company_profile }
+
+  - changeSet:
+      id: 040-2-company-profile-seed
+      author: gms
+      comment: >-
+        Nạp sẵn thông tin lấy từ chính các file .docx đang dùng ở xưởng, để trang cấu hình
+        không mở ra với form trắng.
+      changes:
+        - insert:
+            tableName: company_profile
+            columns:
+              - column: { name: id, valueNumeric: 1 }
+              - column: { name: name, value: "CÔNG TY TNHH DỊCH VỤ THƯƠNG MẠI MINH ANH 18/9" }
+              - column: { name: short_name, value: "TRUNG TÂM MICHELIN CAR SERVICE SƠN TÂY" }
+              - column: { name: tax_code, value: "0111051440" }
+              - column: { name: address, value: "674 Tân Phúc, Sơn Đông, Sơn Tây, Hà Nội" }
+              - column: { name: representative, value: "PHẠM THỊ CHUYỀN" }
+              - column: { name: representative_title, value: "Giám đốc" }
+              - column: { name: phone, value: "0987 545 680" }
+              - column: { name: website, value: "sontaygarage.vn" }
+              - column: { name: bank_accounts, value: "136284541 - Ngân hàng TMCP Việt Nam Thịnh Vượng (VPBank)\n12696868 - Ngân hàng TMCP Kỹ Thương Việt Nam - Chi nhánh Đông Đô, Hà Nội" }
+      rollback:
+        - delete: { tableName: company_profile, where: "id = 1" }
+
+  - changeSet:
+      id: 040-3-document-kind
+      author: gms
+      comment: >-
+        Dạng chứng từ. is_system đánh dấu các dạng do hệ thống nạp sẵn — vẫn sửa được tên và
+        mẫu, nhưng không xoá được vì có chỗ trong code trỏ tới bằng code.
+      changes:
+        - createTable:
+            tableName: document_kind
+            columns:
+              - column: { name: kind_id, type: INT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: code, type: VARCHAR(50), constraints: { nullable: false, unique: true, uniqueConstraintName: uk_document_kind_code } }
+              - column: { name: name, type: VARCHAR(255), constraints: { nullable: false } }
+              - column: { name: data_source, type: VARCHAR(30), constraints: { nullable: false } }
+              - column: { name: stage, type: VARCHAR(30), constraints: { nullable: false } }
+              - column: { name: doc_no_pattern, type: VARCHAR(100) }
+              - column: { name: description, type: VARCHAR(500) }
+              - column: { name: is_system, type: TINYINT(1), defaultValueNumeric: 0 }
+              - column: { name: is_active, type: TINYINT(1), defaultValueNumeric: 1 }
+              - column: { name: sort_order, type: INT, defaultValueNumeric: 0 }
+              - column: { name: created_at, type: DATETIME }
+              - column: { name: updated_at, type: DATETIME }
+      rollback:
+        - dropTable: { tableName: document_kind }
+
+  - changeSet:
+      id: 040-4-document-template
+      author: gms
+      comment: >-
+        Bố cục mẫu. layout_json là Template JSON của pdfme, kể cả nền PDF dạng base64 nếu mẫu
+        được dựng từ file Word đã xuất sang PDF. LONGTEXT vì nền PDF một trang cỡ 350 KB sẽ
+        thành khoảng 470 KB sau khi mã hoá base64, vượt xa giới hạn 64 KB của TEXT.
+      changes:
+        - createTable:
+            tableName: document_template
+            columns:
+              - column: { name: template_id, type: INT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: kind_id, type: INT, constraints: { nullable: false } }
+              - column: { name: name, type: VARCHAR(255), constraints: { nullable: false } }
+              - column: { name: layout_json, type: LONGTEXT }
+              - column: { name: source_file_name, type: VARCHAR(255) }
+              - column: { name: paper_size, type: VARCHAR(20), defaultValue: "A4" }
+              # Ba cột thống kê dưới đây tính sẵn lúc lưu. Không có chúng thì mỗi lần
+              # mở danh sách mẫu phải nạp và phân tích cả layout_json — mà cột đó tới
+              # vài trăm KB khi mẫu dùng nền PDF, chỉ để đếm mấy con số hiển thị.
+              - column: { name: page_count, type: INT, defaultValueNumeric: 0 }
+              - column: { name: field_count, type: INT, defaultValueNumeric: 0 }
+              - column: { name: has_base_pdf, type: TINYINT(1), defaultValueNumeric: 0 }
+              - column: { name: note, type: VARCHAR(500) }
+              - column: { name: is_default, type: TINYINT(1), defaultValueNumeric: 0 }
+              - column: { name: is_active, type: TINYINT(1), defaultValueNumeric: 1 }
+              - column: { name: version, type: INT, defaultValueNumeric: 1 }
+              - column: { name: created_by, type: INT }
+              - column: { name: created_at, type: DATETIME }
+              - column: { name: updated_at, type: DATETIME }
+        - addForeignKeyConstraint:
+            baseTableName: document_template
+            baseColumnNames: kind_id
+            referencedTableName: document_kind
+            referencedColumnNames: kind_id
+            constraintName: fk_document_template_kind
+            onDelete: CASCADE
+        - createIndex:
+            tableName: document_template
+            indexName: idx_document_template_kind
+            columns:
+              - column: { name: kind_id }
+              - column: { name: is_active }
+      rollback:
+        - dropTable: { tableName: document_template }
+
+  - changeSet:
+      id: 040-5-document-kind-seed
+      author: gms
+      comment: >-
+        Mười dạng chứng từ lấy từ bộ biểu mẫu giấy đang dùng ở xưởng. Chưa kèm bố cục —
+        người dùng tự dựng hoặc nhập từ file Word ở /document-template.
+      changes:
+        - sql:
+            splitStatements: false
+            sql: >-
+              INSERT INTO document_kind (code, name, data_source, stage, doc_no_pattern, description, is_system, is_active, sort_order, created_at, updated_at) VALUES
+              ('SERVICE_CONTRACT','Hợp đồng sửa chữa','SERVICE_TICKET','INTAKE','{ticketCode}-HDSC','Ký khi tiếp nhận xe, kèm phụ lục phiếu tiếp nhận',1,1,10,NOW(),NOW()),
+              ('INTAKE_RECORD','Phiếu tiếp nhận xe','SERVICE_TICKET','INTAKE','{ticketCode}-TN','Ghi tình trạng xe, tài sản khách để lại',1,1,20,NOW(),NOW()),
+              ('QUOTATION','Báo giá sửa chữa - bảo dưỡng','SERVICE_TICKET','QUOTE','{ticketCode}-BG','Gửi khách duyệt trước khi làm',1,1,30,NOW(),NOW()),
+              ('VEHICLE_INSPECTION','Phiếu kiểm tra xe','SERVICE_TICKET','QUOTE','{ticketCode}-KT','Kèm sơ đồ lốp và bảng kiểm tra an toàn',1,1,40,NOW(),NOW()),
+              ('ACCEPTANCE_RECORD','Biên bản nghiệm thu - bàn giao xe','SERVICE_TICKET','HANDOVER','{ticketCode}-NT','Ký khi giao xe lại cho khách',1,1,50,NOW(),NOW()),
+              ('WARRANTY_CERTIFICATE','Phiếu bảo hành','SERVICE_TICKET','HANDOVER','{ticketCode}-BH','Thời hạn và phạm vi bảo hành theo hạng mục',1,1,60,NOW(),NOW()),
+              ('PAYMENT_RECEIPT','Phiếu thanh toán','SERVICE_TICKET','PAYMENT','{ticketCode}-TT','In khi thu tiền phiếu dịch vụ',1,1,70,NOW(),NOW()),
+              ('SALES_INVOICE','Hoá đơn bán hàng','PARTS_SALE','PAYMENT','{ticketCode}-HD','In khi bán phụ tùng lẻ',1,1,80,NOW(),NOW()),
+              ('GOODS_HANDOVER','Biên bản bàn giao hàng hoá','PARTS_SALE','HANDOVER','{ticketCode}-BG','Ký khi giao hàng cho khách doanh nghiệp',1,1,90,NOW(),NOW()),
+              ('STOCK_ENTRY_NOTE','Phiếu nhập kho','STOCK_ENTRY','WAREHOUSE','{ticketCode}-NK','Mẫu 01-VT theo Thông tư 99/2025/TT-BTC',1,1,100,NOW(),NOW()),
+              ('STOCK_ISSUE_NOTE','Phiếu xuất kho','STOCK_ISSUE','WAREHOUSE','{ticketCode}-XK','Mẫu 02-VT theo Thông tư 99/2025/TT-BTC',1,1,110,NOW(),NOW())
+      rollback:
+        - delete: { tableName: document_kind, where: "is_system = 1" }
+
+  - changeSet:
+      id: 040-6-permissions
+      author: gms
+      comment: >-
+        Ba mã quyền cho phân hệ biểu mẫu chứng từ. ADMIN không cần gán vì PermissionResolver
+        suy ra là toàn quyền; MANAGER phải gán tay vì quy tắc "toàn bộ trừ vài module" ở
+        changeset 038 chỉ chạy một lần lúc cài đặt, quyền thêm về sau không tự rơi vào.
+        Ghi vào cả role_permission_default để nút "Khôi phục mặc định" không làm mất quyền này.
+      changes:
+        - sql:
+            splitStatements: false
+            sql: >-
+              INSERT INTO permission (code, module_code, module_label, group_label, action_code, label, description, sort_order) VALUES
+              ('DOCUMENT_TEMPLATE_VIEW','DOCUMENT_TEMPLATE','Biểu mẫu chứng từ','Hệ thống','VIEW','Xem','Mở /document-template và xem các mẫu',801),
+              ('DOCUMENT_TEMPLATE_EDIT','DOCUMENT_TEMPLATE','Biểu mẫu chứng từ','Hệ thống','EDIT','Sửa','Tạo, nhập từ Word, sửa bố cục, đặt mẫu mặc định',802),
+              ('DOCUMENT_TEMPLATE_DELETE','DOCUMENT_TEMPLATE','Biểu mẫu chứng từ','Hệ thống','DELETE','Xoá','Xoá dạng chứng từ và mẫu tự tạo',803)
+        - sql:
+            comment: Cấp cho MANAGER ở bộ quyền đang dùng
+            splitStatements: false
+            sql: >-
+              INSERT INTO role_permission (role_id, permission_code)
+              SELECT r.role_id, p.code
+              FROM role r CROSS JOIN permission p
+              WHERE r.role_code = 'MANAGER'
+                AND p.module_code = 'DOCUMENT_TEMPLATE'
+                AND NOT EXISTS (
+                  SELECT 1 FROM role_permission rp
+                  WHERE rp.role_id = r.role_id AND rp.permission_code = p.code
+                )
+        - sql:
+            comment: Và ở bộ mặc định để khôi phục không nuốt mất
+            splitStatements: false
+            sql: >-
+              INSERT INTO role_permission_default (role_id, permission_code)
+              SELECT r.role_id, p.code
+              FROM role r CROSS JOIN permission p
+              WHERE r.role_code = 'MANAGER'
+                AND p.module_code = 'DOCUMENT_TEMPLATE'
+                AND NOT EXISTS (
+                  SELECT 1 FROM role_permission_default rpd
+                  WHERE rpd.role_id = r.role_id AND rpd.permission_code = p.code
+                )
+      rollback:
+        - sql: "DELETE FROM role_permission WHERE permission_code LIKE 'DOCUMENT_TEMPLATE_%'"
+        - sql: "DELETE FROM role_permission_default WHERE permission_code LIKE 'DOCUMENT_TEMPLATE_%'"
+        - sql: "DELETE FROM permission WHERE code LIKE 'DOCUMENT_TEMPLATE_%'"

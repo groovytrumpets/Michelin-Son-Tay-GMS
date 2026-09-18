@@ -195,4 +195,9 @@ public final class PermissionCodes {
     public static final String BACKEND_LOG_VIEW = "BACKEND_LOG_VIEW";
     public static final String BUG_REPORT_VIEW = "BUG_REPORT_VIEW";
     public static final String BUG_REPORT_EDIT = "BUG_REPORT_EDIT";
+
+    // ---- Biểu mẫu chứng từ ----
+    public static final String DOCUMENT_TEMPLATE_VIEW = "DOCUMENT_TEMPLATE_VIEW";
+    public static final String DOCUMENT_TEMPLATE_EDIT = "DOCUMENT_TEMPLATE_EDIT";
+    public static final String DOCUMENT_TEMPLATE_DELETE = "DOCUMENT_TEMPLATE_DELETE";
 }

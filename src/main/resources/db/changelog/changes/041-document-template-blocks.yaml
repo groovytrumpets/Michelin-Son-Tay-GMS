@@ -1,0 +1,93 @@
+# Chuyển bố cục mẫu chứng từ từ toạ độ sang KHỐI NỘI DUNG.
+#
+# Changeset 040 dựng bảng theo hướng cũ: mẫu là Template JSON của pdfme, mỗi ô là
+# một hộp đặt theo toạ độ, kèm cả ảnh nền PDF nhúng base64. Hướng đó bị bỏ vì
+# không dùng được trong thực tế:
+#   - mẫu dựng trên nền PDF chỉ là ảnh chết, không thêm cột, thêm bảng hay tràn
+#     trang được — mà đó lại là thứ cần nhất khi sửa mẫu về sau;
+#   - mẫu dựng thành hộp theo toạ độ thì một tờ hợp đồng ra hơn 250 hộp rời, sửa
+#     một câu phải kéo vài chục hộp.
+#
+# Bản mới lưu mẫu thành danh sách KHỐI — đầu trang công ty, lưới thông tin, bảng
+# hạng mục, đoạn điều khoản, hàng chữ ký. Cột layout_json giữ nguyên (backend vẫn
+# không diễn giải nội dung), chỉ mấy cột thống kê là đổi theo.
+#
+# VÌ SAO KHÔNG SỬA THẲNG 040: cơ sở dữ liệu thật đã chạy 040 rồi. Sửa lại nội
+# dung một changeset đã chạy sẽ làm lệch mã kiểm tra và backend từ chối khởi động.
+# Đường đúng của Liquibase là để yên bản cũ và viết một changeset mới chồng lên.
+databaseChangeLog:
+  - changeSet:
+      id: 041-1-document-template-block-count
+      author: gms
+      comment: >-
+        Thay ba cột thống kê của bản pdfme (số trang, số ô, có nền PDF không) bằng một cột
+        đếm khối. Gỡ luôn source_file_name vì bản mới không nhập mẫu từ file Word nữa.
+        Dùng preConditions để chạy được cả trên cơ sở dữ liệu đã có 040 lẫn cơ sở dữ liệu
+        cài mới — cài mới thì 040 vừa tạo xong mấy cột này rồi 041 gỡ đi ngay, hơi thừa
+        nhưng đổi lại là hai loại cơ sở dữ liệu về cùng một trạng thái.
+      preConditions:
+        - onFail: MARK_RAN
+        - columnExists: { tableName: document_template, columnName: page_count }
+      changes:
+        - dropColumn:
+            tableName: document_template
+            columns:
+              - column: { name: source_file_name }
+              - column: { name: page_count }
+              - column: { name: field_count }
+              - column: { name: has_base_pdf }
+        - addColumn:
+            tableName: document_template
+            columns:
+              - column:
+                  name: block_count
+                  type: INT
+                  defaultValueNumeric: 0
+                  remarks: Số khối trong bố cục, đếm sẵn lúc lưu để danh sách mẫu khỏi phải nạp layout_json
+      rollback:
+        - dropColumn: { tableName: document_template, columnName: block_count }
+        - addColumn:
+            tableName: document_template
+            columns:
+              - column: { name: source_file_name, type: VARCHAR(255) }
+              - column: { name: page_count, type: INT, defaultValueNumeric: 0 }
+              - column: { name: field_count, type: INT, defaultValueNumeric: 0 }
+              - column: { name: has_base_pdf, type: TINYINT(1), defaultValueNumeric: 0 }
+
+  - changeSet:
+      id: 041-2-clear-pdfme-layouts
+      author: gms
+      comment: >-
+        Xoá bố cục của những mẫu đã dựng bằng bản pdfme. Chúng là Template JSON theo toạ độ,
+        bản mới đọc vào sẽ ra mẫu rỗng — mà mẫu rỗng nhìn giống hệt mẫu chưa dựng nên người
+        dùng không biết đường nào mà lần. Thà xoá hẳn để họ bấm "Dùng mẫu gốc" dựng lại.
+        Chỉ đụng vào mẫu có dấu hiệu của pdfme (có khoá "schemas"), mẫu dựng bằng khối có
+        khoá "blocks" nên không bị ảnh hưởng.
+      changes:
+        - sql:
+            splitStatements: false
+            sql: >-
+              DELETE FROM document_template
+              WHERE layout_json IS NOT NULL
+                AND layout_json LIKE '%"schemas"%'
+                AND layout_json NOT LIKE '%"blocks"%'
+      rollback:
+        - empty
+
+  - changeSet:
+      id: 041-3-permission-description
+      author: gms
+      comment: >-
+        Sửa mô tả quyền cho khớp: bản mới không còn đường nhập mẫu từ file Word.
+      changes:
+        - update:
+            tableName: permission
+            columns:
+              - column: { name: description, value: "Tạo và sửa bố cục mẫu, đặt mẫu mặc định" }
+            where: "code = 'DOCUMENT_TEMPLATE_EDIT'"
+      rollback:
+        - update:
+            tableName: permission
+            columns:
+              - column: { name: description, value: "Tạo, nhập từ Word, sửa bố cục, đặt mẫu mặc định" }
+            where: "code = 'DOCUMENT_TEMPLATE_EDIT'"
