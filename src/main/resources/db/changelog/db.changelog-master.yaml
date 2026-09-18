@@ -127,3 +127,6 @@ databaseChangeLog:
   - include:
       file: changes/039-vehicle-plate-shared.yaml
       relativeToChangelogFile: true
+  - include:
+      file: changes/040-document-template.yaml
+      relativeToChangelogFile: true
