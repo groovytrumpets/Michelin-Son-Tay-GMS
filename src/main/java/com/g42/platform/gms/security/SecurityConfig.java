@@ -81,6 +81,10 @@ public class SecurityConfig {
                                 "/api/public/posts/**",
                                 "/api/public/post-categories/**",
                                 "/api/public/post-tags/**",
+                                // Bài viết phụ tùng: nội dung của trang chi tiết dịch vụ/phụ tùng
+                                // (/services/<slug>, /parts/<slug>) và của /danh-muc. Thiếu dòng này
+                                // thì khách chưa đăng nhập bấm "Xem chi tiết" ở trang chủ sẽ ăn 401.
+                                "/api/public/item-posts/**",
                                 // Thanh menu phải dựng được trước khi khách đăng nhập.
                                 "/api/public/nav-menu/**",
                                 // Bố cục thanh đầu trang (logo, ô tìm kiếm, nút) — cùng lý do.
