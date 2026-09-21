@@ -24,7 +24,9 @@ import com.g42.platform.gms.staff.attendance.domain.exception.StaffAttendanceExc
 import com.g42.platform.gms.staff.profile.domain.exception.StaffException;
 import com.g42.platform.gms.warehouse.domain.exception.WarehouseException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -79,6 +81,40 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponses.error(AuthErrorCode.VALIDATION_ERROR.name(), message));
+    }
+
+    /**
+     * Giữ nguyên mã trạng thái mà code đã cố ý chọn khi ném ResponseStatusException.
+     *
+     * Không có handler này thì mọi ResponseStatusException rơi xuống handleException(Exception)
+     * và bị biến thành 500 SYSTEM_ERROR — sai hoàn toàn với ý của chỗ ném ra. Hậu quả thật đã
+     * gặp: mặt hàng chưa có bài viết thì GET /api/public/item-posts/by-catalog-item/{id} trả 404
+     * "Không tìm thấy bài viết" (chuyện bình thường), nhưng FE lại nhận 500 nên ServerDownOverlay
+     * bật lên báo "mất kết nối với máy chủ", kèm một stack trace vô nghĩa trong log.
+     *
+     * 4xx là câu trả lời nghiệp vụ, log một dòng WARN gọn là đủ; chỉ 5xx mới cần stack trace.
+     */
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ApiResponse<?>> handleResponseStatus(
+            ResponseStatusException ex, jakarta.servlet.http.HttpServletRequest request) {
+        HttpStatusCode status = ex.getStatusCode();
+        String reason = ex.getReason() != null && !ex.getReason().isBlank()
+                ? ex.getReason()
+                : "Yêu cầu không hợp lệ.";
+
+        if (status.is5xxServerError()) {
+            log.error("Lỗi máy chủ ở {} {}", request.getMethod(), request.getRequestURI(), ex);
+        } else {
+            log.warn("{} ở {} {}: {}", status.value(), request.getMethod(), request.getRequestURI(), reason);
+        }
+
+        return ResponseEntity.status(status).body(ApiResponses.error(codeFor(status), reason));
+    }
+
+    /** Mã lỗi cho FE đọc: tên của mã trạng thái HTTP, VD 404 → "NOT_FOUND". */
+    private static String codeFor(HttpStatusCode status) {
+        HttpStatus resolved = HttpStatus.resolve(status.value());
+        return resolved != null ? resolved.name() : "HTTP_" + status.value();
     }
 
     /**
