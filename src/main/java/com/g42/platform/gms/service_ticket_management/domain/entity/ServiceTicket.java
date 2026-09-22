@@ -55,6 +55,14 @@ public class ServiceTicket {
     private LocalDateTime backfillReviewedAt;
     private String backfillReviewNote;
 
+    // Bán cho khách lẻ vãng lai (xem PartsSaleService). Phiếu thường: isWalkIn = false và các
+    // cột walkIn* để trống; phiếu khách lẻ trỏ customerId về hồ sơ dùng chung "Khách lẻ" nên
+    // tên người mua thật chỉ có ở đây.
+    private Boolean isWalkIn;
+    private String walkInName;
+    private String walkInPhone;
+    private String walkInAddress;
+
     // List of photo IDs (not full objects - MapStruct will handle conversion)
     private List<Integer> photoIds = new ArrayList<>();
     
@@ -77,6 +85,9 @@ public class ServiceTicket {
         }
         if (isDeleted == null) {
             isDeleted = false;
+        }
+        if (isWalkIn == null) {
+            isWalkIn = false;
         }
     }
 }

@@ -79,6 +79,11 @@ public class ServiceTicketDetailResponse {
     private Boolean isGuest;
     private Boolean safetyInspectionEnabled;
 
+    // Bán cho khách lẻ vãng lai: customer bên trên đã mang tên/SĐT ghi trên phiếu
+    // thay cho hồ sơ dùng chung "Khách lẻ"; địa chỉ chỉ có ở phiếu nên trả riêng
+    private Boolean isWalkIn;
+    private String walkInAddress;
+
     // Nhập bù phiếu ngày trước
     private EntryMode entryMode;
     private BackfillKind backfillKind;

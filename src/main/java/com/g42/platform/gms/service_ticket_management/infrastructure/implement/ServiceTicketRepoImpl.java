@@ -71,8 +71,12 @@ public class ServiceTicketRepoImpl implements ServiceTicketRepo {
     }
 
     @Override
-    public Page<ServiceTicket> findAll(TicketStatus status, LocalDate date, String search, TicketType ticketType, Pageable pageable) {
+    public Page<ServiceTicket> findAll(TicketStatus status, LocalDate date, String search, TicketType ticketType,
+                                       Boolean walkIn, Pageable pageable) {
         Specification<ServiceTicketJpa> spec = ServiceTicketSpecification.filter(date, status, ticketType);
+        if (walkIn != null) {
+            spec = spec.and(ServiceTicketSpecification.byWalkIn(walkIn));
+        }
         if (search != null && !search.isBlank()) {
             spec = spec.and(ServiceTicketSpecification.search(search));
         }

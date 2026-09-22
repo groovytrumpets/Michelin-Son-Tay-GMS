@@ -31,7 +31,9 @@ public interface ServiceTicketRepo {
 
     List<ServiceTicket> findAll();
 
-    Page<ServiceTicket> findAll(TicketStatus status, LocalDate date, String search, TicketType ticketType, Pageable pageable);
+    /** @param walkIn null = không lọc; true/false = chỉ phiếu bán lẻ khách vãng lai / phiếu khách có hồ sơ */
+    Page<ServiceTicket> findAll(TicketStatus status, LocalDate date, String search, TicketType ticketType,
+                                Boolean walkIn, Pageable pageable);
 
     Page<ServiceTicket> findByAssignedStaff(Integer staffId, TicketStatus status, LocalDate date, String search, Pageable pageable);
 

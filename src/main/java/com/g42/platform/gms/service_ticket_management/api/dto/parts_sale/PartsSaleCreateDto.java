@@ -22,4 +22,14 @@ public class PartsSaleCreateDto {
      * da sua de backend dung lai dung phieu cu thay vi tao phieu moi.
      */
     private Integer serviceTicketId;
+
+    /**
+     * Ban cho khach le vang lai: customerId phai la ho so dung chung "Khach le"
+     * (WalkInCustomerService), con ten/SDT/dia chi that duoc luu thang len phieu.
+     * Ten khach la bat buoc, hai truong con lai khong.
+     */
+    private Boolean walkIn;
+    private String walkInName;
+    private String walkInPhone;
+    private String walkInAddress;
 }

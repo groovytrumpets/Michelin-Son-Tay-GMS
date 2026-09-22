@@ -5,11 +5,13 @@ import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.service_ticket_management.api.dto.parts_sale.PartsSaleCreateDto;
 import com.g42.platform.gms.service_ticket_management.api.dto.parts_sale.PartsSaleTicketDto;
+import com.g42.platform.gms.service_ticket_management.api.dto.parts_sale.WalkInCustomerDto;
 import com.g42.platform.gms.service_ticket_management.application.service.PartsSaleService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -28,6 +30,15 @@ import org.springframework.web.bind.annotation.RestController;
 public class PartsSaleController {
 
     private final PartsSaleService partsSaleService;
+
+    /**
+     * Hồ sơ dùng chung "Khách lẻ" để lập báo giá cho lượt bán không lấy thông tin khách.
+     * Tự tạo hồ sơ ở lần gọi đầu tiên.
+     */
+    @GetMapping("/walk-in-customer")
+    public ResponseEntity<ApiResponse<WalkInCustomerDto>> getWalkInCustomer() {
+        return ResponseEntity.ok(ApiResponses.success(partsSaleService.getWalkInCustomer()));
+    }
 
     /** Giữ hàng cho báo giá và tạo phiếu HOLDING hiện ở màn quản lý phiếu bán. */
     @PostMapping("/hold")

@@ -58,6 +58,10 @@ public class ServiceTicketListResponse {
     private Boolean hasBill;
     private Integer billId;
 
+    // Bán cho khách lẻ vãng lai — FE gắn nhãn "Khách lẻ"; customerName/customerPhone
+    // ở trên đã được thay bằng tên/SĐT ghi trên phiếu, không phải của hồ sơ dùng chung
+    private Boolean isWalkIn;
+
     // Nhập bù phiếu ngày trước — FE gắn nhãn "Nhập bù" / "Chờ duyệt"
     private EntryMode entryMode;
     private BackfillKind backfillKind;

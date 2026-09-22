@@ -13,6 +13,7 @@ import com.g42.platform.gms.service_ticket_management.api.dto.assign.AssignStaff
 import com.g42.platform.gms.service_ticket_management.api.dto.assign.AvailableStaffDto;
 import com.g42.platform.gms.service_ticket_management.api.dto.parts_sale.PartsSaleCreateDto;
 import com.g42.platform.gms.service_ticket_management.api.dto.parts_sale.PartsSaleTicketDto;
+import com.g42.platform.gms.service_ticket_management.api.dto.parts_sale.WalkInCustomerDto;
 import com.g42.platform.gms.service_ticket_management.domain.entity.BackfillGuard;
 import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicket;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
@@ -21,6 +22,7 @@ import com.g42.platform.gms.service_ticket_management.domain.repository.ServiceT
 import com.g42.platform.gms.booking.customer.domain.entity.Booking;
 import com.g42.platform.gms.booking.customer.domain.enums.BookingStatus;
 import com.g42.platform.gms.booking.customer.domain.repository.BookingRepository;
+import com.g42.platform.gms.customer.application.service.WalkInCustomerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,11 +63,26 @@ public class PartsSaleService {
     private final StockAllocationService stockAllocationService;
     private final BillingService billingService;
     private final BookingRepository bookingRepository;
+    private final WalkInCustomerService walkInCustomerService;
 
     // Field injection: @Qualifier khong duoc Lombok copy sang constructor (repo khong co lombok.config)
     @Autowired
     @Qualifier("warehouseStockAllocationService")
     private com.g42.platform.gms.warehouse.app.service.allocation.StockAllocationService warehouseStockAllocationService;
+
+    /**
+     * Hồ sơ dùng chung "Khách lẻ" cho màn bán hàng: báo giá phải có customerId ngay
+     * từ lúc lập, nên FE lấy id này trước khi nhập dòng hàng cho khách vãng lai.
+     */
+    @Transactional
+    public WalkInCustomerDto getWalkInCustomer() {
+        var profile = walkInCustomerService.getOrCreateWalkInCustomer();
+        return new WalkInCustomerDto(
+                profile.getCustomerId(),
+                profile.getFullName(),
+                profile.getCustomerCode()
+        );
+    }
 
     /**
      * Giữ hàng cho một báo giá bán linh kiện.
@@ -82,6 +99,7 @@ public class PartsSaleService {
      */
     @Transactional
     public PartsSaleTicketDto holdPartsSale(PartsSaleCreateDto dto, Integer staffId) {
+        applyWalkInCustomer(dto);
         Estimate estimate = requireDraftEstimate(dto);
 
         ServiceTicket ticket = resolveHoldingTicket(dto, estimate, staffId);
@@ -181,6 +199,11 @@ public class PartsSaleService {
         dto.setCustomerId(ticket.getCustomerId());
         dto.setEstimateId(estimate.getId());
         dto.setNote(ticket.getCustomerRequest());
+        // Chốt phiếu khách lẻ mở lại từ màn quản lý: giữ nguyên thông tin đã ghi trên phiếu
+        dto.setWalkIn(Boolean.TRUE.equals(ticket.getIsWalkIn()));
+        dto.setWalkInName(ticket.getWalkInName());
+        dto.setWalkInPhone(ticket.getWalkInPhone());
+        dto.setWalkInAddress(ticket.getWalkInAddress());
         return createPartsSale(dto, staffId);
     }
 
@@ -280,6 +303,42 @@ public class PartsSaleService {
         );
     }
 
+    /**
+     * Phiếu bán cho khách lẻ vãng lai: ép customerId về hồ sơ dùng chung "Khách lẻ"
+     * để không có hồ sơ rác nào được tạo, và bắt buộc phải có tên người mua — bán
+     * không lấy thông tin vẫn phải biết phiếu này bán cho ai.
+     */
+    private void applyWalkInCustomer(PartsSaleCreateDto dto) {
+        if (!Boolean.TRUE.equals(dto.getWalkIn())) {
+            return;
+        }
+        String name = dto.getWalkInName() == null ? "" : dto.getWalkInName().trim();
+        if (name.isEmpty()) {
+            throw new RuntimeException("Phiếu bán khách lẻ phải có tên khách hàng");
+        }
+        dto.setWalkInName(name);
+        dto.setCustomerId(walkInCustomerService.getOrCreateWalkInCustomer().getCustomerId());
+    }
+
+    /** Ghi tên/SĐT/địa chỉ khách lẻ lên phiếu; sửa rồi lưu lại thì cập nhật theo bản mới. */
+    private void applyWalkInInfo(ServiceTicket ticket, PartsSaleCreateDto dto) {
+        if (!Boolean.TRUE.equals(dto.getWalkIn())) {
+            return;
+        }
+        ticket.setIsWalkIn(true);
+        ticket.setWalkInName(dto.getWalkInName());
+        ticket.setWalkInPhone(trimToNull(dto.getWalkInPhone()));
+        ticket.setWalkInAddress(trimToNull(dto.getWalkInAddress()));
+    }
+
+    private static String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
     private Estimate requireDraftEstimate(PartsSaleCreateDto dto) {
         if (dto.getCustomerId() == null) {
             throw new RuntimeException("Thiếu thông tin khách hàng (customerId)");
@@ -321,6 +380,12 @@ public class PartsSaleService {
                 if (linked.getTicketStatus() == TicketStatus.HOLDING
                         || linked.getTicketStatus() == TicketStatus.COMPLETED) {
                     attachBookingIfNeeded(linked, dto.getBookingId());
+                    // Sửa tên/SĐT khách lẻ rồi bấm lưu lại: cập nhật ngay trên phiếu cũ
+                    if (Boolean.TRUE.equals(dto.getWalkIn())) {
+                        applyWalkInInfo(linked, dto);
+                        linked.setUpdatedAt(LocalDateTime.now());
+                        return serviceTicketRepo.save(linked);
+                    }
                     return linked;
                 }
                 throw new RuntimeException("Báo giá đã gắn vào phiếu " + linked.getTicketCode()
@@ -389,6 +454,7 @@ public class PartsSaleService {
         ticket.initializeDefaults();
         ticket.setTicketType(TicketType.PARTS_SALE);
         ticket.setTicketStatus(TicketStatus.HOLDING);
+        applyWalkInInfo(ticket, dto);
         ServiceTicket saved = serviceTicketRepo.save(ticket);
         log.info("Created parts-sale holding ticket {} (id={})", saved.getTicketCode(), saved.getServiceTicketId());
 

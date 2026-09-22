@@ -133,3 +133,6 @@ databaseChangeLog:
   - include:
       file: changes/041-document-template-blocks.yaml
       relativeToChangelogFile: true
+  - include:
+      file: changes/042-parts-sale-walk-in.yaml
+      relativeToChangelogFile: true

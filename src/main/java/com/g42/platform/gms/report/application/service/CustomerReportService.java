@@ -130,12 +130,16 @@ public class CustomerReportService {
             boolean paid = (bill != null && bill.getPaymentStatus() == PaymentStatus.PAID)
                     || ticket.getTicketStatus() == TicketStatus.PAID;
 
+            // Phiếu bán lẻ khách vãng lai: hồ sơ gắn vào là hồ sơ dùng chung "Khách lẻ",
+            // tên/SĐT thật nằm trên phiếu.
+            boolean walkIn = Boolean.TRUE.equals(ticket.getIsWalkIn());
+
             TicketRow row = TicketRow.builder()
                     .serviceTicketId(ticket.getServiceTicketId())
                     .ticketCode(nz(ticket.getTicketCode()))
                     .date(ticket.getReceivedAt() != null ? ticket.getReceivedAt().toLocalDate() : from)
-                    .customerName(customer != null ? nz(customer.getFullName()) : "")
-                    .customerPhone(customer != null ? nz(customer.getPhone()) : "")
+                    .customerName(walkIn ? nz(ticket.getWalkInName()) : (customer != null ? nz(customer.getFullName()) : ""))
+                    .customerPhone(walkIn ? nz(ticket.getWalkInPhone()) : (customer != null ? nz(customer.getPhone()) : ""))
                     .licensePlate(vehicle != null ? nz(vehicle.getLicensePlate()) : "")
                     .ticketStatus(ticket.getTicketStatus() != null ? ticket.getTicketStatus().name() : "")
                     .ticketType(ticket.getTicketType() != null ? ticket.getTicketType().name() : "")
@@ -146,7 +150,10 @@ public class CustomerReportService {
                     .source(SOURCE_SYSTEM)
                     .amountMismatch(false)
                     .build();
-            keyedRows.add(new KeyedRow(row, customerKey(customer, ticket.getCustomerId()), ticket.getCustomerId(), false));
+            // Mỗi phiếu khách lẻ là một lượt khách khác nhau, dù chung một hồ sơ — gom
+            // theo hồ sơ sẽ biến cả tháng bán lẻ thành đúng một khách.
+            String key = walkIn ? "w:" + ticket.getServiceTicketId() : customerKey(customer, ticket.getCustomerId());
+            keyedRows.add(new KeyedRow(row, key, ticket.getCustomerId(), false));
         }
 
         for (LegacyVisitJpa visit : legacyVisits) {

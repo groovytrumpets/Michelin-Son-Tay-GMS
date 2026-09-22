@@ -44,7 +44,9 @@ public class ServiceTicketManageController {
             @RequestParam(required = false) LocalDate date,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String search,
-            @RequestParam(required = false) String ticketType) {
+            @RequestParam(required = false) String ticketType,
+            // null = tất cả; true = chỉ phiếu bán lẻ khách vãng lai
+            @RequestParam(required = false) Boolean walkIn) {
 
         TicketStatus ticketStatus = null;
         if (status != null && !status.isBlank()) {
@@ -55,7 +57,7 @@ public class ServiceTicketManageController {
             try { type = TicketType.valueOf(ticketType.toUpperCase()); } catch (IllegalArgumentException ignored) {}
         }
         return ResponseEntity.ok(ApiResponses.success(
-            serviceTicketManageService.getServiceTicketList(page, size, date, ticketStatus, search, type)));
+            serviceTicketManageService.getServiceTicketList(page, size, date, ticketStatus, search, type, walkIn)));
     }
 
     @GetMapping("/tickets/{ticketCode}")

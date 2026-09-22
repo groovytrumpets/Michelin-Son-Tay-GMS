@@ -111,15 +111,16 @@ public class ServiceTicketManageService {
             LocalDate date,
             TicketStatus status,
             String search,
-            TicketType ticketType) {
+            TicketType ticketType,
+            Boolean walkIn) {
 
-        log.info("Getting service ticket list: page={}, size={}, date={}, status={}, search={}, ticketType={}",
-                page, size, date, status, search, ticketType);
+        log.info("Getting service ticket list: page={}, size={}, date={}, status={}, search={}, ticketType={}, walkIn={}",
+                page, size, date, status, search, ticketType, walkIn);
 
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "receivedAt"));
 
 
-        Page<ServiceTicket> ticketPage = serviceTicketRepo.findAll(status, date, search, ticketType, pageable);
+        Page<ServiceTicket> ticketPage = serviceTicketRepo.findAll(status, date, search, ticketType, walkIn, pageable);
         return ticketPage.map(this::mapToListResponse);
     }
 
@@ -164,6 +165,14 @@ public class ServiceTicketManageService {
 
 
         ServiceTicketListResponse response = listMapper.toManageListResponse(ticket, customer, vehicle, booking);
+        // Phiếu bán khách lẻ: hồ sơ gắn vào là hồ sơ dùng chung "Khách lẻ", người mua
+        // thật chỉ có trên phiếu nên phải thay vào đây, nếu không cả màn quản lý sẽ
+        // toàn một cái tên giống nhau.
+        if (Boolean.TRUE.equals(ticket.getIsWalkIn())) {
+            response.setIsWalkIn(true);
+            response.setCustomerName(ticket.getWalkInName());
+            response.setCustomerPhone(ticket.getWalkInPhone());
+        }
         ServiceBill bill = billingRepository.getBillingByServiceTicket(ticket.getServiceTicketId());
         response.setHasBill(bill != null);
         response.setBillId(bill != null ? bill.getBillId() : null);
@@ -209,6 +218,16 @@ public class ServiceTicketManageService {
         CustomerProfile customer = customerRepository.findById(ticket.getCustomerId())
                 .orElseThrow(() -> new CheckInException("Không tìm thấy khách hàng"));
         response.setCustomer(detailMapper.toManageCustomerInfo(customer));
+        // Phiếu bán khách lẻ: hiện tên/SĐT ghi trên phiếu thay cho hồ sơ dùng chung
+        if (Boolean.TRUE.equals(ticket.getIsWalkIn())) {
+            response.setIsWalkIn(true);
+            response.setWalkInAddress(ticket.getWalkInAddress());
+            if (response.getCustomer() != null) {
+                response.getCustomer().setFullName(ticket.getWalkInName());
+                response.getCustomer().setPhone(ticket.getWalkInPhone());
+                response.getCustomer().setEmail(null);
+            }
+        }
 
         // Vehicle info — phiếu bán linh kiện (PARTS_SALE) không gắn xe
         if (ticket.getVehicleId() != null) {

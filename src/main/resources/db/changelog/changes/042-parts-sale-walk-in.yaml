@@ -1,0 +1,44 @@
+# Bán cho khách lẻ (khách vãng lai không để lại thông tin) ở /parts-sales.
+#
+# Khách lẻ không có hồ sơ riêng trong danh bạ: mọi phiếu loại này trỏ chung về một
+# hồ sơ hệ thống "Khách lẻ" (customer_profile.customer_code = KHACH_LE, do
+# WalkInCustomerService tự tạo lần đầu), còn tên/SĐT/địa chỉ của từng lượt bán được
+# chụp lại ngay trên phiếu. Nhờ vậy danh bạ không phình ra một hồ sơ chỉ-có-tên cho
+# mỗi lần bán, mà từng phiếu vẫn hiện đúng tên người mua.
+#
+# Phiếu khách lẻ vẫn là PARTS_SALE và vẫn đi đúng vòng đời HOLDING → COMPLETED → PAID;
+# is_walk_in chỉ là dấu phân loại để hiện nhãn riêng và lọc riêng ở màn quản lý phiếu bán.
+databaseChangeLog:
+  - changeSet:
+      id: 042-1-service-ticket-add-walk-in-columns
+      author: gms
+      comment: Thêm cột đánh dấu + thông tin khách lẻ vãng lai vào service_ticket
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: service_ticket
+                columnName: is_walk_in
+      changes:
+        - addColumn:
+            tableName: service_ticket
+            columns:
+              - column:
+                  name: is_walk_in
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+                  remarks: true = phiếu bán cho khách lẻ vãng lai, thông tin khách nằm ở các cột walk_in_* bên dưới
+              - column:
+                  name: walk_in_name
+                  type: VARCHAR(255)
+                  remarks: Tên người mua ghi trên phiếu (bắt buộc với phiếu khách lẻ), thay cho tên hồ sơ dùng chung
+              - column:
+                  name: walk_in_phone
+                  type: VARCHAR(30)
+                  remarks: SĐT người mua, không bắt buộc và không dùng để định danh khách
+              - column:
+                  name: walk_in_address
+                  type: VARCHAR(500)
+                  remarks: Địa chỉ người mua, không bắt buộc

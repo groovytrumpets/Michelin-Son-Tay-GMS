@@ -62,6 +62,20 @@ public class ServiceTicketSpecification {
     }
     
     /**
+     * Lọc theo phiếu bán lẻ khách vãng lai (is_walk_in).
+     *
+     * Phiếu cũ tạo trước changeset 042 có cột này mặc định false nên không lọt vào
+     * nhóm khách lẻ.
+     *
+     * @param walkIn true = chỉ phiếu khách lẻ, false = chỉ phiếu khách có hồ sơ
+     */
+    public static Specification<ServiceTicketJpa> byWalkIn(boolean walkIn) {
+        return (root, query, cb) -> walkIn
+                ? cb.isTrue(root.get("isWalkIn"))
+                : cb.or(cb.isFalse(root.get("isWalkIn")), cb.isNull(root.get("isWalkIn")));
+    }
+
+    /**
      * Filter service tickets theo staffId (qua bảng service_ticket_assignment).
      *
      * @param staffId ID của kỹ thuật viên

@@ -140,6 +140,21 @@ public class ServiceTicketJpa {
     @Column(name = "backfill_review_note", length = 500)
     private String backfillReviewNote;
 
+    // ===== Bán cho khách lẻ vãng lai (Liquibase 042) =====
+    // customer_id trỏ về hồ sơ dùng chung "Khách lẻ"; tên/SĐT/địa chỉ thật của lượt
+    // bán nằm ở đây nên mỗi phiếu vẫn giữ được người mua riêng của nó.
+    @Column(name = "is_walk_in", nullable = false)
+    private Boolean isWalkIn = false;
+
+    @Column(name = "walk_in_name")
+    private String walkInName;
+
+    @Column(name = "walk_in_phone", length = 30)
+    private String walkInPhone;
+
+    @Column(name = "walk_in_address", length = 500)
+    private String walkInAddress;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
