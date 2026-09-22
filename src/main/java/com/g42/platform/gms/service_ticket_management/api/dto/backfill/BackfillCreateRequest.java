@@ -48,7 +48,11 @@ public class BackfillCreateRequest {
     private String paymentMethod;
     private String note;
 
-    /** Cố vấn / KTV đã làm (phiếu sửa xe) — phân công lúc duyệt. */
+    /**
+     * Người đã làm, phân công lúc duyệt. Phiếu sửa xe: cố vấn (tuỳ chọn) + KTV (bắt buộc;
+     * nhập thiếu dòng mà bỏ trống thì lấy theo phiếu gốc). Phiếu bán hàng: advisorId là
+     * người bán — bỏ trống thì gán người nhập; technicianId bị bỏ qua.
+     */
     private Integer advisorId;
     private Integer technicianId;
 

@@ -22,4 +22,9 @@ public class BackfillParentDto {
     private String licensePlate;
     private LocalDateTime receivedAt;
     private LocalDateTime deliveredAt;
+    /** Cố vấn / KTV đã làm phiếu gốc — FE điền sẵn cho phiếu nhập thiếu dòng. */
+    private Integer advisorId;
+    private String advisorName;
+    private Integer technicianId;
+    private String technicianName;
 }

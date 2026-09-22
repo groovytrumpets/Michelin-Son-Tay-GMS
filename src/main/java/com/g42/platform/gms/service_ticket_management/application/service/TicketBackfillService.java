@@ -27,12 +27,16 @@ import com.g42.platform.gms.service_ticket_management.api.dto.backfill.BackfillP
 import com.g42.platform.gms.service_ticket_management.api.dto.backfill.BackfillStaffStatDto;
 import com.g42.platform.gms.service_ticket_management.api.dto.backfill.BackfillTicketDto;
 import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicket;
+import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicketAssignment;
+import com.g42.platform.gms.service_ticket_management.domain.enums.AssignmentStatus;
 import com.g42.platform.gms.service_ticket_management.domain.enums.BackfillKind;
 import com.g42.platform.gms.service_ticket_management.domain.enums.BackfillReviewStatus;
 import com.g42.platform.gms.service_ticket_management.domain.enums.EntryMode;
+import com.g42.platform.gms.service_ticket_management.domain.enums.RoleInTicket;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketType;
 import com.g42.platform.gms.service_ticket_management.domain.repository.ServiceTicketRepo;
+import com.g42.platform.gms.service_ticket_management.domain.repository.TicketAssignmentRepo;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
 import com.g42.platform.gms.service_ticket_management.infrastructure.repository.ServiceTicketRepository;
 import com.g42.platform.gms.staff.profile.infrastructure.entity.StaffProfileJpa;
@@ -54,6 +58,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -103,6 +108,7 @@ public class TicketBackfillService {
     private final CustomerProfileRepository customerRepository;
     private final VehicleRepository vehicleRepository;
     private final StaffProileJpaRepo staffProfileRepo;
+    private final TicketAssignmentRepo ticketAssignmentRepo;
 
     // Field injection: @Qualifier khong duoc Lombok copy sang constructor (repo khong co lombok.config)
     @Autowired
@@ -144,8 +150,9 @@ public class TicketBackfillService {
         Estimate estimate = requireFreshDraftEstimate(req.getEstimateId());
 
         ServiceTicket ticket = new ServiceTicket();
+        ServiceTicketJpa parent = null;
         if (kind == BackfillKind.SUPPLEMENT) {
-            ServiceTicketJpa parent = requireSupplementableParent(req.getParentTicketId());
+            parent = requireSupplementableParent(req.getParentTicketId());
             ticket.setTicketType(parent.getTicketType());
             ticket.setCustomerId(parent.getCustomerId());
             ticket.setVehicleId(parent.getVehicleId());
@@ -165,9 +172,23 @@ public class TicketBackfillService {
             }
         }
 
+        // Người đã làm: nhập thiếu dòng mà bỏ trống thì lấy theo phiếu gốc (cùng một lượt xe vào)
+        Integer advisorId = req.getAdvisorId();
+        Integer technicianId = req.getTechnicianId();
+        if (parent != null) {
+            if (advisorId == null) {
+                advisorId = findAssignedStaffId(parent.getServiceTicketId(), RoleInTicket.ADVISOR);
+            }
+            if (technicianId == null) {
+                technicianId = findAssignedStaffId(parent.getServiceTicketId(), RoleInTicket.TECHNICIAN);
+            }
+        }
+        ticket.setBackfillAdvisorId(validateStaffRole(advisorId, "ADVISOR", "cố vấn"));
         if (ticket.getTicketType() == TicketType.SERVICE) {
-            ticket.setBackfillAdvisorId(validateStaffRole(req.getAdvisorId(), "ADVISOR", "cố vấn"));
-            ticket.setBackfillTechnicianId(validateStaffRole(req.getTechnicianId(), "TECHNICIAN", "kỹ thuật viên"));
+            if (technicianId == null) {
+                throw new IllegalArgumentException("Phiếu sửa xe nhập bù phải chọn kỹ thuật viên đã sửa xe.");
+            }
+            ticket.setBackfillTechnicianId(validateStaffRole(technicianId, "TECHNICIAN", "kỹ thuật viên"));
         }
 
         ticket.setBookingId(null);
@@ -373,6 +394,12 @@ public class TicketBackfillService {
         }
         dto.setReceivedAt(parent.getReceivedAt());
         dto.setDeliveredAt(parent.getDeliveredAt());
+        Integer advisorId = findAssignedStaffId(parent.getServiceTicketId(), RoleInTicket.ADVISOR);
+        Integer technicianId = findAssignedStaffId(parent.getServiceTicketId(), RoleInTicket.TECHNICIAN);
+        dto.setAdvisorId(advisorId);
+        dto.setAdvisorName(staffName(advisorId));
+        dto.setTechnicianId(technicianId);
+        dto.setTechnicianName(staffName(technicianId));
         return dto;
     }
 
@@ -651,6 +678,21 @@ public class TicketBackfillService {
                         t.getEntryMode() == null ? EntryMode.NORMAL.name() : t.getEntryMode().name(),
                         t.getReceivedAt()))
                 .toList();
+    }
+
+    /**
+     * Người đã làm một vai trò trên phiếu (bỏ qua phân công đã huỷ) — ưu tiên người chính,
+     * sau đó người được phân công muộn nhất. Phiếu gốc đã thanh toán nên phân công thường là DONE.
+     */
+    private Integer findAssignedStaffId(Integer ticketId, RoleInTicket role) {
+        return ticketAssignmentRepo.findByTicketId(ticketId).stream()
+                .filter(a -> a.getRoleInTicket() == role && a.getStatus() != AssignmentStatus.CANCELLED)
+                .max(Comparator
+                        .comparing((ServiceTicketAssignment a) -> Boolean.TRUE.equals(a.getIsPrimary()))
+                        .thenComparing(ServiceTicketAssignment::getAssignedAt,
+                                Comparator.nullsFirst(Comparator.naturalOrder())))
+                .map(ServiceTicketAssignment::getStaffId)
+                .orElse(null);
     }
 
     private String staffName(Integer staffId) {
