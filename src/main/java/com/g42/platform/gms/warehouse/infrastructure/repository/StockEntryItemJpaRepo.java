@@ -175,4 +175,42 @@ public interface StockEntryItemJpaRepo extends JpaRepository<StockEntryItemJpa, 
     List<com.g42.platform.gms.warehouse.api.dto.WarehouseLotDto> findWarehouseLots(
             @Param("warehouseId") Integer warehouseId,
             @Param("itemId") Integer itemId);
+
+    /**
+     * Bản gộp của findWarehouseLots cho cả một trang danh mục (1 query thay vì
+     * 1 query cho mỗi cặp kho × vật tư). Mỗi dòng:
+     * [warehouseId, itemId, entryItemId, entryId, entryCode, quantity, remainingQuantity,
+     *  importPrice, markupMultiplier, markupMultiplierWholesale, entryDate, expiryDate]
+     */
+    @Query("""
+    SELECT se.warehouseId, sei.itemId, sei.entryItemId, sei.entryId, se.entryCode,
+           sei.quantity, sei.remainingQuantity, sei.importPrice,
+           sei.markupMultiplier, sei.markupMultiplierWholesale, se.entryDate, sei.expiryDate
+    FROM StockEntryItemJpa sei
+    JOIN StockEntryJpa se ON se.entryId = sei.entryId
+    WHERE sei.itemId IN :itemIds
+      AND sei.remainingQuantity > 0
+      AND se.status = com.g42.platform.gms.warehouse.domain.enums.StockEntryStatus.CONFIRMED
+    ORDER BY sei.entryItemId ASC
+    """)
+    List<Object[]> findWarehouseLotRowsByItemIds(@Param("itemIds") java.util.Collection<Integer> itemIds);
+
+    /**
+     * Bản gộp của findLatestLot: lô CONFIRMED mới nhất (entryItemId lớn nhất) của
+     * từng cặp kho × vật tư. Mỗi dòng: [warehouseId, itemId, importPrice, markupMultiplier]
+     */
+    @Query("""
+    SELECT se.warehouseId, sei.itemId, sei.importPrice, sei.markupMultiplier
+    FROM StockEntryItemJpa sei
+    JOIN StockEntryJpa se ON se.entryId = sei.entryId
+    WHERE sei.entryItemId IN (
+        SELECT MAX(sei2.entryItemId)
+        FROM StockEntryItemJpa sei2
+        JOIN StockEntryJpa se2 ON se2.entryId = sei2.entryId
+        WHERE sei2.itemId IN :itemIds
+          AND se2.status = com.g42.platform.gms.warehouse.domain.enums.StockEntryStatus.CONFIRMED
+        GROUP BY se2.warehouseId, sei2.itemId
+    )
+    """)
+    List<Object[]> findLatestLotRowsByItemIds(@Param("itemIds") java.util.Collection<Integer> itemIds);
 }

@@ -9,6 +9,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -51,6 +52,14 @@ public class WarehousePricingRepoImpl implements WarehousePricingRepo {
     public Optional<WarehousePricing> findByItemIdAndWarehouseId(Integer itemId, Integer warehouseId) {
         return jpaRepo.findByWarehouseIdAndItemIdAndIsActiveTrue(warehouseId, itemId)
                 .map(this::toDomain);
+    }
+
+    @Override
+    public List<WarehousePricing> findActiveByItemIds(Collection<Integer> itemIds) {
+        if (itemIds == null || itemIds.isEmpty()) return List.of();
+        return jpaRepo.findByItemIdInAndIsActiveTrue(itemIds).stream()
+                .map(this::toDomain)
+                .toList();
     }
 
     @Override

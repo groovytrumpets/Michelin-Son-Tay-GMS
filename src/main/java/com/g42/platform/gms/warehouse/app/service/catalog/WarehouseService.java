@@ -286,6 +286,30 @@ public class WarehouseService {
         } else {
             itemWarehouseMap = new HashMap<>();
         }
+
+        // Tải sẵn giá kho + lô hàng cho CẢ trang bằng 3 query, thay vì ~5 query cho mỗi
+        // cặp kho × vật tư (trang 500 dòng từng tốn hàng nghìn query, ~6-7 giây).
+        Map<WarehouseItemKey, WarehousePricing> pricingMap = new HashMap<>();
+        Map<WarehouseItemKey, List<WarehouseLotDto>> lotsMap = new HashMap<>();
+        Map<WarehouseItemKey, Object[]> latestLotMap = new HashMap<>();
+        if (!itemIds.isEmpty()) {
+            for (WarehousePricing p : warehousePricingRepo.findActiveByItemIds(itemIds)) {
+                pricingMap.putIfAbsent(new WarehouseItemKey(p.getWarehouseId(), p.getItemId()), p);
+            }
+            for (Object[] r : stockEntryItemJpaRepo.findWarehouseLotRowsByItemIds(itemIds)) {
+                WarehouseLotDto lot = new WarehouseLotDto(
+                        (Integer) r[2], (Integer) r[3], (String) r[4],
+                        (BigDecimal) r[5], (BigDecimal) r[6], (BigDecimal) r[7],
+                        (BigDecimal) r[8], (BigDecimal) r[9],
+                        (java.time.LocalDate) r[10], (java.time.LocalDate) r[11],
+                        null, null);
+                lotsMap.computeIfAbsent(new WarehouseItemKey((Integer) r[0], (Integer) r[1]), k -> new ArrayList<>()).add(lot);
+            }
+            for (Object[] r : stockEntryItemJpaRepo.findLatestLotRowsByItemIds(itemIds)) {
+                latestLotMap.put(new WarehouseItemKey((Integer) r[0], (Integer) r[1]), r);
+            }
+        }
+
         return catalogItems.map(catalogItem -> {
             CatalogWarehouseDto dto = catalogDtoMapper.toSumaryWarehouseDto(catalogItem);
             if (catalogItem.getBrandId() != null) {
@@ -300,27 +324,18 @@ public class WarehouseService {
             List<WarehouseDetailDto> details = itemWarehouseMap.getOrDefault(catalogItem.getItemId(), new ArrayList<>());
             dto.setWarehouseDetails(details);
             for (WarehouseDetailDto detail : details) {
-                // Gọi PricingService, truyền sẵn Lớp 1 (detail.getSellingPrice())
-                // và Lớp 2 (catalogItem.getPrice()) vào để tối ưu hiệu năng.
-                PricingResolve pricingResolve = pricingService.getEffectivePrice(
-                        catalogItem.getItemId(),
-                        detail.getWarehouseId(),
-                        catalogItem.getPrice()
-                );
-                // Set giá trị cuối cùng vào DTO (Bạn nhớ thêm thuộc tính effectivePrice vào WarehouseDetailDto nhé)
+                WarehouseItemKey key = new WarehouseItemKey(detail.getWarehouseId(), catalogItem.getItemId());
+                WarehousePricing pricing = pricingMap.get(key);
+
+                PricingResolve pricingResolve = resolveEffectivePrice(catalogItem, detail.getWarehouseId(), pricing, latestLotMap.get(key));
                 detail.setSellingPrice(pricingResolve.getFinalPrice());
                 detail.setNotify(pricingResolve.getNotify());
 
-                // Query các lô hàng cho kho và vật tư này
-                List<WarehouseLotDto> lots = stockEntryItemJpaRepo.findWarehouseLots(detail.getWarehouseId(), catalogItem.getItemId());
+                List<WarehouseLotDto> lots = lotsMap.getOrDefault(key, new ArrayList<>());
 
                 // Lấy cấu hình giá bán cố định nếu có
-                BigDecimal warehouseSellingPrice = warehousePricingRepo.findActiveByWarehouseAndItem(detail.getWarehouseId(), catalogItem.getItemId())
-                        .map(WarehousePricing::getSellingPrice)
-                        .orElse(null);
-                BigDecimal warehouseSellingPriceWholesale = warehousePricingRepo.findActiveByWarehouseAndItem(detail.getWarehouseId(), catalogItem.getItemId())
-                        .map(WarehousePricing::getSellingPriceWholesale)
-                        .orElse(null);
+                BigDecimal warehouseSellingPrice = pricing != null ? pricing.getSellingPrice() : null;
+                BigDecimal warehouseSellingPriceWholesale = pricing != null ? pricing.getSellingPriceWholesale() : null;
 
                 for (WarehouseLotDto lot : lots) {
                     BigDecimal lotSellingPrice;
@@ -351,5 +366,45 @@ public class WarehouseService {
             }
             return dto;
         });
+    }
+
+    private record WarehouseItemKey(Integer warehouseId, Integer itemId) {}
+
+    /**
+     * Cùng thứ tự ưu tiên với PricingService.getEffectivePrice nhưng dùng dữ liệu đã tải sẵn:
+     * 1. giá cài đặt ở warehouse_pricing, 2. giá nhập lô mới nhất × hệ số, 3. giá niêm yết.
+     * Lô mới nhất thiếu hệ số (phải tra cấu hình fallback theo loại hàng) thì gọi lại
+     * PricingService — trường hợp hiếm nên không đáng gộp.
+     */
+    private PricingResolve resolveEffectivePrice(CatalogItem catalogItem, Integer warehouseId,
+                                                 WarehousePricing pricing, Object[] latestLot) {
+        PricingResolve resolve = new PricingResolve();
+        if (pricing != null && pricing.getSellingPrice() != null
+                && pricing.getSellingPrice().compareTo(BigDecimal.ZERO) > 0) {
+            resolve.setFinalPrice(pricing.getSellingPrice());
+            resolve.setNotify("Đang dùng giá cài đặt sẵn");
+            return resolve;
+        }
+        if (latestLot != null) {
+            BigDecimal importPrice = (BigDecimal) latestLot[2];
+            BigDecimal multiplier = (BigDecimal) latestLot[3];
+            if (importPrice == null || multiplier == null) {
+                return pricingService.getEffectivePrice(catalogItem.getItemId(), warehouseId, catalogItem.getPrice());
+            }
+            BigDecimal lotPrice = importPrice.multiply(multiplier);
+            if (lotPrice.compareTo(BigDecimal.ZERO) > 0) {
+                resolve.setFinalPrice(lotPrice);
+                return resolve;
+            }
+        }
+        BigDecimal price = catalogItem.getPrice();
+        if (price != null && price.compareTo(BigDecimal.ZERO) > 0) {
+            resolve.setFinalPrice(price);
+            resolve.setNotify("Đang dùng giá niêm yết của sản phẩm");
+            return resolve;
+        }
+        resolve.setFinalPrice(BigDecimal.ZERO);
+        resolve.setNotify("Không tìm thấy giá phù hợp trong cơ sở dữ liệu");
+        return resolve;
     }
 }

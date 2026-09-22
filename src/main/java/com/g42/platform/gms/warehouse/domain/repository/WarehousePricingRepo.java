@@ -4,6 +4,7 @@ import com.g42.platform.gms.warehouse.domain.entity.WarehousePricing;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -34,6 +35,9 @@ public interface WarehousePricingRepo {
     Optional<WarehousePricing> findByItemIdAndWarehouseId(Integer itemId, Integer warehouseId);
 
     Optional<WarehousePricing> findById(Integer pricingId);
+
+    /** Toàn bộ pricing đang active của nhiều item cùng lúc (mọi kho) — tránh N+1 khi dựng danh sách. */
+    List<WarehousePricing> findActiveByItemIds(Collection<Integer> itemIds);
 
     WarehousePricing save(WarehousePricing pricing);
 }

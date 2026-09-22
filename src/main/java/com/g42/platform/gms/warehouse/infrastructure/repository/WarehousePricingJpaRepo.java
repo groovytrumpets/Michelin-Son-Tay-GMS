@@ -29,6 +29,8 @@ public interface WarehousePricingJpaRepo extends JpaRepository<WarehousePricingJ
                         Pageable pageable);
 
     java.util.Optional<WarehousePricingJpa> findByWarehouseIdAndItemIdAndIsActiveTrue(Integer warehouseId, Integer itemId);
+
+    List<WarehousePricingJpa> findByItemIdInAndIsActiveTrue(java.util.Collection<Integer> itemIds);
     @Query("""
     select wp from WarehousePricingJpa wp where wp.itemId=:itemId and wp.warehouseId=:warehouseId and wp.isActive=true 
         """)
