@@ -61,6 +61,10 @@ public class EstimateItem {
     private BigDecimal laborCost;
     private String note;
     private BigDecimal discountPercent;
+    /** NORMAL | TRADE_IN — xem EstimateLineType. */
+    private String lineType;
+    /** Số tiền giảm giá nhập tay của dòng (không qua mã). */
+    private BigDecimal manualDiscountAmount;
     /** Mảng JSON serial_id đã chọn cho dòng. */
     private String serialIdsJson;
 

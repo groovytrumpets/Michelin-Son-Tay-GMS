@@ -84,7 +84,8 @@ public class StockAllocationService {
                     .filter(newItem -> newItem.getIsRemoved()==false)
                     .toList();
             List<EstimateItem> sortedItems = brandNewItems.stream()
-                    .sorted(Comparator.comparing(EstimateItem::getItemId))
+                    // Dòng gõ tay / thu mua của khách không có itemId — xếp cuối thay vì NPE
+                    .sorted(Comparator.comparing(EstimateItem::getItemId, Comparator.nullsLast(Comparator.naturalOrder())))
                     .toList();
             for (EstimateItem newItem : sortedItems) {
                 boolean hasAllocationInChain = false;

@@ -1,0 +1,94 @@
+# Bảng báo giá (/service-ticket-detail, /create-booking, /parts-sales) thêm hai thứ:
+#
+# 1. Dòng "Thu mua / thanh lý": gara mua lại linh kiện cũ của khách và trừ thẳng vào
+#    phiếu. Là một dòng báo giá bình thường (tên, SL, đơn giá dương) nhưng line_type =
+#    TRADE_IN nên final_price = -(SL x đơn giá): không thuế, không kho, không áp mã giảm
+#    giá. Tổng phiếu ĐƯỢC PHÉP ÂM (gara trả tiền khách) — người dùng đã chốt như vậy.
+#
+# 2. Giảm giá tay theo từng dòng, không cần mã. Người dùng gõ số tiền hoặc %:
+#    - % nằm ở cột discount_percent (đã có từ changeset 003 nhưng chưa dùng tới).
+#    - manual_discount_amount là số tiền giảm tay thực tế của dòng (tính từ % nếu gõ %).
+#    discount_amount vẫn là "tổng giảm đang hiển thị" của dòng như trước; tách riêng
+#    cột giảm tay để huỷ mã giảm giá không xoá mất phần giảm tay và ngược lại.
+#    Chỉ vai trò có quyền SERVICE_TICKET_DISCOUNT mới được đặt/sửa giảm giá tay.
+databaseChangeLog:
+  - changeSet:
+      id: 043-1-estimate-item-line-type-manual-discount
+      author: gms
+      comment: Thêm loại dòng (NORMAL/TRADE_IN) và số tiền giảm giá tay cho dòng báo giá
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: estimate_item
+                columnName: line_type
+      changes:
+        - addColumn:
+            tableName: estimate_item
+            columns:
+              - column:
+                  name: line_type
+                  type: VARCHAR(20)
+                  defaultValue: NORMAL
+                  constraints:
+                    nullable: false
+                  remarks: NORMAL = dòng hàng/dịch vụ; TRADE_IN = gara thu mua linh kiện của khách, thành tiền âm
+              - column:
+                  name: manual_discount_amount
+                  type: DECIMAL(12,2)
+                  remarks: Số tiền giảm giá nhập tay (không qua mã). Gõ % thì đây là số tiền tính ra từ discount_percent
+      rollback:
+        - dropColumn:
+            tableName: estimate_item
+            columnName: manual_discount_amount
+        - dropColumn:
+            tableName: estimate_item
+            columnName: line_type
+
+  - changeSet:
+      id: 043-2-permission-service-ticket-discount
+      author: gms
+      comment: >-
+        Mã quyền giảm giá tay trên dòng báo giá. ADMIN không cần gán vì PermissionResolver suy ra
+        là toàn quyền; mặc định chỉ cấp MANAGER (quy tắc "toàn bộ trừ vài module" ở 038 chỉ chạy
+        một lần lúc cài đặt nên phải gán tay). Vai trò khác bật thêm ở /role-permission-config.
+        Ghi vào cả role_permission_default để nút "Khôi phục mặc định" không làm mất quyền này.
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: "0"
+            sql: SELECT COUNT(*) FROM permission WHERE code = 'SERVICE_TICKET_DISCOUNT'
+      changes:
+        - sql:
+            splitStatements: false
+            sql: >-
+              INSERT INTO permission (code, module_code, module_label, group_label, action_code, label, description, sort_order) VALUES
+              ('SERVICE_TICKET_DISCOUNT','SERVICE_TICKET','Phiếu dịch vụ','Dịch vụ & Xưởng','DISCOUNT','Giảm giá tay','Nhập giảm giá trực tiếp trên dòng báo giá, không cần mã giảm giá (phiếu dịch vụ, /create-booking, /parts-sales)',207)
+        - sql:
+            comment: Cấp cho MANAGER ở bộ quyền đang dùng
+            splitStatements: false
+            sql: >-
+              INSERT INTO role_permission (role_id, permission_code)
+              SELECT r.role_id, 'SERVICE_TICKET_DISCOUNT'
+              FROM role r
+              WHERE r.role_code = 'MANAGER'
+                AND NOT EXISTS (
+                  SELECT 1 FROM role_permission rp
+                  WHERE rp.role_id = r.role_id AND rp.permission_code = 'SERVICE_TICKET_DISCOUNT'
+                )
+        - sql:
+            comment: Và ở bộ mặc định để khôi phục không nuốt mất
+            splitStatements: false
+            sql: >-
+              INSERT INTO role_permission_default (role_id, permission_code)
+              SELECT r.role_id, 'SERVICE_TICKET_DISCOUNT'
+              FROM role r
+              WHERE r.role_code = 'MANAGER'
+                AND NOT EXISTS (
+                  SELECT 1 FROM role_permission_default rpd
+                  WHERE rpd.role_id = r.role_id AND rpd.permission_code = 'SERVICE_TICKET_DISCOUNT'
+                )
+      rollback:
+        - sql: "DELETE FROM role_permission WHERE permission_code = 'SERVICE_TICKET_DISCOUNT'"
+        - sql: "DELETE FROM role_permission_default WHERE permission_code = 'SERVICE_TICKET_DISCOUNT'"
+        - sql: "DELETE FROM permission WHERE code = 'SERVICE_TICKET_DISCOUNT'"

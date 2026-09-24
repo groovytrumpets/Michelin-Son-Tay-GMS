@@ -117,6 +117,22 @@ public class EstimateItemJpa {
     @Column(name = "discount_percent", precision = 5, scale = 2)
     private BigDecimal discountPercent;
 
+    /** NORMAL | TRADE_IN (gara thu mua linh kiện của khách, thành tiền âm). */
+    @ColumnDefault("'NORMAL'")
+    @Column(name = "line_type", length = 20, nullable = false)
+    private String lineType = "NORMAL";
+
+    /** Số tiền giảm giá nhập tay (không qua mã); gõ % thì là số tiền tính ra từ discount_percent. */
+    @Column(name = "manual_discount_amount", precision = 12, scale = 2)
+    private BigDecimal manualDiscountAmount;
+
+    /** MapStruct chép cả null từ domain sang, nên chốt lại giá trị mặc định ngay trước khi ghi. */
+    @PrePersist
+    @PreUpdate
+    void defaultLineType() {
+        if (lineType == null || lineType.isBlank()) lineType = "NORMAL";
+    }
+
     /** Mảng JSON serial_id đã chọn cho dòng (hàng theo dõi serial). */
     @Column(name = "serial_ids", length = 2000)
     private String serialIdsJson;

@@ -42,6 +42,10 @@ public class EstimateItemReqDto {
     private BigDecimal laborCost;
     private String note;
     private BigDecimal discountPercent;
+    /** NORMAL | TRADE_IN (thu mua linh kiện của khách). Bỏ trống = NORMAL. */
+    private String lineType;
+    /** Giảm giá tay bằng số tiền; có discountPercent thì % được ưu tiên. */
+    private BigDecimal manualDiscountAmount;
     /** Serial đã chọn (hàng theo dõi serial); số phần tử phải bằng quantity. */
     private java.util.List<Integer> serialIds;
 }

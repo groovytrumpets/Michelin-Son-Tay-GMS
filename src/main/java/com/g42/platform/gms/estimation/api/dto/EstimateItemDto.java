@@ -51,6 +51,9 @@ public class EstimateItemDto {
     private BigDecimal laborCost;
     private String note;
     private BigDecimal discountPercent;
+    /** NORMAL | TRADE_IN. */
+    private String lineType;
+    private BigDecimal manualDiscountAmount;
     private java.util.List<Integer> serialIds;
     /** Mã serial tương ứng serialIds, để hiển thị không cần gọi thêm API. */
     private java.util.List<String> serialCodes;

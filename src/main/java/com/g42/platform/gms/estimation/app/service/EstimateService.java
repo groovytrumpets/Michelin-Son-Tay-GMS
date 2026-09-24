@@ -32,9 +32,14 @@ import com.g42.platform.gms.warehouse.infrastructure.repository.StockEntryItemJp
 import com.g42.platform.gms.warehouse.infrastructure.entity.FallbackPricingConfigJpa;
 import com.g42.platform.gms.warehouse.infrastructure.entity.StockEntryItemJpa;
 import com.g42.platform.gms.estimation.domain.enums.EstimateTypeEnum;
+import com.g42.platform.gms.authz.PermissionCodes;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -45,6 +50,11 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class EstimateService {
+    /** Dòng gara thu mua linh kiện của khách: thành tiền âm, trừ thẳng vào phiếu. */
+    static final String LINE_TYPE_TRADE_IN = "TRADE_IN";
+    static final String LINE_TYPE_NORMAL = "NORMAL";
+    private static final BigDecimal ONE_HUNDRED = BigDecimal.valueOf(100);
+
     private final EstimateRepository estimateRepository;
     private final EstimateItemRepository estimateItemRepository;
     private final ItemCategoryRepository itemCategoryRepo;
@@ -138,6 +148,7 @@ public class EstimateService {
 
             BigDecimal totalTax = BigDecimal.ZERO;
             BigDecimal subTotal = BigDecimal.ZERO;
+            BigDecimal tradeInTotal = BigDecimal.ZERO;
             BigDecimal finalPrice =  BigDecimal.ZERO;
             List<EstimateItemDto> itemDtos = new ArrayList<>();
             Set<Integer> prmotionIds = new HashSet<>();
@@ -183,10 +194,14 @@ public class EstimateService {
                         totalTax = totalTax.add(item.getTaxAmount());
                     }
 
-                    // 2. Cộng dồn tiền hàng
+                    // 2. Cộng dồn tiền hàng (tiền thu mua của khách tách riêng, không tính là tiền hàng)
                     BigDecimal itemQty = Qty.nz(item.getQuantity());
                     BigDecimal itemPrice = item.getUnitPrice() != null ? item.getUnitPrice() : BigDecimal.ZERO;
-                    subTotal = subTotal.add(itemPrice.multiply(itemQty));
+                    if (isTradeIn(item)) {
+                        tradeInTotal = tradeInTotal.add(itemPrice.multiply(itemQty));
+                    } else {
+                        subTotal = subTotal.add(itemPrice.multiply(itemQty));
+                    }
                     BigDecimal itemFinalPrice = item.getFinalPrice() != null ? item.getFinalPrice() : BigDecimal.ZERO;
                     if (item.getPromotionId() != null) {
                     prmotionIds.add(item.getPromotionId());
@@ -198,6 +213,7 @@ public class EstimateService {
 
             dto.setTotalPrice(finalPrice);
             dto.setSubTotal(subTotal);
+            dto.setTradeInTotal(tradeInTotal);
             dto.setTotalTaxAmount(totalTax);
             fillSerialCodes(itemDtos);
             dto.setItems(itemDtos);
@@ -267,6 +283,8 @@ public class EstimateService {
             if (req.getEstimateItemId() != null && existingMap.containsKey(req.getEstimateItemId())) {
                 // update old items
                 EstimateItem existing = existingMap.get(req.getEstimateItemId());
+                String discountBefore = manualDiscountKey(existing);
+                existing.setLineType(normalizeLineType(req.getLineType()));
                 existing.setItemName(req.getItemName());
                 existing.setItemId(req.getItemId());
                 existing.setQuantity(req.getQuantity());
@@ -295,6 +313,7 @@ public class EstimateService {
                 existing.setTriggeredByItemId(req.getTriggeredByItemId());
                 existing.setDiscountAmount(req.getDiscountAmount());
                 applyOutsourceAndNote(existing, req);
+                existing.setManualDiscountAmount(req.getManualDiscountAmount());
                 ItemCategory wc = null;
                 if (req.getItemCategoryId() != null) {
                     wc = itemCategoryRepo.findById(req.getItemCategoryId());
@@ -323,13 +342,19 @@ public class EstimateService {
 
                 applyTax(existing, ruleId);
 
-                if (Boolean.TRUE.equals(existing.getIsGift())) {
+                if (isTradeIn(existing)) {
+                    applyTradeInPricing(existing);
+                } else if (Boolean.TRUE.equals(existing.getIsGift())) {
                     existing.setFinalPrice(BigDecimal.ZERO);
                     existing.setIsOverridden(false);
                     existing.setManualLineTotal(null);
-                } else if (!applyManualLineTotal(existing, req)) {
-                    existing.setFinalPrice(existing.getTotalPrice());
+                    clearManualDiscount(existing);
+                } else if (applyManualLineTotal(existing, req)) {
+                    clearManualDiscount(existing);
+                } else {
+                    applyManualDiscountPricing(existing);
                 }
+                requireDiscountPermissionIfChanged(discountBefore, existing);
 
                 toSave.add(existing);
                 incomingIds.add(req.getEstimateItemId());
@@ -477,6 +502,7 @@ public class EstimateService {
 
             EstimateItem item = new EstimateItem();
             item.setEstimateId(estimateId);
+            item.setLineType(normalizeLineType(req.getLineType()));
             item.setItemCategoryId(categoryId);
             item.setCategoryLabel(normalizeCategoryLabel(req.getCategoryLabel()));
             item.setItemId(req.getItemId());
@@ -506,6 +532,7 @@ public class EstimateService {
 
             item.setIsGift(req.getIsGift() != null ? req.getIsGift() : false);
             applyOutsourceAndNote(item, req);
+            item.setManualDiscountAmount(req.getManualDiscountAmount());
 //            System.out.println("DEBUG RESOLVING ITEM: "+req.getIsGift()+", Tiggerd by: "+req.getRevisedFromItemId());
             TaxRule taxRule = null;
             Integer ruleId = null;
@@ -532,13 +559,24 @@ public class EstimateService {
             BigDecimal totalPrice = unitPrice.multiply(quantity);
             item.setTotalPrice(totalPrice);
             applyTax(item,ruleId);
-            if (item.getIsGift()==true){
+            if (isTradeIn(item)) {
+                applyTradeInPricing(item);
+            } else if (item.getIsGift()==true){
                 item.setFinalPrice(BigDecimal.ZERO);
                 item.setIsOverridden(false);
                 item.setManualLineTotal(null);
-            } else if (!applyManualLineTotal(item, req)) {
-                item.setFinalPrice(item.getTotalPrice());
+                clearManualDiscount(item);
+            } else if (applyManualLineTotal(item, req)) {
+                clearManualDiscount(item);
+            } else {
+                applyManualDiscountPricing(item);
             }
+            // Dòng chép từ bản báo giá trước giữ nguyên giảm giá cũ thì không cần quyền;
+            // chỉ khi đặt mới hoặc đổi mức giảm mới phải có quyền giảm giá tay.
+            EstimateItem revisedFrom = req.getRevisedFromItemId() != null
+                    ? estimateItemRepository.findByEstimateItemId(req.getRevisedFromItemId())
+                    : null;
+            requireDiscountPermissionIfChanged(manualDiscountKey(revisedFrom), item);
             return item;
         }).toList();
     }
@@ -563,6 +601,129 @@ public class EstimateService {
         }
         return overridden;
     }
+    private static boolean isTradeIn(EstimateItem item) {
+        return item != null && LINE_TYPE_TRADE_IN.equals(item.getLineType());
+    }
+
+    private static String normalizeLineType(String raw) {
+        return raw != null && LINE_TYPE_TRADE_IN.equalsIgnoreCase(raw.trim()) ? LINE_TYPE_TRADE_IN : LINE_TYPE_NORMAL;
+    }
+
+    /**
+     * Dòng thu mua linh kiện của khách: thành tiền = -(SL x đơn giá). Không thuế, không kho,
+     * không giảm giá, không khoá tay. Tổng phiếu được phép âm (gara trả tiền khách).
+     */
+    private void applyTradeInPricing(EstimateItem item) {
+        item.setItemId(null);
+        item.setWarehouseId(null);
+        item.setEntryItemId(null);
+        item.setSerialIdsJson(null);
+        item.setIsGift(false);
+        item.setPromotionId(null);
+        item.setTriggeredByItemId(null);
+        item.setIsOutsource(false);
+        item.setOutsourcePartnerId(null);
+        item.setOutsourceWorkContent(null);
+        item.setLaborCost(null);
+        item.setTaxAmount(BigDecimal.ZERO);
+        item.setAppliedTaxRate(BigDecimal.ZERO);
+        item.setDiscountAmount(null);
+        item.setIsOverridden(false);
+        item.setManualLineTotal(null);
+        clearManualDiscount(item);
+        BigDecimal unitPrice = item.getUnitPrice() != null ? item.getUnitPrice().abs() : BigDecimal.ZERO;
+        item.setUnitPrice(unitPrice);
+        BigDecimal amount = unitPrice.multiply(Qty.nz(item.getQuantity())).negate();
+        item.setTotalPrice(amount);
+        item.setFinalPrice(amount);
+    }
+
+    private static void clearManualDiscount(EstimateItem item) {
+        item.setDiscountPercent(null);
+        item.setManualDiscountAmount(null);
+    }
+
+    /**
+     * Số tiền giảm giá tay của dòng: có % thì tính theo %, không thì lấy số tiền gõ vào.
+     * Tính trên tiền hàng trước thuế (SL x đơn giá) giống mã giảm giá %, và không được vượt số đó.
+     */
+    private BigDecimal resolveManualDiscount(EstimateItem item) {
+        BigDecimal unitPrice = item.getUnitPrice() != null ? item.getUnitPrice() : BigDecimal.ZERO;
+        BigDecimal base = unitPrice.multiply(Qty.nz(item.getQuantity()));
+        String label = item.getItemName() != null ? item.getItemName() + ": " : "";
+        BigDecimal percent = item.getDiscountPercent();
+        if (percent != null && percent.signum() > 0) {
+            if (percent.compareTo(ONE_HUNDRED) > 0) {
+                throw new EstimateException(label + "giảm giá không được quá 100%", EstimateErrorCode.BAD_REQUEST);
+            }
+            return base.multiply(percent).divide(ONE_HUNDRED, 2, RoundingMode.HALF_UP);
+        }
+        BigDecimal amount = item.getManualDiscountAmount();
+        if (amount == null || amount.signum() <= 0) {
+            return BigDecimal.ZERO;
+        }
+        amount = amount.setScale(2, RoundingMode.HALF_UP);
+        if (amount.compareTo(base) > 0) {
+            throw new EstimateException(label + "số tiền giảm giá vượt quá tiền hàng của dòng", EstimateErrorCode.BAD_REQUEST);
+        }
+        return amount;
+    }
+
+    /**
+     * Chốt thành tiền cho dòng thường (không quà tặng, không khoá tay):
+     * thành tiền = (SL x đơn giá - giảm giá tay) x (1 + thuế suất), cùng công thức với mã giảm giá %.
+     * Giảm tay thắng mã giảm giá trên cùng dòng, nên dòng có giảm tay được gỡ khỏi mã.
+     */
+    private void applyManualDiscountPricing(EstimateItem item) {
+        BigDecimal discount = resolveManualDiscount(item);
+        if (discount.signum() <= 0) {
+            boolean hadManualDiscount = item.getManualDiscountAmount() != null || item.getDiscountPercent() != null;
+            clearManualDiscount(item);
+            // Dòng không gắn mã giảm giá thì không còn lý do giữ số giảm cũ (vd vừa xoá giảm tay)
+            if (hadManualDiscount || item.getPromotionId() == null) {
+                item.setDiscountAmount(null);
+            }
+            item.setFinalPrice(item.getTotalPrice());
+            return;
+        }
+        if (item.getDiscountPercent() != null && item.getDiscountPercent().signum() <= 0) {
+            item.setDiscountPercent(null);
+        }
+        item.setManualDiscountAmount(discount);
+        item.setDiscountAmount(discount);
+        item.setPromotionId(null);
+        BigDecimal unitPrice = item.getUnitPrice() != null ? item.getUnitPrice() : BigDecimal.ZERO;
+        BigDecimal base = unitPrice.multiply(Qty.nz(item.getQuantity()));
+        BigDecimal taxRate = item.getAppliedTaxRate() != null ? item.getAppliedTaxRate() : BigDecimal.ZERO;
+        BigDecimal finalPrice = base.subtract(discount)
+                .multiply(BigDecimal.ONE.add(taxRate.divide(ONE_HUNDRED, 4, RoundingMode.HALF_UP)))
+                .setScale(2, RoundingMode.HALF_UP);
+        item.setFinalPrice(finalPrice);
+    }
+
+    /** Mức giảm giá tay của dòng dạng chuỗi để so trước/sau: "P10" (10%), "A50000" (50.000đ) hoặc "". */
+    private static String manualDiscountKey(EstimateItem item) {
+        if (item == null) return "";
+        BigDecimal percent = item.getDiscountPercent();
+        if (percent != null && percent.signum() > 0) return "P" + percent.stripTrailingZeros().toPlainString();
+        BigDecimal amount = item.getManualDiscountAmount();
+        if (amount != null && amount.signum() > 0) return "A" + amount.stripTrailingZeros().toPlainString();
+        return "";
+    }
+
+    /** Đặt, đổi hay bỏ giảm giá tay đều phải có quyền SERVICE_TICKET_DISCOUNT. */
+    private void requireDiscountPermissionIfChanged(String before, EstimateItem after) {
+        if (Objects.equals(before, manualDiscountKey(after))) return;
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        boolean allowed = auth != null && auth.getAuthorities().stream()
+                .anyMatch(a -> PermissionCodes.SERVICE_TICKET_DISCOUNT.equals(a.getAuthority()));
+        if (!allowed) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    (after.getItemName() != null ? after.getItemName() + ": " : "")
+                            + "bạn không có quyền giảm giá tay trên báo giá. Nhờ quản lý nhập giảm giá, hoặc dùng mã giảm giá.");
+        }
+    }
+
     /**
      * Tra tên các đối tác thuê ngoài đang được dùng trong danh sách dòng báo giá.
      * Gom một lượt để tránh gọi lặp lại theo từng dòng.
@@ -610,6 +771,7 @@ public class EstimateService {
         EstimateRespondDto dto = estimateDtoMapper.toEstimateDto(estimate);
         BigDecimal totalTax = BigDecimal.ZERO;
         BigDecimal subTotal = BigDecimal.ZERO;
+        BigDecimal tradeInTotal = BigDecimal.ZERO;
         List<EstimateItemDto> itemDtos = new ArrayList<>();
 
         for (EstimateItem item : items) {
@@ -653,10 +815,14 @@ public class EstimateService {
                 totalTax = totalTax.add(item.getTaxAmount());
             }
 
-            // Cộng dồn tiền gốc (Đơn giá * Số lượng)
+            // Cộng dồn tiền gốc (Đơn giá * Số lượng); tiền thu mua của khách tách riêng
             BigDecimal itemQty = Qty.nz(item.getQuantity());
             BigDecimal itemPrice = item.getUnitPrice() != null ? item.getUnitPrice() : BigDecimal.ZERO;
-            subTotal = subTotal.add(itemPrice.multiply(itemQty));
+            if (isTradeIn(item)) {
+                tradeInTotal = tradeInTotal.add(itemPrice.multiply(itemQty));
+            } else {
+                subTotal = subTotal.add(itemPrice.multiply(itemQty));
+            }
 
             itemDtos.add(itemDto);
         }
@@ -664,6 +830,7 @@ public class EstimateService {
         dto.setItems(itemDtos);
         dto.setTotalTaxAmount(totalTax);
         dto.setSubTotal(subTotal);
+        dto.setTradeInTotal(tradeInTotal);
         return dto;
     }
 
@@ -727,22 +894,30 @@ public class EstimateService {
 
         applyTax(estimateItem, ruleId);
 
-        if (Boolean.TRUE.equals(estimateItem.getIsGift())) {
+        // Sửa lẻ một dòng (huỷ giữ hàng, đổi kho...) không đổi mức giảm giá tay đã lưu,
+        // chỉ tính lại số tiền giảm theo SL/đơn giá mới.
+        String discountBefore = manualDiscountKey(estimateItem);
+        if (isTradeIn(estimateItem)) {
+            applyTradeInPricing(estimateItem);
+        } else if (Boolean.TRUE.equals(estimateItem.getIsGift())) {
             estimateItem.setFinalPrice(BigDecimal.ZERO);
             estimateItem.setIsOverridden(false);
             estimateItem.setManualLineTotal(null);
         } else if (request.getIsOverridden() != null) {
             // Request nói rõ về việc khoá THÀNH TIỀN tay -> theo request
-            if (!applyManualLineTotal(estimateItem, request)) {
-                estimateItem.setFinalPrice(estimateItem.getTotalPrice());
+            if (applyManualLineTotal(estimateItem, request)) {
+                clearManualDiscount(estimateItem);
+            } else {
+                applyManualDiscountPricing(estimateItem);
             }
         } else if (Boolean.TRUE.equals(estimateItem.getIsOverridden()) && estimateItem.getManualLineTotal() != null) {
             // Request im lặng (vd huỷ giữ hàng) -> giữ nguyên số THÀNH TIỀN đã khoá tay trước đó
             estimateItem.setTotalPrice(estimateItem.getManualLineTotal());
             estimateItem.setFinalPrice(estimateItem.getManualLineTotal());
         } else {
-            estimateItem.setFinalPrice(estimateItem.getTotalPrice());
+            applyManualDiscountPricing(estimateItem);
         }
+        requireDiscountPermissionIfChanged(discountBefore, estimateItem);
 
         EstimateItem saved = estimateItemRepository.save(estimateItem);
         //todo: recalculate
@@ -919,7 +1094,7 @@ public class EstimateService {
         for (PromotionBuyItem buyItem : buyItems) {
             BigDecimal purchasedQuantity = Qty.sum(items.stream()
                     .filter(item -> !Boolean.TRUE.equals(item.getIsGift()))
-                    .filter(item -> item.getItemId().equals(buyItem.getCatalogItemId()))
+                    .filter(item -> Objects.equals(item.getItemId(), buyItem.getCatalogItemId()))
                     .toList(), EstimateItem::getQuantity);
             int ratio = buyItem.getQuantity() == null || buyItem.getQuantity() <= 0 ? 0
                     : purchasedQuantity.divideToIntegralValue(Qty.of(buyItem.getQuantity())).intValue();
@@ -949,15 +1124,18 @@ public class EstimateService {
     private void applyPercentPromotion(Promotion promotion, List<EstimateItem> items) {
         List<EstimateItem> targetItems;
 
+        // Mã giảm giá không áp vào dòng thu mua của khách và dòng đã giảm giá tay (không cộng dồn hai mức giảm)
         if (promotion.getApplyTo().equals("ALL")){
             targetItems = items.stream()
             .filter(item -> !item.getIsGift())
+            .filter(item -> !isTradeIn(item) && manualDiscountKey(item).isEmpty())
             .toList();
         }else {
             List<Integer> eligibleItemIds = promotionInternalApi
             .findItemIdsByPromotionId(promotion);
         targetItems = items.stream()
             .filter(item -> eligibleItemIds.contains(item.getItemId()))
+            .filter(item -> !isTradeIn(item) && manualDiscountKey(item).isEmpty())
             .toList();
         }
 
@@ -1332,7 +1510,12 @@ public class EstimateService {
                     item.setTaxAmount(BigDecimal.ZERO);
                     item.setTotalPrice(subTotal);
                 }
-                item.setFinalPrice(item.getTotalPrice());
+                if (Boolean.TRUE.equals(item.getIsOverridden()) && item.getManualLineTotal() != null) {
+                    item.setTotalPrice(item.getManualLineTotal());
+                    item.setFinalPrice(item.getManualLineTotal());
+                } else {
+                    applyManualDiscountPricing(item);
+                }
                 
                 estimateItemRepository.save(item);
             }

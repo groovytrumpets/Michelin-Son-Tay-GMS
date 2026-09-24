@@ -30,6 +30,8 @@ public class EstimateRespondDto {
     private BigDecimal subTotal;
     private BigDecimal totalTaxAmount;
     private BigDecimal totalPrice;
+    /** Tổng tiền thu mua/thanh lý linh kiện của khách (số dương), đã trừ sẵn trong totalPrice. */
+    private BigDecimal tradeInTotal;
     List<EstimateItemDto> items;
     List<Integer> promotions;
 }

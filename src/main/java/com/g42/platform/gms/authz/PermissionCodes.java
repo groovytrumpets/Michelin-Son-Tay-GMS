@@ -72,6 +72,8 @@ public final class PermissionCodes {
     public static final String SERVICE_TICKET_DELETE = "SERVICE_TICKET_DELETE";
     public static final String SERVICE_TICKET_ASSIGN = "SERVICE_TICKET_ASSIGN";
     public static final String SERVICE_TICKET_PAYMENT = "SERVICE_TICKET_PAYMENT";
+    /** Giảm giá tay trên dòng báo giá (không qua mã) — kiểm tra trong EstimateService. */
+    public static final String SERVICE_TICKET_DISCOUNT = "SERVICE_TICKET_DISCOUNT";
 
     public static final String TICKET_BACKFILL_VIEW = "TICKET_BACKFILL_VIEW";
     public static final String TICKET_BACKFILL_EDIT = "TICKET_BACKFILL_EDIT";

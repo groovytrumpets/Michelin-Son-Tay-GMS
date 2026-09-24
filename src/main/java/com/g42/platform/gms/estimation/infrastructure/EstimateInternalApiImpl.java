@@ -334,6 +334,11 @@ public class EstimateInternalApiImpl implements EstimateInternalApi {
             newDiscount = unitDiscount.multiply(estimateItemJpa.getQuantity());
         }
         estimateItemJpa.setDiscountAmount(newDiscount);
+        // Giảm giá tay (số tiền) cũng chia theo số lượng như phần giảm chung, để hai dòng
+        // tách ra khi hoàn hàng không cùng giữ nguyên số giảm của cả dòng cũ.
+        if (estimateItemJpa.getManualDiscountAmount() != null) {
+            estimateItemJpa.setManualDiscountAmount(newDiscount);
+        }
         BigDecimal finalPrice = totalPrice.subtract(newDiscount);
         //tax
         BigDecimal newTaxAmount = BigDecimal.ZERO;
