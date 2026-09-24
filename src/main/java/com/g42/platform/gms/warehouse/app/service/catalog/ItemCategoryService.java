@@ -2,6 +2,7 @@ package com.g42.platform.gms.warehouse.app.service.catalog;
 
 import com.g42.platform.gms.warehouse.api.dto.ItemCategoryAssignmentDto;
 import com.g42.platform.gms.warehouse.api.dto.ItemCategoryDto;
+import com.g42.platform.gms.warehouse.api.dto.PublicItemCategoryDto;
 import com.g42.platform.gms.warehouse.api.dto.request.AssignItemCategoryRequest;
 import com.g42.platform.gms.warehouse.api.mapper.ItemCategoryDtoMapper;
 import com.g42.platform.gms.warehouse.domain.entity.ItemCategory;
@@ -60,6 +61,21 @@ public class ItemCategoryService {
         return itemCategoryJpaRepo.findAllByIsActiveTrueOrderByDisplayOrderAscCategoryNameAsc().stream()
                 .map(entityMapper::toDomain)
                 .map(dtoMapper::toDto)
+                .toList();
+    }
+
+    /**
+     * Toàn bộ danh mục đang dùng cho trang công khai — kể cả danh mục chưa có sản phẩm,
+     * để khách thấy đủ nhóm hàng chứ không chỉ những nhóm suy ra được từ sản phẩm.
+     */
+    public List<PublicItemCategoryDto> getActiveForPublic() {
+        return itemCategoryJpaRepo.findAllByIsActiveTrueOrderByDisplayOrderAscCategoryNameAsc().stream()
+                .map(c -> new PublicItemCategoryDto(
+                        c.getItemCategoryId(),
+                        c.getCategoryCode(),
+                        c.getCategoryName(),
+                        c.getCategoryType(),
+                        c.getDisplayOrder()))
                 .toList();
     }
 

@@ -13,8 +13,10 @@ import com.g42.platform.gms.warehouse.api.dto.BrandHintDto;
 import com.g42.platform.gms.warehouse.api.dto.CatalogCreateDto;
 import com.g42.platform.gms.warehouse.api.dto.CatalogItemDto;
 import com.g42.platform.gms.warehouse.api.dto.HomeStockLocationDto;
+import com.g42.platform.gms.warehouse.api.dto.PublicItemCategoryDto;
 import com.g42.platform.gms.warehouse.api.dto.PublicPartDetailDto;
 import com.g42.platform.gms.warehouse.app.service.catalog.CatalogItemService;
+import com.g42.platform.gms.warehouse.app.service.catalog.ItemCategoryService;
 import com.g42.platform.gms.warehouse.domain.entity.CatalogItem;
 import com.g42.platform.gms.warehouse.domain.enums.CatalogItemType;
 import com.g42.platform.gms.warehouse.infrastructure.entity.CatalogItemJpa;
@@ -37,6 +39,8 @@ public class ServiceController {
     private final ServiceCatalogService serviceCatalogService;
     @Autowired
     private CatalogItemService catalogItemService;
+    @Autowired
+    private ItemCategoryService itemCategoryService;
     @GetMapping("/")
     public ResponseEntity<ApiResponse<List<ServiceSumaryRespond>>> getLandingServices() {
         List<ServiceSumaryRespond> respondList = serviceCatalogService.getListActiveServices();
@@ -64,6 +68,16 @@ public class ServiceController {
     @GetMapping("/brands")
     public ResponseEntity<ApiResponse<List<BrandHintDto>>> getProductBrands() {
         return ResponseEntity.ok(ApiResponses.success(catalogItemService.getAllBrands()));
+    }
+
+    /**
+     * Toàn bộ danh mục phụ tùng / dịch vụ đang dùng, kể cả danh mục chưa có sản phẩm —
+     * cho bảng "Chọn danh mục" và ô lọc danh mục ở /services, /parts... Không dùng lại
+     * /api/admin/item-category/active vì API đó bắt đăng nhập nhân viên.
+     */
+    @GetMapping("/product-categories")
+    public ResponseEntity<ApiResponse<List<PublicItemCategoryDto>>> getProductCategories() {
+        return ResponseEntity.ok(ApiResponses.success(itemCategoryService.getActiveForPublic()));
     }
 
     /** Danh sách kho/cửa hàng còn hàng của một phụ tùng — public cho trang chi tiết sản phẩm. */
