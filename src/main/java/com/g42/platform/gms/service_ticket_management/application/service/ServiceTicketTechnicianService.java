@@ -96,7 +96,9 @@ public class ServiceTicketTechnicianService {
 
     private TechnicianTicketListResponse mapToListResponse(ServiceTicket ticket) {
         CustomerProfile customer = customerRepository.findById(ticket.getCustomerId()).orElse(null);
-        Vehicle vehicle = vehicleRepository.findById(ticket.getVehicleId()).orElse(null);
+        Vehicle vehicle = ticket.getVehicleId() != null
+            ? vehicleRepository.findById(ticket.getVehicleId()).orElse(null)
+            : null;
 
         Booking booking = null;
         if (ticket.getBookingId() != null) {
@@ -137,10 +139,12 @@ public class ServiceTicketTechnicianService {
             .orElseThrow(() -> new CheckInException("Không tìm thấy khách hàng"));
         response.setCustomer(detailMapper.toTechnicianCustomerInfo(customer));
         
-        // Vehicle info
-        Vehicle vehicle = vehicleRepository.findById(ticket.getVehicleId())
-            .orElseThrow(() -> new CheckInException("Không tìm thấy xe"));
-        response.setVehicle(detailMapper.toTechnicianVehicleInfo(vehicle));
+        // Vehicle info — phiếu bán linh kiện (PARTS_SALE) không gắn xe
+        if (ticket.getVehicleId() != null) {
+            Vehicle vehicle = vehicleRepository.findById(ticket.getVehicleId())
+                .orElseThrow(() -> new CheckInException("Không tìm thấy xe"));
+            response.setVehicle(detailMapper.toTechnicianVehicleInfo(vehicle));
+        }
         
         // Booking info
         if (ticket.getBookingId() != null) {
@@ -159,9 +163,11 @@ public class ServiceTicketTechnicianService {
         }
         
         // Odometer
-        Optional<OdometerReading> latestOdometer = odometerRepo.findLatestByVehicleId(ticket.getVehicleId());
-        if (latestOdometer.isPresent()) {
-            response.setOdometerReading(latestOdometer.get().getReading());
+        if (ticket.getVehicleId() != null) {
+            Optional<OdometerReading> latestOdometer = odometerRepo.findLatestByVehicleId(ticket.getVehicleId());
+            if (latestOdometer.isPresent()) {
+                response.setOdometerReading(latestOdometer.get().getReading());
+            }
         }
         
         // Photos
