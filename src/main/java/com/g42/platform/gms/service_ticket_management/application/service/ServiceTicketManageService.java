@@ -7,6 +7,7 @@ import com.g42.platform.gms.auth.entity.StaffProfile;
 import com.g42.platform.gms.auth.repository.CustomerProfileRepository;
 import com.g42.platform.gms.auth.repository.StaffProfileRepo;
 import com.g42.platform.gms.booking.customer.domain.entity.Booking;
+import com.g42.platform.gms.branch.service.BranchDirectory;
 import com.g42.platform.gms.booking.customer.domain.repository.BookingRepository;
 import com.g42.platform.gms.catalog.infrastructure.repository.CatalogItemRepository;
 import com.g42.platform.gms.common.service.ExcelService;
@@ -93,6 +94,7 @@ public class ServiceTicketManageService {
     private final StockIssueJpaRepo stockIssueJpaRepo;
     private final StockAllocationJpaRepo stockAllocationJpaRepo;
     private final StaffNotifyService staffNotifyService;
+    private final BranchDirectory branchDirectory;
 
     /**
      * Get paginated list of service tickets with filters.
@@ -112,7 +114,8 @@ public class ServiceTicketManageService {
             TicketStatus status,
             String search,
             TicketType ticketType,
-            Boolean walkIn) {
+            Boolean walkIn,
+            Integer branchId) {
 
         log.info("Getting service ticket list: page={}, size={}, date={}, status={}, search={}, ticketType={}, walkIn={}",
                 page, size, date, status, search, ticketType, walkIn);
@@ -120,7 +123,7 @@ public class ServiceTicketManageService {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "receivedAt"));
 
 
-        Page<ServiceTicket> ticketPage = serviceTicketRepo.findAll(status, date, search, ticketType, walkIn, pageable);
+        Page<ServiceTicket> ticketPage = serviceTicketRepo.findAll(status, date, search, ticketType, walkIn, branchId, pageable);
         return ticketPage.map(this::mapToListResponse);
     }
 
@@ -179,6 +182,22 @@ public class ServiceTicketManageService {
         return response;
     }
 
+    /**
+     * Sửa xưởng của phiếu. Chỉ là thông tin ghi nhận (kho, nhân viên dùng chung) nên đổi
+     * được ở mọi trạng thái, kể cả phiếu đã thu tiền — báo cáo theo xưởng đọc lại ngay.
+     */
+    @Transactional
+    public ServiceTicketDetailResponse changeBranch(String ticketCode, Integer branchId) {
+        ServiceTicket ticket = serviceTicketRepo.findByTicketCode(ticketCode)
+                .orElseThrow(() -> new CheckInException("Không tìm thấy service ticket: " + ticketCode));
+        if (!branchDirectory.isUsable(branchId)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "Xưởng không tồn tại hoặc đã bị ẩn.");
+        }
+        serviceTicketRepo.updateBranch(ticket.getServiceTicketId(), branchId);
+        return getServiceTicketDetail(ticketCode);
+    }
+
     @Transactional(readOnly = true)
     public ServiceTicketDetailResponse getServiceTicketDetail(String ticketCode) {
         log.info("Getting service ticket detail: {}", ticketCode);
@@ -198,6 +217,8 @@ public class ServiceTicketManageService {
             response.setEstimateId(latestEstimate.getId());
         }
         response.setTicketStatus(ticket.getTicketStatus());
+        response.setBranchId(ticket.getBranchId());
+        response.setBranchName(BranchDirectory.nameFor(ticket.getBranchId()));
         response.setTicketType(ticket.getTicketType());
         response.setCustomerRequest(ticket.getCustomerRequest());
         response.setCheckInNotes(ticket.getCheckInNotes());

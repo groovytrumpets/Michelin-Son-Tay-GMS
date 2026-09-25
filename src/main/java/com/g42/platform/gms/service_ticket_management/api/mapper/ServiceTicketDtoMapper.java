@@ -20,6 +20,8 @@ public interface ServiceTicketDtoMapper {
     @Mapping(target = "inspectionStatus", ignore = true)
     ServiceTicketResponse toResponse(ServiceTicket domain);
 
+    @Mapping(target = "branchName",
+            expression = "java(com.g42.platform.gms.branch.service.BranchDirectory.nameFor(savedServiceTicket.getBranchId()))")
     ServiceTicketListResponse toDto(ServiceTicket savedServiceTicket);
 
     ServiceQueueResponse toQueueDto(ServiceTicket serviceTicket);

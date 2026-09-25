@@ -8,6 +8,8 @@ import org.mapstruct.Mapping;
 
 @Mapper(componentModel = "spring")
 public interface BookingManageDtoMapper {
+    @Mapping(target = "branchName",
+            expression = "java(com.g42.platform.gms.branch.service.BranchDirectory.nameFor(booking.getBranchId()))")
     BookedRespond toBookedRespond(Booking booking);
     @Mapping(source = "services", target = "items")
     BookedDetailResponse toBookedDetailResponse(Booking booking);

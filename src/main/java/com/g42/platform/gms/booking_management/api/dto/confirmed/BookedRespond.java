@@ -31,4 +31,7 @@ public class BookedRespond {
     private Boolean isPartsSale;
     /** Bao gia cua lich hen nay dang giu hang trong kho (chua check-in) */
     private Boolean hasStockHold;
+    /** Xưởng nhận lịch (Liquibase 044) */
+    private Integer branchId;
+    private String branchName;
 }

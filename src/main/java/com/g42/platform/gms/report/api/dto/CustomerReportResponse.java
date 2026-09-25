@@ -91,6 +91,8 @@ public class CustomerReportResponse {
         private String licensePlate;
         private String ticketStatus;
         private String ticketType;
+        /** Xưởng làm phiếu; sổ cũ tính là của xưởng mặc định. */
+        private String branchName;
         private boolean paid;
         private boolean hasBill;
         private BigDecimal revenue;

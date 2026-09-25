@@ -1,0 +1,203 @@
+# Nhiều xưởng dùng chung một hệ thống.
+#
+# Mỗi lịch hẹn / phiếu (sửa xe lẫn bán phụ tùng) ghi lại nó phát sinh ở xưởng nào, để
+# biết khách dùng dịch vụ ở đâu và tách báo cáo theo xưởng. Chỉ GHI NHẬN, không cô lập
+# dữ liệu: kho dùng chung giữa các xưởng và nhân viên được điều phối qua lại, nên không
+# có bảng nhân viên–xưởng và không gắn kho vào xưởng.
+#
+# Khách hàng và xe KHÔNG gắn xưởng — cùng một khách có thể sửa xe ở xưởng này và mua lốp
+# ở xưởng kia mà vẫn là một hồ sơ. "Khách dùng dịch vụ ở xưởng nào" = nhóm phiếu của khách
+# theo service_ticket.branch_id.
+#
+# Cột branch_id được backend tự điền lúc INSERT (BranchStampListener) theo header
+# X-Branch-Id mà máy đang dùng gửi lên, thiếu thì lấy xưởng mặc định. Để NULL được cho
+# an toàn: một luồng tạo phiếu nào đó bị sót cũng không làm hỏng việc tạo phiếu, báo cáo
+# coi NULL là "chưa rõ xưởng".
+databaseChangeLog:
+  - changeSet:
+      id: 044-1-create-branch
+      author: gms
+      comment: Danh mục xưởng
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: branch
+      changes:
+        - createTable:
+            tableName: branch
+            remarks: Xưởng / chi nhánh dùng chung hệ thống
+            columns:
+              - column:
+                  name: branch_id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: branch_code
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uk_branch_code
+                  remarks: Mã ngắn hiện trên nhãn phiếu, VD ST
+              - column:
+                  name: branch_name
+                  type: VARCHAR(150)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: address
+                  type: VARCHAR(500)
+              - column:
+                  name: phone
+                  type: VARCHAR(50)
+              - column:
+                  name: is_default
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+                  remarks: Xưởng dùng khi máy chưa chọn xưởng và cho khách đặt lịch online; luôn đúng một xưởng
+              - column:
+                  name: is_active
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+              - column:
+                  name: sort_order
+                  type: INT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: DATETIME
+                  defaultValueComputed: CURRENT_TIMESTAMP
+              - column:
+                  name: updated_at
+                  type: DATETIME
+
+  - changeSet:
+      id: 044-2-seed-default-branch
+      author: gms
+      comment: >-
+        Dữ liệu có sẵn đều của một xưởng nên tạo sẵn xưởng đó làm mặc định. Lấy địa chỉ /
+        SĐT từ hồ sơ công ty (changeset 040) nếu có; tên để người dùng tự sửa ở /branch-config.
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: "0"
+            sql: SELECT COUNT(*) FROM branch
+      changes:
+        - sql:
+            splitStatements: false
+            sql: >-
+              INSERT INTO branch (branch_code, branch_name, address, phone, is_default, is_active, sort_order)
+              VALUES ('ST', 'Xưởng Sơn Tây',
+                (SELECT cp.address FROM company_profile cp WHERE cp.id = 1),
+                (SELECT cp.phone FROM company_profile cp WHERE cp.id = 1),
+                1, 1, 1)
+      rollback:
+        - sql: "DELETE FROM branch WHERE branch_code = 'ST'"
+
+  - changeSet:
+      id: 044-3-booking-branch
+      author: gms
+      comment: Lịch hẹn thuộc xưởng nào
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: booking
+                columnName: branch_id
+      changes:
+        - addColumn:
+            tableName: booking
+            columns:
+              - column:
+                  name: branch_id
+                  type: INT
+                  remarks: Xưởng nhận lịch; phiếu tạo từ lịch này kế thừa xưởng này
+                  constraints:
+                    foreignKeyName: fk_booking_branch
+                    referencedTableName: branch
+                    referencedColumnNames: branch_id
+        - createIndex:
+            tableName: booking
+            indexName: idx_booking_branch
+            columns:
+              - column:
+                  name: branch_id
+
+  - changeSet:
+      id: 044-4-service-ticket-branch
+      author: gms
+      comment: Phiếu (sửa xe / bán phụ tùng) phát sinh ở xưởng nào
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: service_ticket
+                columnName: branch_id
+      changes:
+        - addColumn:
+            tableName: service_ticket
+            columns:
+              - column:
+                  name: branch_id
+                  type: INT
+                  remarks: Xưởng làm phiếu; dùng để biết khách dùng dịch vụ ở đâu và tách báo cáo
+                  constraints:
+                    foreignKeyName: fk_service_ticket_branch
+                    referencedTableName: branch
+                    referencedColumnNames: branch_id
+        - createIndex:
+            tableName: service_ticket
+            indexName: idx_service_ticket_branch
+            columns:
+              - column:
+                  name: branch_id
+
+  - changeSet:
+      id: 044-5-booking-request-branch
+      author: gms
+      comment: >-
+        Xưởng khách chọn khi gửi yêu cầu đặt lịch (khách chưa đăng nhập). Không backfill: yêu
+        cầu cũ để NULL, lúc duyệt sẽ lấy xưởng của máy duyệt.
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: booking_request
+                columnName: branch_id
+      changes:
+        - addColumn:
+            tableName: booking_request
+            columns:
+              - column:
+                  name: branch_id
+                  type: INT
+                  remarks: Xưởng khách chọn; NULL = xưởng của máy duyệt yêu cầu
+                  constraints:
+                    foreignKeyName: fk_booking_request_branch
+                    referencedTableName: branch
+                    referencedColumnNames: branch_id
+
+  - changeSet:
+      id: 044-6-backfill-branch
+      author: gms
+      comment: Toàn bộ lịch hẹn / phiếu có sẵn thuộc xưởng mặc định
+      changes:
+        - sql:
+            splitStatements: true
+            sql: >-
+              UPDATE booking SET branch_id = (SELECT b.branch_id FROM branch b WHERE b.is_default = 1 ORDER BY b.branch_id LIMIT 1)
+              WHERE branch_id IS NULL;
+              UPDATE service_ticket SET branch_id = (SELECT b.branch_id FROM branch b WHERE b.is_default = 1 ORDER BY b.branch_id LIMIT 1)
+              WHERE branch_id IS NULL;
+      rollback:
+        - sql: "SELECT 1"

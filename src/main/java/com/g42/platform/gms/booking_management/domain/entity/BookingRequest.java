@@ -38,6 +38,8 @@ public class BookingRequest {
     private String requestCode;
     private String note;
     private String referrerPhone;
+    /** Xưởng khách chọn (Liquibase 044); null = xưởng của máy duyệt yêu cầu. */
+    private Integer branchId;
 
     public boolean isGuest() {
         return isGuest;

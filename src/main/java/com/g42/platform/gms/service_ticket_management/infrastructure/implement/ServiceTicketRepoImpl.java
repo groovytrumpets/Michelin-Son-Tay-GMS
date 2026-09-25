@@ -15,6 +15,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -72,15 +73,25 @@ public class ServiceTicketRepoImpl implements ServiceTicketRepo {
 
     @Override
     public Page<ServiceTicket> findAll(TicketStatus status, LocalDate date, String search, TicketType ticketType,
-                                       Boolean walkIn, Pageable pageable) {
+                                       Boolean walkIn, Integer branchId, Pageable pageable) {
         Specification<ServiceTicketJpa> spec = ServiceTicketSpecification.filter(date, status, ticketType);
         if (walkIn != null) {
             spec = spec.and(ServiceTicketSpecification.byWalkIn(walkIn));
+        }
+        if (branchId != null) {
+            spec = spec.and(ServiceTicketSpecification.byBranch(branchId));
         }
         if (search != null && !search.isBlank()) {
             spec = spec.and(ServiceTicketSpecification.search(search));
         }
         return jpaRepo.findAll(spec, pageable).map(mapper::toDomain);
+    }
+
+    @Override
+    @Transactional
+    public void updateBranch(Integer serviceTicketId, Integer branchId) {
+        jpaRepo.updateBranch(serviceTicketId, branchId);
+        jpaRepo.updateBookingBranchOfTicket(serviceTicketId, branchId);
     }
 
     @Override

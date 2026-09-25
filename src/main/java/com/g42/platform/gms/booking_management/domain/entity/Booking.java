@@ -31,5 +31,7 @@ public class Booking {
     private List<CatalogItem> services;
     private Integer queueOrder;
     private Integer estimateTime;
+    /** Xưởng nhận lịch (Liquibase 044). */
+    private Integer branchId;
 
 }

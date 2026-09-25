@@ -5,6 +5,8 @@ import com.g42.platform.gms.service_ticket_management.domain.enums.BackfillRevie
 import com.g42.platform.gms.service_ticket_management.domain.enums.EntryMode;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketType;
+import com.g42.platform.gms.branch.service.BranchStampListener;
+import com.g42.platform.gms.branch.service.BranchStamped;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -20,8 +22,9 @@ import java.util.List;
  */
 @Entity(name = "ServiceTicketManagement")
 @Table(name = "service_ticket")
+@EntityListeners(BranchStampListener.class)
 @Data
-public class ServiceTicketJpa {
+public class ServiceTicketJpa implements BranchStamped {
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -154,6 +157,12 @@ public class ServiceTicketJpa {
 
     @Column(name = "walk_in_address", length = 500)
     private String walkInAddress;
+
+    // Xưởng làm phiếu (Liquibase 044). Tự điền lúc INSERT (BranchStampListener);
+    // updatable = false để luồng cập nhật cũ copy null từ domain không xoá mất xưởng —
+    // đổi xưởng đi đường riêng ServiceTicketRepository.updateBranch.
+    @Column(name = "branch_id", updatable = false)
+    private Integer branchId;
 
     @PrePersist
     protected void onCreate() {

@@ -69,6 +69,10 @@ public class ServiceTicketSpecification {
      *
      * @param walkIn true = chỉ phiếu khách lẻ, false = chỉ phiếu khách có hồ sơ
      */
+    public static Specification<ServiceTicketJpa> byBranch(Integer branchId) {
+        return (root, query, cb) -> cb.equal(root.get("branchId"), branchId);
+    }
+
     public static Specification<ServiceTicketJpa> byWalkIn(boolean walkIn) {
         return (root, query, cb) -> walkIn
                 ? cb.isTrue(root.get("isWalkIn"))

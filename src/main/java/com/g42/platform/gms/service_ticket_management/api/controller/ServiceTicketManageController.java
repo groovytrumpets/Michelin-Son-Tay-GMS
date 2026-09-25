@@ -13,7 +13,10 @@ import com.g42.platform.gms.service_ticket_management.application.service.Servic
 import com.g42.platform.gms.service_ticket_management.application.service.ServiceTicketManageService;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketType;
+import com.g42.platform.gms.authz.PermissionCodes;
+import com.g42.platform.gms.systemlog.annotation.Auditable;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
@@ -46,7 +49,9 @@ public class ServiceTicketManageController {
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String ticketType,
             // null = tất cả; true = chỉ phiếu bán lẻ khách vãng lai
-            @RequestParam(required = false) Boolean walkIn) {
+            @RequestParam(required = false) Boolean walkIn,
+            // null = mọi xưởng
+            @RequestParam(required = false) Integer branchId) {
 
         TicketStatus ticketStatus = null;
         if (status != null && !status.isBlank()) {
@@ -57,13 +62,26 @@ public class ServiceTicketManageController {
             try { type = TicketType.valueOf(ticketType.toUpperCase()); } catch (IllegalArgumentException ignored) {}
         }
         return ResponseEntity.ok(ApiResponses.success(
-            serviceTicketManageService.getServiceTicketList(page, size, date, ticketStatus, search, type, walkIn)));
+            serviceTicketManageService.getServiceTicketList(page, size, date, ticketStatus, search, type, walkIn, branchId)));
     }
 
     @GetMapping("/tickets/{ticketCode}")
     public ResponseEntity<ApiResponse<ServiceTicketDetailResponse>> getServiceTicketDetail(
             @PathVariable String ticketCode) {
         return ResponseEntity.ok(ApiResponses.success(serviceTicketManageService.getServiceTicketDetail(ticketCode)));
+    }
+
+    /**
+     * Sửa xưởng ghi trên phiếu (và lịch hẹn gốc) khi lỡ tạo phiếu lúc máy đang chọn nhầm xưởng.
+     * Không ảnh hưởng kho: kho dùng chung giữa các xưởng.
+     */
+    @PutMapping("/tickets/{ticketCode}/branch")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.SERVICE_TICKET_EDIT + "')")
+    @Auditable(action = "UPDATE", module = "SERVICE_TICKET", description = "Đổi xưởng của phiếu", targetType = "SERVICE_TICKET")
+    public ResponseEntity<ApiResponse<ServiceTicketDetailResponse>> changeBranch(
+            @PathVariable String ticketCode,
+            @RequestParam Integer branchId) {
+        return ResponseEntity.ok(ApiResponses.success(serviceTicketManageService.changeBranch(ticketCode, branchId)));
     }
 
     /**

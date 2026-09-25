@@ -112,7 +112,9 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
                     b.getQueueOrder(),
                     b.getEstimateId(),
                     b.getIsPartsSale(),
-                    b.getEstimateId() != null && heldEstimateIds.contains(b.getEstimateId())
+                    b.getEstimateId() != null && heldEstimateIds.contains(b.getEstimateId()),
+                    b.getBranchId(),
+                    com.g42.platform.gms.branch.service.BranchDirectory.nameFor(b.getBranchId())
             );
         });
     }
@@ -175,6 +177,8 @@ public class BookingManageRepositoryImpl implements BookingManageRepository {
         booking.setScheduledDate(request.getScheduledDate());
         booking.setScheduledTime(request.getScheduledTime());
         booking.setCreatedAt(request.getCreatedAt());
+        // Khách đã chọn xưởng thì giữ; không thì listener ghi xưởng của máy đang duyệt.
+        booking.setBranchId(request.getBranchId());
         List<CatalogItem> catalogItems = request.getServices();
         int estimateTime = catalogItems.stream()
                 .filter(item -> item.getServiceService() != null)

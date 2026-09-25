@@ -25,4 +25,8 @@ public abstract class BaseBookingRequest extends ReminderRequest {
 
     @Size(max = 20, message = "Số điện thoại người giới thiệu không hợp lệ")
     protected String referrerPhone;
+
+    /** Xưởng khách hẹn tới (Liquibase 044). Bỏ trống = xưởng máy đang chọn / xưởng mặc định. */
+    @Positive(message = "Xưởng không hợp lệ")
+    protected Integer branchId;
 }

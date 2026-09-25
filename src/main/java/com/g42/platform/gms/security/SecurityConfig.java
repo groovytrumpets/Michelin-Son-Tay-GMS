@@ -90,7 +90,8 @@ public class SecurityConfig {
                             "https://sontaygarage.vn","https://api.sontaygarage.vn","https://staff.sontaygarage.vn","http://127.0.0.1:5500",
                             "https://demo.sontaygarage.vn","https://demoapi.sontaygarage.vn","https://staff.demo.sontaygarage.vn"));
                     config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-                    config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept"));
+                    // X-Branch-Id: xưởng mà máy đang dùng đã chọn (xem BranchDirectory)
+                    config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "X-Branch-Id"));
                     config.setAllowCredentials(true);
                     return config;
                 }))
@@ -147,6 +148,8 @@ public class SecurityConfig {
                                 "/api/public/site-header",
                                 // Tuyển dụng: ứng viên xem tin và nộp hồ sơ mà không có tài khoản.
                                 "/api/public/recruitment/**",
+                                // Danh sách xưởng cho form khách đặt lịch online.
+                                "/api/public/branches",
                                 "/seo/**"
                         ).permitAll()
                         // Trang khách (tra phụ tùng, bài viết) dùng chung API tìm kiếm của kho,

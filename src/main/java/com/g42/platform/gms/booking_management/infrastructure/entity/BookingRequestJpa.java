@@ -92,6 +92,10 @@ public class BookingRequestJpa {
     @Column(name = "referrer_phone", length = 20)
     private String referrerPhone;
 
+    // Xưởng khách chọn khi gửi yêu cầu (Liquibase 044); duyệt thành lịch hẹn thì chép sang booking.
+    @Column(name = "branch_id", updatable = false)
+    private Integer branchId;
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) {

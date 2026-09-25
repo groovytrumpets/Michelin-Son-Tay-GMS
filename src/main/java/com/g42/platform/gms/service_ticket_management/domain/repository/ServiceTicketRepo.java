@@ -33,7 +33,10 @@ public interface ServiceTicketRepo {
 
     /** @param walkIn null = không lọc; true/false = chỉ phiếu bán lẻ khách vãng lai / phiếu khách có hồ sơ */
     Page<ServiceTicket> findAll(TicketStatus status, LocalDate date, String search, TicketType ticketType,
-                                Boolean walkIn, Pageable pageable);
+                                Boolean walkIn, Integer branchId, Pageable pageable);
+
+    /** Đổi xưởng của phiếu (và lịch hẹn gốc nếu có) — cột branch_id không cập nhật qua save(). */
+    void updateBranch(Integer serviceTicketId, Integer branchId);
 
     Page<ServiceTicket> findByAssignedStaff(Integer staffId, TicketStatus status, LocalDate date, String search, Pageable pageable);
 

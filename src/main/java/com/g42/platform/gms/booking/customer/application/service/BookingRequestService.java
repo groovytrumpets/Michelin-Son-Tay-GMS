@@ -39,6 +39,7 @@ public class BookingRequestService {
     private final StaffProfileRepo staffRepository;
     private final BookingCodeGenerator bookingCodeGenerator;
     private final StaffNotifyService staffNotifyService;
+    private final com.g42.platform.gms.branch.service.BranchDirectory branchDirectory;
     
     private final Map<String, RateLimitInfo> rateLimitCache = new ConcurrentHashMap<>();
     
@@ -91,6 +92,10 @@ public class BookingRequestService {
         bookingRequest.setScheduledTime(request.getAppointmentTime());
         bookingRequest.setDescription(request.getUserNote());
         bookingRequest.setReferrerPhone(request.getReferrerPhone());
+        // Chỉ nhận xưởng đang hoạt động; sai / bỏ trống thì để null, lúc duyệt lấy xưởng của máy duyệt.
+        if (branchDirectory.isUsable(request.getBranchId())) {
+            bookingRequest.setBranchId(request.getBranchId());
+        }
         bookingRequest.setStatus(BookingRequestStatus.PENDING);
         bookingRequest.setIsGuest(true);
         

@@ -84,6 +84,7 @@ public class BookingService {
     private final BookingCodeGenerator bookingCodeGenerator;
     private final com.g42.platform.gms.catalog.infrastructure.repository.ComboItemRepository comboItemRepository;
     private final VehicleRepository vehicleRepository;
+    private final com.g42.platform.gms.branch.service.BranchDirectory branchDirectory;
 
     /** Cache để tracking rate limit (in-memory, sẽ reset khi restart server) */
     private final Map<String, RateLimitInfo> rateLimitCache = new ConcurrentHashMap<>();
@@ -162,6 +163,7 @@ public class BookingService {
         booking.setDescription(description);
         booking.setIsGuest(false);
         booking.setStatus(BookingStatus.CONFIRMED);
+        booking.setBranchId(branchDirectory.resolve(request.getBranchId()));
 
         if (request.getSelectedServiceIds() != null && !request.getSelectedServiceIds().isEmpty()) {
             booking.setCatalogItemIds(request.getSelectedServiceIds());
@@ -416,6 +418,7 @@ public class BookingService {
         booking.setDescription(description);
         booking.setIsGuest(false);
         booking.setStatus(BookingStatus.CONFIRMED);
+        booking.setBranchId(branchDirectory.resolve(request.getBranchId()));
         booking.setEstimateId(request.getEstimateId());
         booking.setIsPartsSale(request.getIsPartsSale() != null ? request.getIsPartsSale() : false);
         // Phân công sẵn (tuỳ chọn) — check-in sẽ dùng làm giá trị mặc định.

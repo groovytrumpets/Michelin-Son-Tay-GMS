@@ -33,6 +33,8 @@ public class Booking {
     private String vehicleTypeNote;
     /** Số km ước tính khách đọc qua điện thoại lúc tạo lịch — chỉ để tham khảo, không phải số đo thật. */
     private Integer odometerEstimate;
+    /** Xưởng nhận lịch (Liquibase 044). Để null thì BranchStampListener tự điền lúc lưu. */
+    private Integer branchId;
     
     public void initializeDefaults() {
         if (createdAt == null) {

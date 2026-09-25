@@ -76,6 +76,8 @@ public class RevenueReportResponse {
         /** Hạng mục chiếm nhiều tiền nhất trong hoá đơn. */
         private String category;
         private String staffName;
+        /** Xưởng làm phiếu; sổ cũ tính là của xưởng mặc định. */
+        private String branchName;
         private BigDecimal subtotal;
         private BigDecimal discountAmount;
         private BigDecimal totalAmount;

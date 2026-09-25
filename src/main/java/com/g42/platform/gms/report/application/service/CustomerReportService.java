@@ -74,9 +74,21 @@ public class CustomerReportService {
     private final CustomerInternalApi customerInternalApi;
     private final VehicleInternalApi vehicleInternalApi;
     private final DashboardRevenueService dashboardRevenueService;
+    private final com.g42.platform.gms.branch.service.BranchDirectory branchDirectory;
 
     @Transactional(readOnly = true)
     public CustomerReportResponse buildReport(LocalDate fromDate, LocalDate toDate, boolean includeLegacy) {
+        return buildReport(fromDate, toDate, includeLegacy, null);
+    }
+
+    /**
+     * @param branchId null = mọi xưởng. Sổ cũ chỉ tính khi lọc đúng xưởng mặc định (xem
+     *                 RevenueReportService). Khi lọc theo xưởng thì doanh thu cộng từ hoá đơn,
+     *                 không lấy con số của dashboard vì con số đó là của cả hệ thống.
+     */
+    @Transactional(readOnly = true)
+    public CustomerReportResponse buildReport(LocalDate fromDate, LocalDate toDate, boolean includeLegacy,
+                                              Integer branchId) {
         LocalDate from = fromDate != null ? fromDate : LocalDate.now();
         LocalDate to = toDate != null ? toDate : LocalDate.now();
         if (from.isAfter(to)) {
@@ -90,9 +102,12 @@ public class CustomerReportService {
 
         List<ServiceTicket> tickets = serviceTicketRepo.findBetween(start, end).stream()
                 .filter(t -> t != null && !Boolean.TRUE.equals(t.getIsDeleted()))
+                .filter(t -> branchId == null || branchId.equals(t.getBranchId()))
                 .toList();
 
-        List<LegacyVisitJpa> legacyVisits = includeLegacy
+        Integer defaultBranchId = branchDirectory.defaultBranchId();
+        boolean legacyInBranch = branchId == null || branchId.equals(defaultBranchId);
+        List<LegacyVisitJpa> legacyVisits = includeLegacy && legacyInBranch
                 ? legacyVisitRepository.findByVisitedAtBetweenOrderByVisitedAtAsc(start, end)
                 : List.<LegacyVisitJpa>of();
 
@@ -143,6 +158,7 @@ public class CustomerReportService {
                     .licensePlate(vehicle != null ? nz(vehicle.getLicensePlate()) : "")
                     .ticketStatus(ticket.getTicketStatus() != null ? ticket.getTicketStatus().name() : "")
                     .ticketType(ticket.getTicketType() != null ? ticket.getTicketType().name() : "")
+                    .branchName(branchDirectory.nameOf(ticket.getBranchId()))
                     .paid(paid)
                     .hasBill(bill != null)
                     .revenue(bill != null ? nvl(bill.getFinalAmount()) : BigDecimal.ZERO)
@@ -170,6 +186,7 @@ public class CustomerReportService {
                     .licensePlate(vehicle != null ? nz(vehicle.getLicensePlate()) : "")
                     .ticketStatus("LEGACY")
                     .ticketType("")
+                    .branchName(branchDirectory.nameOf(defaultBranchId))
                     // Sổ cũ chỉ ghi lượt đã làm xong: có tiền trong sổ nghĩa là đã thu.
                     .paid(amount.signum() > 0)
                     .hasBill(false)
@@ -198,7 +215,7 @@ public class CustomerReportService {
 
         // Bảng doanh thu tổng hợp chỉ biết phiếu trong phần mềm, nên nó thay cho phần
         // revenueFromBills chứ không thay cho tiền sổ cũ.
-        BigDecimal kpiPaidRevenue = fetchDashboardPaidRevenue(from, to);
+        BigDecimal kpiPaidRevenue = branchId == null ? fetchDashboardPaidRevenue(from, to) : BigDecimal.ZERO;
         boolean useDashboard = kpiPaidRevenue.signum() > 0;
         BigDecimal systemRevenue = useDashboard ? kpiPaidRevenue : revenueFromBills;
         BigDecimal totalRevenue = systemRevenue.add(legacyRevenue);
@@ -239,7 +256,11 @@ public class CustomerReportService {
 
     /** Xuất báo cáo ra file Excel (.xlsx) gồm 3 sheet: Tổng quan / Theo khách hàng / Chi tiết phiếu. */
     public byte[] exportReport(LocalDate fromDate, LocalDate toDate, boolean includeLegacy) {
-        CustomerReportResponse report = buildReport(fromDate, toDate, includeLegacy);
+        return exportReport(fromDate, toDate, includeLegacy, null);
+    }
+
+    public byte[] exportReport(LocalDate fromDate, LocalDate toDate, boolean includeLegacy, Integer branchId) {
+        CustomerReportResponse report = buildReport(fromDate, toDate, includeLegacy, branchId);
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             writeOverviewSheet(workbook, report.getSummary());
             writeCustomerSheet(workbook, report.getCustomers());

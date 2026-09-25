@@ -31,6 +31,10 @@ public interface ServiceTicketListMapper {
     @Mapping(target = "scheduledTime", source = "booking.scheduledTime")
     @Mapping(target = "serviceCategory", source = "booking.serviceCategory")
     @Mapping(target = "isGuest", source = "booking.isGuest")
+    // Cả phiếu lẫn lịch hẹn đều có branchId; phiếu mới là nơi thật sự làm (có thể đã đổi xưởng)
+    @Mapping(target = "branchId", source = "ticket.branchId")
+    @Mapping(target = "branchName",
+            expression = "java(com.g42.platform.gms.branch.service.BranchDirectory.nameFor(ticket.getBranchId()))")
     ServiceTicketListResponse toManageListResponse(ServiceTicket ticket,
                                                     CustomerProfile customer,
                                                     Vehicle vehicle,

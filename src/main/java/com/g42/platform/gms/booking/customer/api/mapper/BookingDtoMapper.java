@@ -41,6 +41,8 @@ public abstract class BookingDtoMapper {
     @Mapping(target = "progressSteps", ignore = true)
     @Mapping(target = "technicianNotes", ignore = true)
     @Mapping(target = "ticketStatus", ignore = true)
+    @Mapping(target = "branchName",
+            expression = "java(com.g42.platform.gms.branch.service.BranchDirectory.nameFor(domain.getBranchId()))")
     public abstract BookingResponse toResponse(Booking domain);
 
     @AfterMapping

@@ -63,6 +63,9 @@ public class ServiceTicket {
     private String walkInPhone;
     private String walkInAddress;
 
+    // Xưởng làm phiếu (Liquibase 044). Để null lúc tạo thì BranchStampListener tự điền.
+    private Integer branchId;
+
     // List of photo IDs (not full objects - MapStruct will handle conversion)
     private List<Integer> photoIds = new ArrayList<>();
     

@@ -73,9 +73,21 @@ public class RevenueReportService {
     private final CustomerInternalApi customerInternalApi;
     private final VehicleInternalApi vehicleInternalApi;
     private final EntityManager entityManager;
+    private final com.g42.platform.gms.branch.service.BranchDirectory branchDirectory;
 
     @Transactional(readOnly = true)
     public RevenueReportResponse buildReport(LocalDate fromDate, LocalDate toDate, boolean includeLegacy) {
+        return buildReport(fromDate, toDate, includeLegacy, null);
+    }
+
+    /**
+     * @param branchId null = mọi xưởng. Sổ dịch vụ cũ không ghi xưởng, nhưng toàn bộ là của
+     *                 xưởng có sẵn trước khi có nhiều xưởng (xưởng mặc định) nên chỉ hiện khi
+     *                 lọc đúng xưởng đó.
+     */
+    @Transactional(readOnly = true)
+    public RevenueReportResponse buildReport(LocalDate fromDate, LocalDate toDate, boolean includeLegacy,
+                                             Integer branchId) {
         LocalDate from = fromDate != null ? fromDate : LocalDate.now().withDayOfMonth(1);
         LocalDate to = toDate != null ? toDate : LocalDate.now();
         if (from.isAfter(to)) {
@@ -116,6 +128,9 @@ public class RevenueReportService {
             if (ticket == null || !isCountable(ticket)) {
                 continue;
             }
+            if (branchId != null && !branchId.equals(ticket.getBranchId())) {
+                continue;
+            }
             billByTicket.merge(ticket.getServiceTicketId(), bill,
                     (a, b) -> preferBill(b, a) ? b : a);
         }
@@ -124,7 +139,9 @@ public class RevenueReportService {
         List<ServiceTicketJpa> tickets = bills.stream()
                 .map(b -> ticketsById.get(b.getServiceTicketId())).toList();
 
-        List<LegacyVisitJpa> legacyVisits = includeLegacy
+        Integer defaultBranchId = branchDirectory.defaultBranchId();
+        boolean legacyInBranch = branchId == null || branchId.equals(defaultBranchId);
+        List<LegacyVisitJpa> legacyVisits = includeLegacy && legacyInBranch
                 ? legacyVisitRepository.findByVisitedAtBetweenOrderByVisitedAtAsc(start, end).stream()
                     .filter(v -> nvl(v.getTotalAmount()).signum() > 0)
                     .toList()
@@ -197,6 +214,7 @@ public class RevenueReportService {
                     .ticketStatus(ticket.getTicketStatus() != null ? ticket.getTicketStatus().name() : "")
                     .category(mainCategory(lines))
                     .staffName(resolveStaff(ticket, advisorByTicket, staffNames))
+                    .branchName(branchDirectory.nameOf(ticket.getBranchId()))
                     .subtotal(bill.getSubTotal() != null ? bill.getSubTotal() : total.add(nvl(bill.getDiscountAmount())))
                     .discountAmount(nvl(bill.getDiscountAmount()))
                     .totalAmount(total)
@@ -228,6 +246,7 @@ public class RevenueReportService {
                     .ticketStatus(SOURCE_LEGACY)
                     .category(LEGACY_LABEL)
                     .staffName(LEGACY_LABEL)
+                    .branchName(branchDirectory.nameOf(defaultBranchId))
                     .subtotal(amount.add(discount))
                     .discountAmount(discount)
                     .totalAmount(amount)

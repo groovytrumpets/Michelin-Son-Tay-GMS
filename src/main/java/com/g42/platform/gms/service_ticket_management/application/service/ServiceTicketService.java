@@ -51,6 +51,9 @@ public class ServiceTicketService {
         ticket.setCustomerId(customerId);
         ticket.setCreatedBy(createdBy);
         ticket.setCustomerRequest(booking.getDescription());
+        // Khách hẹn ở xưởng nào thì phiếu thuộc xưởng đó, kể cả khi lễ tân check-in trên
+        // một máy đang chọn xưởng khác. Lịch cũ chưa có xưởng thì để listener điền theo máy.
+        ticket.setBranchId(booking.getBranchId());
         ticket.initializeDefaults();
 
         ServiceTicket saved = serviceTicketRepo.save(ticket);

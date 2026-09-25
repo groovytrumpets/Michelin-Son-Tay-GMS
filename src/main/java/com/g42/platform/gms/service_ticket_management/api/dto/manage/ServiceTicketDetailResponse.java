@@ -91,6 +91,10 @@ public class ServiceTicketDetailResponse {
     private Integer backfillParentTicketId;
     private String backfillReason;
 
+    // Xưởng làm phiếu (Liquibase 044)
+    private Integer branchId;
+    private String branchName;
+
     @Data
     @NoArgsConstructor
     @AllArgsConstructor

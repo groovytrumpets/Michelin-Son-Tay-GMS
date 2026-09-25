@@ -30,6 +30,8 @@ public class BookingRequest {
     private String clientIp;
     private List<Integer> catalogItemIds = new ArrayList<>();
     private String referrerPhone;
+    /** Xưởng khách chọn (Liquibase 044); null = xưởng của máy duyệt yêu cầu. */
+    private Integer branchId;
     
     public void initializeDefaults() {
         if (createdAt == null) {

@@ -6,6 +6,7 @@ import com.g42.platform.gms.service_ticket_management.domain.enums.TicketType;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
@@ -31,6 +32,16 @@ public interface ServiceTicketRepository extends JpaRepository<ServiceTicketJpa,
      * @return Optional containing the service ticket if found
      */
     Optional<ServiceTicketJpa> findByTicketCode(String ticketCode);
+
+    // branch_id khai báo updatable = false trên entity nên phải UPDATE thẳng (xem ServiceTicketJpa)
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = "UPDATE service_ticket SET branch_id = :branchId WHERE service_ticket_id = :ticketId", nativeQuery = true)
+    int updateBranch(@Param("ticketId") Integer ticketId, @Param("branchId") Integer branchId);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = "UPDATE booking b JOIN service_ticket t ON t.booking_id = b.booking_id " +
+            "SET b.branch_id = :branchId WHERE t.service_ticket_id = :ticketId", nativeQuery = true)
+    int updateBookingBranchOfTicket(@Param("ticketId") Integer ticketId, @Param("branchId") Integer branchId);
     
     /**
      * Check if a service ticket exists with the given ticket code.

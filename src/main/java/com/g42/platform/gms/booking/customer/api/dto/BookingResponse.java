@@ -30,6 +30,8 @@ public class BookingResponse {
     private Integer technicianId;
     private String vehicleTypeNote;
     private Integer odometerEstimate;
+    private Integer branchId;
+    private String branchName;
 
     // Progress tracking
     private List<ProgressStep> progressSteps;

@@ -3,6 +3,8 @@ package com.g42.platform.gms.booking_management.infrastructure.entity;
 import com.g42.platform.gms.auth.entity.CustomerProfile;
 import com.g42.platform.gms.booking_management.domain.enums.BookingEnum;
 import com.g42.platform.gms.vehicle.entity.Vehicle;
+import com.g42.platform.gms.branch.service.BranchStampListener;
+import com.g42.platform.gms.branch.service.BranchStamped;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -13,8 +15,9 @@ import java.util.List;
 
 @Entity
 @Table(name = "booking")
+@EntityListeners(BranchStampListener.class)
 @Data
-public class BookingJpa {
+public class BookingJpa implements BranchStamped {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "booking_id")
@@ -64,4 +67,8 @@ public class BookingJpa {
     private Integer estimateId;
     @Column(name = "is_parts_sale", nullable = false)
     private Boolean isPartsSale = false;
+
+    // Xưởng nhận lịch (Liquibase 044) — xem ghi chú cùng cột ở ServiceTicketJpa.
+    @Column(name = "branch_id", updatable = false)
+    private Integer branchId;
 }

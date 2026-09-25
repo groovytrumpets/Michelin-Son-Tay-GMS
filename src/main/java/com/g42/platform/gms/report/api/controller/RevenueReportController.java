@@ -35,8 +35,10 @@ public class RevenueReportController {
     public ResponseEntity<ApiResponse<RevenueReportResponse>> getRevenueReport(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            @RequestParam(defaultValue = "false") boolean includeLegacy) {
+            @RequestParam(defaultValue = "false") boolean includeLegacy,
+            // null = mọi xưởng
+            @RequestParam(required = false) Integer branchId) {
         return ResponseEntity.ok(ApiResponses.success(
-                revenueReportService.buildReport(from, to, includeLegacy)));
+                revenueReportService.buildReport(from, to, includeLegacy, branchId)));
     }
 }

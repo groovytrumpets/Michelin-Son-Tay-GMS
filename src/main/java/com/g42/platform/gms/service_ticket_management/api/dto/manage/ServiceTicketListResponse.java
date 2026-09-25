@@ -66,4 +66,8 @@ public class ServiceTicketListResponse {
     private EntryMode entryMode;
     private BackfillKind backfillKind;
     private BackfillReviewStatus backfillReviewStatus;
+
+    // Xưởng làm phiếu (Liquibase 044)
+    private Integer branchId;
+    private String branchName;
 }

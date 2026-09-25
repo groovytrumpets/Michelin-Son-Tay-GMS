@@ -39,17 +39,20 @@ public class CustomerReportController {
     public ResponseEntity<ApiResponse<CustomerReportResponse>> getCustomerReport(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            @RequestParam(defaultValue = "true") boolean includeLegacy) {
+            @RequestParam(defaultValue = "true") boolean includeLegacy,
+            // null = mọi xưởng
+            @RequestParam(required = false) Integer branchId) {
         return ResponseEntity.ok(ApiResponses.success(
-                customerReportService.buildReport(from, to, includeLegacy)));
+                customerReportService.buildReport(from, to, includeLegacy, branchId)));
     }
 
     @GetMapping("/customer/export")
     public ResponseEntity<byte[]> exportCustomerReport(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            @RequestParam(defaultValue = "true") boolean includeLegacy) {
-        byte[] content = customerReportService.exportReport(from, to, includeLegacy);
+            @RequestParam(defaultValue = "true") boolean includeLegacy,
+            @RequestParam(required = false) Integer branchId) {
+        byte[] content = customerReportService.exportReport(from, to, includeLegacy, branchId);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.parseMediaType(
