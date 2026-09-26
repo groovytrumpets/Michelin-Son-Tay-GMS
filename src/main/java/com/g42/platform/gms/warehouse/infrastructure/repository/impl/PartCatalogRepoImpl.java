@@ -122,6 +122,11 @@ public class PartCatalogRepoImpl implements PartCatalogRepo {
         return jpaRepo.existsBySku(sku);
     }
 
+    @Override
+    public boolean existsActiveBySku(String sku) {
+        return jpaRepo.existsActiveBySku(sku, null);
+    }
+
     /** SQL: INSERT hoặc UPDATE catalog_item */
     @Override
     public CatalogItem save(CatalogItem item) {

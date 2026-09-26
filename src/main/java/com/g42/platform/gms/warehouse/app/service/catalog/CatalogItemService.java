@@ -138,9 +138,12 @@ public class CatalogItemService {
         }
         applyMeasurementConfig(domain, createDto, null);
         String normalizedSlug = normalizeSlug(createDto.getSlug());
-        if (normalizedSlug != null && catalogItemRepo.exitBySlug(normalizedSlug)) {
-            throw new WarehouseException("Đường dẫn đã được dùng cho mặt hàng khác, hãy chọn đường dẫn khác",
-                    WarehouseErrorCode.DUPLICATE_SLUG);
+        if (normalizedSlug != null) {
+            if (catalogItemRepo.existsActiveBySlug(normalizedSlug, null)) {
+                throw new WarehouseException("Đường dẫn đã được dùng cho mặt hàng khác, hãy chọn đường dẫn khác",
+                        WarehouseErrorCode.DUPLICATE_SLUG);
+            }
+            catalogItemRepo.releaseSlugFromInactive(normalizedSlug);
         }
         domain.setSlug(normalizedSlug);
 
@@ -236,7 +239,7 @@ public class CatalogItemService {
                         WarehouseErrorCode.INVALID_BRAND);
             }
         }
-        if (catalogItemRepo.exitBySku(createDto.getSku())){
+        if (catalogItemRepo.existsActiveBySku(createDto.getSku(), null)){
             throw new WarehouseException("Sku is duplicated! please create new sku",
                     WarehouseErrorCode.DUPLICATE_SKU);
         }
@@ -550,7 +553,7 @@ public class CatalogItemService {
 
         // Validate SKU only if it changed
         if (updateDto.getSku() != null && !updateDto.getSku().equals(catalogItem.getSku())) {
-            if (catalogItemRepo.exitBySku(updateDto.getSku())){
+            if (catalogItemRepo.existsActiveBySku(updateDto.getSku(), itemId)){
                 throw new WarehouseException("Sku is duplicated! please create new sku",
                         WarehouseErrorCode.DUPLICATE_SKU);
             }
@@ -558,10 +561,12 @@ public class CatalogItemService {
 
         if (updateDto.getSlug() != null) {
             String normalizedSlug = normalizeSlug(updateDto.getSlug());
-            if (normalizedSlug != null && !normalizedSlug.equals(catalogItem.getSlug())
-                    && catalogItemRepo.exitBySlug(normalizedSlug)) {
-                throw new WarehouseException("Đường dẫn đã được dùng cho mặt hàng khác, hãy chọn đường dẫn khác",
-                        WarehouseErrorCode.DUPLICATE_SLUG);
+            if (normalizedSlug != null && !normalizedSlug.equals(catalogItem.getSlug())) {
+                if (catalogItemRepo.existsActiveBySlug(normalizedSlug, itemId)) {
+                    throw new WarehouseException("Đường dẫn đã được dùng cho mặt hàng khác, hãy chọn đường dẫn khác",
+                            WarehouseErrorCode.DUPLICATE_SLUG);
+                }
+                catalogItemRepo.releaseSlugFromInactive(normalizedSlug);
             }
             catalogItem.setSlug(normalizedSlug);
         }
@@ -1044,6 +1049,13 @@ public class CatalogItemService {
         CatalogItemJpa catalogItem = catalogItemJpaRepo.findById(itemId)
                 .orElseThrow(() -> new WarehouseException(
                         "Catalog item not found", WarehouseErrorCode.CATALOG_404));
+
+        // Trong lúc bị xoá, SKU có thể đã được mục mới lấy lại — không cho hai mục đang hoạt động trùng SKU.
+        // (Slug không cần kiểm tra: nếu đã bị lấy thì mục này đã bị gỡ slug về null.)
+        if (catalogItem.getSku() != null && catalogItemRepo.existsActiveBySku(catalogItem.getSku(), itemId)) {
+            throw new WarehouseException("SKU của mục này đã được mục khác dùng lại, không thể kích hoạt lại",
+                    WarehouseErrorCode.DUPLICATE_SKU);
+        }
 
         catalogItem.setIsActive(true);
         catalogItemJpaRepo.save(catalogItem);

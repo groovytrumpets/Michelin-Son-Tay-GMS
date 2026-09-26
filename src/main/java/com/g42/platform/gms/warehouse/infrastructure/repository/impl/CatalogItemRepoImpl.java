@@ -102,12 +102,16 @@ public class CatalogItemRepoImpl implements CatalogItemRepo {
     }
 
     @Override
-    public boolean exitBySku(String sku) {
-        return catalogItemJpaRepo.existsBySku(sku);
+    public boolean existsActiveBySku(String sku, Integer excludeItemId) {
+        return catalogItemJpaRepo.existsActiveBySku(sku, excludeItemId);
     }
     @Override
-    public boolean exitBySlug(String slug) {
-        return catalogItemJpaRepo.existsBySlug(slug);
+    public boolean existsActiveBySlug(String slug, Integer excludeItemId) {
+        return catalogItemJpaRepo.existsActiveBySlug(slug, excludeItemId);
+    }
+    @Override
+    public void releaseSlugFromInactive(String slug) {
+        catalogItemJpaRepo.releaseSlugFromInactive(slug);
     }
     @Override
     public Integer findItemIdBySlug(String slug) {

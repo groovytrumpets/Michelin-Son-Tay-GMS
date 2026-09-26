@@ -27,9 +27,13 @@ public interface CatalogItemRepo {
 
     ProductLine saveProductLine(ProductLine productLine);
 
-    boolean exitBySku(String sku);
+    /** Chỉ tính mục đang hoạt động — SKU của mục đã xoá được phép dùng lại. */
+    boolean existsActiveBySku(String sku, Integer excludeItemId);
 
-    boolean exitBySlug(String slug);
+    /** Chỉ tính mục đang hoạt động; slug của mục đã xoá gỡ bằng {@link #releaseSlugFromInactive}. */
+    boolean existsActiveBySlug(String slug, Integer excludeItemId);
+
+    void releaseSlugFromInactive(String slug);
 
     Integer findItemIdBySlug(String slug);
 

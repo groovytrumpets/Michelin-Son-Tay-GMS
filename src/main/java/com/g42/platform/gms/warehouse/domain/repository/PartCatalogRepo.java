@@ -25,6 +25,9 @@ public interface PartCatalogRepo {
 
     boolean existsBySku(String sku);
 
+    /** Như existsBySku nhưng bỏ qua mục đã xoá (is_active = 0) — SKU của mục đã xoá được dùng lại. */
+    boolean existsActiveBySku(String sku);
+
     CatalogItem save(CatalogItem item);
 
     /** Lấy tên item theo danh sách id — dùng cho enrichment response */

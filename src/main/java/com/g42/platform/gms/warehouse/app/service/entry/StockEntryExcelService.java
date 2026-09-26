@@ -99,8 +99,10 @@ public class StockEntryExcelService {
             Integer staffId) {
 
         // Build map SKU -> itemId từ catalog PART.
+        // Bỏ mục đã xoá: SKU của nó có thể đã được mục mới dùng lại.
         Map<String, Integer> skuToItemId = partCatalogRepo.findAllParts().stream()
                 .filter(p -> p.getSku() != null)
+                .filter(p -> !Boolean.FALSE.equals(p.getIsActive()))
                 .collect(Collectors.toMap(
                         p -> p.getSku().trim().toLowerCase(),
                 CatalogItem::getItemId,

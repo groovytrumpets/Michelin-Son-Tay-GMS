@@ -75,7 +75,7 @@ public class WarehouseCatalogService {
 
     private String resolveSku(String requestedSku) {
         if (requestedSku != null && !requestedSku.isBlank()) {
-            if (partCatalogRepo.existsBySku(requestedSku)) {
+            if (partCatalogRepo.existsActiveBySku(requestedSku)) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT,
                         "SKU '" + requestedSku + "' đã tồn tại");
             }
