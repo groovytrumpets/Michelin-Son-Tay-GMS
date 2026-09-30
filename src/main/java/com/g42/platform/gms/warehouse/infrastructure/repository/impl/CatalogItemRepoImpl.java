@@ -226,6 +226,11 @@ public class CatalogItemRepoImpl implements CatalogItemRepo {
     }
 
     @Override
+    public Map<Integer, String> findAllCateNamesByIds(Set<Integer> categoryIds) {
+        return itemCategoryJpaRepo.findCateNamesByIds(categoryIds);
+    }
+
+    @Override
     public int findCategoryMaxOrder() {
         return itemCategoryJpaRepo.findMaxDisplayOrder();
     }

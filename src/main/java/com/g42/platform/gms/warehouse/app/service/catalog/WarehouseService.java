@@ -258,6 +258,7 @@ public class WarehouseService {
         Map<Integer, String> lineMap = catalogItemRepo.findAllLinesByIds(lineIds);
 
         Map<Integer, String> cateMap = catalogItemRepo.findAllCatesByIds(categoryIds);
+        Map<Integer, String> cateNameMap = catalogItemRepo.findAllCateNamesByIds(categoryIds);
 
         Map<Integer, List<WarehouseDetailDto>> itemWarehouseMap;
 
@@ -320,6 +321,7 @@ public class WarehouseService {
             }
             if (catalogItem.getItemCategoryId() != null) {
                 dto.setItemCategoryCode(cateMap.get(catalogItem.getItemCategoryId()));
+                dto.setItemCategoryName(cateNameMap.get(catalogItem.getItemCategoryId()));
             }
             List<WarehouseDetailDto> details = itemWarehouseMap.getOrDefault(catalogItem.getItemId(), new ArrayList<>());
             dto.setWarehouseDetails(details);

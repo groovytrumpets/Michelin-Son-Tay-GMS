@@ -28,10 +28,11 @@ public interface ItemCategoryJpaRepo extends JpaRepository<ItemCategoryJpa, Inte
     interface ItemCategoryProjection {
         Integer getItemCategoryId();
         String getCategoryCode();
+        String getCategoryName();
     }
 
     @Query("""
-        select c.itemCategoryId as itemCategoryId, c.categoryCode as categoryCode
+        select c.itemCategoryId as itemCategoryId, c.categoryCode as categoryCode, c.categoryName as categoryName
             from ItemCategoryJpa c where c.itemCategoryId in :categoryIds
     """)
     List<ItemCategoryProjection> findAllItemCateIdsMap(@Param("categoryIds") Set<Integer> categoryIds);
@@ -44,5 +45,16 @@ public interface ItemCategoryJpaRepo extends JpaRepository<ItemCategoryJpa, Inte
                 ItemCategoryProjection::getItemCategoryId,
                 ItemCategoryProjection::getCategoryCode
         ));
+    }
+
+    default Map<Integer, String> findCateNamesByIds(Set<Integer> categoryIds) {
+        if (categoryIds == null || categoryIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Integer, String> result = new java.util.HashMap<>();
+        for (ItemCategoryProjection p : findAllItemCateIdsMap(categoryIds)) {
+            result.put(p.getItemCategoryId(), p.getCategoryName());
+        }
+        return result;
     }
 }

@@ -72,6 +72,8 @@ public interface CatalogItemRepo {
 
     Map<Integer, String> findAllCatesByIds(Set<Integer> categoryIds);
 
+    Map<Integer, String> findAllCateNamesByIds(Set<Integer> categoryIds);
+
     int findCategoryMaxOrder();
 
     List<ItemColor> getColorsByItemId(Integer itemId);
