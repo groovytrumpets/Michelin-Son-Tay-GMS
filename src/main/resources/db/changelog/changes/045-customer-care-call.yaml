@@ -1,0 +1,192 @@
+# Gọi chăm sóc khách hàng — thay cho file Excel "Đã gọi / Lặp sđt / Gọi thành công / Note".
+#
+# VÌ SAO LÀ NHẬT KÝ CUỘC GỌI CHỨ KHÔNG PHẢI MẤY CỘT CỜ
+# File Excel chỉ giữ được MỘT trạng thái cho mỗi dòng: gọi lần hai là ghi đè lần một,
+# không biết ai gọi, gọi lúc nào, và ô "Note" phải gánh cả kết quả lẫn lời hẹn ("Vài hôm
+# nữa sẽ qua", "Chưa đến kỳ kiểm tra"). Ở đây mỗi cuộc gọi là một dòng; trạng thái hiện
+# tại của khách (chưa gọi / chưa liên lạc được / hẹn gọi lại / đã hẹn lịch / ...) được
+# SUY RA từ cuộc gọi gần nhất ở tầng ứng dụng, nên không có cột trạng thái nào để lệch.
+#
+# Cột "Tổng" và "Lặp sđt" của file cũng KHÔNG lưu: tổng chi tiêu cộng từ hoá đơn + sổ cũ,
+# trùng SĐT/biển số dò từ danh bạ, đều tính lúc đọc — file Excel có ô "#REF!" chính vì
+# con số đó do người gõ công thức giữ.
+#
+# Cờ called / call_success / call_note trên legacy_visit (nhập từ sổ cũ) vẫn giữ nguyên và
+# được đọc như "cuộc gọi từ sổ cũ" khi khách chưa có cuộc gọi nào trong phần mềm. Không
+# chép sang bảng mới: lô sổ cũ còn được sửa lại / nhập lại, chép thì hai bản lệch nhau.
+#
+# customer_id của cả hai bảng tự được chuyển khi gộp hồ sơ trùng (ReferenceRewriter dò
+# theo tên cột), không cần đăng ký thêm ở đâu.
+databaseChangeLog:
+  - changeSet:
+      id: 045-1-customer-care-call
+      author: gms
+      comment: Nhật ký từng cuộc gọi chăm sóc khách
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: customer_care_call
+      changes:
+        - createTable:
+            tableName: customer_care_call
+            remarks: Một cuộc gọi chăm sóc khách hàng và kết quả của nó
+            columns:
+              - column:
+                  name: care_call_id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: customer_id
+                  type: INT
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_care_call_customer
+                    referencedTableName: customer_profile
+                    referencedColumnNames: customer_id
+              - column:
+                  name: phone
+                  type: VARCHAR(20)
+                  remarks: Số đã gọi — khách có thể có nhiều số
+              - column:
+                  name: called_at
+                  type: DATETIME
+                  constraints:
+                    nullable: false
+                  remarks: Lúc gọi; mặc định lúc ghi, sửa được khi ghi bù cuộc gọi đã gọi trước đó
+              - column:
+                  name: staff_id
+                  type: INT
+                  remarks: Nhân viên gọi (staff_profile)
+              - column:
+                  name: reached
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+                  remarks: Có nói chuyện được với khách không — cột "Gọi thành công" của file Excel
+              - column:
+                  name: outcome
+                  type: VARCHAR(30)
+                  constraints:
+                    nullable: false
+                  remarks: Mã kết quả (CareCallOutcome) — NO_ANSWER, BLOCKED, THINKING, NOT_DUE, BOOKED...
+              - column:
+                  name: note
+                  type: VARCHAR(1000)
+                  remarks: Ghi chú tự do — cột "Note" của file Excel
+              - column:
+                  name: follow_up_date
+                  type: DATE
+                  remarks: Ngày hẹn gọi lại; NULL = không hẹn
+              - column:
+                  name: created_at
+                  type: DATETIME
+                  defaultValueComputed: CURRENT_TIMESTAMP
+        - createIndex:
+            tableName: customer_care_call
+            indexName: idx_care_call_customer_time
+            columns:
+              - column:
+                  name: customer_id
+              - column:
+                  name: called_at
+        - createIndex:
+            tableName: customer_care_call
+            indexName: idx_care_call_called_at
+            columns:
+              - column:
+                  name: called_at
+      rollback:
+        - dropTable:
+            tableName: customer_care_call
+
+  - changeSet:
+      id: 045-2-customer-care-profile
+      author: gms
+      comment: Ghi chú chăm sóc lâu dài của một khách (khác ghi chú từng cuộc gọi)
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: customer_care_profile
+      changes:
+        - createTable:
+            tableName: customer_care_profile
+            remarks: Điều cần nhớ mỗi lần gọi khách này — VD "chỉ rảnh cuối tuần", "gọi sau 17h"
+            columns:
+              - column:
+                  name: customer_id
+                  type: INT
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+                    foreignKeyName: fk_care_profile_customer
+                    referencedTableName: customer_profile
+                    referencedColumnNames: customer_id
+              - column:
+                  name: care_note
+                  type: VARCHAR(1000)
+              - column:
+                  name: preferred_time
+                  type: VARCHAR(100)
+                  remarks: Khung giờ nên gọi
+              - column:
+                  name: updated_by
+                  type: INT
+              - column:
+                  name: updated_at
+                  type: DATETIME
+      rollback:
+        - dropTable:
+            tableName: customer_care_profile
+
+  - changeSet:
+      id: 045-3-permission-customer-care
+      author: gms
+      comment: >-
+        Mã quyền cho màn gọi chăm sóc khách. Cấp cho lễ tân và quản lý ở cả bộ đang dùng lẫn
+        bộ mặc định (để nút "Khôi phục mặc định" không nuốt mất). ADMIN tự có mọi quyền.
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: "0"
+            sql: SELECT COUNT(*) FROM permission WHERE code = 'CUSTOMER_CARE_VIEW'
+      changes:
+        - sql:
+            splitStatements: false
+            sql: >-
+              INSERT INTO permission (code, module_code, module_label, group_label, action_code, label, description, sort_order) VALUES
+              ('CUSTOMER_CARE_VIEW','CUSTOMER_CARE','Gọi chăm sóc khách hàng','Marketing & CSKH','VIEW','Xem','Mở /customer-care-calls: danh sách cần gọi, tổng chi tiêu, lịch sử dịch vụ',691),
+              ('CUSTOMER_CARE_CALL','CUSTOMER_CARE','Gọi chăm sóc khách hàng','Marketing & CSKH','CALL','Ghi cuộc gọi','Ghi kết quả gọi, hẹn gọi lại, sửa ghi chú chăm sóc, bật/tắt ngừng liên hệ',692)
+        - sql:
+            splitStatements: false
+            sql: >-
+              INSERT INTO role_permission (role_id, permission_code)
+              SELECT r.role_id, p.code
+              FROM role r
+              JOIN permission p ON p.code IN ('CUSTOMER_CARE_VIEW','CUSTOMER_CARE_CALL')
+              WHERE r.role_code IN ('MANAGER','RECEPTIONIST')
+                AND NOT EXISTS (
+                  SELECT 1 FROM role_permission rp
+                  WHERE rp.role_id = r.role_id AND rp.permission_code = p.code
+                )
+        - sql:
+            splitStatements: false
+            sql: >-
+              INSERT INTO role_permission_default (role_id, permission_code)
+              SELECT r.role_id, p.code
+              FROM role r
+              JOIN permission p ON p.code IN ('CUSTOMER_CARE_VIEW','CUSTOMER_CARE_CALL')
+              WHERE r.role_code IN ('MANAGER','RECEPTIONIST')
+                AND NOT EXISTS (
+                  SELECT 1 FROM role_permission_default rpd
+                  WHERE rpd.role_id = r.role_id AND rpd.permission_code = p.code
+                )
+      rollback:
+        - sql: "DELETE FROM role_permission WHERE permission_code IN ('CUSTOMER_CARE_VIEW','CUSTOMER_CARE_CALL')"
+        - sql: "DELETE FROM role_permission_default WHERE permission_code IN ('CUSTOMER_CARE_VIEW','CUSTOMER_CARE_CALL')"
+        - sql: "DELETE FROM permission WHERE code IN ('CUSTOMER_CARE_VIEW','CUSTOMER_CARE_CALL')"

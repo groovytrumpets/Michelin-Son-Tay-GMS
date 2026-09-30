@@ -179,6 +179,10 @@ public final class PermissionCodes {
     public static final String CAMPAIGN_VIEW = "CAMPAIGN_VIEW";
     public static final String CAMPAIGN_SEND = "CAMPAIGN_SEND";
 
+    /** Màn gọi chăm sóc khách (/customer-care-calls). Changeset 045-3. */
+    public static final String CUSTOMER_CARE_VIEW = "CUSTOMER_CARE_VIEW";
+    public static final String CUSTOMER_CARE_CALL = "CUSTOMER_CARE_CALL";
+
     public static final String LOYALTY_VIEW = "LOYALTY_VIEW";
     public static final String LOYALTY_EDIT = "LOYALTY_EDIT";
 
