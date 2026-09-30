@@ -7,8 +7,6 @@ import com.g42.platform.gms.billing.infrastructure.entity.ServiceBillJpa;
 import com.g42.platform.gms.billing.infrastructure.repository.ServiceBillJpaRepo;
 import com.g42.platform.gms.customerimport.infrastructure.entity.LegacyVisitJpa;
 import com.g42.platform.gms.customerimport.infrastructure.repository.LegacyVisitRepository;
-import com.g42.platform.gms.dashboard.api.dto.DashboardRevenueResponseDto;
-import com.g42.platform.gms.dashboard.application.service.DashboardRevenueService;
 import com.g42.platform.gms.report.api.dto.CustomerReportResponse;
 import com.g42.platform.gms.report.api.dto.CustomerReportResponse.CustomerRow;
 import com.g42.platform.gms.report.api.dto.CustomerReportResponse.Summary;
@@ -51,7 +49,6 @@ import java.util.stream.Stream;
  *  - {@code service_ticket} (lọc theo received_at) → danh sách khách + số phiếu.
  *  - {@code service_bill}   → số tiền thu theo từng phiếu.
  *  - {@code legacy_visit}   → lượt khách nhập từ sổ Excel cũ, khi {@code includeLegacy}.
- *  - {@link DashboardRevenueService} → đối chiếu tổng thu với bảng doanh thu tổng hợp.
  *
  * Về tiền của sổ cũ: {@code legacy_visit.total_amount} là con số chép tay, không có hoá đơn
  * đằng sau, nên nó KHÔNG được trộn vào doanh thu kế toán ở những báo cáo khác. Ở đây nó có
@@ -73,7 +70,6 @@ public class CustomerReportService {
     private final LegacyVisitRepository legacyVisitRepository;
     private final CustomerInternalApi customerInternalApi;
     private final VehicleInternalApi vehicleInternalApi;
-    private final DashboardRevenueService dashboardRevenueService;
     private final com.g42.platform.gms.branch.service.BranchDirectory branchDirectory;
 
     @Transactional(readOnly = true)
@@ -213,11 +209,7 @@ public class CustomerReportService {
                 .map(TicketRow::getDiscountAmount).map(CustomerReportService::nvl)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // Bảng doanh thu tổng hợp chỉ biết phiếu trong phần mềm, nên nó thay cho phần
-        // revenueFromBills chứ không thay cho tiền sổ cũ.
-        BigDecimal kpiPaidRevenue = branchId == null ? fetchDashboardPaidRevenue(from, to) : BigDecimal.ZERO;
-        boolean useDashboard = kpiPaidRevenue.signum() > 0;
-        BigDecimal systemRevenue = useDashboard ? kpiPaidRevenue : revenueFromBills;
+        BigDecimal systemRevenue = revenueFromBills;
         BigDecimal totalRevenue = systemRevenue.add(legacyRevenue);
 
         long paidTickets = ticketRows.stream().filter(TicketRow::isPaid).count();
@@ -239,7 +231,7 @@ public class CustomerReportService {
                 .revenueFromBills(revenueFromBills)
                 .discountTotal(discountTotal)
                 .averagePerCustomer(averagePerCustomer)
-                .revenueSource(useDashboard ? "dashboard" : "bills")
+                .revenueSource("bills")
                 .legacyIncluded(includeLegacy)
                 .legacyVisits(legacyVisits.size())
                 .legacyOnlyCustomers(legacyOnlyCustomers)
@@ -384,18 +376,6 @@ public class CustomerReportService {
                 .filter(r -> r.legacy == legacy)
                 .map(r -> nvl(r.row.getRevenue()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
-    private BigDecimal fetchDashboardPaidRevenue(LocalDate from, LocalDate to) {
-        try {
-            DashboardRevenueResponseDto dto = dashboardRevenueService.getRevenueReport(from, to);
-            if (dto != null && dto.getKpis() != null && dto.getKpis().getPaidRevenue() != null) {
-                return dto.getKpis().getPaidRevenue();
-            }
-        } catch (Exception e) {
-            log.warn("Không lấy được doanh thu tổng hợp cho báo cáo khách hàng: {}", e.getMessage());
-        }
-        return BigDecimal.ZERO;
     }
 
     // ------------------------------------------------------------------------------------------

@@ -1,0 +1,154 @@
+# Bảng cache số liệu tổng hợp cho trang /dashboard — MỖI NGÀY MỘT DÒNG.
+#
+# VÌ SAO CACHE THEO NGÀY
+# Widget dashboard hỏi theo kỳ (hôm nay / tháng / năm / tất cả). Nếu mỗi lần mở trang lại
+# quét hoá đơn + phiếu + sổ cũ từ đầu thì kỳ "Tất cả" càng ngày càng chậm. Ở đây mỗi ngày
+# được tính MỘT lần thành một dòng; đọc kỳ nào thì chỉ cộng các dòng trong kỳ (vài trăm tới
+# vài nghìn dòng). Ngày chưa có dòng thì tính bù lúc đọc.
+#
+# KHI NÀO MỘT DÒNG ĐƯỢC TÍNH LẠI (xem DashboardSummaryService)
+#  - Dòng bị coi là "chưa chốt" nếu computed_at còn trước 00:00 của ngày summary_date + 2
+#    (tức là tính lúc ngày đó chưa qua hẳn) → đọc tới là tính lại nếu đã cũ hơn vài phút.
+#    Hôm nay và hôm qua vì vậy luôn gần đúng thời gian thực.
+#  - Job đêm tính lại 62 ngày gần nhất để bắt các thay đổi muộn: phiếu nhập bù có paid_at
+#    ngày cũ, lịch hẹn được đánh "khách không đến" sau vài hôm, sửa giới tính khách...
+#  - Nút "Làm mới số liệu" trên dashboard (quyền REVENUE_VIEW) tính lại cả kỳ đang xem —
+#    dùng sau khi nhập / sửa lô sổ cũ của những năm trước.
+#
+# Bảng này chỉ là số dẫn xuất: xoá sạch cũng không mất gì, lần đọc sau sẽ tự tính lại.
+#
+# Bảng dashboard_revenue_summary (changeset 015) được tạo trước đây cho cùng mục đích nhưng
+# không có code nào ghi vào nên luôn rỗng — bỏ đi để khỏi nhầm.
+databaseChangeLog:
+  - changeSet:
+      id: 046-1-dashboard-daily-summary
+      author: gms
+      comment: Cache số liệu dashboard theo ngày
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: dashboard_daily_summary
+      changes:
+        - createTable:
+            tableName: dashboard_daily_summary
+            remarks: Số liệu tổng hợp một ngày cho dashboard (cache, tính lại được bất cứ lúc nào)
+            columns:
+              - column:
+                  name: summary_date
+                  type: DATE
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: paid_revenue
+                  type: DECIMAL(15,2)
+                  defaultValueNumeric: 0
+                  remarks: Tổng final_amount của hoá đơn đã thu có paid_at trong ngày (mỗi phiếu một hoá đơn)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: paid_bill_count
+                  type: INT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: discount_amount
+                  type: DECIMAL(15,2)
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: legacy_revenue
+                  type: DECIMAL(15,2)
+                  defaultValueNumeric: 0
+                  remarks: Tiền sổ dịch vụ cũ (legacy_visit) — luôn tách riêng khỏi doanh thu hệ thống
+                  constraints:
+                    nullable: false
+              - column:
+                  name: legacy_visit_count
+                  type: INT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: new_customers
+                  type: INT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: new_customers_male
+                  type: INT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: new_customers_female
+                  type: INT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: new_customers_other
+                  type: INT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: booking_requests
+                  type: INT
+                  defaultValueNumeric: 0
+                  remarks: Yêu cầu đặt lịch tạo trong ngày (trừ SPAM)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: bookings_scheduled
+                  type: INT
+                  defaultValueNumeric: 0
+                  remarks: Lịch hẹn sửa xe hẹn vào ngày này (trừ DRAFT, trừ lịch lấy hàng bán lẻ)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: bookings_done
+                  type: INT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: bookings_not_arrived
+                  type: INT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: bookings_cancelled
+                  type: INT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: tickets_completed
+                  type: INT
+                  defaultValueNumeric: 0
+                  remarks: Phiếu KTV báo xong trong ngày (completed_at), đang ở COMPLETED hoặc PAID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: computed_at
+                  type: DATETIME
+                  constraints:
+                    nullable: false
+
+  - changeSet:
+      id: 046-2-drop-dashboard-revenue-summary
+      author: gms
+      comment: Bỏ bảng tổng hợp doanh thu cũ không có code nào ghi vào (thay bằng dashboard_daily_summary)
+      preConditions:
+        - onFail: MARK_RAN
+        - tableExists:
+            tableName: dashboard_revenue_summary
+      changes:
+        - dropTable:
+            tableName: dashboard_revenue_summary

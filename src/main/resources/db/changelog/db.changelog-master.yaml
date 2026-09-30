@@ -145,3 +145,6 @@ databaseChangeLog:
   - include:
       file: changes/045-customer-care-call.yaml
       relativeToChangelogFile: true
+  - include:
+      file: changes/046-dashboard-daily-summary.yaml
+      relativeToChangelogFile: true

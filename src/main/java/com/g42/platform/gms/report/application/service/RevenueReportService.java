@@ -297,14 +297,15 @@ public class RevenueReportService {
                 .map(Transaction::getTotalAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    private static boolean isCountable(ServiceTicketJpa ticket) {
+    /** Phiếu có được tính vào doanh thu không — dashboard dùng chung quy tắc này. */
+    public static boolean isCountable(ServiceTicketJpa ticket) {
         return !Boolean.TRUE.equals(ticket.getIsDeleted())
                 && ticket.getTicketStatus() != TicketStatus.CANCELLED
                 && ticket.getBackfillReviewStatus() != BackfillReviewStatus.REJECTED;
     }
 
     /** Ưu tiên hoá đơn đã thu, rồi hoá đơn thu muộn hơn, rồi mã hoá đơn lớn hơn. */
-    private static boolean preferBill(ServiceBillJpa candidate, ServiceBillJpa current) {
+    public static boolean preferBill(ServiceBillJpa candidate, ServiceBillJpa current) {
         boolean candPaid = candidate.getPaymentStatus() == PaymentStatus.PAID;
         boolean currPaid = current.getPaymentStatus() == PaymentStatus.PAID;
         if (candPaid != currPaid) {
