@@ -47,13 +47,15 @@ public class DashboardSummaryResponse {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class Revenue {
+        /** Tổng doanh thu hiển thị trên dashboard = paidRevenue + legacyRevenue. */
+        private BigDecimal totalRevenue;
         /** Tổng thực thu của hoá đơn trong hệ thống (không gồm sổ cũ). */
         private BigDecimal paidRevenue;
-        /** Ước tính trước thuế: paidRevenue / 1,1 — hoá đơn chưa lưu tiền thuế riêng. */
+        /** Ước tính trước thuế: totalRevenue / 1,1 — hoá đơn / sổ cũ chưa lưu tiền thuế riêng. */
         private BigDecimal revenueNoTax;
         private BigDecimal discountAmount;
         private long paidBillCount;
-        /** Tiền sổ dịch vụ cũ trong kỳ — để riêng, không cộng vào paidRevenue. */
+        /** Tiền sổ dịch vụ cũ trong kỳ — không cộng vào paidRevenue, đã cộng vào totalRevenue. */
         private BigDecimal legacyRevenue;
         private long legacyVisitCount;
     }

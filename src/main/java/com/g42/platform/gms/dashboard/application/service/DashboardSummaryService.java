@@ -238,12 +238,17 @@ public class DashboardSummaryService {
 
     private static Revenue revenue(List<DailyRow> rows) {
         BigDecimal paid = sumMoney(rows, DailyRow::getPaidRevenue);
+        BigDecimal legacy = sumMoney(rows, DailyRow::getLegacyRevenue);
+        // Dashboard gộp cả tiền sổ cũ vào tổng doanh thu (khác trang Quản lý doanh thu, nơi sổ cũ
+        // là tuỳ chọn) — vẫn trả paidRevenue / legacyRevenue riêng để hiện phần tách.
+        BigDecimal total = paid.add(legacy);
         return Revenue.builder()
+                .totalRevenue(total)
                 .paidRevenue(paid)
-                .revenueNoTax(paid.divide(VAT_DIVISOR, 0, RoundingMode.HALF_UP))
+                .revenueNoTax(total.divide(VAT_DIVISOR, 0, RoundingMode.HALF_UP))
                 .discountAmount(sumMoney(rows, DailyRow::getDiscountAmount))
                 .paidBillCount(sumInt(rows, DailyRow::getPaidBillCount))
-                .legacyRevenue(sumMoney(rows, DailyRow::getLegacyRevenue))
+                .legacyRevenue(legacy)
                 .legacyVisitCount(sumInt(rows, DailyRow::getLegacyVisitCount))
                 .build();
     }
