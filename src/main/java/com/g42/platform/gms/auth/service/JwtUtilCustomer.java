@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.util.Date;
 import java.util.Map;
+import java.util.Optional;
 
 @Slf4j
 @Component
@@ -44,32 +45,26 @@ public class JwtUtilCustomer {
                 .getBody();
     }
 
-    public boolean isTokenValid(String token) {
+    /**
+     * Claims của token khách còn hạn; rỗng nếu không phải token khách hợp lệ.
+     *
+     * <p>Mọi request có Bearer token đều đi qua filter khách trước filter nhân viên, nên token
+     * nhân viên (ký bằng key khác — JWTService base64-decode secret, lớp này thì không) sẽ luôn
+     * sai chữ ký ở đây. Đó là trường hợp BÌNH THƯỜNG, chỉ log DEBUG; trước đây log ERROR cho
+     * từng request của nhân viên khiến log đầy "Secret key mismatch" dù request vẫn thành công.
+     */
+    public Optional<Claims> parseValidClaims(String token) {
         try {
-            Claims claims = extractClaims(token);
-            Date expiration = claims.getExpiration();
-            Date now = new Date();
-            if (expiration.before(now)) {
-                log.error("Token expired: exp={}, now={}", expiration, now);
-                return false;
-            }
-            log.debug("Token is valid: exp={}, now={}", expiration, now);
-            return true;
+            return Optional.of(extractClaims(token));
         } catch (ExpiredJwtException e) {
-            log.error("Token expired: exp={}, now={}", e.getClaims().getExpiration(), new Date());
-            return false;
+            log.debug("Customer token expired: exp={}", e.getClaims().getExpiration());
         } catch (io.jsonwebtoken.security.SecurityException e) {
-            log.error("Token signature invalid - Secret key mismatch? Error: {}", e.getMessage());
-            return false;
-        } catch (MalformedJwtException e) {
-            log.error("Token malformed: {}", e.getMessage());
-            return false;
-        } catch (UnsupportedJwtException e) {
-            log.error("Token unsupported: {}", e.getMessage());
-            return false;
+            log.debug("Không phải token khách (sai chữ ký) — để filter nhân viên xử lý");
+        } catch (MalformedJwtException | UnsupportedJwtException e) {
+            log.warn("Token malformed/unsupported: {}", e.getMessage());
         } catch (JwtException | IllegalArgumentException e) {
-            log.error("Token validation failed: {} - {}", e.getClass().getSimpleName(), e.getMessage());
-            return false;
+            log.warn("Token validation failed: {} - {}", e.getClass().getSimpleName(), e.getMessage());
         }
+        return Optional.empty();
     }
 }

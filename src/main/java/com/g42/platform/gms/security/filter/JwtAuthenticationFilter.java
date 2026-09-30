@@ -72,13 +72,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         final String token = authHeader.substring(7).trim();
         
         try {
-            // validate customer token
-            boolean isValid = jwtUtilCustomer.isTokenValid(token);
-            log.debug("JWT Filter: Token validation result for {}: {}", request.getRequestURI(), isValid);
+            // validate customer token — token nhân viên sẽ ra rỗng ở đây, StaffJwtFilter xử lý sau
+            Claims claims = jwtUtilCustomer.parseValidClaims(token).orElse(null);
 
-            if (isValid) {
-                // parse claims từ token
-                Claims claims = jwtUtilCustomer.extractClaims(token);
+            if (claims != null) {
                 String phone = claims.getSubject(); // phone từ token
                 String role = claims.get("role", String.class);
                 Integer customerId = claims.get("customerId", Integer.class);
@@ -109,10 +106,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 // set authentication vào security context để authorization sử dụng
                 SecurityContextHolder.getContext().setAuthentication(authentication);
 
-                log.info("JWT Authentication successful - CustomerId: {}, Phone: {}, Path: {}", 
-                    customerId, phone, request.getRequestURI());
-            } else {
-                log.warn("JWT Token validation failed for path: {}", request.getRequestURI());
+                log.debug("JWT Authentication successful - CustomerId: {}, Path: {}",
+                    customerId, request.getRequestURI());
             }
         } catch (Exception e) {
             // nếu parse lỗi (có thể là staff token hoặc token không hợp lệ) → catch và cho qua

@@ -9,6 +9,7 @@ import com.g42.platform.gms.authz.application.PermissionResolver;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
+import lombok.extern.slf4j.Slf4j;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -22,6 +23,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+@Slf4j
 @Component
 public class StaffJwtFilter extends OncePerRequestFilter {
 
@@ -101,11 +103,8 @@ public class StaffJwtFilter extends OncePerRequestFilter {
                         // attach request metadata (ip, sessionId)
                         authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                         
-                        // log thông tin request (có thể dùng để audit)
-                        String userAgent = request.getHeader("User-Agent");
-                        String ip = request.getHeader("X-Forwarded-For");
-                        System.out.println("WEB: " + userAgent);
-                        System.out.println("IP: " + ip);
+                        log.debug("Staff auth ok - path: {}, ip: {}, agent: {}", path,
+                                request.getHeader("X-Forwarded-For"), request.getHeader("User-Agent"));
                         
                         // set authentication vào security context để authorization sử dụng
                         SecurityContextHolder.getContext().setAuthentication(authToken);
