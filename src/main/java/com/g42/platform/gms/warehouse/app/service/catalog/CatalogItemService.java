@@ -40,6 +40,9 @@ import java.util.List;
 
 @Service("catalogItemWarehouseService")
 public class CatalogItemService {
+    /** Khớp catalog_item.item_name VARCHAR(500) — changeset 049. */
+    public static final int ITEM_NAME_MAX_LENGTH = 500;
+
     @Autowired
     private InventoryJpaRepo inventoryJpaRepo;
     @Autowired
@@ -229,7 +232,15 @@ public class CatalogItemService {
                 .toList();
     }
 
+    private static void validateItemNameLength(String itemName) {
+        if (itemName != null && itemName.trim().length() > ITEM_NAME_MAX_LENGTH) {
+            throw new WarehouseException("Tên sản phẩm tối đa " + ITEM_NAME_MAX_LENGTH + " ký tự",
+                    WarehouseErrorCode.INVALID_ITEM_NAME);
+        }
+    }
+
     private void validateCatalogItemDto(CatalogCreateDto createDto) {
+        validateItemNameLength(createDto.getItemName());
         if (createDto.getBrandId() != null) {
             Brand brand = catalogItemRepo.getBrandById(createDto.getBrandId());
             // is_active để trống là hãng cũ nhập trước khi có cột này — coi như đang dùng.
@@ -622,6 +633,7 @@ public class CatalogItemService {
         List<Specification> specificationsForSearch = catalogItemRepo.getListOfSpecsByItem(itemId);
 
         if (updateDto.getItemName() != null && !updateDto.getItemName().isBlank()) {
+            validateItemNameLength(updateDto.getItemName());
             catalogItem.setItemName(updateDto.getItemName());
         } else {
             ItemCategory categoryForName = itemCategoryForSearch != null ? itemCategoryForSearch : new ItemCategory();

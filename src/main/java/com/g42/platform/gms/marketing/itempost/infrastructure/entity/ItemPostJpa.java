@@ -37,7 +37,7 @@ public class ItemPostJpa {
     @Column(name = "catalog_item_id", nullable = false)
     private Integer catalogItemId;
 
-    @Column(name = "title", nullable = false, length = 250)
+    @Column(name = "title", nullable = false, length = 500)
     private String title;
 
     @Column(name = "excerpt", length = 500)

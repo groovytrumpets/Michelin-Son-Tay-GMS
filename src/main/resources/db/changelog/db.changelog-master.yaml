@@ -154,3 +154,6 @@ databaseChangeLog:
   - include:
       file: changes/048-document-print-set.yaml
       relativeToChangelogFile: true
+  - include:
+      file: changes/049-item-name-500.yaml
+      relativeToChangelogFile: true

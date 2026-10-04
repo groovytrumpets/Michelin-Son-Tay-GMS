@@ -1,0 +1,110 @@
+# Nới tên sản phẩm/dịch vụ từ 255 lên 500 ký tự.
+#
+# Tên mặt hàng (catalog_item.item_name) được chép nguyên sang dòng báo giá
+# (estimate_item), dòng sổ cũ (legacy_visit_item), tiêu đề bản nháp
+# (catalog_draft) và tiêu đề bài viết sản phẩm (item_post) — nới một cột mà
+# không nới các cột kia thì thêm mặt hàng tên dài vào báo giá sẽ lỗi.
+#
+# Dùng ALTER ... MODIFY thay cho modifyDataType để giữ đúng NULL/NOT NULL và
+# comment cột. Không ghi COLLATE: cột lấy collation mặc định của bảng, trùng với
+# collation hiện tại của cả 5 cột (đã soi information_schema 2026-10-04).
+# slug (220) giữ nguyên — backend tự cắt slug ở 220 ký tự.
+databaseChangeLog:
+  - changeSet:
+      id: 049-1-catalog-item-name-500
+      author: gms
+      comment: catalog_item.item_name VARCHAR(255) -> VARCHAR(500)
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: 1
+            sql: >-
+              SELECT COUNT(*) FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'catalog_item'
+                AND COLUMN_NAME = 'item_name' AND CHARACTER_MAXIMUM_LENGTH < 500
+      changes:
+        - sql:
+            sql: ALTER TABLE catalog_item MODIFY item_name VARCHAR(500) NULL
+      rollback:
+        - sql:
+            sql: ALTER TABLE catalog_item MODIFY item_name VARCHAR(255) NULL
+
+  - changeSet:
+      id: 049-2-estimate-item-name-500
+      author: gms
+      comment: estimate_item.item_name VARCHAR(255) -> VARCHAR(500)
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: 1
+            sql: >-
+              SELECT COUNT(*) FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'estimate_item'
+                AND COLUMN_NAME = 'item_name' AND CHARACTER_MAXIMUM_LENGTH < 500
+      changes:
+        - sql:
+            sql: ALTER TABLE estimate_item MODIFY item_name VARCHAR(500) NULL
+      rollback:
+        - sql:
+            sql: ALTER TABLE estimate_item MODIFY item_name VARCHAR(255) NULL
+
+  - changeSet:
+      id: 049-3-legacy-visit-item-name-500
+      author: gms
+      comment: legacy_visit_item.item_name VARCHAR(255) -> VARCHAR(500)
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: 1
+            sql: >-
+              SELECT COUNT(*) FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'legacy_visit_item'
+                AND COLUMN_NAME = 'item_name' AND CHARACTER_MAXIMUM_LENGTH < 500
+      changes:
+        - sql:
+            sql: >-
+              ALTER TABLE legacy_visit_item MODIFY item_name VARCHAR(500) NULL
+              COMMENT 'Ô "Diễn giải"; sổ cũ bỏ trống thì lấy chính tên hạng mục'
+      rollback:
+        - sql:
+            sql: >-
+              ALTER TABLE legacy_visit_item MODIFY item_name VARCHAR(255) NULL
+              COMMENT 'Ô "Diễn giải"; sổ cũ bỏ trống thì lấy chính tên hạng mục'
+
+  - changeSet:
+      id: 049-4-catalog-draft-title-500
+      author: gms
+      comment: catalog_draft.title VARCHAR(255) -> VARCHAR(500)
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: 1
+            sql: >-
+              SELECT COUNT(*) FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'catalog_draft'
+                AND COLUMN_NAME = 'title' AND CHARACTER_MAXIMUM_LENGTH < 500
+      changes:
+        - sql:
+            sql: ALTER TABLE catalog_draft MODIFY title VARCHAR(500) NOT NULL
+      rollback:
+        - sql:
+            sql: ALTER TABLE catalog_draft MODIFY title VARCHAR(255) NOT NULL
+
+  - changeSet:
+      id: 049-5-item-post-title-500
+      author: gms
+      comment: item_post.title VARCHAR(250) -> VARCHAR(500) (bài viết sản phẩm lấy tên sản phẩm làm tiêu đề)
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: 1
+            sql: >-
+              SELECT COUNT(*) FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'item_post'
+                AND COLUMN_NAME = 'title' AND CHARACTER_MAXIMUM_LENGTH < 500
+      changes:
+        - sql:
+            sql: ALTER TABLE item_post MODIFY title VARCHAR(500) NOT NULL
+      rollback:
+        - sql:
+            sql: ALTER TABLE item_post MODIFY title VARCHAR(250) NOT NULL

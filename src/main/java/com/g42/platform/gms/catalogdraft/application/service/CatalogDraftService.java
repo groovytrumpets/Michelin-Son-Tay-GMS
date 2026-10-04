@@ -80,7 +80,7 @@ public class CatalogDraftService {
         }
         String title = request.getTitle() == null ? "" : request.getTitle().trim();
         if (title.isEmpty()) title = "Bản nháp chưa đặt tên";
-        if (title.length() > 255) title = title.substring(0, 255);
+        if (title.length() > 500) title = title.substring(0, 500);
 
         entity.setStaffId(staffId);
         entity.setDraftType(type);

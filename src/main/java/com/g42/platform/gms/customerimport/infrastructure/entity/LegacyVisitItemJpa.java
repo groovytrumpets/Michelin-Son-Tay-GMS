@@ -34,7 +34,7 @@ public class LegacyVisitItemJpa {
     @Column(name = "category", length = 64)
     private String category;
 
-    @Column(name = "item_name", length = 255)
+    @Column(name = "item_name", length = 500)
     private String itemName;
 
     @Column(name = "quantity", precision = 9, scale = 2)

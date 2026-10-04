@@ -2,6 +2,7 @@ package com.g42.platform.gms.warehouse.api.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -10,6 +11,7 @@ import java.math.BigDecimal;
 public class CreatePartRequest {
 
     @NotBlank
+    @Size(max = 500, message = "Tên sản phẩm tối đa 500 ký tự")
     private String itemName;
 
     /** Kho sẽ tạo inventory record (qty=0) khi tạo part mới */

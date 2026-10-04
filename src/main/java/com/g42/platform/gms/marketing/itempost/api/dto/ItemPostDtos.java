@@ -159,7 +159,7 @@ public final class ItemPostDtos {
     /** Dữ liệu tạo/sửa bài. */
     public record SaveRequest(
             @NotBlank(message = "Tiêu đề không được để trống")
-            @Size(max = 250, message = "Tiêu đề tối đa 250 ký tự")
+            @Size(max = 500, message = "Tiêu đề tối đa 500 ký tự")
             String title,
             /** Bỏ trống thì hệ thống tự sinh từ tiêu đề. */
             @Size(max = 200) String slug,

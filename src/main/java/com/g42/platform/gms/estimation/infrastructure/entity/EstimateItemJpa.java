@@ -25,8 +25,8 @@ public class EstimateItemJpa {
     @Column(name = "estimate_id", nullable = false)
     private Integer estimateId;
 
-    @Size(max = 255)
-    @Column(name = "item_name")
+    @Size(max = 500)
+    @Column(name = "item_name", length = 500)
     private String itemName;
 
 
