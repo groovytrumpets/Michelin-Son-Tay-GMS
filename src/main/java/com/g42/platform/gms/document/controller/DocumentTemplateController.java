@@ -6,8 +6,10 @@ import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.document.dto.CompanyProfileDto;
 import com.g42.platform.gms.document.dto.DocumentKindDto;
+import com.g42.platform.gms.document.dto.DocumentPrintSetDto;
 import com.g42.platform.gms.document.dto.DocumentTemplateDto;
 import com.g42.platform.gms.document.dto.DocumentTemplateSummaryDto;
+import com.g42.platform.gms.document.service.DocumentPrintSetService;
 import com.g42.platform.gms.document.service.DocumentTemplateService;
 import com.g42.platform.gms.systemlog.annotation.Auditable;
 import lombok.RequiredArgsConstructor;
@@ -34,13 +36,16 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class DocumentTemplateController {
 
-    /** Ai được đọc mẫu + hồ sơ công ty để IN — người quản lý biểu mẫu và các màn nghiệp vụ có nút in. */
-    private static final String PRINT_READERS = "hasAnyAuthority('"
-            + PermissionCodes.DOCUMENT_TEMPLATE_VIEW + "','"
-            + PermissionCodes.PARTS_SALE_VIEW + "','"
-            + PermissionCodes.PARTS_SALE_CREATE + "')";
+    /**
+     * Ai được đọc mẫu, hồ sơ công ty và bộ in để IN: mọi nhân viên đã đăng nhập.
+     * Nút "In chứng từ" nằm ở nhiều màn (bán phụ tùng, tạo lịch, thu tiền, phiếu
+     * kho) với mã quyền khác nhau, còn mẫu chứng từ thì không có gì bí mật; chặn
+     * ở đây chỉ làm nút in ra tờ giấy trắng. Phần SỬA vẫn cần DOCUMENT_TEMPLATE_EDIT.
+     */
+    private static final String PRINT_READERS = "isAuthenticated() and !hasRole('CUSTOMER')";
 
     private final DocumentTemplateService documentTemplateService;
+    private final DocumentPrintSetService documentPrintSetService;
 
     // ---------------------------------------------------------------- dạng chứng từ
 
@@ -230,6 +235,56 @@ public class DocumentTemplateController {
         try {
             documentTemplateService.deleteTemplate(templateId);
             return ResponseEntity.ok(ApiResponses.successMessage("Đã xoá mẫu chứng từ"));
+        } catch (IllegalArgumentException e) {
+            return badRequest(e);
+        }
+    }
+
+    // ---------------------------------------------------------------- bộ in theo màn hình
+
+    /** Mọi bộ in đã được chỉnh — cho tab "Bộ in theo màn hình" ở /document-template. */
+    @GetMapping("/print-sets")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.DOCUMENT_TEMPLATE_VIEW + "')")
+    public ResponseEntity<ApiResponse<List<DocumentPrintSetDto>>> listPrintSets() {
+        return ResponseEntity.ok(ApiResponses.success(documentPrintSetService.listAll()));
+    }
+
+    /** Bộ in của một màn — popup "In chứng từ" của màn đó gọi khi mở. */
+    @GetMapping("/print-sets/{screenCode}")
+    @PreAuthorize(PRINT_READERS)
+    public ResponseEntity<ApiResponse<DocumentPrintSetDto>> getPrintSet(@PathVariable String screenCode) {
+        try {
+            return ResponseEntity.ok(ApiResponses.success(documentPrintSetService.get(screenCode)));
+        } catch (IllegalArgumentException e) {
+            return badRequest(e);
+        }
+    }
+
+    @PutMapping("/print-sets/{screenCode}")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.DOCUMENT_TEMPLATE_EDIT + "')")
+    @Auditable(action = "UPDATE", module = "DOCUMENT_TEMPLATE",
+            description = "Sửa bộ in chứng từ của màn hình", targetType = "DOCUMENT_PRINT_SET")
+    public ResponseEntity<ApiResponse<DocumentPrintSetDto>> savePrintSet(
+            @AuthenticationPrincipal StaffPrincipal principal,
+            @PathVariable String screenCode,
+            @RequestBody DocumentPrintSetDto dto) {
+        try {
+            return ResponseEntity.ok(ApiResponses.success(
+                    documentPrintSetService.save(screenCode, dto, staffId(principal))));
+        } catch (IllegalArgumentException e) {
+            return badRequest(e);
+        }
+    }
+
+    /** Bỏ cấu hình riêng, màn quay về bộ mặc định trong code. */
+    @DeleteMapping("/print-sets/{screenCode}")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.DOCUMENT_TEMPLATE_EDIT + "')")
+    @Auditable(action = "DELETE", module = "DOCUMENT_TEMPLATE",
+            description = "Khôi phục bộ in chứng từ mặc định", targetType = "DOCUMENT_PRINT_SET")
+    public ResponseEntity<ApiResponse<Void>> resetPrintSet(@PathVariable String screenCode) {
+        try {
+            documentPrintSetService.reset(screenCode);
+            return ResponseEntity.ok(ApiResponses.successMessage("Đã khôi phục bộ in mặc định"));
         } catch (IllegalArgumentException e) {
             return badRequest(e);
         }

@@ -1,0 +1,54 @@
+# Bộ "In chứng từ" theo từng màn hình.
+#
+# Mỗi màn nghiệp vụ có nút "In chứng từ" (bán phụ tùng, tạo lịch, thu tiền, phiếu
+# nhập kho, phiếu xuất kho...) mở cùng một popup; bảng này giữ màn nào được chọn
+# in những dạng chứng từ nào, theo thứ tự nào, dạng nào chọn sẵn. Quản lý ở
+# /document-template, tab "Bộ in theo màn hình".
+#
+# Màn chưa có dòng nào thì frontend dùng bộ mặc định viết trong code
+# (printSetup.js) — nên KHÔNG nạp sẵn dữ liệu ở đây.
+#
+# screen_code do frontend định nghĩa và backend không diễn giải; kind_codes là
+# mảng JSON mã dạng chứng từ (document_kind.code) xen lẫn mã phiếu viết tay cũ
+# (LEGACY_*) không có trong document_kind.
+databaseChangeLog:
+  - changeSet:
+      id: 048-1-document-print-set
+      author: gms
+      comment: Bộ dạng chứng từ in được ở từng màn hình nghiệp vụ
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: document_print_set
+      changes:
+        - createTable:
+            tableName: document_print_set
+            remarks: Màn nào in được những dạng chứng từ nào (popup In chứng từ)
+            columns:
+              - column:
+                  name: screen_code
+                  type: VARCHAR(50)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+                  remarks: Mã màn hình do frontend định nghĩa, VD PARTS_SALES, STOCK_ISSUE
+              - column:
+                  name: kind_codes
+                  type: TEXT
+                  constraints:
+                    nullable: false
+                  remarks: Mảng JSON mã dạng chứng từ theo thứ tự hiện trong popup
+              - column:
+                  name: default_kind_code
+                  type: VARCHAR(50)
+                  remarks: Dạng chọn sẵn khi mở popup; NULL = dạng đầu tiên
+              - column:
+                  name: updated_by
+                  type: INT
+              - column:
+                  name: updated_at
+                  type: DATETIME
+      rollback:
+        - dropTable:
+            tableName: document_print_set
