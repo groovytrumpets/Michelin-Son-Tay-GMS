@@ -42,14 +42,21 @@ public class StockAllocationService {
 
     @Transactional
     public List<StockAllocationDto> createStockAllocation(Integer estimateId, Integer staffId) {
+        // Chống bấm đúp theo TỪNG DÒNG báo giá chứ không theo cả báo giá: trước đây hễ báo giá
+        // có một allocation bất kỳ (kể cả RELEASED do huỷ giữ hàng) là bỏ qua toàn bộ, nên dòng
+        // thêm sau khi huỷ giữ hàng không bao giờ được giữ → phiếu kẹt, không yêu cầu xuất kho
+        // được mà cũng không tiến hành sửa được (MST_W4T244).
         List<StockAllocation> existingAllocations = stockAllocationRepository.findByEstimateId(estimateId);
-        if (existingAllocations!=null && !existingAllocations.isEmpty()) {
-            System.err.println("Estimate ID " + estimateId + " đã có allocation, bỏ qua tạo mới.");
-            return existingAllocations.stream().map(stockAllocationDtoMapper::toDto).toList();
-        }
+        List<StockAllocation> activeAllocations = existingAllocations == null ? List.of() : existingAllocations.stream()
+                .filter(a -> "RESERVED".equals(a.getStatus()) || "COMMITTED".equals(a.getStatus()))
+                .toList();
+        Set<Integer> estimateItemIdsWithActiveAllocation = activeAllocations.stream()
+                .map(StockAllocation::getEstimateItemId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
 
         Estimate newEstimate = estimateService.findById(estimateId);
-        List<StockAllocation> stockAllocations = new ArrayList<>();
+        List<StockAllocation> stockAllocations = new ArrayList<>(activeAllocations);
         Map<Integer, Integer> itemAncestryMap = new HashMap<>();
         Integer currentRevIdToCheck = newEstimate.getRevisedFromId();
 
@@ -82,6 +89,7 @@ public class StockAllocationService {
                     .collect(Collectors.toSet());
             List<EstimateItem> brandNewItems = newEstimateItems.stream()
                     .filter(newItem -> newItem.getIsRemoved()==false)
+                    .filter(newItem -> shouldAllocateItem(newItem, estimateItemIdsWithActiveAllocation))
                     .toList();
             List<EstimateItem> sortedItems = brandNewItems.stream()
                     // Dòng gõ tay / thu mua của khách không có itemId — xếp cuối thay vì NPE
@@ -163,7 +171,8 @@ public class StockAllocationService {
         else {
             List<EstimateItem> estimateItems = estimateItemRepository.findByEstimateId(estimateId);
             for (EstimateItem estimateItem : estimateItems) {
-                if (estimateItem.getItemId() != null && Boolean.FALSE.equals(estimateItem.getIsRemoved())) {
+                if (estimateItem.getItemId() != null && Boolean.FALSE.equals(estimateItem.getIsRemoved())
+                        && shouldAllocateItem(estimateItem, estimateItemIdsWithActiveAllocation)) {
                     List<ComboItemJpa> comboSubItems = comboItemRepoJpa.findAllByComboId(estimateItem.getItemId());
                     if (comboSubItems != null && !comboSubItems.isEmpty()) {
                         Integer warehouseId = estimateItem.getWarehouseId() != null ? estimateItem.getWarehouseId() : 1;
@@ -223,6 +232,16 @@ public class StockAllocationService {
 
         return stockAllocations.stream().map(stockAllocationDtoMapper::toDto).toList();
     }
+
+    /**
+     * Dòng báo giá cần giữ hàng khi: chưa có allocation đang giữ/đã xuất, và không phải dòng đã
+     * bỏ tick (is_checked = false — dòng đã nhả hàng, chỉ giữ lại để lưu vết, không tính tiền).
+     */
+    private static boolean shouldAllocateItem(EstimateItem item, Set<Integer> estimateItemIdsWithActiveAllocation) {
+        if (estimateItemIdsWithActiveAllocation.contains(item.getId())) return false;
+        return !Boolean.FALSE.equals(item.getIsChecked());
+    }
+
     @Transactional
     public List<StockAllocationDto> updateStockAllocation(Integer estimateId, Integer staffId, List<StockAllocationDto> stockAllocationDtos) {
         List<StockAllocation> oldList = stockAllocationRepository.findByEstimateId(estimateId);
