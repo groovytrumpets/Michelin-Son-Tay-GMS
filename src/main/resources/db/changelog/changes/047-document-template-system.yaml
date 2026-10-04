@@ -1,0 +1,35 @@
+# Mẫu GỐC của biểu mẫu chứng từ — dựng theo đúng bộ file Word trong
+# "Giấy tờ biểu mẫu" (Hoá đơn bán hàng, Phiếu nhập kho 01-VT...).
+#
+# Mẫu gốc là mẫu mặc định của dạng chứng từ và KHÔNG xoá được: các màn nghiệp vụ
+# (VD nút "In phiếu" ở /parts-sales) luôn có một mẫu để in. Người dùng vẫn sửa
+# được nội dung, và có nút "Khôi phục mẫu gốc" để trả về bản dựng sẵn.
+#
+# Bố cục của mẫu gốc nằm ở frontend (seedTemplates.js) chứ không chép vào đây —
+# frontend tự cài vào DB qua POST /api/admin/document-templates/kinds/{id}/system-template.
+databaseChangeLog:
+  - changeSet:
+      id: 047-1-document-template-add-is-system
+      author: gms
+      comment: Thêm cờ đánh dấu mẫu gốc (không xoá được) cho document_template
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: document_template
+                columnName: is_system
+      changes:
+        - addColumn:
+            tableName: document_template
+            columns:
+              - column:
+                  name: is_system
+                  type: TINYINT(1)
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+                  remarks: 1 = mẫu gốc dựng sẵn theo file Word, không xoá được; mỗi dạng chứng từ có tối đa một mẫu gốc
+      rollback:
+        - dropColumn:
+            tableName: document_template
+            columnName: is_system

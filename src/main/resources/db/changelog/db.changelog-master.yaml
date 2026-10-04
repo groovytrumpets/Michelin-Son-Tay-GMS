@@ -148,3 +148,6 @@ databaseChangeLog:
   - include:
       file: changes/046-dashboard-daily-summary.yaml
       relativeToChangelogFile: true
+  - include:
+      file: changes/047-document-template-system.yaml
+      relativeToChangelogFile: true

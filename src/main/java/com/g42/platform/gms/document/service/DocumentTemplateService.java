@@ -51,7 +51,9 @@ public class DocumentTemplateService {
                     .map(DocumentTemplate::getName)
                     .findFirst()
                     .orElse(null);
-            return toKindDto(kind, templates.size(), defaultName);
+            DocumentKindDto dto = toKindDto(kind, templates.size(), defaultName);
+            dto.setHasSystemTemplate(templates.stream().anyMatch(t -> Boolean.TRUE.equals(t.getSystem())));
+            return dto;
         }).toList();
     }
 
@@ -228,6 +230,8 @@ public class DocumentTemplateService {
         copy.setCreatedBy(staffId);
         // Bản sao KHÔNG kế thừa cờ mặc định — nhân bản để thử sửa, chưa phải để dùng.
         copy.setDefaultTemplate(false);
+        // Cũng không kế thừa cờ mẫu gốc: mỗi dạng chỉ có một mẫu gốc, bản sao xoá được.
+        copy.setSystem(false);
 
         DocumentTemplate saved = templateRepository.save(copy);
         return toTemplateDto(saved, kindRepository.findById(saved.getKindId()).orElse(null));
@@ -247,6 +251,11 @@ public class DocumentTemplateService {
     public void deleteTemplate(Integer templateId) {
         DocumentTemplate template = templateRepository.findById(templateId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy mẫu chứng từ"));
+        if (Boolean.TRUE.equals(template.getSystem())) {
+            throw new IllegalArgumentException(
+                    "Không xoá được mẫu gốc. Muốn dùng mẫu khác thì đặt mẫu đó làm mặc định; "
+                            + "sửa hỏng thì bấm 'Khôi phục mẫu gốc'.");
+        }
         Integer kindId = template.getKindId();
         boolean wasDefault = Boolean.TRUE.equals(template.getDefaultTemplate());
         templateRepository.delete(template);
@@ -258,6 +267,60 @@ public class DocumentTemplateService {
             templateRepository.findByKindIdAndActiveTrueOrderByDefaultTemplateDescNameAsc(kindId)
                     .stream().findFirst().ifPresent(this::markDefault);
         }
+    }
+
+    /**
+     * Cài (hoặc khôi phục) mẫu gốc của một dạng chứng từ.
+     *
+     * Bố cục do frontend gửi lên từ bộ mẫu dựng sẵn theo file Word — backend vẫn
+     * giữ nguyên tắc không diễn giải layoutJson. Thứ tự tìm chỗ ghi:
+     *   1. dạng đã có mẫu gốc thì ghi đè lên nó (= "Khôi phục mẫu gốc");
+     *   2. chưa có thì nhận lại mẫu thường trùng tên — mẫu cài bằng nút "Dùng mẫu
+     *      gốc" đời trước — để khỏi sinh ra hai bản giống nhau;
+     *   3. không có nữa thì tạo mới.
+     *
+     * Dạng chưa có mẫu mặc định nào đang dùng thì mẫu gốc thành mặc định.
+     */
+    @Transactional
+    public DocumentTemplateDto installSystemTemplate(Integer kindId, DocumentTemplateDto dto, Integer staffId) {
+        DocumentKind kind = kindRepository.findById(kindId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy dạng chứng từ"));
+        requireText(dto.getName(), "Tên mẫu");
+        requireText(dto.getLayoutJson(), "Bố cục mẫu");
+        String name = dto.getName().trim();
+
+        List<DocumentTemplate> existing = templateRepository.findByKindIdOrderByDefaultTemplateDescNameAsc(kindId);
+        DocumentTemplate template = existing.stream()
+                .filter(t -> Boolean.TRUE.equals(t.getSystem()))
+                .findFirst()
+                .or(() -> existing.stream().filter(t -> name.equalsIgnoreCase(t.getName())).findFirst())
+                .orElseGet(() -> {
+                    DocumentTemplate fresh = new DocumentTemplate();
+                    fresh.setKindId(kindId);
+                    fresh.setCreatedBy(staffId);
+                    fresh.setVersion(0);
+                    return fresh;
+                });
+
+        if (!dto.getLayoutJson().equals(template.getLayoutJson())) {
+            template.setVersion(Optional.ofNullable(template.getVersion()).orElse(0) + 1);
+        }
+        template.setName(name);
+        template.setNote(trimToNull(dto.getNote()));
+        template.setPaperSize(Optional.ofNullable(trimToNull(dto.getPaperSize())).orElse("A4"));
+        template.setLayoutJson(dto.getLayoutJson());
+        template.setBlockCount(countBlocks(dto.getLayoutJson()));
+        template.setActive(true);
+        template.setSystem(true);
+        DocumentTemplate saved = templateRepository.save(template);
+
+        boolean hasActiveDefault = existing.stream()
+                .anyMatch(t -> Boolean.TRUE.equals(t.getDefaultTemplate()) && Boolean.TRUE.equals(t.getActive()));
+        if (!hasActiveDefault) {
+            markDefault(saved);
+        }
+
+        return toTemplateDto(saved, kind);
     }
 
     // ---------------------------------------------------------------- hồ sơ công ty
@@ -360,6 +423,7 @@ public class DocumentTemplateService {
                 .note(template.getNote())
                 .defaultTemplate(Boolean.TRUE.equals(template.getDefaultTemplate()))
                 .active(Boolean.TRUE.equals(template.getActive()))
+                .system(Boolean.TRUE.equals(template.getSystem()))
                 .version(template.getVersion())
                 .build();
     }
@@ -373,6 +437,7 @@ public class DocumentTemplateService {
                 .note(template.getNote())
                 .defaultTemplate(Boolean.TRUE.equals(template.getDefaultTemplate()))
                 .active(Boolean.TRUE.equals(template.getActive()))
+                .system(Boolean.TRUE.equals(template.getSystem()))
                 .version(template.getVersion())
                 .blockCount(template.getBlockCount())
                 .updatedAt(template.getUpdatedAt())

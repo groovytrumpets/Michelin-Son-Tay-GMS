@@ -20,6 +20,8 @@ public class DocumentTemplateSummaryDto {
     private String note;
     private Boolean defaultTemplate;
     private Boolean active;
+    /** Mẫu gốc — không xoá được, xem DocumentTemplate#system. */
+    private Boolean system;
     private Integer version;
     private Integer blockCount;
     private LocalDateTime updatedAt;

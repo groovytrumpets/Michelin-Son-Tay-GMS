@@ -29,5 +29,7 @@ public class DocumentTemplateDto {
     private String note;
     private Boolean defaultTemplate;
     private Boolean active;
+    /** Mẫu gốc — không xoá được, xem DocumentTemplate#system. */
+    private Boolean system;
     private Integer version;
 }

@@ -34,6 +34,12 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class DocumentTemplateController {
 
+    /** Ai được đọc mẫu + hồ sơ công ty để IN — người quản lý biểu mẫu và các màn nghiệp vụ có nút in. */
+    private static final String PRINT_READERS = "hasAnyAuthority('"
+            + PermissionCodes.DOCUMENT_TEMPLATE_VIEW + "','"
+            + PermissionCodes.PARTS_SALE_VIEW + "','"
+            + PermissionCodes.PARTS_SALE_CREATE + "')";
+
     private final DocumentTemplateService documentTemplateService;
 
     // ---------------------------------------------------------------- dạng chứng từ
@@ -120,9 +126,13 @@ public class DocumentTemplateController {
         }
     }
 
-    /** Mẫu đang dùng của một dạng — các màn nghiệp vụ gọi cái này để in. */
+    /**
+     * Mẫu đang dùng của một dạng — các màn nghiệp vụ gọi cái này để in, nên mở cho
+     * cả người có quyền ở màn đó chứ không chỉ người quản lý biểu mẫu. Thêm màn
+     * in mới thì thêm mã quyền của màn đó vào {@link #PRINT_READERS}.
+     */
     @GetMapping("/by-kind/{kindCode}/default")
-    @PreAuthorize("hasAuthority('" + PermissionCodes.DOCUMENT_TEMPLATE_VIEW + "')")
+    @PreAuthorize(PRINT_READERS)
     public ResponseEntity<ApiResponse<DocumentTemplateDto>> getDefaultTemplate(@PathVariable String kindCode) {
         try {
             return ResponseEntity.ok(ApiResponses.success(documentTemplateService.getDefaultTemplate(kindCode)));
@@ -157,6 +167,26 @@ public class DocumentTemplateController {
         try {
             return ResponseEntity.ok(ApiResponses.success(
                     documentTemplateService.saveTemplate(templateId, dto, staffId(principal))));
+        } catch (IllegalArgumentException e) {
+            return badRequest(e);
+        }
+    }
+
+    /**
+     * Cài hoặc khôi phục mẫu gốc của một dạng — bố cục do frontend gửi lên từ bộ
+     * mẫu dựng sẵn theo file Word. Mẫu gốc không xoá được.
+     */
+    @PostMapping("/kinds/{kindId}/system-template")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.DOCUMENT_TEMPLATE_EDIT + "')")
+    @Auditable(action = "UPDATE", module = "DOCUMENT_TEMPLATE",
+            description = "Cài / khôi phục mẫu gốc chứng từ", targetType = "DOCUMENT_TEMPLATE")
+    public ResponseEntity<ApiResponse<DocumentTemplateDto>> installSystemTemplate(
+            @AuthenticationPrincipal StaffPrincipal principal,
+            @PathVariable Integer kindId,
+            @RequestBody DocumentTemplateDto dto) {
+        try {
+            return ResponseEntity.ok(ApiResponses.success(
+                    documentTemplateService.installSystemTemplate(kindId, dto, staffId(principal))));
         } catch (IllegalArgumentException e) {
             return badRequest(e);
         }
@@ -208,7 +238,7 @@ public class DocumentTemplateController {
     // ---------------------------------------------------------------- hồ sơ công ty
 
     @GetMapping("/company-profile")
-    @PreAuthorize("hasAuthority('" + PermissionCodes.DOCUMENT_TEMPLATE_VIEW + "')")
+    @PreAuthorize(PRINT_READERS)
     public ResponseEntity<ApiResponse<CompanyProfileDto>> getCompanyProfile() {
         return ResponseEntity.ok(ApiResponses.success(documentTemplateService.getCompanyProfile()));
     }

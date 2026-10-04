@@ -58,6 +58,14 @@ public class DocumentTemplate {
     @Column(name = "is_active")
     private Boolean active = true;
 
+    /**
+     * Mẫu gốc dựng sẵn theo bộ file Word của xưởng. Sửa được nhưng KHÔNG xoá
+     * được, để dạng chứng từ luôn còn một mẫu mà in. Mỗi dạng có tối đa một mẫu
+     * gốc; bản sao của nó là mẫu thường.
+     */
+    @Column(name = "is_system")
+    private Boolean system = false;
+
     /** Tăng mỗi lần lưu bố cục, để về sau đối chiếu với bản chứng từ đã in. */
     @Column(name = "version")
     private Integer version = 1;

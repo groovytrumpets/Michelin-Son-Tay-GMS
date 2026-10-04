@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface DocumentTemplateRepository extends JpaRepository<DocumentTemplate, Integer> {
@@ -17,6 +18,8 @@ public interface DocumentTemplateRepository extends JpaRepository<DocumentTempla
     List<DocumentTemplate> findByKindIdAndActiveTrueOrderByDefaultTemplateDescNameAsc(Integer kindId);
 
     long countByKindId(Integer kindId);
+
+    Optional<DocumentTemplate> findFirstByKindIdAndSystemTrue(Integer kindId);
 
     /**
      * Bỏ cờ mặc định của mọi mẫu khác cùng dạng. Gọi ngay trước khi đặt mẫu mới

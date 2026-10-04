@@ -26,4 +26,6 @@ public class DocumentKindDto {
     private Integer sortOrder;
     private Integer templateCount;
     private String defaultTemplateName;
+    /** Dạng này đã có mẫu gốc trong DB chưa — frontend dựa vào đây để tự cài mẫu gốc còn thiếu. */
+    private Boolean hasSystemTemplate;
 }
