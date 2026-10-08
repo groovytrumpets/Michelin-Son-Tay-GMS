@@ -351,8 +351,10 @@ public class PartsSaleService {
         if (estimate == null) {
             throw new RuntimeException("Không tìm thấy báo giá: " + dto.getEstimateId());
         }
-        if (estimate.getStatus() != EstimateEnum.DRAFT) {
-            throw new RuntimeException("Báo giá không ở trạng thái DRAFT (hiện tại: " + estimate.getStatus() + ")");
+        // SENT = đã bấm "In chứng từ" ở /service-ticket-detail (DRAFT → SENT), nội dung
+        // báo giá không đổi nên vẫn được giữ hàng/chốt như bản nháp.
+        if (estimate.getStatus() != EstimateEnum.DRAFT && estimate.getStatus() != EstimateEnum.SENT) {
+            throw new RuntimeException("Báo giá không ở trạng thái DRAFT/SENT (hiện tại: " + estimate.getStatus() + ")");
         }
         return estimate;
     }

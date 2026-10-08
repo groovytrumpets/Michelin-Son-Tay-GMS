@@ -33,6 +33,7 @@ import com.g42.platform.gms.warehouse.infrastructure.entity.FallbackPricingConfi
 import com.g42.platform.gms.warehouse.infrastructure.entity.StockEntryItemJpa;
 import com.g42.platform.gms.estimation.domain.enums.EstimateTypeEnum;
 import com.g42.platform.gms.authz.PermissionCodes;
+import com.g42.platform.gms.billing.domain.repository.BillingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
@@ -57,6 +58,7 @@ public class EstimateService {
 
     private final EstimateRepository estimateRepository;
     private final EstimateItemRepository estimateItemRepository;
+    private final BillingRepository billingRepository;
     private final ItemCategoryRepository itemCategoryRepo;
     private final EstimateDtoMapper estimateDtoMapper;
     private final TaxRuleRepository taxRuleRepository;
@@ -267,9 +269,30 @@ public class EstimateService {
     }
 
     @Transactional
+    /**
+     * Chặn sửa báo giá đã chốt: đã ARCHIVED (lập hoá đơn) / CANCELLED, hoặc phiếu đã có hoá đơn.
+     * Trước đây không chặn nên một tab cũ còn giữ báo giá nháp đã gửi nhập bù có thể ghi đè báo giá
+     * của phiếu đã thanh toán (MST_7HNBN7: hoá đơn 1.190.000đ nhưng báo giá bị sửa còn 910.000đ,
+     * kho đã xuất theo bản trước). Kiểm tra cả hoá đơn vì có phiếu PAID mà báo giá vẫn DRAFT.
+     */
+    private void assertEstimateEditable(Estimate estimate) {
+        if (estimate == null) return;
+        if (estimate.getStatus() == EstimateEnum.ARCHIVED) {
+            throw new EstimateException("Báo giá đã chốt hoá đơn, không thể sửa.", EstimateErrorCode.BAD_REQUEST);
+        }
+        if (estimate.getStatus() == EstimateEnum.CANCELLED) {
+            throw new EstimateException("Báo giá đã bị huỷ, không thể sửa.", EstimateErrorCode.BAD_REQUEST);
+        }
+        if (estimate.getServiceTicketId() != null
+                && billingRepository.getBillingByServiceTicket(estimate.getServiceTicketId()) != null) {
+            throw new EstimateException("Phiếu đã có hoá đơn, không thể sửa báo giá.", EstimateErrorCode.BAD_REQUEST);
+        }
+    }
+
     public EstimateRespondDto updateEstimate(Integer estimateId, EstimateRequestDto request) {
         Estimate estimate = estimateRepository.findEstimateById(estimateId);
         if (estimate == null) throw new RuntimeException("Estimate not found");
+        assertEstimateEditable(estimate);
         estimate.setFallbackPricingConfigId(request.getFallbackPricingConfigId());
         estimate.setManualMarkupMultiplier(request.getManualMarkupMultiplier());
 
@@ -837,6 +860,9 @@ public class EstimateService {
     @Transactional
     public EstimateItemReqDto updateEstimateItem(Integer estimateItemId, EstimateItemReqDto request) {
         EstimateItem estimateItem = estimateItemRepository.findByEstimateItemId(estimateItemId);
+        if (estimateItem != null && estimateItem.getEstimateId() != null) {
+            assertEstimateEditable(estimateRepository.findEstimateById(estimateItem.getEstimateId()));
+        }
 
         Integer currentTaxRuleId = null;
 
