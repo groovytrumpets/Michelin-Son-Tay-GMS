@@ -54,6 +54,8 @@ public class WarehouseService {
     private StockEntryItemJpaRepo stockEntryItemJpaRepo;
     @Autowired
     private WarehousePricingRepo warehousePricingRepo;
+    @Autowired
+    private com.g42.platform.gms.warehouse.domain.repository.InventoryRepo inventoryRepo;
 
     // ─── CRUD Warehouse ───────────────────────────────────────────────────────
 
@@ -61,22 +63,23 @@ public class WarehouseService {
     @Transactional
     public WarehouseDto createWarehouse(CreateWarehouseRequest req) {
         // validate code unique
-        boolean codeExists = warehouseRepo.getAllWarehouse().stream()
+        boolean codeExists = warehouseRepo.findAllWarehouses().stream()
                 .anyMatch(w -> req.getWarehouseCode().equalsIgnoreCase(w.getWarehouseCode()));
         if (codeExists) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Mã kho '" + req.getWarehouseCode() + "' đã tồn tại");
         }
 
-        // BRANCH / DEFECTIVE phải có kho cha
+        // BRANCH / DEFECTIVE phải có kho cha; MASTER luôn là gốc
         if (req.getWarehouseType() != com.g42.platform.gms.common.enums.WarehouseTypeEnum.MASTER) {
             if (req.getParentWarehouseId() == null) {
                 throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                         "Kho loại " + req.getWarehouseType() + " phải có kho cha (parentWarehouseId)");
             }
-            warehouseRepo.findById(req.getParentWarehouseId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                            "Không tìm thấy kho cha id=" + req.getParentWarehouseId()));
+            validateParent(req.getParentWarehouseId());
+        } else if (req.getParentWarehouseId() != null) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Kho tổng (MASTER) là kho gốc, không có kho cha");
         }
 
         // DEFECTIVE: không tạo trùng cho cùng 1 kho cha
@@ -118,8 +121,45 @@ public class WarehouseService {
         if (req.getManagerStaffId() != null) {
             w.setManagerStaffId(req.getManagerStaffId());
         }
+        if (req.getParentWarehouseId() != null && !req.getParentWarehouseId().equals(w.getParentWarehouseId())) {
+            moveUnderParent(w, req.getParentWarehouseId());
+        }
 
         return toDto(warehouseRepo.save(w));
+    }
+
+    /** Kho cha phải tồn tại và không phải kho lỗi (kho lỗi là nút lá, không chứa kho con). */
+    private Warehouse validateParent(Integer parentId) {
+        Warehouse parent = warehouseRepo.findById(parentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Không tìm thấy kho cha id=" + parentId));
+        if (parent.getWarehouseType() == com.g42.platform.gms.common.enums.WarehouseTypeEnum.DEFECTIVE) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Không thể đặt kho con dưới kho lỗi '" + parent.getWarehouseName() + "'");
+        }
+        return parent;
+    }
+
+    /** Chuyển kho sang kho cha khác — chặn vòng lặp (chọn chính nó / kho con cháu làm cha). */
+    private void moveUnderParent(Warehouse w, Integer newParentId) {
+        if (w.getWarehouseType() == com.g42.platform.gms.common.enums.WarehouseTypeEnum.MASTER) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Kho tổng (MASTER) là kho gốc, không có kho cha");
+        }
+        validateParent(newParentId);
+        WarehouseHierarchy tree = new WarehouseHierarchy(warehouseRepo.findAllWarehouses());
+        if (tree.wouldCreateCycle(w.getWarehouseId(), newParentId)) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Không thể chọn chính kho này hoặc kho con của nó làm kho cha");
+        }
+        if (w.getWarehouseType() == com.g42.platform.gms.common.enums.WarehouseTypeEnum.DEFECTIVE) {
+            warehouseRepo.findByParentAndType(newParentId, com.g42.platform.gms.common.enums.WarehouseTypeEnum.DEFECTIVE)
+                    .ifPresent(existing -> {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                "Kho cha id=" + newParentId + " đã có kho lỗi (DEFECTIVE)");
+                    });
+        }
+        w.setParentWarehouseId(newParentId);
     }
 
     /** Bật/tắt trạng thái kho. */
@@ -140,26 +180,69 @@ public class WarehouseService {
                         "Không tìm thấy kho id=" + warehouseId));
     }
 
-    /** Danh sách tất cả kho (có thể lọc theo isActive). */
+    /** Danh sách kho đang hoạt động (isActive = false thì lấy kho đã tắt). */
     public java.util.List<WarehouseDto> listWarehouses(Boolean isActive) {
-        return warehouseRepo.getAllWarehouse().stream()
-                .filter(w -> isActive == null || isActive.equals(w.getIsActive()))
+        return listWarehouses(isActive, false, false);
+    }
+
+    /**
+     * Danh sách kho. Mặc định (isActive = null) chỉ trả kho đang hoạt động như trước vì các ô chọn
+     * kho đều dùng endpoint này; includeInactive = true để màn cấu hình thấy cả kho đã tắt.
+     * withStock = true thì kèm tồn riêng + tồn cộng dồn cây kho con
+     * (đọc toàn bộ bảng inventory một lần nên chỉ bật ở màn cấu hình kho).
+     */
+    @Transactional(readOnly = true)
+    public java.util.List<WarehouseDto> listWarehouses(Boolean isActive, boolean withStock, boolean includeInactive) {
+        List<Warehouse> all = warehouseRepo.findAllWarehouses();
+        Boolean activeFilter = isActive == null && !includeInactive ? Boolean.TRUE : isActive;
+        List<WarehouseDto> result = all.stream()
+                .filter(w -> activeFilter == null || activeFilter.equals(Boolean.TRUE.equals(w.getIsActive())))
                 .map(this::toDto)
                 .collect(java.util.stream.Collectors.toList());
+        if (withStock) {
+            fillStockRollup(result, all);
+        }
+        return result;
+    }
+
+    private void fillStockRollup(List<WarehouseDto> dtos, List<Warehouse> all) {
+        // warehouseId -> (itemId -> quantity), chỉ giữ dòng còn hàng
+        Map<Integer, Map<Integer, BigDecimal>> qtyByWarehouse = new HashMap<>();
+        for (com.g42.platform.gms.warehouse.domain.entity.Inventory inv : inventoryRepo.findAll()) {
+            if (inv.getQuantity() == null || inv.getQuantity().signum() <= 0) continue;
+            qtyByWarehouse.computeIfAbsent(inv.getWarehouseId(), k -> new HashMap<>())
+                    .merge(inv.getItemId(), inv.getQuantity(), BigDecimal::add);
+        }
+        WarehouseHierarchy tree = new WarehouseHierarchy(all);
+        for (WarehouseDto dto : dtos) {
+            Map<Integer, BigDecimal> own = qtyByWarehouse.getOrDefault(dto.getWarehouseId(), Map.of());
+            dto.setOwnQuantity(own.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add));
+            dto.setOwnItemCount(own.size());
+
+            BigDecimal total = BigDecimal.ZERO;
+            Set<Integer> items = new HashSet<>();
+            for (Integer wid : tree.rollupWarehouseIds(dto.getWarehouseId())) {
+                Map<Integer, BigDecimal> m = qtyByWarehouse.getOrDefault(wid, Map.of());
+                for (BigDecimal q : m.values()) total = total.add(q);
+                items.addAll(m.keySet());
+            }
+            dto.setTotalQuantity(total);
+            dto.setTotalItemCount(items.size());
+        }
     }
 
     private WarehouseDto toDto(Warehouse w) {
-        return new WarehouseDto(
-                w.getWarehouseId(),
-                w.getWarehouseCode(),
-                w.getWarehouseName(),
-                w.getWarehouseType(),
-                w.getParentWarehouseId(),
-                w.getAddress(),
-                w.getManagerStaffId(),
-                w.getIsActive(),
-                w.getCreatedAt()
-        );
+        WarehouseDto dto = new WarehouseDto();
+        dto.setWarehouseId(w.getWarehouseId());
+        dto.setWarehouseCode(w.getWarehouseCode());
+        dto.setWarehouseName(w.getWarehouseName());
+        dto.setWarehouseType(w.getWarehouseType());
+        dto.setParentWarehouseId(w.getParentWarehouseId());
+        dto.setAddress(w.getAddress());
+        dto.setManagerStaffId(w.getManagerStaffId());
+        dto.setIsActive(w.getIsActive());
+        dto.setCreatedAt(w.getCreatedAt());
+        return dto;
     }
 
     // ─────────────────────────────────────────────────────────────────────────

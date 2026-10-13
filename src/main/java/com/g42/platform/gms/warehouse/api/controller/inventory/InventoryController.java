@@ -36,18 +36,21 @@ public class InventoryController {
      * - WAREHOUSE_KEEPER: chỉ thấy số lượng
      * - ADVISOR: thấy số lượng + giá bán
      * - ACCOUNTANT / MANAGER / ADMIN: thấy tất cả kể cả giá nhập
+     * includeChildren=true: cộng dồn tồn của mọi kho con cháu (kho đa cấp, bỏ kho lỗi).
      */
     @GetMapping("/{warehouseId}")
     @PreAuthorize("hasAuthority('" + PermissionCodes.WAREHOUSE_VIEW + "')")
     public ResponseEntity<ApiResponse<List<InventoryResponse>>> listByWarehouse(
             @PathVariable Integer warehouseId,
+            @RequestParam(defaultValue = "false") boolean includeChildren,
             @AuthenticationPrincipal StaffPrincipal principal) {
 
         boolean showImportPrice = hasAnyRole(principal, "ACCOUNTANT", "MANAGER", "ADMIN");
         boolean showSellingPrice = hasAnyRole(principal, "ADVISOR", "ACCOUNTANT", "MANAGER", "ADMIN");
 
-        List<InventoryResponse> result = inventoryService.listByWarehouse(
-                warehouseId, showImportPrice, showSellingPrice);
+        List<InventoryResponse> result = includeChildren
+                ? inventoryService.listByWarehouseTree(warehouseId, showImportPrice, showSellingPrice)
+                : inventoryService.listByWarehouse(warehouseId, showImportPrice, showSellingPrice);
         return ResponseEntity.ok(ApiResponses.success(result));
     }
 

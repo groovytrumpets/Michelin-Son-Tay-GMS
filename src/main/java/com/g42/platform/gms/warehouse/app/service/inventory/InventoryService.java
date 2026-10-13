@@ -15,6 +15,8 @@ import com.g42.platform.gms.warehouse.domain.repository.InventoryRepo;
 import com.g42.platform.gms.warehouse.domain.repository.PartCatalogRepo;
 import com.g42.platform.gms.warehouse.domain.repository.StockEntryRepo;
 import com.g42.platform.gms.warehouse.domain.repository.WarehousePricingRepo;
+import com.g42.platform.gms.warehouse.domain.repository.WarehouseRepo;
+import com.g42.platform.gms.warehouse.app.service.catalog.WarehouseHierarchy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,8 +24,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -34,6 +38,7 @@ public class InventoryService {
     private final PartCatalogRepo partCatalogRepo;
     private final StockEntryRepo stockEntryRepo;
     private final WarehousePricingRepo pricingRepo;
+    private final WarehouseRepo warehouseRepo;
     @Transactional(readOnly = true)
     public BigDecimal getAvailableQuantity(Integer warehouseId, Integer itemId) {
         return inventoryRepo.findByWarehouseAndItem(warehouseId, itemId)
@@ -136,30 +141,92 @@ public class InventoryService {
                     r.setSku(catalog.getSku());
                     r.setUnit(catalog.getUnit());
 
-                    if (showSellingPrice) {
-                        BigDecimal selling = pricingRepo
-                                .findActiveByWarehouseAndItem(warehouseId, inv.getItemId())
-                            .map(WarehousePricing::getSellingPrice)
-                                .orElse(null);
-                        if (selling == null) {
-                            selling = stockEntryRepo.findFifoLots(warehouseId, inv.getItemId()).stream()
-                                    .findFirst()
-                                    .map(lot -> lot.getImportPrice()
-                                            .multiply(lot.getMarkupMultiplier())
-                                            .setScale(2, RoundingMode.HALF_UP))
-                                    .orElse(null);
-                        }
-                        r.setSellingPrice(selling);
-                    }
-
-                    if (showImportPrice) {
-                        stockEntryRepo.findFifoLots(warehouseId, inv.getItemId()).stream()
-                                .findFirst()
-                                .ifPresent(lot -> r.setImportPrice(lot.getImportPrice()));
-                    }
-
+                    fillPrices(r, warehouseId, inv.getItemId(), showImportPrice, showSellingPrice);
                     return r;
                 }).collect(Collectors.toList());
+    }
+
+    /**
+     * Tồn kho đa cấp: kho đang xem + mọi kho con cháu (bỏ nhánh kho lỗi), cộng dồn theo mặt hàng.
+     * quantity/reserved/available là số tổng, ownQuantity là phần nằm trực tiếp trong kho đang xem.
+     * Xuất/giữ hàng vẫn làm trên kho vật lý cụ thể — số tổng này chỉ để xem.
+     */
+    @Transactional(readOnly = true)
+    public List<InventoryResponse> listByWarehouseTree(Integer warehouseId,
+                                                       boolean showImportPrice,
+                                                       boolean showSellingPrice) {
+        Set<Integer> scope = new WarehouseHierarchy(warehouseRepo.findAllWarehouses())
+                .rollupWarehouseIds(warehouseId);
+
+        Map<Integer, List<Inventory>> rowsByItem = new LinkedHashMap<>();
+        for (Integer wid : scope) {
+            for (Inventory inv : inventoryRepo.findByWarehouse(wid)) {
+                rowsByItem.computeIfAbsent(inv.getItemId(), k -> new ArrayList<>()).add(inv);
+            }
+        }
+
+        Map<Integer, CatalogItem> catalogMap = partCatalogRepo.findAllPartsByIds(new ArrayList<>(rowsByItem.keySet())).stream()
+                .filter(c -> c.getItemType() == CatalogItemType.PART)
+                .collect(Collectors.toMap(CatalogItem::getItemId, c -> c));
+
+        List<InventoryResponse> result = new ArrayList<>();
+        rowsByItem.forEach((itemId, rows) -> {
+            CatalogItem catalog = catalogMap.get(itemId);
+            if (catalog == null) return;
+            Inventory own = rows.stream()
+                    .filter(inv -> warehouseId.equals(inv.getWarehouseId()))
+                    .findFirst().orElse(null);
+
+            InventoryResponse r = new InventoryResponse();
+            r.setInventoryId(own != null ? own.getInventoryId() : null);
+            r.setWarehouseId(warehouseId);
+            r.setItemId(itemId);
+            r.setItemName(catalog.getItemName());
+            r.setSku(catalog.getSku());
+            r.setUnit(catalog.getUnit());
+            r.setOwnQuantity(own != null ? Qty.nz(own.getQuantity()) : BigDecimal.ZERO);
+            BigDecimal qty = BigDecimal.ZERO, reserved = BigDecimal.ZERO, available = BigDecimal.ZERO;
+            for (Inventory inv : rows) {
+                qty = qty.add(Qty.nz(inv.getQuantity()));
+                reserved = reserved.add(Qty.nz(inv.getReservedQuantity()));
+                // Khả dụng tính theo từng kho rồi mới cộng: hàng giữ ở kho này không được bù bằng hàng kho khác
+                available = available.add(inv.getAvailableQuantity());
+            }
+            r.setQuantity(qty);
+            r.setReservedQuantity(reserved);
+            r.setAvailableQuantity(available);
+
+            // Giá theo kho đang xem; kho cha không chứa trực tiếp mặt hàng thì lấy theo kho con đầu tiên có hàng
+            Integer priceWarehouseId = own != null ? warehouseId : rows.get(0).getWarehouseId();
+            fillPrices(r, priceWarehouseId, itemId, showImportPrice, showSellingPrice);
+            result.add(r);
+        });
+        return result;
+    }
+
+    private void fillPrices(InventoryResponse r, Integer warehouseId, Integer itemId,
+                            boolean showImportPrice, boolean showSellingPrice) {
+        if (showSellingPrice) {
+            BigDecimal selling = pricingRepo
+                    .findActiveByWarehouseAndItem(warehouseId, itemId)
+                    .map(WarehousePricing::getSellingPrice)
+                    .orElse(null);
+            if (selling == null) {
+                selling = stockEntryRepo.findFifoLots(warehouseId, itemId).stream()
+                        .findFirst()
+                        .map(lot -> lot.getImportPrice()
+                                .multiply(lot.getMarkupMultiplier())
+                                .setScale(2, RoundingMode.HALF_UP))
+                        .orElse(null);
+            }
+            r.setSellingPrice(selling);
+        }
+
+        if (showImportPrice) {
+            stockEntryRepo.findFifoLots(warehouseId, itemId).stream()
+                    .findFirst()
+                    .ifPresent(lot -> r.setImportPrice(lot.getImportPrice()));
+        }
     }
 
     /**

@@ -20,7 +20,7 @@ public class CreateWarehouseRequest {
     @NotNull(message = "Loại kho không được để trống")
     private WarehouseTypeEnum warehouseType;
 
-    /** ID kho cha — bắt buộc khi warehouseType = BRANCH hoặc DEFECTIVE */
+    /** ID kho cha — bắt buộc khi warehouseType = BRANCH hoặc DEFECTIVE; kho cha được là bất kỳ kho nào không phải kho lỗi (kho đa cấp) */
     private Integer parentWarehouseId;
 
     private String address;

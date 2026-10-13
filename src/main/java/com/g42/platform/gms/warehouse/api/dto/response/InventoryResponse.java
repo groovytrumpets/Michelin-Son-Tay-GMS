@@ -21,6 +21,12 @@ public class InventoryResponse {
     private BigDecimal reservedQuantity;
     private BigDecimal availableQuantity;
 
+    /**
+     * Chỉ có khi xem kèm kho con (includeChildren=true): phần nằm trực tiếp trong kho đang xem.
+     * Khi đó quantity/reservedQuantity/availableQuantity là số đã cộng cả kho con cháu.
+     */
+    private BigDecimal ownQuantity;
+
     /** Chỉ trả về cho ADVISOR, ACCOUNTANT, MANAGER, ADMIN */
     private BigDecimal sellingPrice;
 

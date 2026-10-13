@@ -106,6 +106,11 @@ public class WarehouseRepoImpl implements WarehouseRepo {
     }
 
     @Override
+    public List<Warehouse> findAllWarehouses() {
+        return warehouseJpaRepo.findAll().stream().map(warehouseJpaMapper::toDomain).toList();
+    }
+
+    @Override
     public Optional<Warehouse> findById(Integer warehouseId) {
         return warehouseJpaRepo.findById(warehouseId).map(warehouseJpaMapper::toDomain);
     }
@@ -121,6 +126,8 @@ public class WarehouseRepoImpl implements WarehouseRepo {
     public Warehouse save(Warehouse warehouse) {
         com.g42.platform.gms.warehouse.infrastructure.entity.WarehouseJpa jpa =
                 new com.g42.platform.gms.warehouse.infrastructure.entity.WarehouseJpa();
+        // Thiếu id thì JPA INSERT dòng mới -> trùng warehouse_code (UNIQUE), nên sửa/bật/tắt kho từng luôn lỗi 500
+        jpa.setWarehouseId(warehouse.getWarehouseId());
         jpa.setWarehouseCode(warehouse.getWarehouseCode());
         jpa.setWarehouseName(warehouse.getWarehouseName());
         jpa.setWarehouseType(warehouse.getWarehouseType());

@@ -158,12 +158,17 @@ public class WarehouseController {
     /**
      * Danh sách tất cả kho.
      * WAREHOUSE_KEEPER / WAREHOUSE_MANAGER / MANAGER / ADMIN đều được xem.
+     * Không truyền isActive thì chỉ trả kho đang hoạt động; includeInactive=true để lấy cả kho đã tắt.
+     * withStock=true: kèm tồn riêng + tồn cộng dồn cả cây kho con (ownQuantity/totalQuantity...).
      */
     @GetMapping("/warehouse/all")
     @PreAuthorize("hasAuthority('" + PermissionCodes.WAREHOUSE_CONFIG_VIEW + "')")
     public ResponseEntity<ApiResponse<List<WarehouseDto>>> getAllWarehouse(
-            @RequestParam(required = false) Boolean isActive) {
-        return ResponseEntity.ok(ApiResponses.success(warehouseService.listWarehouses(isActive)));
+            @RequestParam(required = false) Boolean isActive,
+            @RequestParam(defaultValue = "false") boolean withStock,
+            @RequestParam(defaultValue = "false") boolean includeInactive) {
+        return ResponseEntity.ok(ApiResponses.success(
+                warehouseService.listWarehouses(isActive, withStock, includeInactive)));
     }
 
     /** Chi tiết 1 kho. */

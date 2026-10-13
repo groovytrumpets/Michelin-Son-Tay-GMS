@@ -22,7 +22,11 @@ public interface WarehouseRepo {
 
     List<WarehouseDetailDto> getWarehouseDetailsByItemId(Integer itemId);
 
+    /** Chỉ kho đang hoạt động. */
     List<Warehouse> getAllWarehouse();
+
+    /** Mọi kho kể cả đã tắt — dùng khi dựng cây kho cha/con (kho tắt ở giữa vẫn nối cha với cháu). */
+    List<Warehouse> findAllWarehouses();
 
     Optional<Warehouse> findById(Integer warehouseId);
 

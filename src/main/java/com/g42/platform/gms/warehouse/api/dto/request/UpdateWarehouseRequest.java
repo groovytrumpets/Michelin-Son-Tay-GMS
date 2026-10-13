@@ -12,4 +12,10 @@ public class UpdateWarehouseRequest {
     private String address;
 
     private Integer managerStaffId;
+
+    /**
+     * Đổi kho cha (null = giữ nguyên). Không được chọn chính nó hoặc kho con cháu của nó,
+     * không được chọn kho lỗi; kho tổng (MASTER) luôn là gốc nên không có kho cha.
+     */
+    private Integer parentWarehouseId;
 }
