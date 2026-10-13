@@ -19,6 +19,7 @@ import com.g42.platform.gms.manager.schedule.domain.exception.ScheduleException;
 import com.g42.platform.gms.marketing.service_catalog.domain.exception.ServiceException;
 import com.g42.platform.gms.marketing.service_combo.domain.exception.ComboItemException;
 import com.g42.platform.gms.service_ticket_management.domain.exception.AssignmentException;
+import com.g42.platform.gms.service_ticket_management.domain.exception.CheckInException;
 import com.g42.platform.gms.promotion.domain.exception.PromotionException;
 import com.g42.platform.gms.staff.attendance.domain.exception.StaffAttendanceException;
 import com.g42.platform.gms.staff.profile.domain.exception.StaffException;
@@ -26,6 +27,7 @@ import com.g42.platform.gms.warehouse.domain.exception.WarehouseException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -109,6 +111,44 @@ public class GlobalExceptionHandler {
         }
 
         return ResponseEntity.status(status).body(ApiResponses.error(codeFor(status), reason));
+    }
+
+    /**
+     * Lỗi nghiệp vụ của tiếp nhận / phiếu dịch vụ. Trước đây không có handler nên mọi
+     * CheckInException ("Xe đã gắn với phiếu nên không thể để trống biển số"...) đều bị biến
+     * thành 500 "Lỗi hệ thống" — người dùng không biết mình nhập sai ô nào.
+     * Lỗi gắn với một ô nhập thì trả kèm data.field để FE hiện ngay dưới ô đó.
+     */
+    @ExceptionHandler(CheckInException.class)
+    public ResponseEntity<ApiResponse<?>> handleCheckInException(
+            CheckInException ex, jakarta.servlet.http.HttpServletRequest request) {
+        log.warn("400 ở {} {}: {} - {}", request.getMethod(), request.getRequestURI(), ex.getCode(), ex.getMessage());
+        Object data = ex.getField() == null ? null : java.util.Map.of("field", ex.getField());
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponses.error(ex.getCode(), ex.getMessage(), data));
+    }
+
+    /**
+     * Body JSON hỏng hoặc sai kiểu (số quá lớn cho Integer, ngày giờ sai định dạng...) là lỗi
+     * phía client — trả 400 thay vì để rơi xuống 500 "Lỗi hệ thống".
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<?>> handleNotReadable(
+            HttpMessageNotReadableException ex, jakarta.servlet.http.HttpServletRequest request) {
+        log.warn("400 ở {} {}: body không đọc được - {}", request.getMethod(), request.getRequestURI(),
+                ex.getMostSpecificCause().getMessage());
+        String message = "Dữ liệu gửi lên không đúng định dạng. Vui lòng kiểm tra lại các ô đã nhập.";
+        Object data = null;
+        if (ex.getCause() instanceof com.fasterxml.jackson.databind.JsonMappingException jme
+                && !jme.getPath().isEmpty() && jme.getPath().get(0).getFieldName() != null) {
+            String field = jme.getPath().get(0).getFieldName();
+            message = "Giá trị của ô \"" + field + "\" không đúng định dạng.";
+            data = java.util.Map.of("field", field);
+        }
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponses.error(AuthErrorCode.VALIDATION_ERROR.name(), message, data));
     }
 
     /** Mã lỗi cho FE đọc: tên của mã trạng thái HTTP, VD 404 → "NOT_FOUND". */

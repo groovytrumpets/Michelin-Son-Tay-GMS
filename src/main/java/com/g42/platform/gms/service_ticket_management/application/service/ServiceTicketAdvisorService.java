@@ -17,6 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
 import com.g42.platform.gms.auth.repository.CustomerProfileRepository;
 import com.g42.platform.gms.vehicle.repository.VehicleRepository;
 import com.g42.platform.gms.service_ticket_management.domain.repository.OdometerReadingRepo;
+import com.g42.platform.gms.customer.application.service.CustomerPhoneService;
+import com.g42.platform.gms.customerimport.application.service.ImportNormalizer;
 
 
 import java.time.LocalDateTime;
@@ -40,6 +42,7 @@ public class ServiceTicketAdvisorService {
     private final CustomerProfileRepository customerRepository;
     private final VehicleRepository vehicleRepository;
     private final OdometerReadingRepo odometerReadingRepo;
+    private final CustomerPhoneService customerPhoneService;
 
 
     /** Advisor duyệt báo giá, bắt đầu sửa — ESTIMATED/PENDING → REPAIRING.
@@ -152,16 +155,26 @@ public class ServiceTicketAdvisorService {
     public ServiceTicketDetailResponse updateEstimate(String ticketCode, UpdateServiceTicketRequest request) {
         ServiceTicket ticket = findTicket(ticketCode);
         TicketStatus current = ticket.getTicketStatus();
-        boolean isFinalized = current == TicketStatus.COMPLETED
-                || current == TicketStatus.PAID
-                || current == TicketStatus.CANCELLED;
-        if (isFinalized) {
-            throw new CheckInException("Không thể cập nhật báo giá khi phiếu đang " + current);
+        if (current == TicketStatus.PAID || current == TicketStatus.CANCELLED) {
+            throw new CheckInException("Phiếu đang ở trạng thái "
+                    + (current == TicketStatus.PAID ? "đã thanh toán" : "đã huỷ") + " nên không thể chỉnh sửa.");
         }
+        // Phiếu đã báo xong (COMPLETED) vẫn phải sửa được thông tin đầu phiếu — nhất là ngày bàn
+        // giao, vốn chỉ biết sau khi sửa xong — nhưng không được đổi danh sách dịch vụ nữa.
+        if (current == TicketStatus.COMPLETED && request.getCatalogItemIds() != null) {
+            throw new CheckInException("Phiếu đã hoàn thành sửa chữa nên không thể đổi danh sách dịch vụ.");
+        }
+
+        validateTicketTimes(ticket, request);
 
         // Update customerRequest
         if (request.getCustomerRequest() != null) {
-            ticket.setCustomerRequest(request.getCustomerRequest());
+            String customerRequest = request.getCustomerRequest().trim();
+            if (customerRequest.length() > CUSTOMER_REQUEST_MAX_LENGTH) {
+                throw CheckInException.field("customerRequest",
+                        "Yêu cầu khách hàng tối đa " + CUSTOMER_REQUEST_MAX_LENGTH + " ký tự.");
+            }
+            ticket.setCustomerRequest(customerRequest);
         }
 
         // Giống lúc tạo lịch (/create-booking): chỉ bắt buộc có SĐT HOẶC biển số, họ tên/email/kiểu xe
@@ -169,29 +182,57 @@ public class ServiceTicketAdvisorService {
         // nên không được lưu "" cho nhiều khách).
         com.g42.platform.gms.auth.entity.CustomerProfile customer = ticket.getCustomerId() == null ? null
                 : customerRepository.findById(ticket.getCustomerId()).orElse(null);
+        String phoneToDetach = null;
         if (request.getCustomerName() != null || request.getCustomerPhone() != null || request.getCustomerEmail() != null) {
             if (customer == null) {
-                throw new CheckInException("Không tìm thấy khách hàng");
+                throw new CheckInException("Không tìm thấy khách hàng của phiếu này.");
             }
             if (request.getCustomerName() != null) {
-                customer.setFullName(blankToNull(request.getCustomerName()));
+                String name = blankToNull(request.getCustomerName());
+                if (name != null && name.length() > NAME_MAX_LENGTH) {
+                    throw CheckInException.field("customerName", "Họ tên tối đa " + NAME_MAX_LENGTH + " ký tự.");
+                }
+                customer.setFullName(name);
             }
             if (request.getCustomerPhone() != null) {
-                customer.setPhone(blankToNull(request.getCustomerPhone()));
+                String phone = resolveNewPhone(request.getCustomerPhone(), customer);
+                if (phone != null && !phone.equals(customer.getPhone())) {
+                    phoneToDetach = phone;
+                }
+                customer.setPhone(phone);
             }
             if (request.getCustomerEmail() != null) {
-                customer.setEmail(blankToNull(request.getCustomerEmail()));
+                customer.setEmail(resolveNewEmail(request.getCustomerEmail(), customer));
+            }
+        }
+
+        if (request.getVehicleModel() != null) {
+            String model = blankToNull(request.getVehicleModel());
+            if (model != null && model.length() > VEHICLE_MODEL_MAX_LENGTH) {
+                throw CheckInException.field("vehicleModel", "Loại & kiểu xe tối đa " + VEHICLE_MODEL_MAX_LENGTH + " ký tự.");
             }
         }
 
         String requestedPlate = request.getLicensePlate() == null ? null : blankToNull(request.getLicensePlate());
+        if (requestedPlate != null && requestedPlate.length() > LICENSE_PLATE_MAX_LENGTH) {
+            throw CheckInException.field("licensePlate", "Biển số tối đa " + LICENSE_PLATE_MAX_LENGTH + " ký tự.");
+        }
         boolean willHavePlate = ticket.getVehicleId() != null || requestedPlate != null;
         boolean willHavePhone = customer != null && customer.getPhone() != null && !customer.getPhone().isBlank();
         if (!willHavePhone && !willHavePlate) {
-            throw new CheckInException("Cần có số điện thoại hoặc biển số xe");
+            throw CheckInException.field("customerPhone", "Cần nhập số điện thoại hoặc biển số xe.");
+        }
+        if (request.getOdometerKm() != null
+                && (request.getOdometerKm() < 0 || request.getOdometerKm() > ODOMETER_MAX_KM)) {
+            throw CheckInException.field("odometerKm", "Số ki-lô-mét phải từ 0 đến 9.999.999.");
         }
         if (customer != null) {
             customerRepository.save(customer);
+            // Số chính mới vốn là số phụ của chính khách này → bỏ khỏi danh sách phụ để một số
+            // không nằm ở hai nơi (bất biến của CustomerPhoneService).
+            if (phoneToDetach != null) {
+                customerPhoneService.detachOtherPhone(customer.getCustomerId(), phoneToDetach);
+            }
         }
 
         // Phiếu tiếp nhận chỉ bằng SĐT (chưa gắn xe) mà giờ mới nhập biển số → gắn xe cho phiếu:
@@ -220,7 +261,7 @@ public class ServiceTicketAdvisorService {
             if (request.getLicensePlate() != null) {
                 // Cột license_plate là NOT NULL nên xe đã gắn vào phiếu không xoá trắng biển được.
                 if (requestedPlate == null) {
-                    throw new CheckInException("Xe đã gắn với phiếu nên không thể để trống biển số");
+                    throw CheckInException.field("licensePlate", "Xe đã gắn với phiếu nên không thể để trống biển số.");
                 }
                 String newPlate = requestedPlate;
                 // Xe dùng chung (vợ chồng, công ty) được phép trùng biển giữa các hồ sơ khác nhau
@@ -229,7 +270,7 @@ public class ServiceTicketAdvisorService {
                 java.util.Optional<com.g42.platform.gms.vehicle.entity.Vehicle> sameOwnerVehicle =
                         vehicleRepository.findByPlateForCustomer(newPlate, ownerId);
                 if (sameOwnerVehicle.isPresent() && !sameOwnerVehicle.get().getVehicleId().equals(vehicle.getVehicleId())) {
-                    throw new CheckInException("Khách hàng này đã có xe biển số " + newPlate);
+                    throw CheckInException.field("licensePlate", "Khách hàng này đã có một xe khác biển số " + newPlate + ".");
                 }
                 vehicle.setLicensePlate(newPlate);
             }
@@ -238,11 +279,8 @@ public class ServiceTicketAdvisorService {
 
         // Update odometer reading
         if (request.getOdometerKm() != null) {
-            if (request.getOdometerKm() < 0) {
-                throw new CheckInException("Số công tơ mét không hợp lệ");
-            }
             if (ticket.getVehicleId() == null) {
-                throw new CheckInException("Cần nhập biển số xe trước khi ghi số ki-lô-mét");
+                throw CheckInException.field("odometerKm", "Cần nhập biển số xe trước khi ghi số ki-lô-mét.");
             }
             java.util.List<com.g42.platform.gms.service_ticket_management.domain.entity.OdometerReading> readings =
                     odometerReadingRepo.findByServiceTicketId(ticket.getServiceTicketId());
@@ -401,6 +439,77 @@ public class ServiceTicketAdvisorService {
     private void requireStatus(ServiceTicket ticket, TicketStatus required) {
         if (ticket.getTicketStatus() != required) {
             throw new CheckInException("Yêu cầu trạng thái " + required + ". Hiện tại: " + ticket.getTicketStatus());
+        }
+    }
+
+    private static final int CUSTOMER_REQUEST_MAX_LENGTH = 1000;
+    private static final int NAME_MAX_LENGTH = 255;
+    private static final int EMAIL_MAX_LENGTH = 255;
+    private static final int VEHICLE_MODEL_MAX_LENGTH = 255;
+    private static final int LICENSE_PLATE_MAX_LENGTH = 30;
+    private static final int ODOMETER_MAX_KM = 9_999_999;
+    private static final java.util.regex.Pattern EMAIL_PATTERN =
+            java.util.regex.Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
+
+    /**
+     * SĐT mới nhập ở đầu phiếu. Giữ nguyên số cũ thì không bắt định dạng (hồ sơ sổ cũ có thể
+     * lưu số lạ); số mới phải là 10 số bắt đầu bằng 0 và chưa thuộc về khách khác — cột phone
+     * là UNIQUE nên để lọt xuống DB sẽ thành 500 "Lỗi hệ thống".
+     */
+    private String resolveNewPhone(String raw, com.g42.platform.gms.auth.entity.CustomerProfile customer) {
+        String trimmed = blankToNull(raw);
+        if (trimmed == null) return null;
+        if (trimmed.equals(customer.getPhone())) return customer.getPhone();
+        String phone = ImportNormalizer.normalizePhone(trimmed);
+        if (!ImportNormalizer.isValidPhone(phone)) {
+            throw CheckInException.field("customerPhone", "Số điện thoại phải gồm 10 chữ số, bắt đầu bằng 0.");
+        }
+        if (phone.equals(customer.getPhone())) return phone;
+        customerRepository.findByPhone(phone).ifPresent(owner -> {
+            if (!owner.getCustomerId().equals(customer.getCustomerId())) {
+                String name = owner.getFullName() == null || owner.getFullName().isBlank() ? "chưa có tên" : owner.getFullName();
+                throw CheckInException.field("customerPhone", "Số điện thoại " + phone + " đã thuộc về khách hàng "
+                        + name + ". Nếu là cùng một người, hãy gộp hai hồ sơ ở màn Gộp hồ sơ trùng.");
+            }
+        });
+        return phone;
+    }
+
+    /** Email mới nhập ở đầu phiếu — lưu chữ thường như CustomerAuthService, và không được trùng khách khác (UNIQUE). */
+    private String resolveNewEmail(String raw, com.g42.platform.gms.auth.entity.CustomerProfile customer) {
+        String trimmed = blankToNull(raw);
+        if (trimmed == null) return null;
+        if (trimmed.equals(customer.getEmail())) return customer.getEmail();
+        String email = trimmed.toLowerCase(java.util.Locale.ROOT);
+        if (email.length() > EMAIL_MAX_LENGTH) {
+            throw CheckInException.field("customerEmail", "E-mail tối đa " + EMAIL_MAX_LENGTH + " ký tự.");
+        }
+        if (!EMAIL_PATTERN.matcher(email).matches()) {
+            throw CheckInException.field("customerEmail", "E-mail không hợp lệ. Ví dụ đúng: ten@gmail.com");
+        }
+        if (customerRepository.existsByEmailIgnoreCaseAndCustomerIdNot(email, customer.getCustomerId())) {
+            throw CheckInException.field("customerEmail", "E-mail " + email + " đã thuộc về một khách hàng khác.");
+        }
+        return email;
+    }
+
+    /**
+     * Thứ tự thời gian của phiếu: dự kiến hoàn tất và ngày bàn giao không được trước ngày tiếp nhận.
+     * Chỉ kiểm khi request có đổi một trong các mốc liên quan, để dữ liệu cũ đã lệch không chặn
+     * người dùng sửa các ô khác.
+     */
+    private void validateTicketTimes(ServiceTicket ticket, UpdateServiceTicketRequest request) {
+        LocalDateTime receivedAt = request.getReceivedAt() != null ? request.getReceivedAt() : ticket.getReceivedAt();
+        LocalDateTime estimated = request.getEstimatedDeliveryAt() != null ? request.getEstimatedDeliveryAt() : ticket.getEstimatedDeliveryAt();
+        LocalDateTime delivered = request.getDeliveredAt() != null ? request.getDeliveredAt() : ticket.getDeliveredAt();
+        if (receivedAt == null) return;
+        if (estimated != null && estimated.isBefore(receivedAt)
+                && (request.getReceivedAt() != null || request.getEstimatedDeliveryAt() != null)) {
+            throw CheckInException.field("estimatedDeliveryAt", "Dự kiến hoàn tất không được trước ngày tiếp nhận.");
+        }
+        if (delivered != null && delivered.isBefore(receivedAt)
+                && (request.getReceivedAt() != null || request.getDeliveredAt() != null)) {
+            throw CheckInException.field("deliveredAt", "Ngày bàn giao không được trước ngày tiếp nhận.");
         }
     }
 
