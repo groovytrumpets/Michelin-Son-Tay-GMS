@@ -20,6 +20,8 @@ public class WarehouseDto {
     private Integer parentWarehouseId;
     private String address;
     private Integer managerStaffId;
+    /** Tên nhân viên quản lý kho (null nếu chưa gán). */
+    private String managerStaffName;
     private Boolean isActive;
     private Instant createdAt;
 

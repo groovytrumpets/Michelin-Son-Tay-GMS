@@ -13,6 +13,9 @@ public class UpdateWarehouseRequest {
 
     private Integer managerStaffId;
 
+    /** true = bỏ gán quản lý kho (managerStaffId null nghĩa là giữ nguyên nên cần cờ riêng). */
+    private Boolean clearManager;
+
     /**
      * Đổi kho cha (null = giữ nguyên). Không được chọn chính nó hoặc kho con cháu của nó,
      * không được chọn kho lỗi; kho tổng (MASTER) luôn là gốc nên không có kho cha.

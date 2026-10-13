@@ -171,6 +171,13 @@ public class WarehouseController {
                 warehouseService.listWarehouses(isActive, withStock, includeInactive)));
     }
 
+    /** Nhân viên đang làm để chọn "Quản lý kho" — chỉ id, tên, SĐT, chức vụ. */
+    @GetMapping("/warehouse/manager-options")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.WAREHOUSE_CONFIG_VIEW + "')")
+    public ResponseEntity<ApiResponse<List<WarehouseManagerOptionDto>>> getManagerOptions() {
+        return ResponseEntity.ok(ApiResponses.success(warehouseService.listManagerOptions()));
+    }
+
     /** Chi tiết 1 kho. */
     @GetMapping("/warehouse/{id}")
     @PreAuthorize("hasAuthority('" + PermissionCodes.WAREHOUSE_CONFIG_VIEW + "')")

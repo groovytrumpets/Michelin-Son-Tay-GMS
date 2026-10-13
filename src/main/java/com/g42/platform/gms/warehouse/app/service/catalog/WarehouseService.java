@@ -56,6 +56,8 @@ public class WarehouseService {
     private WarehousePricingRepo warehousePricingRepo;
     @Autowired
     private com.g42.platform.gms.warehouse.domain.repository.InventoryRepo inventoryRepo;
+    @Autowired
+    private com.g42.platform.gms.auth.repository.StaffProfileRepo staffProfileRepo;
 
     // ─── CRUD Warehouse ───────────────────────────────────────────────────────
 
@@ -98,11 +100,11 @@ public class WarehouseService {
         w.setWarehouseType(req.getWarehouseType());
         w.setParentWarehouseId(req.getParentWarehouseId());
         w.setAddress(req.getAddress());
-        w.setManagerStaffId(req.getManagerStaffId());
+        w.setManagerStaffId(validateManager(req.getManagerStaffId()));
         w.setIsActive(true);
         w.setCreatedAt(java.time.Instant.now());
 
-        return toDto(warehouseRepo.save(w));
+        return withManagerNames(List.of(toDto(warehouseRepo.save(w)))).get(0);
     }
 
     /** Cập nhật tên, địa chỉ, manager của kho. */
@@ -118,14 +120,47 @@ public class WarehouseService {
         if (req.getAddress() != null) {
             w.setAddress(req.getAddress());
         }
-        if (req.getManagerStaffId() != null) {
-            w.setManagerStaffId(req.getManagerStaffId());
+        if (Boolean.TRUE.equals(req.getClearManager())) {
+            w.setManagerStaffId(null);
+        } else if (req.getManagerStaffId() != null) {
+            w.setManagerStaffId(validateManager(req.getManagerStaffId()));
         }
         if (req.getParentWarehouseId() != null && !req.getParentWarehouseId().equals(w.getParentWarehouseId())) {
             moveUnderParent(w, req.getParentWarehouseId());
         }
 
-        return toDto(warehouseRepo.save(w));
+        return withManagerNames(List.of(toDto(warehouseRepo.save(w)))).get(0);
+    }
+
+    /** Nhân viên quản lý phải tồn tại (có FK fk_warehouse_manager — sai id thì DB ném lỗi khó hiểu). */
+    private Integer validateManager(Integer staffId) {
+        if (staffId == null) return null;
+        if (!staffProfileRepo.existsById(staffId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Không tìm thấy nhân viên id=" + staffId);
+        }
+        return staffId;
+    }
+
+    /** Danh sách nhân viên đang làm để chọn quản lý kho (không đòi quyền xem nhân sự). */
+    @Transactional(readOnly = true)
+    public List<com.g42.platform.gms.warehouse.api.dto.WarehouseManagerOptionDto> listManagerOptions() {
+        return staffProfileRepo.findActiveStaffBrief().stream()
+                .map(r -> new com.g42.platform.gms.warehouse.api.dto.WarehouseManagerOptionDto(
+                        (Integer) r[0], (String) r[1], (String) r[2], (String) r[3]))
+                .collect(Collectors.toList());
+    }
+
+    private List<WarehouseDto> withManagerNames(List<WarehouseDto> dtos) {
+        Set<Integer> ids = dtos.stream().map(WarehouseDto::getManagerStaffId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        if (ids.isEmpty()) return dtos;
+        Map<Integer, String> names = new HashMap<>();
+        for (Object[] r : staffProfileRepo.findNamesByIds(ids)) {
+            names.put((Integer) r[0], (String) r[1]);
+        }
+        dtos.forEach(d -> d.setManagerStaffName(names.get(d.getManagerStaffId())));
+        return dtos;
     }
 
     /** Kho cha phải tồn tại và không phải kho lỗi (kho lỗi là nút lá, không chứa kho con). */
@@ -169,13 +204,13 @@ public class WarehouseService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Không tìm thấy kho id=" + warehouseId));
         w.setIsActive(active);
-        return toDto(warehouseRepo.save(w));
+        return withManagerNames(List.of(toDto(warehouseRepo.save(w)))).get(0);
     }
 
     /** Lấy chi tiết 1 kho. */
     public WarehouseDto getWarehouse(Integer warehouseId) {
         return warehouseRepo.findById(warehouseId)
-                .map(this::toDto)
+                .map(w -> withManagerNames(List.of(toDto(w))).get(0))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Không tìm thấy kho id=" + warehouseId));
     }
@@ -202,7 +237,7 @@ public class WarehouseService {
         if (withStock) {
             fillStockRollup(result, all);
         }
-        return result;
+        return withManagerNames(result);
     }
 
     private void fillStockRollup(List<WarehouseDto> dtos, List<Warehouse> all) {
