@@ -18,4 +18,7 @@ public class PermissionDto {
     private String label;
     private String description;
     private Integer sortOrder;
+
+    /** Vai trò (ngoài ADMIN) được phép giữ mã này; null = mọi vai trò. FE khoá ô tick của vai trò khác. */
+    private java.util.List<String> allowedRoles;
 }

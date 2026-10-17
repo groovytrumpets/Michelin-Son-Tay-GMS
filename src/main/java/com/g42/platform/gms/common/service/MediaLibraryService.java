@@ -3,6 +3,7 @@ package com.g42.platform.gms.common.service;
 import com.cloudinary.Cloudinary;
 import com.cloudinary.api.exceptions.NotFound;
 import com.g42.platform.gms.common.constant.FileUploadConstants;
+import com.g42.platform.gms.datasafety.application.service.MediaTrashService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
@@ -53,6 +54,7 @@ public class MediaLibraryService {
 
     private final Cloudinary cloudinary;
     private final ImageUploadService imageUploadService;
+    private final MediaTrashService mediaTrashService;
     private final JdbcTemplate jdbcTemplate;
 
     private volatile List<ColumnReference> cachedColumns = List.of();
@@ -125,10 +127,15 @@ public class MediaLibraryService {
         return scanReferences(normalizedPublicId, asset.secureUrl());
     }
 
-    /** Re-check references immediately before destroy to keep deletion fail-safe. */
+    /**
+     * "Xoá" ảnh = chuyển vào thùng rác (đổi sang loại private trên Cloudinary), không destroy.
+     * Khôi phục / xoá vĩnh viễn ở màn /data-backup — xem MediaTrashService.
+     * Re-check references immediately before moving to keep deletion fail-safe.
+     */
     public DeleteResult deleteImage(String publicId) {
         String normalizedPublicId = normalizePublicId(publicId);
-        MediaUsage usage = inspectUsage(normalizedPublicId);
+        MediaAsset asset = getImage(normalizedPublicId);
+        MediaUsage usage = scanReferences(normalizedPublicId, asset.secureUrl());
         if (!"SAFE".equals(usage.referenceStatus())) {
             String message = "IN_USE".equals(usage.referenceStatus())
                     ? "Ảnh đang được sử dụng tại " + usage.referenceCount() + " vị trí"
@@ -137,11 +144,11 @@ public class MediaLibraryService {
         }
 
         try {
-            String result = imageUploadService.deleteImageWithResult(normalizedPublicId);
-            log.info("Media library image deleted: publicId={}, cloudinaryResult={}", normalizedPublicId, result);
-            return new DeleteResult(normalizedPublicId, result, true);
-        } catch (IOException exception) {
-            throw new MediaLibraryException("CLOUDINARY_DELETE_FAILED", "Cloudinary không thể xóa ảnh", exception);
+            mediaTrashService.moveToTrash(normalizedPublicId, asset.secureUrl(), asset.folder(), asset.format(),
+                    asset.width(), asset.height(), asset.bytes());
+            return new DeleteResult(normalizedPublicId, "trashed", true);
+        } catch (Exception exception) {
+            throw new MediaLibraryException("CLOUDINARY_TRASH_FAILED", "Cloudinary không chuyển được ảnh vào thùng rác", exception);
         }
     }
 

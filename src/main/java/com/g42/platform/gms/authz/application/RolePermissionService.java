@@ -120,6 +120,11 @@ public class RolePermissionService {
             if (unknown) log.warn("Bỏ qua mã quyền không có trong danh mục: {}", code);
             return unknown;
         });
+        requested.removeIf(code -> {
+            boolean restricted = !PermissionCodes.isAllowedForRole(code, role.getRoleCode());
+            if (restricted) log.warn("Bỏ qua mã quyền {} — chỉ cấp được cho {}", code, PermissionCodes.allowedRolesFor(code));
+            return restricted;
+        });
 
         guardAgainstSelfLockout(role, requested);
 
@@ -252,7 +257,10 @@ public class RolePermissionService {
                 entity.getActionCode(),
                 entity.getLabel(),
                 entity.getDescription(),
-                entity.getSortOrder()
+                entity.getSortOrder(),
+                PermissionCodes.allowedRolesFor(entity.getCode()) == null
+                        ? null
+                        : List.copyOf(PermissionCodes.allowedRolesFor(entity.getCode()))
         );
     }
 }

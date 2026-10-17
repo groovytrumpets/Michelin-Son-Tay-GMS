@@ -87,7 +87,7 @@ public class MediaLibraryController {
     public ResponseEntity<ApiResponse<?>> delete(@RequestBody DeleteMediaRequest request) {
         try {
             DeleteResult result = mediaLibraryService.deleteImage(request == null ? null : request.publicId());
-            return ResponseEntity.ok(ApiResponses.success(result, "Đã xóa ảnh khỏi Cloudinary"));
+            return ResponseEntity.ok(ApiResponses.success(result, "Đã chuyển ảnh vào thùng rác"));
         } catch (IllegalArgumentException exception) {
             return badRequest(exception.getMessage());
         } catch (MediaInUseException exception) {

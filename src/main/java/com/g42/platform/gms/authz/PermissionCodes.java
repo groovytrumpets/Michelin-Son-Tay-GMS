@@ -206,4 +206,40 @@ public final class PermissionCodes {
     public static final String DOCUMENT_TEMPLATE_VIEW = "DOCUMENT_TEMPLATE_VIEW";
     public static final String DOCUMENT_TEMPLATE_EDIT = "DOCUMENT_TEMPLATE_EDIT";
     public static final String DOCUMENT_TEMPLATE_DELETE = "DOCUMENT_TEMPLATE_DELETE";
+
+    // ---- Sao lưu & thùng rác (/data-backup). Changeset 050-2. ----
+    /** Xem màn: dung lượng CSDL, lịch sử sao lưu, dữ liệu và ảnh đã xoá. */
+    public static final String DATA_SAFETY_VIEW = "DATA_SAFETY_VIEW";
+    /** Tải toàn bộ CSDL về máy — gồm cả PII và mật khẩu đã băm. */
+    public static final String DATA_BACKUP_EXPORT = "DATA_BACKUP_EXPORT";
+    public static final String DATA_TRASH_RESTORE = "DATA_TRASH_RESTORE";
+    /** Xoá hẳn ảnh trong thùng rác khỏi Cloudinary. */
+    public static final String DATA_TRASH_PURGE = "DATA_TRASH_PURGE";
+
+    /**
+     * Mã quyền chỉ được phép nằm ở vài vai trò cố định, bất kể ma trận ở
+     * /role-permission-config nói gì. ADMIN không cần liệt kê — luôn có tất cả.
+     *
+     * <p>Sinh ra cho màn sao lưu: bản sao lưu chứa toàn bộ dữ liệu khách và mật khẩu
+     * đã băm, yêu cầu là "chỉ Admin và Quản lý". Để là quyền động bình thường thì một
+     * cú tick nhầm cho lễ tân là đủ lộ cả CSDL. Chặn ở hai chỗ: lúc lưu ma trận
+     * (RolePermissionService bỏ mã ra) và lúc suy quyền (PermissionResolver lọc lại,
+     * phòng ai đó chèn thẳng vào bảng role_permission).
+     */
+    private static final java.util.Map<String, java.util.Set<String>> ROLE_RESTRICTED = java.util.Map.of(
+            DATA_SAFETY_VIEW, java.util.Set.of("MANAGER"),
+            DATA_BACKUP_EXPORT, java.util.Set.of("MANAGER"),
+            DATA_TRASH_RESTORE, java.util.Set.of("MANAGER"),
+            DATA_TRASH_PURGE, java.util.Set.of("MANAGER"));
+
+    /** Các vai trò (ngoài ADMIN) được cấp mã này; null = vai trò nào cũng được. */
+    public static java.util.Set<String> allowedRolesFor(String code) {
+        return code == null ? null : ROLE_RESTRICTED.get(code);
+    }
+
+    /** Vai trò này (mã không tiền tố ROLE_) có được phép giữ mã quyền này không. */
+    public static boolean isAllowedForRole(String code, String roleCode) {
+        java.util.Set<String> allowed = allowedRolesFor(code);
+        return allowed == null || (roleCode != null && allowed.contains(roleCode));
+    }
 }

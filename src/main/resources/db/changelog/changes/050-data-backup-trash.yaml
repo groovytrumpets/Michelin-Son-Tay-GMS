@@ -1,0 +1,139 @@
+# Sao lưu CSDL + thùng rác (/data-backup).
+#
+# Bản sao lưu KHÔNG lưu trên máy chủ: backend dựng file .sql.gz lúc bấm tải và đẩy thẳng
+# về trình duyệt, nên không có bảng nào cho bản sao lưu. Lịch sử "ai tải lúc nào" đọc từ
+# system_log (module DATA_BACKUP) — đã có sẵn, không cần bảng riêng.
+#
+# Dữ liệu xoá mềm của các module (is_active = 0, deleted_at, status = DELETED...) cũng
+# KHÔNG chép sang đâu: thùng rác đọc thẳng từ bảng gốc theo danh sách khai báo trong
+# TrashRegistry, khôi phục là lật lại đúng cờ đó.
+#
+# Riêng ẢNH thì cần bảng: ảnh nằm trên Cloudinary và trước đây "Xoá" ở /media-library là
+# xoá cứng. Giờ "Xoá" chuyển ảnh sang loại private (URL công khai tắt ngay, file vẫn còn),
+# và media_trash nhớ ảnh đó là gì, ai xoá, lúc nào để còn khôi phục hoặc xoá vĩnh viễn.
+#
+# Bốn mã quyền mới chỉ cấp được cho MANAGER (ADMIN tự có mọi quyền) — PermissionCodes
+# .ROLE_RESTRICTED chặn ở cả lúc lưu ma trận lẫn lúc suy quyền, nên tick nhầm cho vai trò
+# khác ở /role-permission-config cũng không có tác dụng.
+databaseChangeLog:
+  - changeSet:
+      id: 050-1-media-trash
+      author: gms
+      comment: Ảnh Cloudinary đã chuyển vào thùng rác (đổi sang loại private), chờ khôi phục hoặc xoá vĩnh viễn
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: media_trash
+      changes:
+        - createTable:
+            tableName: media_trash
+            remarks: Ảnh đã xoá khỏi thư viện ảnh nhưng còn giữ trên Cloudinary dưới dạng private
+            columns:
+              - column:
+                  name: trash_id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: public_id
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uq_media_trash_public_id
+                  remarks: public_id trên Cloudinary — giữ nguyên lúc vào thùng rác, chỉ đổi loại upload -> private
+              - column:
+                  name: original_link
+                  type: VARCHAR(500)
+                  remarks: Đường dẫn công khai trước khi xoá (đặt tên không chứa chữ "url" để quét "ảnh đang được dùng" ở thư viện ảnh không đếm nhầm bảng này)
+              - column:
+                  name: folder
+                  type: VARCHAR(255)
+              - column:
+                  name: format
+                  type: VARCHAR(20)
+              - column:
+                  name: width
+                  type: INT
+              - column:
+                  name: height
+                  type: INT
+              - column:
+                  name: bytes
+                  type: BIGINT
+              - column:
+                  name: deleted_by
+                  type: INT
+                  remarks: staff_id người xoá
+              - column:
+                  name: deleted_by_name
+                  type: VARCHAR(255)
+              - column:
+                  name: deleted_at
+                  type: DATETIME
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: media_trash
+            indexName: idx_media_trash_deleted_at
+            columns:
+              - column:
+                  name: deleted_at
+      rollback:
+        - dropTable:
+            tableName: media_trash
+
+  - changeSet:
+      id: 050-2-permission-data-safety
+      author: gms
+      comment: >-
+        Mã quyền cho màn Sao lưu & thùng rác. ADMIN không cần gán vì PermissionResolver suy ra
+        là toàn quyền; chỉ cấp MANAGER — và cũng chỉ MANAGER được cấp (PermissionCodes.ROLE_RESTRICTED).
+        Ghi vào cả role_permission_default để nút "Khôi phục mặc định" không làm mất quyền này.
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: "0"
+            sql: SELECT COUNT(*) FROM permission WHERE code = 'DATA_SAFETY_VIEW'
+      changes:
+        - sql:
+            splitStatements: false
+            sql: >-
+              INSERT INTO permission (code, module_code, module_label, group_label, action_code, label, description, sort_order) VALUES
+              ('DATA_SAFETY_VIEW','DATA_SAFETY','Sao lưu & thùng rác','Hệ thống','VIEW','Xem','Mở màn /data-backup: dung lượng CSDL, lịch sử sao lưu, danh sách dữ liệu và ảnh đã xoá. Chỉ cấp được cho Quản lý',841),
+              ('DATA_BACKUP_EXPORT','DATA_SAFETY','Sao lưu & thùng rác','Hệ thống','EXPORT','Tải bản sao lưu','Tải về máy toàn bộ cơ sở dữ liệu (file .sql.gz, gồm cả thông tin khách và mật khẩu đã mã hoá). Chỉ cấp được cho Quản lý',842),
+              ('DATA_TRASH_RESTORE','DATA_SAFETY','Sao lưu & thùng rác','Hệ thống','RESTORE','Khôi phục','Khôi phục dữ liệu và ảnh đã xoá mềm. Chỉ cấp được cho Quản lý',843),
+              ('DATA_TRASH_PURGE','DATA_SAFETY','Sao lưu & thùng rác','Hệ thống','DELETE','Xoá vĩnh viễn','Xoá hẳn ảnh trong thùng rác khỏi Cloudinary (không khôi phục được). Chỉ cấp được cho Quản lý',844)
+        - sql:
+            comment: Cấp cho MANAGER ở bộ quyền đang dùng
+            splitStatements: false
+            sql: >-
+              INSERT INTO role_permission (role_id, permission_code)
+              SELECT r.role_id, p.code
+              FROM role r CROSS JOIN permission p
+              WHERE r.role_code = 'MANAGER'
+                AND p.module_code = 'DATA_SAFETY'
+                AND NOT EXISTS (
+                  SELECT 1 FROM role_permission rp
+                  WHERE rp.role_id = r.role_id AND rp.permission_code = p.code
+                )
+        - sql:
+            comment: Và ở bộ mặc định để khôi phục không nuốt mất
+            splitStatements: false
+            sql: >-
+              INSERT INTO role_permission_default (role_id, permission_code)
+              SELECT r.role_id, p.code
+              FROM role r CROSS JOIN permission p
+              WHERE r.role_code = 'MANAGER'
+                AND p.module_code = 'DATA_SAFETY'
+                AND NOT EXISTS (
+                  SELECT 1 FROM role_permission_default rpd
+                  WHERE rpd.role_id = r.role_id AND rpd.permission_code = p.code
+                )
+      rollback:
+        - sql: "DELETE FROM role_permission WHERE permission_code IN ('DATA_SAFETY_VIEW','DATA_BACKUP_EXPORT','DATA_TRASH_RESTORE','DATA_TRASH_PURGE')"
+        - sql: "DELETE FROM role_permission_default WHERE permission_code IN ('DATA_SAFETY_VIEW','DATA_BACKUP_EXPORT','DATA_TRASH_RESTORE','DATA_TRASH_PURGE')"
+        - sql: "DELETE FROM permission WHERE module_code = 'DATA_SAFETY'"

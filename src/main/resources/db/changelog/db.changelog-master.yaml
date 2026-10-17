@@ -157,3 +157,6 @@ databaseChangeLog:
   - include:
       file: changes/049-item-name-500.yaml
       relativeToChangelogFile: true
+  - include:
+      file: changes/050-data-backup-trash.yaml
+      relativeToChangelogFile: true

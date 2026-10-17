@@ -72,6 +72,10 @@ public class PermissionResolver {
                 granted.addAll(ofRole);
             }
         }
+        // Lớp chặn thứ hai cho mã quyền bị khoá theo vai trò (VD tải bản sao lưu CSDL):
+        // RolePermissionService đã không cho lưu, nhưng dòng chèn thẳng vào DB vẫn phải vô hiệu.
+        granted.removeIf(code -> normalizedRoles.stream()
+                .noneMatch(roleCode -> PermissionCodes.isAllowedForRole(code, roleCode)));
         return granted;
     }
 
