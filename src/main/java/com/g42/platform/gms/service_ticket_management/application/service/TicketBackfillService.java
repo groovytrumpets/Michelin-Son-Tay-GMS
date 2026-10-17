@@ -26,6 +26,7 @@ import com.g42.platform.gms.service_ticket_management.api.dto.backfill.BackfillP
 import com.g42.platform.gms.service_ticket_management.api.dto.backfill.BackfillPolicyDto;
 import com.g42.platform.gms.service_ticket_management.api.dto.backfill.BackfillStaffStatDto;
 import com.g42.platform.gms.service_ticket_management.api.dto.backfill.BackfillTicketDto;
+import com.g42.platform.gms.service_ticket_management.domain.entity.OdometerReading;
 import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicket;
 import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicketAssignment;
 import com.g42.platform.gms.service_ticket_management.domain.enums.AssignmentStatus;
@@ -35,6 +36,7 @@ import com.g42.platform.gms.service_ticket_management.domain.enums.EntryMode;
 import com.g42.platform.gms.service_ticket_management.domain.enums.RoleInTicket;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketType;
+import com.g42.platform.gms.service_ticket_management.domain.repository.OdometerReadingRepo;
 import com.g42.platform.gms.service_ticket_management.domain.repository.ServiceTicketRepo;
 import com.g42.platform.gms.service_ticket_management.domain.repository.TicketAssignmentRepo;
 import com.g42.platform.gms.service_ticket_management.infrastructure.entity.ServiceTicketJpa;
@@ -94,6 +96,8 @@ public class TicketBackfillService {
     private static final long FUTURE_TOLERANCE_MINUTES = 5;
     private static final int REASON_MAX_LENGTH = 500;
     private static final Set<String> PAYMENT_METHODS = Set.of("CASH", "TRANSFER");
+    private static final int ODOMETER_MAX_KM = 9_999_999;
+    private static final int VEHICLE_TEXT_MAX_LENGTH = 100;
 
     private final ServiceTicketRepo serviceTicketRepo;
     private final ServiceTicketRepository serviceTicketJpaRepo;
@@ -109,6 +113,7 @@ public class TicketBackfillService {
     private final VehicleRepository vehicleRepository;
     private final StaffProileJpaRepo staffProfileRepo;
     private final TicketAssignmentRepo ticketAssignmentRepo;
+    private final OdometerReadingRepo odometerReadingRepo;
 
     // Field injection: @Qualifier khong duoc Lombok copy sang constructor (repo khong co lombok.config)
     @Autowired
@@ -191,6 +196,15 @@ public class TicketBackfillService {
             ticket.setBackfillTechnicianId(validateStaffRole(technicianId, "TECHNICIAN", "kỹ thuật viên"));
         }
 
+        // Thông tin xe như lúc tiếp nhận: loại xe, km, giờ trả xe — để phiếu không trống
+        // "Loại & kiểu xe" / "Ki-lô-mét" / "Dự kiến hoàn tất" khi mở ở /service-ticket-detail.
+        Integer odometerKm = null;
+        if (ticket.getTicketType() == TicketType.SERVICE) {
+            ticket.setEstimatedDeliveryAt(validateCompletedAt(req.getCompletedAt(), actualAt, kind));
+            odometerKm = validateOdometer(req.getOdometerKm(), ticket.getVehicleId());
+            enrichVehicle(ticket.getVehicleId(), req);
+        }
+
         ticket.setBookingId(null);
         ticket.setCreatedBy(staffId);
         ticket.setCustomerRequest(trimToNull(req.getNote()));
@@ -205,6 +219,16 @@ public class TicketBackfillService {
         ticket.setBackfillReviewStatus(BackfillReviewStatus.PENDING_REVIEW);
         ServiceTicket saved = serviceTicketRepo.save(ticket);
         Integer ticketId = saved.getServiceTicketId();
+
+        if (odometerKm != null) {
+            OdometerReading reading = new OdometerReading();
+            reading.setVehicleId(saved.getVehicleId());
+            reading.setReading(odometerKm);
+            reading.setRecordedAt(actualAt);
+            reading.setRecordedBy(staffId);
+            reading.setServiceTicketId(ticketId);
+            odometerReadingRepo.save(reading);
+        }
 
         estimateInternalApi.linkEstimateToServiceTicket(estimate.getId(), ticketId);
         // Giữ hàng ngay — thiếu tồn thì ném lỗi và rollback cả phiếu
@@ -246,12 +270,14 @@ public class TicketBackfillService {
 
         // Đánh dấu duyệt TRƯỚC khi gọi billing: BackfillGuard trong createNewBilling chỉ cho qua phiếu đã APPROVED
         LocalDateTime actualAt = ticket.getReceivedAt();
+        // Giờ trả xe đã khai lúc nhập (phiếu sửa xe); phiếu bán hàng/thiếu khai thì lấy ngày thực tế
+        LocalDateTime finishedAt = ticket.getEstimatedDeliveryAt() != null ? ticket.getEstimatedDeliveryAt() : actualAt;
         ticket.setBackfillReviewStatus(BackfillReviewStatus.APPROVED);
         ticket.setBackfillReviewedBy(reviewerId);
         ticket.setBackfillReviewedAt(LocalDateTime.now());
         ticket.setBackfillReviewNote(trimToNull(note));
         ticket.setTicketStatus(TicketStatus.COMPLETED);
-        ticket.setCompletedAt(actualAt);
+        ticket.setCompletedAt(finishedAt);
         serviceTicketRepo.save(ticket);
         // createNewBilling chỉ nhận báo giá ARCHIVED (giống PartsSaleService.createPartsSale)
         estimateService.updateEstimateStatus(estimate.getId(), EstimateEnum.ARCHIVED);
@@ -262,7 +288,7 @@ public class TicketBackfillService {
         billDto.setPaymentStatus("UNPAID");
         ServiceBillDto bill = billingService.createNewBilling(billDto);
 
-        billingService.recordBackfillPayment(bill.getBillId(), ticket.getBackfillPaymentMethod(), actualAt, reviewerId);
+        billingService.recordBackfillPayment(bill.getBillId(), ticket.getBackfillPaymentMethod(), actualAt, finishedAt, reviewerId);
 
         log.info("Backfill ticket {} approved by staff {}", ticket.getTicketCode(), reviewerId);
         return toDto(serviceTicketJpaRepo.findByServiceTicketId(serviceTicketId), true);
@@ -301,18 +327,20 @@ public class TicketBackfillService {
 
     @Transactional(readOnly = true)
     public Page<BackfillTicketDto> list(String reviewStatus, Integer createdBy, LocalDate from, LocalDate to,
-                                        int page, int size, StaffPrincipal principal) {
+                                        String search, int page, int size, StaffPrincipal principal) {
         Integer staffId = requireStaffId(principal);
         // Nhân viên thường chỉ xem phiếu mình nhập; quản lý xem tất cả
         Integer creatorFilter = isReviewer(principal) ? createdBy : staffId;
         BackfillReviewStatus status = trimToNull(reviewStatus) == null
                 ? null : parseEnum(BackfillReviewStatus.class, reviewStatus, "Trạng thái duyệt");
         int safeSize = Math.min(Math.max(size, 1), 100);
+        String keyword = trimToNull(search);
         return serviceTicketJpaRepo.findBackfillTickets(
                         status,
                         creatorFilter,
                         from == null ? null : from.atStartOfDay(),
                         to == null ? null : to.plusDays(1).atStartOfDay(),
+                        keyword == null ? null : "%" + keyword.toLowerCase(Locale.ROOT) + "%",
                         PageRequest.of(Math.max(page, 0), safeSize))
                 .map(t -> toDto(t, false));
     }
@@ -435,6 +463,67 @@ public class TicketBackfillService {
             throw new IllegalArgumentException("Chỉ được nhập bù phiếu trong " + maxDays + " ngày gần nhất"
                     + (isReviewer(principal) ? "." : " — phiếu cũ hơn cần quản lý nhập."));
         }
+    }
+
+    /**
+     * Giờ trả xe thực tế: bắt buộc khi nhập lại cả phiếu sửa xe, nhập thiếu dòng thì tuỳ chọn
+     * (phiếu gốc đã có ngày bàn giao). Không được trước giờ xe vào và không ở tương lai.
+     */
+    private LocalDateTime validateCompletedAt(LocalDateTime completedAt, LocalDateTime actualAt, BackfillKind kind) {
+        if (completedAt == null) {
+            if (kind == BackfillKind.MISSED) {
+                throw new IllegalArgumentException("Vui lòng chọn giờ trả xe thực tế.");
+            }
+            return null;
+        }
+        if (completedAt.isBefore(actualAt)) {
+            throw new IllegalArgumentException("Giờ trả xe không được trước giờ xe vào xưởng.");
+        }
+        if (completedAt.isAfter(LocalDateTime.now().plusMinutes(FUTURE_TOLERANCE_MINUTES))) {
+            throw new IllegalArgumentException("Giờ trả xe không được ở tương lai.");
+        }
+        return completedAt;
+    }
+
+    private Integer validateOdometer(Integer odometerKm, Integer vehicleId) {
+        if (odometerKm == null) {
+            return null;
+        }
+        if (odometerKm < 0 || odometerKm > ODOMETER_MAX_KM) {
+            throw new IllegalArgumentException("Số ki-lô-mét phải từ 0 đến 9.999.999.");
+        }
+        if (vehicleId == null) {
+            throw new IllegalArgumentException("Cần nhập biển số xe trước khi ghi số ki-lô-mét.");
+        }
+        return odometerKm;
+    }
+
+    /** Ghi hãng/dòng/năm xe chỉ khi xe đang trống field đó — không ghi đè dữ liệu đã có. */
+    private void enrichVehicle(Integer vehicleId, BackfillCreateRequest req) {
+        String brand = trimToNull(req.getVehicleBrand());
+        String model = trimToNull(req.getVehicleModel());
+        Integer year = req.getVehicleYear();
+        if (vehicleId == null || (brand == null && model == null && year == null)) {
+            return;
+        }
+        vehicleRepository.findById(vehicleId).ifPresent(vehicle -> {
+            boolean changed = false;
+            if (brand != null && trimToNull(vehicle.getBrand()) == null) {
+                vehicle.setBrand(brand.length() > VEHICLE_TEXT_MAX_LENGTH ? brand.substring(0, VEHICLE_TEXT_MAX_LENGTH) : brand);
+                changed = true;
+            }
+            if (model != null && trimToNull(vehicle.getModel()) == null) {
+                vehicle.setModel(model.length() > VEHICLE_TEXT_MAX_LENGTH ? model.substring(0, VEHICLE_TEXT_MAX_LENGTH) : model);
+                changed = true;
+            }
+            if (year != null && year > 1900 && year <= LocalDate.now().getYear() + 1 && vehicle.getManufactureYear() == null) {
+                vehicle.setManufactureYear(year);
+                changed = true;
+            }
+            if (changed) {
+                vehicleRepository.save(vehicle);
+            }
+        });
     }
 
     private int maxDaysBack(StaffPrincipal principal) {

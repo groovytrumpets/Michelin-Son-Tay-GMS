@@ -60,11 +60,12 @@ public class TicketBackfillController {
             @RequestParam(required = false) Integer createdBy,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @AuthenticationPrincipal StaffPrincipal principal) {
         return ResponseEntity.ok(ApiResponses.success(
-                backfillService.list(reviewStatus, createdBy, from, to, page, size, principal)));
+                backfillService.list(reviewStatus, createdBy, from, to, search, page, size, principal)));
     }
 
     @GetMapping("/policy")

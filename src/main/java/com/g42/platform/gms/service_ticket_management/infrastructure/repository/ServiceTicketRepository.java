@@ -97,6 +97,7 @@ public interface ServiceTicketRepository extends JpaRepository<ServiceTicketJpa,
     /**
      * Danh sách phiếu nhập bù cho màn duyệt. Tham số null = không lọc.
      * Lọc theo created_at (lúc bấm nhập) chứ không theo received_at (ngày thực tế).
+     * search: mẫu LIKE đã hạ chữ thường và bọc %, khớp mã phiếu / biển số / tên / SĐT khách.
      */
     @Query("""
         select st from ServiceTicketManagement st
@@ -105,6 +106,13 @@ public interface ServiceTicketRepository extends JpaRepository<ServiceTicketJpa,
           and (:createdBy is null or st.createdBy = :createdBy)
           and (:createdFrom is null or st.createdAt >= :createdFrom)
           and (:createdTo is null or st.createdAt < :createdTo)
+          and (:search is null
+               or lower(st.ticketCode) like :search
+               or exists (select 1 from com.g42.platform.gms.vehicle.entity.Vehicle v
+                          where v.vehicleId = st.vehicleId and lower(v.licensePlate) like :search)
+               or exists (select 1 from com.g42.platform.gms.auth.entity.CustomerProfile c
+                          where c.customerId = st.customerId
+                            and (lower(c.fullName) like :search or c.phone like :search)))
         order by st.createdAt desc
         """)
     org.springframework.data.domain.Page<ServiceTicketJpa> findBackfillTickets(
@@ -112,6 +120,7 @@ public interface ServiceTicketRepository extends JpaRepository<ServiceTicketJpa,
             @Param("createdBy") Integer createdBy,
             @Param("createdFrom") LocalDateTime createdFrom,
             @Param("createdTo") LocalDateTime createdTo,
+            @Param("search") String search,
             org.springframework.data.domain.Pageable pageable);
 
     /** Toàn bộ phiếu nhập bù tạo trong khoảng — để thống kê theo nhân viên. */

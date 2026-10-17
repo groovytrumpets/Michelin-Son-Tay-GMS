@@ -37,6 +37,20 @@ public class BackfillCreateRequest {
     /** Xe của khách (phiếu sửa xe). */
     private Integer vehicleId;
 
+    /**
+     * Thông tin xe như ô "Loại xe" ở /create-booking — chỉ ghi vào vehicle khi field đó
+     * đang trống (cùng quy ước BookingService.createDirectBookingByStaff).
+     */
+    private String vehicleBrand;
+    private String vehicleModel;
+    private Integer vehicleYear;
+
+    /** Số km đọc trên đồng hồ lúc xe vào — ghi odometer_reading gắn với phiếu. */
+    private Integer odometerKm;
+
+    /** Giờ trả xe thực tế (phiếu sửa xe) — hiện ở "Dự kiến hoàn tất", duyệt xong thành ngày bàn giao. */
+    private LocalDateTime completedAt;
+
     /** Báo giá DRAFT chứa các dòng hàng/dịch vụ đã làm. */
     private Integer estimateId;
 

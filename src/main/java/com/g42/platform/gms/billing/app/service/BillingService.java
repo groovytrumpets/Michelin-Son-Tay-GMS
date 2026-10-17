@@ -240,7 +240,8 @@ public class BillingService {
      */
     @Transactional
     public PaymentTransactionDto recordBackfillPayment(Integer billId, String method,
-                                                       LocalDateTime paidAt, Integer staffId) {
+                                                       LocalDateTime paidAt, LocalDateTime deliveredAt,
+                                                       Integer staffId) {
         ServiceBill serviceBill = billingRepository.getBillingByBillingId(billId);
         if (serviceBill == null) {
             throw new BillingException("Bill not found!", BillingErrorCode.ESTIMATE_404);
@@ -257,7 +258,7 @@ public class BillingService {
 
         ServiceTicketJpa ticket = serviceTicketRepository.findByServiceTicketId(serviceBill.getServiceTicketId());
         ticket.setTicketStatus(TicketStatus.PAID);
-        ticket.setDeliveredAt(paidAt);
+        ticket.setDeliveredAt(deliveredAt != null ? deliveredAt : paidAt);
         serviceTicketRepository.save(ticket);
 
         serviceBill.setPaymentStatus(PaymentStatus.PAID.name());
