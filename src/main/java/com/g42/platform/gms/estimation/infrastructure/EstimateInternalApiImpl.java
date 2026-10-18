@@ -102,7 +102,10 @@ public class EstimateInternalApiImpl implements EstimateInternalApi {
                     UsedEstimateItemDto dto = new UsedEstimateItemDto();
                     dto.setServiceTicketId(estimateIdToTicketId.get(item.getEstimateId()));
                     dto.setItemName(item.getItemName());
-                    ItemCategory category = categoryMap.get(item.getItemCategoryId());
+                    // Map.of() rỗng ném NPE khi get(null) — dòng không có danh mục phải chặn trước
+                    ItemCategory category = item.getItemCategoryId() == null
+                            ? null
+                            : categoryMap.get(item.getItemCategoryId());
                     dto.setCategoryName(category != null ? category.getCategoryName() : null);
                     dto.setQuantity(item.getQuantity());
                     dto.setUnitPrice(item.getUnitPrice());

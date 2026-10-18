@@ -60,10 +60,12 @@ public class WarehouseSearchController {
                                                                                     @RequestParam(required = false) BigDecimal maxPrice,
                                                                                     @RequestParam(required = false) String sortBy,
                                                                                     @RequestParam(required = false) String vehicleBrand,
-                                                                                    @RequestParam(required = false) String vehicleModel
+                                                                                    @RequestParam(required = false) String vehicleModel,
+                                                                                    // Kho đang lọc + kho con cháu (FE tự gom cây kho), VD warehouseIds=10,16
+                                                                                    @RequestParam(required = false) List<Integer> warehouseIds
     ){
         Page<CatalogWarehouseDto> apiResponse = warehouseService.getListItemsDetail
-                (page,size,itemType,isActive,search,brand,productLine,categoryCode,minPrice,maxPrice,sortBy,vehicleBrand,vehicleModel);
+                (page,size,itemType,isActive,search,brand,productLine,categoryCode,minPrice,maxPrice,sortBy,vehicleBrand,vehicleModel,warehouseIds);
         return ResponseEntity.ok(ApiResponses.success(apiResponse));
     }
     @GetMapping("/catalog-items/detail/{catalogItemId}")

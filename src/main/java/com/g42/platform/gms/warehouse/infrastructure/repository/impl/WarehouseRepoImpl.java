@@ -8,6 +8,9 @@ import com.g42.platform.gms.warehouse.domain.enums.CatalogItemType;
 import com.g42.platform.gms.warehouse.domain.repository.WarehouseDetailProjection;
 import com.g42.platform.gms.warehouse.domain.repository.WarehouseRepo;
 import com.g42.platform.gms.warehouse.infrastructure.entity.CatalogItemJpa;
+import com.g42.platform.gms.warehouse.infrastructure.entity.InventoryJpa;
+import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Subquery;
 import com.g42.platform.gms.warehouse.infrastructure.mapper.*;
 import com.g42.platform.gms.warehouse.infrastructure.repository.*;
 import com.g42.platform.gms.warehouse.infrastructure.specification.CatalogItemSpecification;
@@ -21,6 +24,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -56,7 +60,7 @@ public class WarehouseRepoImpl implements WarehouseRepo {
 
     @Override
     public Page<CatalogItem> getListOfCatalogItems
-            (int page, int size, CatalogItemType itemType, Boolean isActive, String search, Integer brandId, Integer productLineId, Integer categoryId, BigDecimal minPrice, BigDecimal maxPrice, String sortBy, String vehicleBrand, String vehicleModel)
+            (int page, int size, CatalogItemType itemType, Boolean isActive, String search, Integer brandId, Integer productLineId, Integer categoryId, BigDecimal minPrice, BigDecimal maxPrice, String sortBy, String vehicleBrand, String vehicleModel, Collection<Integer> warehouseIds)
     {
         Sort sort = Sort.by(Sort.Direction.ASC, "itemName");
 
@@ -85,6 +89,18 @@ public class WarehouseRepoImpl implements WarehouseRepo {
                             cb.like(root.get("searchKey"), searchLower)
                     )
             );
+        }
+        // Lọc kho ở server: trước đây FE tải 500 mục mới nhất rồi lọc kho phía client, nên
+        // hàng cũ hơn của kho đó bị rớt hẳn khỏi danh sách.
+        if (warehouseIds != null && !warehouseIds.isEmpty()) {
+            specification = specification.and((root, query, cb) -> {
+                Subquery<Integer> sub = query.subquery(Integer.class);
+                Root<InventoryJpa> inv = sub.from(InventoryJpa.class);
+                sub.select(inv.get("itemId")).where(
+                        cb.equal(inv.get("itemId"), root.get("itemId")),
+                        inv.get("warehouseId").in(warehouseIds));
+                return cb.exists(sub);
+            });
         }
             return catalogItemJpaRepo.findAll(specification, pageable)
                     .map(catalogItemJpaMapper::toDomain);

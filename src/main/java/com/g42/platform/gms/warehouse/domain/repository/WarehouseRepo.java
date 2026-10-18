@@ -8,6 +8,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -16,7 +17,8 @@ import com.g42.platform.gms.common.enums.WarehouseTypeEnum;
 
 @Repository
 public interface WarehouseRepo {
-    Page<CatalogItem> getListOfCatalogItems(int page, int size, CatalogItemType itemType, Boolean isActive, String search, Integer brandId, Integer productLineId, Integer categoryId, BigDecimal minPrice, BigDecimal maxPrice, String sortBy, String vehicleBrand, String vehicleModel);
+    /** warehouseIds khác rỗng → chỉ lấy mục có dòng tồn (inventory) ở ít nhất một kho trong danh sách. */
+    Page<CatalogItem> getListOfCatalogItems(int page, int size, CatalogItemType itemType, Boolean isActive, String search, Integer brandId, Integer productLineId, Integer categoryId, BigDecimal minPrice, BigDecimal maxPrice, String sortBy, String vehicleBrand, String vehicleModel, Collection<Integer> warehouseIds);
 
     List<WarehouseDetailProjection> getWarehouseDetailsByItemIds(Set<Integer> itemIds);
 
