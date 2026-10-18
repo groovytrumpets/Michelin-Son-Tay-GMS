@@ -4,6 +4,7 @@ import com.cloudinary.Api;
 import com.cloudinary.Cloudinary;
 import com.cloudinary.api.ApiResponse;
 import com.g42.platform.gms.common.service.MediaLibraryService.MediaInUseException;
+import com.g42.platform.gms.datasafety.application.service.MediaTrashService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -41,6 +42,8 @@ class MediaLibraryServiceTest {
     @Mock
     private ImageUploadService imageUploadService;
     @Mock
+    private MediaTrashService mediaTrashService;
+    @Mock
     private JdbcTemplate jdbcTemplate;
 
     private MediaLibraryService service;
@@ -48,7 +51,7 @@ class MediaLibraryServiceTest {
     @BeforeEach
     void setUp() {
         lenient().when(cloudinary.api()).thenReturn(api);
-        service = new MediaLibraryService(cloudinary, imageUploadService, jdbcTemplate);
+        service = new MediaLibraryService(cloudinary, imageUploadService, mediaTrashService, jdbcTemplate);
     }
 
     @Test
@@ -75,18 +78,18 @@ class MediaLibraryServiceTest {
     }
 
     @Test
-    void deleteImageDestroysOnlyAfterReferenceScanIsSafe() throws Exception {
+    void deleteImageMovesToTrashOnlyAfterReferenceScanIsSafe() throws Exception {
         stubResource();
         stubSearchableColumn("posts", "content_html");
         when(jdbcTemplate.queryForObject(contains("SELECT COUNT(*)"), eq(Long.class), anyString(), anyString()))
                 .thenReturn(0L);
-        when(imageUploadService.deleteImageWithResult("garage/posts/post-cover")).thenReturn("ok");
 
         var result = service.deleteImage("garage/posts/post-cover");
 
-        assertThat(result.result()).isEqualTo("ok");
+        assertThat(result.result()).isEqualTo("trashed");
         assertThat(result.invalidated()).isTrue();
-        verify(imageUploadService).deleteImageWithResult("garage/posts/post-cover");
+        verify(mediaTrashService).moveToTrash(eq("garage/posts/post-cover"), anyString(), any(), any(), any(), any(), any());
+        verify(imageUploadService, never()).deleteImageWithResult(anyString());
     }
 
     @Test
@@ -99,7 +102,7 @@ class MediaLibraryServiceTest {
         assertThatThrownBy(() -> service.deleteImage("garage/posts/post-cover"))
                 .isInstanceOf(MediaInUseException.class)
                 .hasMessageContaining("2 vị trí");
-        verify(imageUploadService, never()).deleteImageWithResult(anyString());
+        verify(mediaTrashService, never()).moveToTrash(anyString(), anyString(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -116,7 +119,7 @@ class MediaLibraryServiceTest {
         assertThatThrownBy(() -> service.deleteImage("garage/posts/post-cover"))
                 .isInstanceOf(MediaInUseException.class)
                 .hasMessageContaining("Chưa thể xác minh");
-        verify(imageUploadService, never()).deleteImageWithResult(anyString());
+        verify(mediaTrashService, never()).moveToTrash(anyString(), anyString(), any(), any(), any(), any(), any());
     }
 
     @Test
