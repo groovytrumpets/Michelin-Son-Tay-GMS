@@ -30,6 +30,8 @@ public interface LegacyVisitRepository extends JpaRepository<LegacyVisitJpa, Int
 
     long countByVehicleId(Integer vehicleId);
 
+    List<LegacyVisitJpa> findByVehicleId(Integer vehicleId);
+
     void deleteByImportBatchId(Integer importBatchId);
 
     /** Lần cuối và số lần đến xưởng theo sổ cũ, gom nhóm sẵn để màn danh sách không bị N+1. */

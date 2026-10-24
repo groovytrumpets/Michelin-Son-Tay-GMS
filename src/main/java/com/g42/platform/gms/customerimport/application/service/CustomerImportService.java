@@ -851,19 +851,21 @@ public class CustomerImportService {
         String raw = ImportNormalizer.trimToNull(row.getBrand());
         if (raw == null) return null;
 
-        String canonical = ImportNormalizer.canonicalBrand(raw);
-        if (canonical != null) {
-            Optional<VehicleBrand> known = vehicleBrandRepo.findByNameIgnoreCase(canonical);
-            if (known.isPresent()) return known.get().getName();
-            return canonical;
-        }
-
-        Optional<VehicleBrand> exact = vehicleBrandRepo.findByNameIgnoreCase(raw);
-        if (exact.isPresent()) return exact.get().getName();
+        String known = knownBrandName(raw);
+        if (known != null) return known;
 
         report.add(ImportIssueDto.warning(row.getSourceRowNo(), "brand",
                 "Hãng xe \"" + raw + "\" không có trong danh mục. Giữ nguyên văn — sửa lại sau ở màn Cấu hình hãng xe nếu cần."));
         return raw;
+    }
+
+    /** Tên hãng theo danh mục, đã gộp lỗi chính tả; null khi không nhận ra. */
+    private String knownBrandName(String raw) {
+        String canonical = ImportNormalizer.canonicalBrand(raw);
+        if (canonical != null) {
+            return vehicleBrandRepo.findByNameIgnoreCase(canonical).map(VehicleBrand::getName).orElse(canonical);
+        }
+        return vehicleBrandRepo.findByNameIgnoreCase(raw).map(VehicleBrand::getName).orElse(null);
     }
 
     /* ============================ Dòng dịch vụ ============================ */
@@ -997,6 +999,60 @@ public class CustomerImportService {
             entities.add(entity);
         }
         legacyVisitItemRepo.saveAll(entities);
+
+        if (dto.getVehicle() != null && visit.getVehicleId() != null) {
+            updateVisitVehicle(visit.getVehicleId(), dto.getVehicle());
+        }
+    }
+
+    /**
+     * Sửa hãng / dòng / năm của xe gắn với lượt. Người dùng chủ động sửa nên ghi đè thẳng,
+     * khác luồng nhập file chỉ điền ô trống.
+     *
+     * Phải chép cả vào nội dung gốc của các lô có lượt gắn xe này: "Sửa lại lô" gỡ rồi
+     * tạo lại xe do lô sinh ra theo nội dung gốc, không chép thì lần sửa này mất trắng.
+     */
+    private void updateVisitVehicle(Integer vehicleId, LegacyVisitUpdateDto.VehicleInfo info) {
+        Vehicle vehicle = vehicleRepo.findById(vehicleId).orElse(null);
+        if (vehicle == null) return;
+
+        Integer year = info.getManufactureYear();
+        if (year != null && (year < 1900 || year > LocalDate.now().getYear() + 1)) {
+            throw new IllegalArgumentException("Năm sản xuất " + year + " không hợp lệ.");
+        }
+        String rawBrand = ImportNormalizer.trimToNull(info.getBrand());
+        String known = rawBrand == null ? null : knownBrandName(rawBrand);
+        String brand = known != null ? known : rawBrand;
+        String model = ImportNormalizer.trimToNull(info.getModel());
+
+        vehicle.setBrand(brand);
+        vehicle.setModel(model);
+        vehicle.setManufactureYear(year);
+        vehicleRepo.save(vehicle);
+
+        String plateKey = ImportNormalizer.normalizePlate(vehicle.getLicensePlate());
+        if (plateKey == null) return;
+
+        Set<Integer> batchIds = new LinkedHashSet<>();
+        for (LegacyVisitJpa linked : legacyVisitRepo.findByVehicleId(vehicleId)) {
+            if (linked.getImportBatchId() != null) batchIds.add(linked.getImportBatchId());
+        }
+        for (ImportBatchJpa batch : importBatchRepo.findAllById(batchIds)) {
+            List<ImportRowDto> rows = readStoredRows(batch);
+            if (rows == null) continue;
+            boolean changed = false;
+            for (ImportRowDto row : rows) {
+                if (!plateKey.equals(ImportNormalizer.normalizePlate(row.getLicensePlate()))) continue;
+                row.setBrand(brand);
+                row.setModel(model);
+                row.setManufactureYear(year);
+                changed = true;
+            }
+            if (changed) {
+                batch.setRowsJson(writeRows(rows));
+                importBatchRepo.save(batch);
+            }
+        }
     }
 
     /**

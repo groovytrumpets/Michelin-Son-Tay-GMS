@@ -24,6 +24,12 @@ public class LegacyVisitDetailDto {
     private LocalDateTime deliveredAt;
     private String legacyTicketCode;
     private String licensePlate;
+
+    /** Xe đang gắn với lượt — để ô sửa lượt hiện và sửa được hãng, dòng, năm của xe. */
+    private Integer vehicleId;
+    private String vehicleBrand;
+    private String vehicleModel;
+    private Integer vehicleYear;
     private Integer odometer;
     private String customerNote;
     private String servicesText;

@@ -10,6 +10,7 @@ import com.g42.platform.gms.customerimport.infrastructure.entity.LegacyVisitJpa;
 import com.g42.platform.gms.customerimport.infrastructure.repository.ImportBatchRepository;
 import com.g42.platform.gms.customerimport.infrastructure.repository.LegacyVisitItemRepository;
 import com.g42.platform.gms.customerimport.infrastructure.repository.LegacyVisitRepository;
+import com.g42.platform.gms.vehicle.entity.Vehicle;
 import com.g42.platform.gms.vehicle.repository.VehicleRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -122,7 +123,7 @@ public class CustomerVisitStatsService {
             fileNameByBatch.put(batch.getImportBatchId(), batch.getFileName());
         }
 
-        Map<Integer, String> plateByVehicle = new HashMap<>();
+        Map<Integer, Optional<Vehicle>> vehicleById = new HashMap<>();
         List<LegacyVisitDetailDto> result = new ArrayList<>();
         for (LegacyVisitJpa visit : visits) {
             LegacyVisitDetailDto dto = new LegacyVisitDetailDto();
@@ -144,8 +145,13 @@ public class CustomerVisitStatsService {
             dto.setImportFileName(fileNameByBatch.get(visit.getImportBatchId()));
             dto.setItems(itemsByVisit.getOrDefault(visit.getLegacyVisitId(), List.of()));
             if (visit.getVehicleId() != null) {
-                dto.setLicensePlate(plateByVehicle.computeIfAbsent(visit.getVehicleId(),
-                        id -> vehicleRepo.findById(id).map(v -> v.getLicensePlate()).orElse(null)));
+                dto.setVehicleId(visit.getVehicleId());
+                vehicleById.computeIfAbsent(visit.getVehicleId(), vehicleRepo::findById).ifPresent(vehicle -> {
+                    dto.setLicensePlate(vehicle.getLicensePlate());
+                    dto.setVehicleBrand(vehicle.getBrand());
+                    dto.setVehicleModel(vehicle.getModel());
+                    dto.setVehicleYear(vehicle.getManufactureYear());
+                });
             }
             result.add(dto);
         }

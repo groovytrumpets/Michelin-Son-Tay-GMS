@@ -13,7 +13,8 @@ import java.util.List;
  *
  * Không có biển số: đổi xe của một lượt kéo theo chuyện tạo xe, chuyển chủ sở hữu —
  * đúng phần việc của luồng nhập lô, không nên làm lén trong một ô sửa nhanh. Muốn đổi
- * xe thì sửa lại cả lô ở màn nhập sổ cũ.
+ * xe thì sửa lại cả lô ở màn nhập sổ cũ. Hãng, dòng, năm của chính chiếc xe đang gắn
+ * thì sửa được ({@link #vehicle}), vì không đổi xe nào thuộc về ai.
  *
  * Giảm giá vẫn đi theo quy ước của luồng nhập: một dòng có hạng mục "Giảm giá". Server
  * tự tách ra khỏi các dòng dịch vụ và tính lại tổng, y như lúc nhập file.
@@ -34,4 +35,19 @@ public class LegacyVisitUpdateDto {
     private String callNote;
 
     private List<ImportItemDto> items = new ArrayList<>();
+
+    /**
+     * Hãng / dòng / năm sản xuất của xe gắn với lượt. null nghĩa là không đụng tới xe —
+     * để client cũ (chưa có ô này) không vô tình xoá trắng thông tin xe.
+     */
+    private VehicleInfo vehicle;
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class VehicleInfo {
+        private String brand;
+        private String model;
+        private Integer manufactureYear;
+    }
 }
