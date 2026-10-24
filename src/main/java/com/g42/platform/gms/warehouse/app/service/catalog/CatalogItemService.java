@@ -11,6 +11,7 @@ import com.g42.platform.gms.warehouse.api.mapper.*;
 import com.g42.platform.gms.warehouse.app.service.dto.PricingResolve;
 import com.g42.platform.gms.warehouse.app.service.pricing.PricingService;
 import com.g42.platform.gms.warehouse.domain.entity.*;
+import com.g42.platform.gms.warehouse.domain.enums.CatalogItemType;
 import com.g42.platform.gms.warehouse.domain.exception.WarehouseErrorCode;
 import com.g42.platform.gms.warehouse.domain.exception.WarehouseException;
 import com.g42.platform.gms.vehicle.entity.VehicleBrand;
@@ -230,6 +231,24 @@ public class CatalogItemService {
                         row.getYearFrom(),
                         row.getYearTo()))
                 .toList();
+    }
+
+    /** Các loại hàng có tồn kho thật — đổi qua lại giữa chúng không ảnh hưởng lô/tồn. */
+    private static final java.util.Set<CatalogItemType> STOCKED_ITEM_TYPES =
+            java.util.EnumSet.of(CatalogItemType.PART, CatalogItemType.EQUIPMENT, CatalogItemType.MACHINERY);
+
+    /**
+     * Đổi phân loại hàng hoá khi sửa mục kho. Truyền null là giữ nguyên.
+     * Chỉ cho đổi giữa phụ tùng / thiết bị / máy móc; dịch vụ, combo, gói bảo dưỡng
+     * gắn với bài viết và không có tồn kho nên không được đổi sang (hoặc từ) hàng vật lý.
+     */
+    private static void applyItemTypeChange(CatalogItem catalogItem, CatalogItemType newType) {
+        if (newType == null || newType == catalogItem.getItemType()) return;
+        if (!STOCKED_ITEM_TYPES.contains(newType) || !STOCKED_ITEM_TYPES.contains(catalogItem.getItemType())) {
+            throw new WarehouseException("Chỉ được đổi phân loại giữa Phụ tùng, Thiết bị và Máy móc",
+                    WarehouseErrorCode.WRONG_ENUM);
+        }
+        catalogItem.setItemType(newType);
     }
 
     private static void validateItemNameLength(String itemName) {
@@ -582,6 +601,7 @@ public class CatalogItemService {
             catalogItem.setSlug(normalizedSlug);
         }
 
+        applyItemTypeChange(catalogItem, updateDto.getItemType());
         catalogItem.setSku(updateDto.getSku());
         catalogItem.setPrice(updateDto.getPrice());
         catalogItem.setShowPrice(updateDto.getShowPrice());
