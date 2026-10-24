@@ -322,12 +322,12 @@ public class WarehouseService {
     }
 
 
-    public Page<CatalogSummaryDto> getListItems(int page, int size, CatalogItemType itemType, Boolean isActive, String search, Integer brand, Integer productLine, String categoryCode, BigDecimal minPrice, BigDecimal maxPrice, String sortBy, String vehicleBrand, String vehicleModel) {
+    public Page<CatalogSummaryDto> getListItems(int page, int size, CatalogItemType itemType, Boolean isActive, String search, Integer brand, Integer productLine, String categoryCode, BigDecimal minPrice, BigDecimal maxPrice, String sortBy, String vehicleBrand, String vehicleModel, List<Integer> categoryIdFilter) {
         Integer resolvedCategoryId = null;
         if (categoryCode != null) {
             resolvedCategoryId = catalogItemService.findCodeByCategoryCode(categoryCode);
         }
-        Page<CatalogItem> catalogItems = warehouseRepo.getListOfCatalogItems(page,size,itemType,isActive,search,brand,productLine,resolvedCategoryId,minPrice,maxPrice,sortBy,vehicleBrand,vehicleModel,null);
+        Page<CatalogItem> catalogItems = warehouseRepo.getListOfCatalogItems(page,size,itemType,isActive,search,brand,productLine,resolvedCategoryId,minPrice,maxPrice,sortBy,vehicleBrand,vehicleModel,null,categoryIdFilter);
         //get all ids of brands and lineProduct to query find string
         Set<Integer> brandIds = catalogItems.stream()
                 .map(CatalogItem::getBrandId).filter(Objects::nonNull).collect(Collectors.toSet());
@@ -355,12 +355,12 @@ public class WarehouseService {
             return dto;
         });
     }
-    public Page<CatalogWarehouseDto> getListItemsDetail(int page, int size, CatalogItemType itemType, Boolean isActive, String search, Integer brand, Integer productLine, String categoryCode, BigDecimal minPrice, BigDecimal maxPrice, String sortBy, String vehicleBrand, String vehicleModel, List<Integer> warehouseIds) {
+    public Page<CatalogWarehouseDto> getListItemsDetail(int page, int size, CatalogItemType itemType, Boolean isActive, String search, Integer brand, Integer productLine, String categoryCode, BigDecimal minPrice, BigDecimal maxPrice, String sortBy, String vehicleBrand, String vehicleModel, List<Integer> warehouseIds, List<Integer> categoryIdFilter) {
         Integer resolvedCategoryId = null;
         if (categoryCode != null) {
             resolvedCategoryId = catalogItemService.findCodeByCategoryCode(categoryCode);
         }
-        Page<CatalogItem> catalogItems = warehouseRepo.getListOfCatalogItems(page,size,itemType,isActive,search,brand,productLine,resolvedCategoryId,minPrice,maxPrice,sortBy,vehicleBrand,vehicleModel,warehouseIds);
+        Page<CatalogItem> catalogItems = warehouseRepo.getListOfCatalogItems(page,size,itemType,isActive,search,brand,productLine,resolvedCategoryId,minPrice,maxPrice,sortBy,vehicleBrand,vehicleModel,warehouseIds,categoryIdFilter);
         //get all ids of brands and lineProduct to query find string
         Set<Integer> brandIds = catalogItems.stream()
                 .map(CatalogItem::getBrandId).filter(Objects::nonNull).collect(Collectors.toSet());

@@ -60,7 +60,7 @@ public class WarehouseRepoImpl implements WarehouseRepo {
 
     @Override
     public Page<CatalogItem> getListOfCatalogItems
-            (int page, int size, CatalogItemType itemType, Boolean isActive, String search, Integer brandId, Integer productLineId, Integer categoryId, BigDecimal minPrice, BigDecimal maxPrice, String sortBy, String vehicleBrand, String vehicleModel, Collection<Integer> warehouseIds)
+            (int page, int size, CatalogItemType itemType, Boolean isActive, String search, Integer brandId, Integer productLineId, Integer categoryId, BigDecimal minPrice, BigDecimal maxPrice, String sortBy, String vehicleBrand, String vehicleModel, Collection<Integer> warehouseIds, Collection<Integer> categoryIds)
     {
         Sort sort = Sort.by(Sort.Direction.ASC, "itemName");
 
@@ -101,6 +101,10 @@ public class WarehouseRepoImpl implements WarehouseRepo {
                         inv.get("warehouseId").in(warehouseIds));
                 return cb.exists(sub);
             });
+        }
+        // Chọn nhiều danh mục cùng lúc: mục thuộc BẤT KỲ danh mục nào trong danh sách
+        if (categoryIds != null && !categoryIds.isEmpty()) {
+            specification = specification.and((root, query, cb) -> root.get("itemCategoryId").in(categoryIds));
         }
             return catalogItemJpaRepo.findAll(specification, pageable)
                     .map(catalogItemJpaMapper::toDomain);
