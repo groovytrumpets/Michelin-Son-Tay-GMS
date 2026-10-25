@@ -31,4 +31,9 @@ public class StockEntryResponse {
     private Integer createdBy;
     private String createdByName;
     private LocalDateTime createdAt;
+
+    private Integer cancelledBy;
+    private String cancelledByName;
+    private LocalDateTime cancelledAt;
+    private String cancelReason;
 }

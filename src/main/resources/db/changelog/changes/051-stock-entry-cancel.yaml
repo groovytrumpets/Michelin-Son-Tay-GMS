@@ -1,0 +1,64 @@
+# Huỷ phiếu nhập kho (xoá mềm theo trạng thái).
+#
+# Phiếu nhập ở trạng thái DRAFT ("Khởi tạo phiếu") chưa cộng tồn kho, nên "xoá" nó
+# chỉ cần lật status sang CANCELLED — không phải hoàn tác gì ở inventory / lô / serial.
+# Giữ dòng lại (không DELETE) để còn truy vết và khôi phục được ở /data-backup → Thùng
+# rác (TrashRegistry khai báo STOCK_ENTRY theo status = 'CANCELLED').
+#
+# stock_entry.status là MySQL ENUM nên phải mở rộng danh sách giá trị, nếu không ghi
+# CANCELLED sẽ bị MySQL từ chối ("Data truncated for column 'status'"). Dùng SQL thẳng
+# như 032 để giữ nguyên CHARACTER SET / COLLATE / NOT NULL DEFAULT 'DRAFT'.
+databaseChangeLog:
+  - changeSet:
+      id: 051-1-stock-entry-status-add-cancelled
+      author: gms
+      comment: Thêm giá trị CANCELLED vào enum stock_entry.status
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: "0"
+            sql: >-
+              SELECT COUNT(*) FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = 'stock_entry'
+                AND COLUMN_NAME = 'status'
+                AND COLUMN_TYPE LIKE '%CANCELLED%'
+      changes:
+        - sql:
+            sql: >-
+              ALTER TABLE `stock_entry` MODIFY COLUMN `status`
+              enum('DRAFT','CONFIRMED','CANCELLED')
+              CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'DRAFT'
+      rollback:
+        - sql:
+            sql: >-
+              ALTER TABLE `stock_entry` MODIFY COLUMN `status`
+              enum('DRAFT','CONFIRMED')
+              CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'DRAFT'
+
+  - changeSet:
+      id: 051-2-stock-entry-cancel-columns
+      author: gms
+      comment: Ai huỷ phiếu nhập, lúc nào, vì sao
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: stock_entry
+                columnName: cancelled_at
+      changes:
+        - addColumn:
+            tableName: stock_entry
+            columns:
+              - column:
+                  name: cancelled_by
+                  type: INT
+                  remarks: staff_id người huỷ phiếu
+              - column:
+                  name: cancelled_at
+                  type: DATETIME
+                  remarks: Thời điểm huỷ phiếu
+              - column:
+                  name: cancel_reason
+                  type: VARCHAR(500)
+                  remarks: Lý do huỷ phiếu

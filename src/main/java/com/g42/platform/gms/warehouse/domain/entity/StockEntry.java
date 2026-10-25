@@ -33,6 +33,10 @@ public class StockEntry {
     private String delivererPhone;
     private String licensePlate;
 
+    private Integer cancelledBy;
+    private LocalDateTime cancelledAt;
+    private String cancelReason;
+
     @Builder.Default
     private List<StockEntryItem> items = new ArrayList<>();
 }

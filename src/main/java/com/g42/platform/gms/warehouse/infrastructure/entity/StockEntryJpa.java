@@ -70,6 +70,15 @@ public class StockEntryJpa {
     @Column(name = "license_plate", length = 20)
     private String licensePlate;
 
+    @Column(name = "cancelled_by")
+    private Integer cancelledBy;
+
+    @Column(name = "cancelled_at")
+    private LocalDateTime cancelledAt;
+
+    @Column(name = "cancel_reason", length = 500)
+    private String cancelReason;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();

@@ -23,10 +23,11 @@ import com.g42.platform.gms.booking_management.domain.repository.BookingManageRe
 import com.g42.platform.gms.booking_management.infrastructure.entity.BookingJpa;
 import com.g42.platform.gms.booking_management.infrastructure.mapper.TimeSlotMMapper;
 import com.g42.platform.gms.marketing.service_catalog.domain.exception.ServiceException;
-import com.g42.platform.gms.notification.application.service.CustomerNotificationDispatcher;
+import com.g42.platform.gms.notification.application.event.BookingConfirmNotificationRequested;
 import com.g42.platform.gms.notification.domain.NotificationRecipient;
 import com.g42.platform.gms.auth.repository.CustomerProfileRepository;
 import lombok.AllArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,7 +46,7 @@ public class BookingManageService {
     private final BookingManageDtoMapper bookingManageDtoMapper;
     private final BookingMDetailDtoMapper  bookingMDetailDtoMapper;
     private final BookingMRequestDtoMapper  bookingMRequestDtoMapper;
-    private final CustomerNotificationDispatcher notificationDispatcher;
+    private final ApplicationEventPublisher eventPublisher;
     private final CustomerProfileRepository customerProfileRepository;
     private final SlotService slotService;
 
@@ -113,18 +114,19 @@ public class BookingManageService {
         boolean confirmed = request.confirm();
         bookingRepository.setConfirmStatus(request);
 
-        // Gửi thông báo xác nhận (Zalo hoặc Email tuỳ lựa chọn của khách)
+        // Gửi thông báo xác nhận (Zalo hoặc Email tuỳ lựa chọn của khách) — chạy nền
+        // sau khi commit, xem BookingConfirmNotificationListener
         NotificationRecipient recipient = customerProfileRepository.findById(customerId)
                 .map(c -> NotificationRecipient.of(c.getPhone(), c.getEmail(), c.getNotificationChannel()))
                 .orElse(NotificationRecipient.phoneOnly(request.getPhone()));
-        notificationDispatcher.sendBookingConfirm(
+        eventPublisher.publishEvent(new BookingConfirmNotificationRequested(
                 recipient,
                 request.getFullName(),
                 request.getServices().stream().map(CatalogItem::getItemName).toList(),
                 request.getRequestCode(),
                 request.getLocalDateTime(),
                 "Michelin Sơn Tây"
-        );
+        ));
         return confirmed;
     }
     private final TimeSlotMMapper  timeSlotMMapper;

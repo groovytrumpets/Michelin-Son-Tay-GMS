@@ -24,4 +24,7 @@ public class StockEntryItemResponse {
     private BigDecimal inputQuantity;
     private BigDecimal conversionFactor;
     private java.util.List<String> serialCodes;
+    /** Đơn vị đóng gói + hệ số quy đổi hiện tại của sản phẩm — màn sửa phiếu cần để đổi qua lại gói/lẻ. */
+    private String packagingUnit;
+    private BigDecimal packagingConversionFactor;
 }

@@ -27,7 +27,10 @@ public interface StockEntryJpaRepo extends JpaRepository<StockEntryJpa, Integer>
         select distinct e from StockEntryJpa e
         left join e.items i
         where (:warehouseId is null or e.warehouseId = :warehouseId)
-            and (:status is null or e.status = :status)
+            and (
+                (:status is null and e.status <> com.g42.platform.gms.warehouse.domain.enums.StockEntryStatus.CANCELLED)
+                or e.status = :status
+            )
             and (:fromDate is null or e.entryDate >= :fromDate)
             and (:toDate is null or e.entryDate <= :toDate)
             and (
@@ -48,13 +51,15 @@ public interface StockEntryJpaRepo extends JpaRepository<StockEntryJpa, Integer>
 
     @Query("""
     select se.importPrice*se.markupMultiplier from StockEntryItemJpa se join StockEntryJpa s on se.entryId = s.entryId
-        where s.warehouseId=:warehouseId and se.itemId=:itemId order by s.createdAt desc limit 1
+        where s.warehouseId=:warehouseId and se.itemId=:itemId
+            and s.status <> com.g42.platform.gms.warehouse.domain.enums.StockEntryStatus.CANCELLED order by s.createdAt desc limit 1
     """)
     Optional<BigDecimal> findLatesFallBackPrice(Integer itemId, Integer warehouseId);
 
     @Query("""
     select se.importPrice * coalesce(se.markupMultiplierWholesale, se.markupMultiplier) from StockEntryItemJpa se join StockEntryJpa s on se.entryId = s.entryId
-        where s.warehouseId=:warehouseId and se.itemId=:itemId order by s.createdAt desc limit 1
+        where s.warehouseId=:warehouseId and se.itemId=:itemId
+            and s.status <> com.g42.platform.gms.warehouse.domain.enums.StockEntryStatus.CANCELLED order by s.createdAt desc limit 1
     """)
     Optional<BigDecimal> findLatesFallBackPriceWholesale(Integer itemId, Integer warehouseId);
 }

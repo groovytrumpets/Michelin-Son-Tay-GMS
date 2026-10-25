@@ -92,6 +92,9 @@ public class StockEntryRepoImpl implements StockEntryRepo {
                 .createdBy(jpa.getCreatedBy())
                 .createdAt(jpa.getCreatedAt())
                 .updatedAt(jpa.getUpdatedAt())
+                .cancelledBy(jpa.getCancelledBy())
+                .cancelledAt(jpa.getCancelledAt())
+                .cancelReason(jpa.getCancelReason())
                 .items(jpa.getItems() != null
                         ? jpa.getItems().stream().map(this::toDomainItem).toList()
                         : new ArrayList<>())
@@ -119,6 +122,9 @@ public class StockEntryRepoImpl implements StockEntryRepo {
         jpa.setCreatedBy(domain.getCreatedBy());
         jpa.setCreatedAt(domain.getCreatedAt());
         jpa.setUpdatedAt(domain.getUpdatedAt());
+        jpa.setCancelledBy(domain.getCancelledBy());
+        jpa.setCancelledAt(domain.getCancelledAt());
+        jpa.setCancelReason(domain.getCancelReason());
         return jpa;
     }
 

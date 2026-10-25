@@ -39,8 +39,9 @@ import com.g42.platform.gms.common.util.Qty;
  *
  * Sơ đồ trạng thái:
  *   DRAFT ──[confirm]──► CONFIRMED
- *     ▲
- *     └── có thể sửa thoải mái khi còn DRAFT
+ *     │ ▲
+ *     │ └── có thể sửa thoải mái khi còn DRAFT
+ *     └──[cancel]──► CANCELLED  (xoá mềm, khôi phục về DRAFT ở thùng rác /data-backup)
  *
  * ============================================================
  */
@@ -54,6 +55,7 @@ import com.g42.platform.gms.common.service.ImageUploadService;
 import com.g42.platform.gms.warehouse.api.dto.entry.CreateStockEntryRequest;
 import com.g42.platform.gms.warehouse.api.dto.entry.CreateStockEntryWithAttachmentRequest;
 import com.g42.platform.gms.warehouse.api.dto.entry.StockEntryItemRequest;
+import com.g42.platform.gms.warehouse.api.dto.request.CancelStockEntryRequest;
 import com.g42.platform.gms.warehouse.api.dto.request.PatchEntryItemRequest;
 import com.g42.platform.gms.warehouse.api.dto.request.UpdateStockEntryRequest;
 import com.g42.platform.gms.warehouse.api.dto.response.StockEntryItemResponse;
@@ -411,6 +413,9 @@ public class StockEntryService {
         if (entry.getStatus() == StockEntryStatus.CONFIRMED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Phiếu đã được xác nhận");
         }
+        if (entry.getStatus() == StockEntryStatus.CANCELLED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Phiếu đã bị huỷ, không thể xác nhận");
+        }
 
         // [Guard 2] Bắt buộc phải có ảnh chứng từ (hóa đơn NCC, biên bản nhập)
         boolean hasAttachment = attachmentRepo.existsByRefTypeAndRefId(
@@ -442,6 +447,42 @@ public class StockEntryService {
         notifyManagersAboutStockEntry(finalSaved, "Xác nhận phiếu nhập kho", "Phiếu nhập kho " + finalSaved.getEntryCode() + " đã được xác nhận thành công.");
 
         return toResponse(finalSaved);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // CANCEL — Huỷ (xoá mềm) phiếu còn DRAFT
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Huỷ phiếu nhập (DRAFT → CANCELLED).
+     *
+     * Phiếu DRAFT chưa cộng tồn, chưa sinh serial/lô dùng được (FIFO chỉ đọc lô của phiếu
+     * CONFIRMED) nên không có gì phải hoàn tác — chỉ lật trạng thái. Dòng vẫn còn trong DB:
+     * danh sách mặc định ẩn phiếu đã huỷ, thùng rác /data-backup khôi phục lại về DRAFT.
+     * Phiếu CONFIRMED không huỷ được ở đây — hàng đã vào kho thì phải làm phiếu xuất/trả.
+     */
+    @Transactional
+    public StockEntryResponse cancel(Integer entryId, CancelStockEntryRequest request, Integer staffId) {
+        StockEntry entry = findOrThrow(entryId);
+        if (entry.getStatus() != StockEntryStatus.DRAFT) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    entry.getStatus() == StockEntryStatus.CANCELLED
+                            ? "Phiếu đã bị huỷ trước đó"
+                            : "Phiếu đã xác nhận nhập kho, không thể huỷ");
+        }
+        String reason = request != null && request.getReason() != null ? request.getReason().trim() : null;
+
+        entry.setStatus(StockEntryStatus.CANCELLED);
+        entry.setCancelledBy(staffId);
+        entry.setCancelledAt(LocalDateTime.now());
+        entry.setCancelReason(reason == null || reason.isEmpty() ? null : reason);
+        // Giữ nguyên entry.items vừa load: save() merge cả collection (orphanRemoval),
+        // để rỗng/null là xoá sạch dòng hàng của phiếu.
+        StockEntry saved = stockEntryRepo.save(entry);
+        notifyManagersAboutStockEntry(saved, "Huỷ phiếu nhập kho",
+                "Phiếu nhập kho " + saved.getEntryCode() + " đã bị huỷ"
+                        + (saved.getCancelReason() != null ? ": " + saved.getCancelReason() : "."));
+        return toResponse(saved);
     }
 
     private void notifyManagersAboutStockEntry(StockEntry entry, String title, String message) {
@@ -754,6 +795,9 @@ public class StockEntryService {
         r.setConfirmedAt(entry.getConfirmedAt());
         r.setCreatedBy(entry.getCreatedBy());
         r.setCreatedAt(entry.getCreatedAt());
+        r.setCancelledBy(entry.getCancelledBy());
+        r.setCancelledAt(entry.getCancelledAt());
+        r.setCancelReason(entry.getCancelReason());
 
         // Enrich: tên và mã kho (để hiển thị trên UI, không cần client gọi thêm API)
         if (entry.getWarehouseId() != null) {
@@ -775,6 +819,13 @@ public class StockEntryService {
             staffProfileRepo.findById(entry.getConfirmedBy())
                     .map(StaffProfile::getFullName)
                     .ifPresent(r::setConfirmedByName);
+        }
+
+        // Enrich: tên nhân viên huỷ phiếu (null nếu chưa huỷ)
+        if (entry.getCancelledBy() != null) {
+            staffProfileRepo.findById(entry.getCancelledBy())
+                    .map(StaffProfile::getFullName)
+                    .ifPresent(r::setCancelledByName);
         }
 
         // Enrich: tên sản phẩm — batch lookup 1 query cho tất cả items (tránh N+1)
@@ -813,6 +864,8 @@ public class StockEntryService {
                 ir.setMeasurementType(catalog.getMeasurementType());
                 ir.setDecimalScale(catalog.getDecimalScale());
                 ir.setTracksSerial(catalog.getTracksSerial());
+                ir.setPackagingUnit(catalog.getPackagingUnit());
+                ir.setPackagingConversionFactor(catalog.getConversionFactor());
             }
             return ir;
         }).collect(Collectors.toList());

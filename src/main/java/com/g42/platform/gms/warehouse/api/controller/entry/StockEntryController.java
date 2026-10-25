@@ -6,6 +6,7 @@ import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.warehouse.api.dto.entry.CreateStockEntryRequest;
 import com.g42.platform.gms.warehouse.api.dto.entry.CreateStockEntryWithAttachmentRequest;
+import com.g42.platform.gms.warehouse.api.dto.request.CancelStockEntryRequest;
 import com.g42.platform.gms.warehouse.api.dto.request.PatchEntryItemRequest;
 import com.g42.platform.gms.warehouse.api.dto.request.UpdateStockEntryRequest;
 import com.g42.platform.gms.warehouse.api.dto.response.StockEntryImportResponse;
@@ -140,6 +141,21 @@ public class StockEntryController {
             @AuthenticationPrincipal StaffPrincipal principal) {
         return ResponseEntity.ok(ApiResponses.success(
                 stockEntryService.confirm(id, principal.getStaffId())));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // CANCEL
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /** Huỷ phiếu nhập (xoá mềm, status → CANCELLED) — chỉ khi DRAFT. */
+    @PostMapping("/{id}/cancel")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.STOCK_ENTRY_DELETE + "')")
+    public ResponseEntity<ApiResponse<StockEntryResponse>> cancel(
+            @PathVariable Integer id,
+            @Valid @RequestBody(required = false) CancelStockEntryRequest request,
+            @AuthenticationPrincipal StaffPrincipal principal) {
+        return ResponseEntity.ok(ApiResponses.success(
+                stockEntryService.cancel(id, request, principal.getStaffId())));
     }
 
     // ─────────────────────────────────────────────────────────────────────────
