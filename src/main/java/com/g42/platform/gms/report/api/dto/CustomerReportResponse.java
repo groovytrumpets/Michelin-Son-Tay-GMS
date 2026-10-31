@@ -38,7 +38,10 @@ public class CustomerReportResponse {
         private long totalCustomers;
         private long totalTickets;
         private long paidTickets;
+        /** Phiếu chưa thu — không gồm phiếu đã huỷ. */
         private long unpaidTickets;
+        /** Phiếu đã huỷ (CANCELLED hoặc nhập bù bị từ chối): vẫn nằm trong totalTickets, không tính tiền. */
+        private long cancelledTickets;
         private BigDecimal totalRevenue;
         private BigDecimal revenueFromBills;
         private BigDecimal discountTotal;
@@ -69,6 +72,7 @@ public class CustomerReportResponse {
         private List<String> plates;
         private long ticketCount;
         private long paidTicketCount;
+        private long cancelledTicketCount;
         private BigDecimal revenue;
         private BigDecimal discountAmount;
         private List<String> ticketCodes;
@@ -94,6 +98,8 @@ public class CustomerReportResponse {
         /** Xưởng làm phiếu; sổ cũ tính là của xưởng mặc định. */
         private String branchName;
         private boolean paid;
+        /** Phiếu đã huỷ: paid=false, revenue=0 dù có hoá đơn. */
+        private boolean cancelled;
         private boolean hasBill;
         private BigDecimal revenue;
         private BigDecimal discountAmount;

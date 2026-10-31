@@ -12,6 +12,7 @@ import com.g42.platform.gms.report.api.dto.CustomerReportResponse.CustomerRow;
 import com.g42.platform.gms.report.api.dto.CustomerReportResponse.Summary;
 import com.g42.platform.gms.report.api.dto.CustomerReportResponse.TicketRow;
 import com.g42.platform.gms.service_ticket_management.domain.entity.ServiceTicket;
+import com.g42.platform.gms.service_ticket_management.domain.enums.BackfillReviewStatus;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
 import com.g42.platform.gms.service_ticket_management.domain.repository.ServiceTicketRepo;
 import com.g42.platform.gms.vehicle.api.internal.VehicleInternalApi;
@@ -138,8 +139,14 @@ public class CustomerReportService {
             CustomerProfile customer = ticket.getCustomerId() != null ? customerMap.get(ticket.getCustomerId()) : null;
             Vehicle vehicle = ticket.getVehicleId() != null ? vehicleMap.get(ticket.getVehicleId()) : null;
 
-            boolean paid = (bill != null && bill.getPaymentStatus() == PaymentStatus.PAID)
-                    || ticket.getTicketStatus() == TicketStatus.PAID;
+            // Phiếu huỷ (kể cả phiếu nhập bù bị từ chối — cũng bị huỷ) vẫn liệt kê để đối chiếu,
+            // nhưng không phải "chưa thu" và tiền hoá đơn của nó không tính vào tổng thu.
+            boolean cancelled = ticket.getTicketStatus() == TicketStatus.CANCELLED
+                    || ticket.getBackfillReviewStatus() == BackfillReviewStatus.REJECTED;
+            boolean paid = !cancelled
+                    && ((bill != null && bill.getPaymentStatus() == PaymentStatus.PAID)
+                        || ticket.getTicketStatus() == TicketStatus.PAID);
+            boolean countBill = bill != null && !cancelled;
 
             // Phiếu bán lẻ khách vãng lai: hồ sơ gắn vào là hồ sơ dùng chung "Khách lẻ",
             // tên/SĐT thật nằm trên phiếu.
@@ -156,9 +163,10 @@ public class CustomerReportService {
                     .ticketType(ticket.getTicketType() != null ? ticket.getTicketType().name() : "")
                     .branchName(branchDirectory.nameOf(ticket.getBranchId()))
                     .paid(paid)
+                    .cancelled(cancelled)
                     .hasBill(bill != null)
-                    .revenue(bill != null ? nvl(bill.getFinalAmount()) : BigDecimal.ZERO)
-                    .discountAmount(bill != null ? nvl(bill.getDiscountAmount()) : BigDecimal.ZERO)
+                    .revenue(countBill ? nvl(bill.getFinalAmount()) : BigDecimal.ZERO)
+                    .discountAmount(countBill ? nvl(bill.getDiscountAmount()) : BigDecimal.ZERO)
                     .source(SOURCE_SYSTEM)
                     .amountMismatch(false)
                     .build();
@@ -213,6 +221,7 @@ public class CustomerReportService {
         BigDecimal totalRevenue = systemRevenue.add(legacyRevenue);
 
         long paidTickets = ticketRows.stream().filter(TicketRow::isPaid).count();
+        long cancelledTickets = ticketRows.stream().filter(TicketRow::isCancelled).count();
         long legacyOnlyCustomers = customers.stream()
                 .filter(c -> c.getLegacyVisitCount() > 0 && c.getLegacyVisitCount() == c.getTicketCount())
                 .count();
@@ -226,7 +235,8 @@ public class CustomerReportService {
                 .totalCustomers(customers.size())
                 .totalTickets(ticketRows.size())
                 .paidTickets(paidTickets)
-                .unpaidTickets(ticketRows.size() - paidTickets)
+                .unpaidTickets(ticketRows.size() - paidTickets - cancelledTickets)
+                .cancelledTickets(cancelledTickets)
                 .totalRevenue(totalRevenue)
                 .revenueFromBills(revenueFromBills)
                 .discountTotal(discountTotal)
@@ -319,6 +329,9 @@ public class CustomerReportService {
             if (row.isPaid()) {
                 a.paidTicketCount++;
             }
+            if (row.isCancelled()) {
+                a.cancelledTicketCount++;
+            }
             if (keyed.legacy) {
                 a.legacyVisitCount++;
                 a.legacyRevenue = a.legacyRevenue.add(nvl(row.getRevenue()));
@@ -341,6 +354,7 @@ public class CustomerReportService {
                         .plates(new ArrayList<>(a.plates))
                         .ticketCount(a.ticketCount)
                         .paidTicketCount(a.paidTicketCount)
+                        .cancelledTicketCount(a.cancelledTicketCount)
                         .revenue(a.revenue)
                         .discountAmount(a.discountAmount)
                         .ticketCodes(a.ticketCodes)
@@ -393,6 +407,7 @@ public class CustomerReportService {
         putRow(sheet, r++, "Tổng lượt phiếu dịch vụ", s.getTotalTickets());
         putRow(sheet, r++, "Phiếu đã thanh toán", s.getPaidTickets());
         putRow(sheet, r++, "Phiếu chưa thanh toán", s.getUnpaidTickets());
+        putRow(sheet, r++, "Phiếu đã huỷ", s.getCancelledTickets());
         putRow(sheet, r++, "Tổng thu (VND)", s.getTotalRevenue());
         putRow(sheet, r++, "Tổng thu chưa VAT (VND)", noTax(s.getTotalRevenue()));
         putRow(sheet, r++, "Tổng giảm giá (VND)", s.getDiscountTotal());
@@ -413,7 +428,7 @@ public class CustomerReportService {
     private void writeCustomerSheet(Workbook workbook, List<CustomerRow> customers) {
         Sheet sheet = workbook.createSheet("Theo khách hàng");
         String[] headers = {"STT", "Khách hàng", "Số điện thoại", "Biển số", "Số phiếu",
-                "Phiếu đã thu", "Doanh thu (VND)", "Giảm giá (VND)",
+                "Phiếu đã thu", "Phiếu huỷ", "Doanh thu (VND)", "Giảm giá (VND)",
                 "Lượt sổ cũ", "Tiền sổ cũ (VND)"};
         putRow(sheet, 0, (Object[]) headers);
         int rowIdx = 1;
@@ -426,6 +441,7 @@ public class CustomerReportService {
                     String.join(", ", c.getPlates()),
                     c.getTicketCount(),
                     c.getPaidTicketCount(),
+                    c.getCancelledTicketCount(),
                     nvl(c.getRevenue()),
                     nvl(c.getDiscountAmount()),
                     c.getLegacyVisitCount(),
@@ -437,7 +453,7 @@ public class CustomerReportService {
     private void writeTicketSheet(Workbook workbook, List<TicketRow> ticketRows) {
         Sheet sheet = workbook.createSheet("Chi tiết phiếu");
         String[] headers = {"STT", "Nguồn", "Mã phiếu", "Ngày", "Khách hàng", "Số điện thoại", "Biển số",
-                "Trạng thái", "Đã thanh toán", "Doanh thu (VND)", "Giảm giá (VND)", "Nội dung sổ cũ"};
+                "Trạng thái", "Thanh toán", "Doanh thu (VND)", "Giảm giá (VND)", "Nội dung sổ cũ"};
         putRow(sheet, 0, (Object[]) headers);
         int rowIdx = 1;
         int stt = 1;
@@ -452,7 +468,7 @@ public class CustomerReportService {
                     t.getCustomerPhone(),
                     t.getLicensePlate(),
                     t.getTicketStatus(),
-                    t.isPaid() ? "Có" : "Không",
+                    t.isCancelled() ? "Đã huỷ" : t.isPaid() ? "Đã thu" : "Chưa thu",
                     nvl(t.getRevenue()),
                     nvl(t.getDiscountAmount()),
                     legacy ? nz(t.getServicesText()) : "");
@@ -508,6 +524,7 @@ public class CustomerReportService {
         private String customerPhone;
         private long ticketCount;
         private long paidTicketCount;
+        private long cancelledTicketCount;
         private long legacyVisitCount;
         private BigDecimal revenue = BigDecimal.ZERO;
         private BigDecimal legacyRevenue = BigDecimal.ZERO;
