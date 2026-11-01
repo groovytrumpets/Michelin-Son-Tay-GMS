@@ -67,7 +67,8 @@ public interface InventoryJpaRepo extends JpaRepository<InventoryJpa, Integer> {
     }
 
     @Query("""
-        SELECT i.itemId as itemId, SUM(i.quantity - i.reservedQuantity) as availableQty
+        SELECT i.itemId as itemId,
+               SUM(CASE WHEN i.quantity > i.reservedQuantity THEN i.quantity - i.reservedQuantity ELSE 0 END) as availableQty
         FROM InventoryJpa i, WarehouseJpa w
         WHERE w.warehouseId = i.warehouseId
           AND w.isActive = true

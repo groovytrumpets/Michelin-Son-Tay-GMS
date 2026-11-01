@@ -693,6 +693,12 @@ public class CatalogItemService {
                 if (whDto.getReservedQuantity() != null) {
                     inventory.setReservedQuantity(whDto.getReservedQuantity());
                 }
+                // Hàng giữ > tồn làm tồn khả dụng âm và kéo tổng tồn các kho về 0 (báo giá báo "Hết hàng")
+                if (Qty.gt(inventory.getReservedQuantity(), inventory.getQuantity())) {
+                    throw new WarehouseException("Hàng giữ (" + Qty.text(inventory.getReservedQuantity())
+                            + ") không được lớn hơn tồn kho (" + Qty.text(inventory.getQuantity()) + ")",
+                            WarehouseErrorCode.INVALID_QUANTITY);
+                }
                 inventoryJpaRepo.save(inventory);
 
                 // Update Warehouse Pricing
