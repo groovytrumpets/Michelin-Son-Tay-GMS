@@ -198,19 +198,26 @@ public interface StockEntryItemJpaRepo extends JpaRepository<StockEntryItemJpa, 
     /**
      * Bản gộp của findLatestLot: lô CONFIRMED mới nhất (entryItemId lớn nhất) của
      * từng cặp kho × vật tư. Mỗi dòng: [warehouseId, itemId, importPrice, markupMultiplier]
+     *
+     * Viết bằng NOT EXISTS thay cho "entryItemId IN (SELECT MAX ... GROUP BY ...)": MySQL chạy
+     * dạng IN đó thành subquery phụ thuộc, chạy lại cho TỪNG dòng stock_entry_item → tìm 1 vật tư
+     * ở báo giá mất ~10 giây. Bản này lọc theo idx_sei_item trước nên chỉ vài ms.
      */
     @Query("""
     SELECT se.warehouseId, sei.itemId, sei.importPrice, sei.markupMultiplier
     FROM StockEntryItemJpa sei
     JOIN StockEntryJpa se ON se.entryId = sei.entryId
-    WHERE sei.entryItemId IN (
-        SELECT MAX(sei2.entryItemId)
+    WHERE sei.itemId IN :itemIds
+      AND se.status = com.g42.platform.gms.warehouse.domain.enums.StockEntryStatus.CONFIRMED
+      AND NOT EXISTS (
+        SELECT 1
         FROM StockEntryItemJpa sei2
         JOIN StockEntryJpa se2 ON se2.entryId = sei2.entryId
-        WHERE sei2.itemId IN :itemIds
+        WHERE sei2.itemId = sei.itemId
+          AND se2.warehouseId = se.warehouseId
           AND se2.status = com.g42.platform.gms.warehouse.domain.enums.StockEntryStatus.CONFIRMED
-        GROUP BY se2.warehouseId, sei2.itemId
-    )
+          AND sei2.entryItemId > sei.entryItemId
+      )
     """)
     List<Object[]> findLatestLotRowsByItemIds(@Param("itemIds") java.util.Collection<Integer> itemIds);
 }
