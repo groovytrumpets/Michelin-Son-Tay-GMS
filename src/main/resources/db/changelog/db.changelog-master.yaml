@@ -163,3 +163,6 @@ databaseChangeLog:
   - include:
       file: changes/051-stock-entry-cancel.yaml
       relativeToChangelogFile: true
+  - include:
+      file: changes/052-service-ticket-duplicate-cancel.yaml
+      relativeToChangelogFile: true

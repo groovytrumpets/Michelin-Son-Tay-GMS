@@ -66,6 +66,13 @@ public class ServiceTicket {
     // Xưởng làm phiếu (Liquibase 044). Để null lúc tạo thì BranchStampListener tự điền.
     private Integer branchId;
 
+    // Thông tin huỷ phiếu (Liquibase 052). Phải có ở domain: ServiceTicketRepoImpl.save() dựng
+    // lại cả dòng từ domain, thiếu field ở đây là lần lưu sau ghi NULL đè mất lý do huỷ.
+    private String cancelReason;
+    private LocalDateTime cancelledAt;
+    private Integer cancelledBy;
+    private Integer duplicateOfTicketId;
+
     // List of photo IDs (not full objects - MapStruct will handle conversion)
     private List<Integer> photoIds = new ArrayList<>();
     

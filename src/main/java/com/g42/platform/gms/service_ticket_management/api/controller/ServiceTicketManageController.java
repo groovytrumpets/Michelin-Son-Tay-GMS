@@ -9,6 +9,11 @@ import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceQueu
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceTicketDetailResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.ServiceTicketListResponse;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.UpdateServiceTicketRequest;
+import com.g42.platform.gms.auth.entity.StaffPrincipal;
+import com.g42.platform.gms.service_ticket_management.api.dto.manage.DuplicateCancelRequest;
+import com.g42.platform.gms.service_ticket_management.api.dto.manage.DuplicateCancelSummary;
+import com.g42.platform.gms.service_ticket_management.application.service.DuplicateTicketCancelService;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import com.g42.platform.gms.service_ticket_management.application.service.ServiceTicketAdvisorService;
 import com.g42.platform.gms.service_ticket_management.application.service.ServiceTicketManageService;
 import com.g42.platform.gms.service_ticket_management.domain.enums.TicketStatus;
@@ -39,6 +44,7 @@ public class ServiceTicketManageController {
 
     private final ServiceTicketManageService serviceTicketManageService;
     private final ServiceTicketAdvisorService serviceTicketAdvisorService;
+    private final DuplicateTicketCancelService duplicateTicketCancelService;
 
     @GetMapping("/tickets")
     public ResponseEntity<ApiResponse<Page<ServiceTicketListResponse>>> getServiceTicketList(
@@ -113,6 +119,35 @@ public class ServiceTicketManageController {
         return ResponseEntity.ok(
                 ApiResponses.success(serviceTicketManageService.updateServiceTicketStatus(serviceTicketId,status))
         );
+    }
+
+    /**
+     * Xem trước việc huỷ phiếu trùng: hoá đơn nào bị huỷ, hàng nào trả về kho, lưu ý gì.
+     * Không ghi gì. Chỉ ADMIN (mã quyền khoá cứng cho ADMIN qua PermissionCodes.ROLE_RESTRICTED).
+     */
+    @GetMapping("/{serviceTicketId}/cancel-duplicate/preview")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.SERVICE_TICKET_CANCEL_DUPLICATE + "')")
+    public ResponseEntity<ApiResponse<DuplicateCancelSummary>> previewCancelDuplicate(
+            @PathVariable Integer serviceTicketId,
+            @RequestParam(required = false) String duplicateOfTicketCode,
+            @AuthenticationPrincipal StaffPrincipal principal) {
+        return ResponseEntity.ok(ApiResponses.success(
+                duplicateTicketCancelService.preview(serviceTicketId, duplicateOfTicketCode, principal)));
+    }
+
+    /** Huỷ phiếu bị tạo trùng, kể cả đã hoàn thành / đã thanh toán. Chỉ ADMIN. */
+    @PostMapping("/{serviceTicketId}/cancel-duplicate")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.SERVICE_TICKET_CANCEL_DUPLICATE + "')")
+    @Auditable(action = "DELETE", module = "SERVICE_TICKET", severity = "CRITICAL",
+            description = "Huỷ phiếu dịch vụ trùng (huỷ hoá đơn, giao dịch thu tiền, hoàn kho)",
+            targetType = "SERVICE_TICKET")
+    public ResponseEntity<ApiResponse<DuplicateCancelSummary>> cancelDuplicate(
+            @PathVariable Integer serviceTicketId,
+            @RequestBody DuplicateCancelRequest request,
+            @AuthenticationPrincipal StaffPrincipal principal) {
+        DuplicateCancelSummary result = duplicateTicketCancelService.cancel(serviceTicketId,
+                request.getDuplicateOfTicketCode(), request.getReason(), principal);
+        return ResponseEntity.ok(ApiResponses.success(result, "Đã huỷ phiếu trùng " + result.getTicket().getTicketCode()));
     }
 
     /** Lễ tân chỉnh sửa yêu cầu khách hàng và danh sách dịch vụ. */

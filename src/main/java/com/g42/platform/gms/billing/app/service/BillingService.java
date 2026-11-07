@@ -15,6 +15,10 @@ import com.g42.platform.gms.billing.domain.exception.BillingErrorCode;
 import com.g42.platform.gms.billing.domain.exception.BillingException;
 import com.g42.platform.gms.billing.domain.repository.BillingRepository;
 import com.g42.platform.gms.billing.domain.repository.PaymentTransationRepo;
+import com.g42.platform.gms.billing.infrastructure.entity.PaymentTransactionJpa;
+import com.g42.platform.gms.billing.infrastructure.entity.ServiceBillJpa;
+import com.g42.platform.gms.billing.infrastructure.repository.PaymentTransactionJpaRepo;
+import com.g42.platform.gms.billing.infrastructure.repository.ServiceBillJpaRepo;
 import com.g42.platform.gms.common.dto.ApiResponses;
 import com.g42.platform.gms.common.enums.EstimateEnum;
 import com.g42.platform.gms.customer.domain.entity.CustomerProfile;
@@ -48,7 +52,10 @@ import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class BillingService {
@@ -81,6 +88,10 @@ public class BillingService {
     private com.g42.platform.gms.warehouse.app.service.allocation.StockAllocationService warehouseStockAllocationService;
     @Autowired
     private EstimateInternalApi estimateInternalApi;
+    @Autowired
+    private ServiceBillJpaRepo serviceBillJpaRepo;
+    @Autowired
+    private PaymentTransactionJpaRepo paymentTransactionJpaRepo;
 
     //todo: get available promotion
     @Transactional
@@ -163,7 +174,20 @@ public class BillingService {
     @Transactional
     public PaymentTransactionDto createNewPayment(PaymentTransactionDto dto, Integer staffId) {
         ServiceBill serviceBill = billingRepository.getBillingByBillingId(dto.getBillId());
+        if (serviceBill == null) {
+            throw new BillingException("Bill not found!", BillingErrorCode.ESTIMATE_404);
+        }
+        // Hoá đơn đã huỷ (phiếu tạo trùng) không được thu tiền lại — thu là phiếu nhảy về PAID
+        // và doanh thu bị tính hai lần đúng như lỗi vừa huỷ.
+        if (PaymentStatus.VOID.name().equals(serviceBill.getPaymentStatus())) {
+            throw new IllegalArgumentException("Hoá đơn #" + serviceBill.getBillId()
+                    + " đã bị huỷ, không thể thu tiền.");
+        }
         ServiceTicketJpa ticketToPay = serviceTicketRepository.findByServiceTicketId(serviceBill.getServiceTicketId());
+        if (ticketToPay != null && ticketToPay.getTicketStatus() == TicketStatus.CANCELLED) {
+            throw new IllegalArgumentException("Phiếu " + ticketToPay.getTicketCode()
+                    + " đã bị huỷ, không thể thu tiền.");
+        }
         if (ticketToPay != null) {
             // Phiếu nhập bù ghi thanh toán qua recordBackfillPayment lúc quản lý duyệt, không thu tiền ở quầy
             if (ticketToPay.getEntryMode() == EntryMode.BACKFILL) {
@@ -268,6 +292,64 @@ public class BillingService {
         warehouseStockAllocationService.issueAndConfirmOnPaid(serviceBill.getServiceTicketId(), staffId);
         ticketAssignmentService.markAssignmentDone(serviceBill.getServiceTicketId());
         return serviceBillDtoMapper.mapPaymentToDto(saved);
+    }
+
+    /** Một hoá đơn vừa bị huỷ — để báo lại cho người huỷ biết đã huỷ những gì. */
+    public record VoidedBill(Integer billId, BigDecimal finalAmount, String previousStatus,
+                             Instant paidAt, int voidedTransactionCount) {
+    }
+
+    /**
+     * Huỷ mọi hoá đơn (và giao dịch thu tiền của chúng) của một phiếu bị tạo trùng.
+     *
+     * <p>Không xoá dòng nào: hoá đơn → payment_status VOID, giao dịch → status VOID, giữ nguyên
+     * số tiền và ngày thu để còn truy vết. Báo cáo doanh thu / dashboard / chăm sóc khách chỉ
+     * cộng hoá đơn PAID nên tự loại các dòng này. Hoá đơn đã VOID thì bỏ qua (gọi lại an toàn).
+     */
+    @Transactional
+    public List<VoidedBill> voidBillsOfTicket(Integer serviceTicketId) {
+        List<ServiceBillJpa> bills = serviceBillJpaRepo.findByServiceTicketIdIn(List.of(serviceTicketId));
+        List<ServiceBillJpa> toVoid = bills.stream()
+                .filter(b -> b.getPaymentStatus() != PaymentStatus.VOID)
+                .toList();
+        if (toVoid.isEmpty()) {
+            return List.of();
+        }
+        List<Integer> billIds = toVoid.stream().map(ServiceBillJpa::getBillId).toList();
+        Map<Integer, List<PaymentTransactionJpa>> txByBill = paymentTransactionJpaRepo.findByBillIdIn(billIds)
+                .stream().collect(Collectors.groupingBy(PaymentTransactionJpa::getBillId));
+
+        List<VoidedBill> result = new ArrayList<>();
+        for (ServiceBillJpa bill : toVoid) {
+            String previous = bill.getPaymentStatus() != null ? bill.getPaymentStatus().name() : null;
+            List<PaymentTransactionJpa> txs = txByBill.getOrDefault(bill.getBillId(), List.of());
+            for (PaymentTransactionJpa tx : txs) {
+                tx.setStatus(PaymentTransactionStatus.VOID);
+            }
+            paymentTransactionJpaRepo.saveAll(txs);
+            bill.setPaymentStatus(PaymentStatus.VOID);
+            serviceBillJpaRepo.save(bill);
+            result.add(new VoidedBill(bill.getBillId(), bill.getFinalAmount(), previous, bill.getPaidAt(), txs.size()));
+        }
+        return result;
+    }
+
+    /** Hoá đơn còn hiệu lực (chưa VOID) của phiếu — để xem trước khi huỷ phiếu trùng. */
+    public List<VoidedBill> activeBillsOfTicket(Integer serviceTicketId) {
+        List<ServiceBillJpa> bills = serviceBillJpaRepo.findByServiceTicketIdIn(List.of(serviceTicketId)).stream()
+                .filter(b -> b.getPaymentStatus() != PaymentStatus.VOID)
+                .toList();
+        if (bills.isEmpty()) {
+            return List.of();
+        }
+        Map<Integer, Long> txCount = paymentTransactionJpaRepo
+                .findByBillIdIn(bills.stream().map(ServiceBillJpa::getBillId).toList()).stream()
+                .collect(Collectors.groupingBy(PaymentTransactionJpa::getBillId, Collectors.counting()));
+        return bills.stream()
+                .map(b -> new VoidedBill(b.getBillId(), b.getFinalAmount(),
+                        b.getPaymentStatus() != null ? b.getPaymentStatus().name() : null,
+                        b.getPaidAt(), txCount.getOrDefault(b.getBillId(), 0L).intValue()))
+                .toList();
     }
 
     public BillEstimateDto getBillWithEstimate(Integer serviceTicketId) {

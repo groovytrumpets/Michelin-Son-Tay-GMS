@@ -95,6 +95,7 @@ public class ServiceTicketManageService {
     private final StockAllocationJpaRepo stockAllocationJpaRepo;
     private final StaffNotifyService staffNotifyService;
     private final BranchDirectory branchDirectory;
+    private final com.g42.platform.gms.billing.infrastructure.repository.ServiceBillJpaRepo serviceBillJpaRepo;
 
     /**
      * Get paginated list of service tickets with filters.
@@ -234,6 +235,20 @@ public class ServiceTicketManageService {
         response.setBackfillReviewStatus(ticket.getBackfillReviewStatus());
         response.setBackfillParentTicketId(ticket.getBackfillParentTicketId());
         response.setBackfillReason(ticket.getBackfillReason());
+        response.setCancelReason(ticket.getCancelReason());
+        response.setCancelledAt(ticket.getCancelledAt());
+        response.setCancelledBy(ticket.getCancelledBy());
+        if (ticket.getCancelledBy() != null) {
+            staffRepository.findById(ticket.getCancelledBy())
+                    .ifPresent(s -> response.setCancelledByName(s.getFullName()));
+        }
+        response.setDuplicateOfTicketId(ticket.getDuplicateOfTicketId());
+        if (ticket.getDuplicateOfTicketId() != null) {
+            ServiceTicket original = serviceTicketRepo.findByServiceTicketId(ticket.getDuplicateOfTicketId());
+            if (original != null) {
+                response.setDuplicateOfTicketCode(original.getTicketCode());
+            }
+        }
 
         // Customer info
         CustomerProfile customer = customerRepository.findById(ticket.getCustomerId())
@@ -484,12 +499,98 @@ public class ServiceTicketManageService {
         }
     }
 
+    @Transactional
     public ServiceTicketListResponse updateServiceTicketStatus(Integer serviceTicketId, TicketStatus status) {
-        ServiceTicket serviceTicket = serviceTicketRepo.findByServiceTicketId(serviceTicketId);
+        if (status == null) {
+            throw new CheckInException("Thiếu trạng thái cần chuyển.");
+        }
+        ServiceTicket serviceTicket = serviceTicketId == null ? null : serviceTicketRepo.findByServiceTicketId(serviceTicketId);
+        if (serviceTicket == null) {
+            throw new CheckInException("Không tìm thấy phiếu dịch vụ #" + serviceTicketId + ".");
+        }
         com.g42.platform.gms.service_ticket_management.domain.entity.BackfillGuard.requireNotUnapprovedBackfill(serviceTicket);
+        // Gọi lại đúng trạng thái đang có (VD màn thanh toán đặt PAID sau khi thu tiền đã tự chuyển PAID)
+        if (serviceTicket.getTicketStatus() == status) {
+            return serviceTicketDtoMapper.toDto(serviceTicket);
+        }
+        validateManualStatusChange(serviceTicket, status);
         serviceTicket.setTicketStatus(status);
         ServiceTicket savedServiceTicket = serviceTicketRepo.save(serviceTicket);
         return serviceTicketDtoMapper.toDto(savedServiceTicket);
+    }
+
+    /** Trạng thái mà nút "Hủy phiếu dịch vụ" thường được phép huỷ (khớp ServiceTicketDetail.jsx). */
+    private static final java.util.Set<TicketStatus> NORMAL_CANCELLABLE = java.util.EnumSet.of(
+            TicketStatus.CREATED, TicketStatus.INSPECTING, TicketStatus.INSPECTED,
+            TicketStatus.ESTIMATED, TicketStatus.PENDING, TicketStatus.REPAIRING);
+
+    /**
+     * Rào chắn của PUT /api/service-ticket/manage/{id}/{status}.
+     *
+     * <p>Endpoint này là "đặt thẳng trạng thái" — FE dùng nó cho cả bước tiến lẫn hoàn tác (huỷ
+     * thêm dịch vụ, huỷ tạo bản báo giá mới...), nên không ép theo một sơ đồ chuyển trạng thái chặt.
+     * Trước đây nó không kiểm tra gì: gọi thẳng API là chuyển được phiếu ĐÃ THANH TOÁN sang
+     * CANCELLED trong khi hoá đơn, tiền đã thu, hàng đã xuất vẫn còn nguyên — dữ liệu lệch nhau.
+     * Giờ chặn đúng những chỗ làm hỏng dữ liệu:
+     * <ul>
+     *   <li>phiếu đã huỷ / đã thanh toán là trạng thái cuối, không đổi nữa;</li>
+     *   <li>đặt PAID phải có hoá đơn đã thu tiền thật;</li>
+     *   <li>đã lập hoá đơn (chưa huỷ) thì chỉ còn bước thu tiền;</li>
+     *   <li>HOLDING chỉ màn bán phụ tùng đặt / huỷ (vì kèm giữ và nhả hàng);</li>
+     *   <li>huỷ thường chỉ tới REPAIRING và khi phiếu không còn giữ / đã xuất hàng. Phiếu đã hoàn
+     *       thành bị tạo trùng thì ADMIN dùng "Huỷ phiếu trùng" (DuplicateTicketCancelService).</li>
+     * </ul>
+     */
+    private void validateManualStatusChange(ServiceTicket ticket, TicketStatus target) {
+        TicketStatus current = ticket.getTicketStatus();
+        String code = ticket.getTicketCode();
+        if (current == TicketStatus.CANCELLED) {
+            throw new CheckInException("Phiếu " + code + " đã bị huỷ — không đổi trạng thái được nữa.");
+        }
+        if (current == TicketStatus.PAID) {
+            throw new CheckInException("Phiếu " + code + " đã thanh toán — không đổi trạng thái được nữa. "
+                    + "Nếu phiếu bị tạo trùng, Admin dùng chức năng \"Huỷ phiếu trùng\".");
+        }
+        if (target == TicketStatus.HOLDING) {
+            throw new CheckInException("Trạng thái giữ hàng chỉ được đặt ở màn Bán phụ tùng.");
+        }
+        if (current == TicketStatus.HOLDING && target == TicketStatus.CANCELLED) {
+            throw new CheckInException("Phiếu " + code + " đang giữ hàng — huỷ ở màn Bán phụ tùng để nhả hàng về kho.");
+        }
+
+        List<com.g42.platform.gms.billing.infrastructure.entity.ServiceBillJpa> activeBills = serviceBillJpaRepo
+                .findByServiceTicketIdIn(List.of(ticket.getServiceTicketId())).stream()
+                .filter(b -> b.getPaymentStatus() != com.g42.platform.gms.billing.domain.enums.PaymentStatus.VOID)
+                .toList();
+        if (target == TicketStatus.PAID) {
+            boolean paid = activeBills.stream()
+                    .anyMatch(b -> b.getPaymentStatus() == com.g42.platform.gms.billing.domain.enums.PaymentStatus.PAID);
+            if (!paid) {
+                throw new CheckInException("Phiếu " + code + " chưa ghi nhận thu tiền — hãy thu tiền ở màn thanh toán, "
+                        + "không đặt thẳng trạng thái \"Đã thanh toán\".");
+            }
+            return;
+        }
+        if (!activeBills.isEmpty()) {
+            throw new CheckInException("Phiếu " + code + " đã lập hoá đơn — không đổi trạng thái được nữa, chỉ còn bước thu tiền.");
+        }
+        if (target == TicketStatus.CANCELLED) {
+            if (!NORMAL_CANCELLABLE.contains(current)) {
+                throw new CheckInException("Không thể huỷ phiếu " + code + " ở trạng thái " + current
+                        + ". Phiếu đã hoàn thành bị tạo trùng thì Admin dùng chức năng \"Huỷ phiếu trùng\".");
+            }
+            requireNoActiveStock(ticket.getServiceTicketId(), code);
+        }
+    }
+
+    /** Huỷ thường không tự hoàn kho: còn giữ / đã xuất hàng thì phải hoàn hàng về kho trước. */
+    public void requireNoActiveStock(Integer serviceTicketId, String ticketCode) {
+        boolean holdsStock = stockAllocationJpaRepo.findByServiceTicketId(serviceTicketId).stream()
+                .anyMatch(a -> a.getStatus() == AllocationStatus.RESERVED || a.getStatus() == AllocationStatus.COMMITTED);
+        if (holdsStock) {
+            throw new CheckInException("Phiếu " + ticketCode + " đang giữ hoặc đã xuất hàng trong kho — "
+                    + "cần hoàn hàng về kho trước khi huỷ.");
+        }
     }
     @Transactional
     public byte[] exportTicketToExcel(LocalDate startDate, LocalDate endDate, TicketType ticketType){

@@ -74,6 +74,11 @@ public final class PermissionCodes {
     public static final String SERVICE_TICKET_PAYMENT = "SERVICE_TICKET_PAYMENT";
     /** Giảm giá tay trên dòng báo giá (không qua mã) — kiểm tra trong EstimateService. */
     public static final String SERVICE_TICKET_DISCOUNT = "SERVICE_TICKET_DISCOUNT";
+    /**
+     * Huỷ phiếu bị tạo trùng kể cả đã hoàn thành / đã thanh toán (huỷ hoá đơn, trả hàng về kho).
+     * Chỉ ADMIN — xem ROLE_RESTRICTED. Changeset 052-4.
+     */
+    public static final String SERVICE_TICKET_CANCEL_DUPLICATE = "SERVICE_TICKET_CANCEL_DUPLICATE";
 
     public static final String TICKET_BACKFILL_VIEW = "TICKET_BACKFILL_VIEW";
     public static final String TICKET_BACKFILL_EDIT = "TICKET_BACKFILL_EDIT";
@@ -225,12 +230,15 @@ public final class PermissionCodes {
      * cú tick nhầm cho lễ tân là đủ lộ cả CSDL. Chặn ở hai chỗ: lúc lưu ma trận
      * (RolePermissionService bỏ mã ra) và lúc suy quyền (PermissionResolver lọc lại,
      * phòng ai đó chèn thẳng vào bảng role_permission).
+     *
+     * <p>Tập rỗng = chỉ ADMIN, không vai trò nào khác được cấp (VD huỷ phiếu trùng đã thu tiền).
      */
     private static final java.util.Map<String, java.util.Set<String>> ROLE_RESTRICTED = java.util.Map.of(
             DATA_SAFETY_VIEW, java.util.Set.of("MANAGER"),
             DATA_BACKUP_EXPORT, java.util.Set.of("MANAGER"),
             DATA_TRASH_RESTORE, java.util.Set.of("MANAGER"),
-            DATA_TRASH_PURGE, java.util.Set.of("MANAGER"));
+            DATA_TRASH_PURGE, java.util.Set.of("MANAGER"),
+            SERVICE_TICKET_CANCEL_DUPLICATE, java.util.Set.of());
 
     /** Các vai trò (ngoài ADMIN) được cấp mã này; null = vai trò nào cũng được. */
     public static java.util.Set<String> allowedRolesFor(String code) {

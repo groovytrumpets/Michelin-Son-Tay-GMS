@@ -164,6 +164,20 @@ public class ServiceTicketJpa implements BranchStamped {
     @Column(name = "branch_id", updatable = false)
     private Integer branchId;
 
+    // ===== Thông tin huỷ phiếu (Liquibase 052) =====
+    // duplicateOfTicketId chỉ có khi huỷ do tạo trùng (DuplicateTicketCancelService).
+    @Column(name = "cancel_reason", length = 500)
+    private String cancelReason;
+
+    @Column(name = "cancelled_at")
+    private LocalDateTime cancelledAt;
+
+    @Column(name = "cancelled_by")
+    private Integer cancelledBy;
+
+    @Column(name = "duplicate_of_ticket_id")
+    private Integer duplicateOfTicketId;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();

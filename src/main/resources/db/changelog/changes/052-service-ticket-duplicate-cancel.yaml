@@ -1,0 +1,127 @@
+# Huỷ phiếu dịch vụ bị tạo trùng (kể cả phiếu đã hoàn thành / đã thanh toán).
+#
+# Trước đây phiếu đã COMPLETED/PAID không có đường nào để huỷ: nút "Hủy phiếu" chỉ mở tới
+# REPAIRING, còn hoá đơn/giao dịch thu tiền không có trạng thái huỷ. Chức năng mới (chỉ ADMIN)
+# làm trọn một lượt: phiếu -> CANCELLED, hoá đơn + giao dịch -> VOID, hàng của phiếu trả về kho.
+#
+# 1) service_ticket: ai huỷ, lúc nào, vì sao, và trùng với phiếu nào.
+# 2) service_bill.payment_status / payment_transaction.status là MySQL ENUM nên phải mở rộng
+#    danh sách giá trị (giống 032, 051), nếu không ghi VOID bị từ chối "Data truncated".
+#    Danh sách mới là HỢP của giá trị đang có trong DB lẫn enum Java (PaymentStatus có cả
+#    PARTIALLY_PAID) — nên dù DB đang ở trạng thái nào thì MODIFY cũng không làm rơi giá trị cũ.
+# 3) Mã quyền SERVICE_TICKET_CANCEL_DUPLICATE: không cấp cho vai trò nào. ADMIN tự có mọi quyền
+#    (PermissionResolver.SUPER_ROLE), còn PermissionCodes.ROLE_RESTRICTED khoá mã này với mọi
+#    vai trò khác, nên tick ở /role-permission-config cũng không có tác dụng.
+databaseChangeLog:
+  - changeSet:
+      id: 052-1-service-ticket-cancel-columns
+      author: gms
+      comment: Thông tin huỷ phiếu dịch vụ (người huỷ, thời điểm, lý do, phiếu gốc nếu huỷ do trùng)
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: service_ticket
+                columnName: cancel_reason
+      changes:
+        - addColumn:
+            tableName: service_ticket
+            columns:
+              - column:
+                  name: cancel_reason
+                  type: VARCHAR(500)
+                  remarks: Lý do huỷ phiếu
+              - column:
+                  name: cancelled_at
+                  type: DATETIME
+                  remarks: Thời điểm huỷ phiếu
+              - column:
+                  name: cancelled_by
+                  type: INT
+                  remarks: staff_id người huỷ phiếu
+              - column:
+                  name: duplicate_of_ticket_id
+                  type: INT
+                  remarks: Phiếu gốc mà phiếu này bị tạo trùng (chỉ có khi huỷ do trùng)
+        - createIndex:
+            tableName: service_ticket
+            indexName: idx_service_ticket_duplicate_of
+            columns:
+              - column:
+                  name: duplicate_of_ticket_id
+
+  - changeSet:
+      id: 052-2-service-bill-payment-status-void
+      author: gms
+      comment: Thêm giá trị VOID (hoá đơn bị huỷ) vào enum service_bill.payment_status
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: "0"
+            sql: >-
+              SELECT COUNT(*) FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = 'service_bill'
+                AND COLUMN_NAME = 'payment_status'
+                AND COLUMN_TYPE LIKE '%VOID%'
+      changes:
+        - sql:
+            sql: >-
+              ALTER TABLE `service_bill` MODIFY COLUMN `payment_status`
+              enum('UNPAID','PARTIALLY_PAID','PAID','REFUNDED','VOID')
+              CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'UNPAID'
+      rollback:
+        - sql:
+            sql: >-
+              ALTER TABLE `service_bill` MODIFY COLUMN `payment_status`
+              enum('UNPAID','PARTIALLY_PAID','PAID','REFUNDED')
+              CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'UNPAID'
+
+  - changeSet:
+      id: 052-3-payment-transaction-status-void
+      author: gms
+      comment: Thêm giá trị VOID (giao dịch thu tiền bị huỷ) vào enum payment_transaction.status
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: "0"
+            sql: >-
+              SELECT COUNT(*) FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = 'payment_transaction'
+                AND COLUMN_NAME = 'status'
+                AND COLUMN_TYPE LIKE '%VOID%'
+      changes:
+        - sql:
+            sql: >-
+              ALTER TABLE `payment_transaction` MODIFY COLUMN `status`
+              enum('SUCCESS','FAILED','REFUNDED','VOID')
+              CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL
+      rollback:
+        - sql:
+            sql: >-
+              ALTER TABLE `payment_transaction` MODIFY COLUMN `status`
+              enum('SUCCESS','FAILED','REFUNDED')
+              CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL
+
+  - changeSet:
+      id: 052-4-permission-cancel-duplicate
+      author: gms
+      comment: >-
+        Mã quyền "Huỷ phiếu trùng". Không gán cho vai trò nào: chỉ ADMIN có (PermissionResolver
+        suy ra toàn quyền), PermissionCodes.ROLE_RESTRICTED chặn cấp cho vai trò khác.
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: "0"
+            sql: SELECT COUNT(*) FROM permission WHERE code = 'SERVICE_TICKET_CANCEL_DUPLICATE'
+      changes:
+        - sql:
+            splitStatements: false
+            sql: >-
+              INSERT INTO permission (code, module_code, module_label, group_label, action_code, label, description, sort_order) VALUES
+              ('SERVICE_TICKET_CANCEL_DUPLICATE','SERVICE_TICKET','Phiếu dịch vụ','Dịch vụ & Xưởng','CANCEL_DUPLICATE','Huỷ phiếu trùng','Huỷ phiếu bị tạo trùng kể cả khi đã hoàn thành / đã thanh toán: huỷ hoá đơn, huỷ giao dịch thu tiền, trả hàng về kho. Chỉ dành cho Admin',208)
+      rollback:
+        - sql: "DELETE FROM role_permission WHERE permission_code = 'SERVICE_TICKET_CANCEL_DUPLICATE'"
+        - sql: "DELETE FROM role_permission_default WHERE permission_code = 'SERVICE_TICKET_CANCEL_DUPLICATE'"
+        - sql: "DELETE FROM permission WHERE code = 'SERVICE_TICKET_CANCEL_DUPLICATE'"

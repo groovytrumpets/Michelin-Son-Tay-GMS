@@ -95,6 +95,14 @@ public class ServiceTicketDetailResponse {
     private Integer branchId;
     private String branchName;
 
+    // Thông tin huỷ phiếu (Liquibase 052). duplicateOf* chỉ có khi huỷ do tạo trùng.
+    private String cancelReason;
+    private LocalDateTime cancelledAt;
+    private Integer cancelledBy;
+    private String cancelledByName;
+    private Integer duplicateOfTicketId;
+    private String duplicateOfTicketCode;
+
     @Data
     @NoArgsConstructor
     @AllArgsConstructor

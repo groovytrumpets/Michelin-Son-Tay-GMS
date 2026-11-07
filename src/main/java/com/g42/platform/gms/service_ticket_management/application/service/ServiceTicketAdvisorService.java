@@ -130,6 +130,8 @@ public class ServiceTicketAdvisorService {
         if (!canCancel) {
             throw new CheckInException("Không thể hủy phiếu ở trạng thái: " + current);
         }
+        // Huỷ thường không nhả giữ hàng / không hoàn kho — trước đây huỷ ở đây là hàng kẹt RESERVED mãi
+        manageService.requireNoActiveStock(ticket.getServiceTicketId(), ticketCode);
         ticket.setTicketStatus(TicketStatus.CANCELLED);
         ticket.setUpdatedAt(LocalDateTime.now());
         serviceTicketRepo.save(ticket);
