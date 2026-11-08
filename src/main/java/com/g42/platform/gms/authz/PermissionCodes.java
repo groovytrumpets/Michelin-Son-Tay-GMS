@@ -181,6 +181,10 @@ public final class PermissionCodes {
     public static final String FEEDBACK_VIEW = "FEEDBACK_VIEW";
     public static final String FEEDBACK_EDIT = "FEEDBACK_EDIT";
 
+    /** Đánh giá sao từng mặt hàng trên website (/item-review-management). Changeset 053-5. */
+    public static final String ITEM_REVIEW_VIEW = "ITEM_REVIEW_VIEW";
+    public static final String ITEM_REVIEW_EDIT = "ITEM_REVIEW_EDIT";
+
     public static final String CAMPAIGN_VIEW = "CAMPAIGN_VIEW";
     public static final String CAMPAIGN_SEND = "CAMPAIGN_SEND";
 
@@ -206,6 +210,10 @@ public final class PermissionCodes {
     public static final String BACKEND_LOG_VIEW = "BACKEND_LOG_VIEW";
     public static final String BUG_REPORT_VIEW = "BUG_REPORT_VIEW";
     public static final String BUG_REPORT_EDIT = "BUG_REPORT_EDIT";
+
+    /** Màn /zalo-oa-config. CONFIG lộ được secret key + token gửi tin nên khoá ở MANAGER. Changeset 053-5. */
+    public static final String ZALO_OA_VIEW = "ZALO_OA_VIEW";
+    public static final String ZALO_OA_CONFIG = "ZALO_OA_CONFIG";
 
     // ---- Biểu mẫu chứng từ ----
     public static final String DOCUMENT_TEMPLATE_VIEW = "DOCUMENT_TEMPLATE_VIEW";
@@ -238,6 +246,7 @@ public final class PermissionCodes {
             DATA_BACKUP_EXPORT, java.util.Set.of("MANAGER"),
             DATA_TRASH_RESTORE, java.util.Set.of("MANAGER"),
             DATA_TRASH_PURGE, java.util.Set.of("MANAGER"),
+            ZALO_OA_CONFIG, java.util.Set.of("MANAGER"),
             SERVICE_TICKET_CANCEL_DUPLICATE, java.util.Set.of());
 
     /** Các vai trò (ngoài ADMIN) được cấp mã này; null = vai trò nào cũng được. */

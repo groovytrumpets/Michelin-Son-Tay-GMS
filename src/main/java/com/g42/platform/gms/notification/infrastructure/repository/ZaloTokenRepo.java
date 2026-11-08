@@ -17,4 +17,7 @@ public interface ZaloTokenRepo extends JpaRepository<ZaloToken, String> {
     ZaloToken getZaloTokensByStateEqualsIgnoreCase(String state);
 
     ZaloToken getZaloTokensByState(String state);
+
+    /** Mọi dòng "active", mới nhất trước — dùng để dọn khi lỡ có nhiều hơn 1 dòng. */
+    java.util.List<ZaloToken> findByStateOrderByIdDesc(String state);
 }

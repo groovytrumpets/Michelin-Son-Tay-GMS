@@ -1,0 +1,145 @@
+# Nới tên sản phẩm/dịch vụ từ 500 lên 1000 ký tự (khách yêu cầu tên dài hơn).
+#
+# Giống 049: tên mặt hàng (catalog_item.item_name) được chép nguyên sang dòng báo
+# giá (estimate_item), dòng sổ cũ (legacy_visit_item), tiêu đề bản nháp
+# (catalog_draft) và tiêu đề bài viết sản phẩm (item_post) — phải nới cả 5 cột cùng
+# lúc, sót một cột thì chép tên dài sang bảng đó sẽ lỗi "Data too long".
+#
+# 1000 ký tự utf8mb4 = tối đa 4000 byte, item_name không có index nên không vướng
+# giới hạn index 3072 byte. Không dùng TEXT để vẫn có trần chặn tên dài phá bố cục in.
+#
+# Changeset cuối tính lại search_key cho các dòng đã bị cắt ở 2000 ký tự, theo thứ tự
+# ghép mới trong CatalogItemService.buildSearchKey (mã/hãng/dòng/danh mục/thông số
+# trước, tên + mô tả sau) — dòng ngắn hơn 2000 đã chứa đủ mọi token nên không cần tính lại.
+databaseChangeLog:
+  - changeSet:
+      id: 054-1-catalog-item-name-1000
+      author: gms
+      comment: catalog_item.item_name VARCHAR(500) -> VARCHAR(1000)
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: 1
+            sql: >-
+              SELECT COUNT(*) FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'catalog_item'
+                AND COLUMN_NAME = 'item_name' AND CHARACTER_MAXIMUM_LENGTH < 1000
+      changes:
+        - sql:
+            sql: ALTER TABLE catalog_item MODIFY item_name VARCHAR(1000) NULL
+      rollback:
+        - sql:
+            sql: ALTER TABLE catalog_item MODIFY item_name VARCHAR(500) NULL
+
+  - changeSet:
+      id: 054-2-estimate-item-name-1000
+      author: gms
+      comment: estimate_item.item_name VARCHAR(500) -> VARCHAR(1000)
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: 1
+            sql: >-
+              SELECT COUNT(*) FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'estimate_item'
+                AND COLUMN_NAME = 'item_name' AND CHARACTER_MAXIMUM_LENGTH < 1000
+      changes:
+        - sql:
+            sql: ALTER TABLE estimate_item MODIFY item_name VARCHAR(1000) NULL
+      rollback:
+        - sql:
+            sql: ALTER TABLE estimate_item MODIFY item_name VARCHAR(500) NULL
+
+  - changeSet:
+      id: 054-3-legacy-visit-item-name-1000
+      author: gms
+      comment: legacy_visit_item.item_name VARCHAR(500) -> VARCHAR(1000)
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: 1
+            sql: >-
+              SELECT COUNT(*) FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'legacy_visit_item'
+                AND COLUMN_NAME = 'item_name' AND CHARACTER_MAXIMUM_LENGTH < 1000
+      changes:
+        - sql:
+            sql: >-
+              ALTER TABLE legacy_visit_item MODIFY item_name VARCHAR(1000) NULL
+              COMMENT 'Ô "Diễn giải"; sổ cũ bỏ trống thì lấy chính tên hạng mục'
+      rollback:
+        - sql:
+            sql: >-
+              ALTER TABLE legacy_visit_item MODIFY item_name VARCHAR(500) NULL
+              COMMENT 'Ô "Diễn giải"; sổ cũ bỏ trống thì lấy chính tên hạng mục'
+
+  - changeSet:
+      id: 054-4-catalog-draft-title-1000
+      author: gms
+      comment: catalog_draft.title VARCHAR(500) -> VARCHAR(1000)
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: 1
+            sql: >-
+              SELECT COUNT(*) FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'catalog_draft'
+                AND COLUMN_NAME = 'title' AND CHARACTER_MAXIMUM_LENGTH < 1000
+      changes:
+        - sql:
+            sql: ALTER TABLE catalog_draft MODIFY title VARCHAR(1000) NOT NULL
+      rollback:
+        - sql:
+            sql: ALTER TABLE catalog_draft MODIFY title VARCHAR(500) NOT NULL
+
+  - changeSet:
+      id: 054-5-item-post-title-1000
+      author: gms
+      comment: item_post.title VARCHAR(500) -> VARCHAR(1000) (bài viết sản phẩm lấy tên sản phẩm làm tiêu đề)
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: 1
+            sql: >-
+              SELECT COUNT(*) FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'item_post'
+                AND COLUMN_NAME = 'title' AND CHARACTER_MAXIMUM_LENGTH < 1000
+      changes:
+        - sql:
+            sql: ALTER TABLE item_post MODIFY title VARCHAR(1000) NOT NULL
+      rollback:
+        - sql:
+            sql: ALTER TABLE item_post MODIFY title VARCHAR(500) NOT NULL
+
+  - changeSet:
+      id: 054-6-rebuild-truncated-search-key
+      author: gms
+      comment: Tính lại search_key bị cắt ở 2000 ký tự theo thứ tự ghép mới (mã/hãng/danh mục/thông số trước, tên + mô tả sau)
+      changes:
+        - sql:
+            sql: >-
+              UPDATE catalog_item ci
+              LEFT JOIN brand b ON b.brand_id = ci.brand_id
+              LEFT JOIN product_line pl ON pl.product_line_id = ci.product_line_id
+              LEFT JOIN item_category ic ON ic.item_category_id = ci.item_category_id
+              LEFT JOIN (
+                SELECT item_id, GROUP_CONCAT(NULLIF(TRIM(spec_value), '') SEPARATOR ' ') AS specs
+                FROM specification GROUP BY item_id
+              ) s ON s.item_id = ci.item_id
+              SET ci.search_key = LEFT(LOWER(CONCAT_WS(' ',
+                    NULLIF(TRIM(ci.sku), ''),
+                    NULLIF(TRIM(ci.part_number), ''),
+                    NULLIF(TRIM(ci.barcode), ''),
+                    NULLIF(TRIM(b.brand_name), ''),
+                    NULLIF(TRIM(pl.line_name), ''),
+                    NULLIF(TRIM(ic.category_name), ''),
+                    s.specs,
+                    NULLIF(TRIM(ci.color), ''),
+                    NULLIF(TRIM(ci.made_in), ''),
+                    NULLIF(TRIM(ci.compatible_cars), ''),
+                    NULLIF(TRIM(ci.item_name), ''),
+                    NULLIF(TRIM(ci.description), '')
+                  )), 2000)
+              WHERE CHAR_LENGTH(ci.search_key) >= 2000
+      rollback:
+        - empty

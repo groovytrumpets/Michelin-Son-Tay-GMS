@@ -9,6 +9,7 @@ import com.g42.platform.gms.billing.api.dto.PaymentProofCreateDto;
 import com.g42.platform.gms.billing.api.dto.ServiceBillCreateDto;
 import com.g42.platform.gms.billing.api.dto.ServiceBillDto;
 import com.g42.platform.gms.billing.app.service.BillingService;
+import com.g42.platform.gms.branch.service.BranchDirectory;
 import com.g42.platform.gms.billing.app.service.PaymentProofService;
 import com.g42.platform.gms.billing.infrastructure.repository.PaymentProofJpaRepo;
 import com.g42.platform.gms.common.enums.CodePrefix;
@@ -114,6 +115,7 @@ public class TicketBackfillService {
     private final StaffProileJpaRepo staffProfileRepo;
     private final TicketAssignmentRepo ticketAssignmentRepo;
     private final OdometerReadingRepo odometerReadingRepo;
+    private final BranchDirectory branchDirectory;
 
     // Field injection: @Qualifier khong duoc Lombok copy sang constructor (repo khong co lombok.config)
     @Autowired
@@ -163,7 +165,11 @@ public class TicketBackfillService {
             ticket.setVehicleId(parent.getVehicleId());
             ticket.setBackfillParentTicketId(parent.getServiceTicketId());
             ticket.setTicketCode(nextSupplementCode(parent));
+            // Cùng một lượt xe vào nên thuộc xưởng của phiếu gốc, không phải xưởng của máy đang nhập
+            ticket.setBranchId(parent.getBranchId());
         } else {
+            // Xưởng đã chọn trên form; không chọn thì BranchDirectory lấy theo máy (header) / mặc định
+            ticket.setBranchId(branchDirectory.resolve(req.getBranchId()));
             TicketType type = parseEnum(TicketType.class, req.getTicketType(), "Loại phiếu");
             ticket.setTicketType(type);
             if (type == TicketType.PARTS_SALE) {

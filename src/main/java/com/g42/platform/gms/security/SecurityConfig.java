@@ -150,6 +150,9 @@ public class SecurityConfig {
                                 "/api/public/recruitment/**",
                                 // Danh sách xưởng cho form khách đặt lịch online.
                                 "/api/public/branches",
+                                // Đánh giá sao từng mặt hàng: ai cũng xem được; gửi đánh giá thì
+                                // đi /api/customer/item-reviews (cần token khách).
+                                "/api/public/item-reviews/**",
                                 "/seo/**"
                         ).permitAll()
                         // Trang khách (tra phụ tùng, bài viết) dùng chung API tìm kiếm của kho,

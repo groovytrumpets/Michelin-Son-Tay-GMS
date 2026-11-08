@@ -2,9 +2,10 @@ package com.g42.platform.gms.notification.infrastructure;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.g42.platform.gms.notification.application.zalo.ZaloOaSettings;
+import com.g42.platform.gms.notification.application.zalo.ZaloTokenService;
 import com.g42.platform.gms.notification.domain.NotificationSender;
-import com.g42.platform.gms.notification.infrastructure.entity.ZaloToken;
-import com.g42.platform.gms.notification.infrastructure.repository.ZaloTokenRepo;
+import com.g42.platform.gms.notification.domain.ZnsTemplateType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpEntity;
@@ -12,7 +13,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
@@ -27,6 +27,9 @@ import java.util.Map;
  * Mọi hàm send* trả về true khi Zalo xác nhận gửi thành công (body có "error": 0),
  * false khi thiếu access token, lỗi mạng, hoặc Zalo trả về mã lỗi — nhờ đó
  * CustomerNotificationDispatcher biết để chuyển sang gửi email thay thế.
+ *
+ * Token lấy qua ZaloTokenService (chịu được lỡ có nhiều dòng active), mã mẫu lấy qua
+ * ZaloOaSettings (đổi được ở /zalo-oa-config, mặc định là mã cứng cũ).
  */
 @Slf4j
 @Component
@@ -34,103 +37,103 @@ import java.util.Map;
 public class ZaloNotificationSender implements NotificationSender {
 
     private static final String ZNS_URL = "https://business.openapi.zalo.me/message/template";
+    private static final DateTimeFormatter BOOKING_TIME = DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy");
 
-    private final ZaloTokenRepo zaloTokenRepo;
+    private final ZaloTokenService tokenService;
+    private final ZaloOaSettings settings;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final RestTemplate restTemplate = new RestTemplate();
 
-    public boolean sendBookingRequested(String phone, String customerName, List<String> productName, String orderCode, String bookingStatus, String bookingTime, String garageLocation) {
-        ZaloToken zaloToken = zaloTokenRepo.getZaloTokensByStateEqualsIgnoreCase("active");
-        String accessToken = extractAccessToken(zaloToken, "booking requested " + orderCode);
-        if (accessToken == null) {
-            return false;
-        }
+    /** Kết quả chi tiết của 1 lần gửi — màn cấu hình cần thấy mã lỗi Zalo, không chỉ true/false. */
+    public record ZnsSendResult(boolean ok, Integer errorCode, String message, String msgId, String templateId) {}
 
-        Map<String, Object> templateData = new HashMap<>();
-        templateData.put("customer_name", customerName);
-        templateData.put("product_name", String.join(", ", productName));
-        templateData.put("order_code", orderCode);
-        templateData.put("booking_status", bookingStatus);
-        templateData.put("booking_time", bookingTime);
-        templateData.put("garage_location", garageLocation);
+    // ------------------------------------------------------------------ dữ liệu từng mẫu
 
-        return post(accessToken, "546766", phone, templateData, null, "booking requested " + orderCode);
+    private static Map<String, Object> bookingRequestedData(String customerName, List<String> productName, String orderCode,
+                                                           String bookingStatus, String bookingTime, String garageLocation) {
+        Map<String, Object> d = new HashMap<>();
+        d.put("customer_name", customerName);
+        d.put("product_name", productName == null ? "" : String.join(", ", productName));
+        d.put("order_code", orderCode);
+        d.put("booking_status", bookingStatus);
+        d.put("booking_time", bookingTime);
+        d.put("garage_location", garageLocation);
+        return d;
     }
 
-    @Transactional
+    private static Map<String, Object> bookingConfirmData(String customerName, List<String> productName, String orderCode,
+                                                         LocalDateTime bookingTime, String garageLocation) {
+        String serviceNames = productName == null || productName.isEmpty()
+                ? "Không có dịch vụ cụ thể" // Zalo không cho phép để trống trường template
+                : String.join(", ", productName);
+        Map<String, Object> d = new HashMap<>();
+        d.put("customer_name", customerName);
+        d.put("service", serviceNames);
+        d.put("booking_code", orderCode);
+        d.put("booking_time", bookingTime.format(BOOKING_TIME));
+        d.put("location", garageLocation);
+        return d;
+    }
+
+    private static Map<String, Object> otpData(String otp) {
+        Map<String, Object> d = new HashMap<>();
+        d.put("otp", otp);
+        return d;
+    }
+
+    private static Map<String, Object> feedbackData(String name, String code) {
+        Map<String, Object> d = new HashMap<>();
+        d.put("customer_name", name);
+        d.put("service_code", code);
+        return d;
+    }
+
+    private static Map<String, Object> estimateData(String customerName, List<String> productName, String orderCode,
+                                                   LocalDateTime createAt, String garageLocation, String totalPrice) {
+        Map<String, Object> d = new HashMap<>();
+        d.put("customer_name", customerName);
+        d.put("order_code", orderCode);
+        d.put("time", createAt);
+        d.put("service_price", productName);
+        d.put("price", totalPrice);
+        d.put("location", garageLocation);
+        return d;
+    }
+
+    // ------------------------------------------------------------------ gửi thật
+
+    public boolean sendBookingRequested(String phone, String customerName, List<String> productName, String orderCode,
+                                        String bookingStatus, String bookingTime, String garageLocation) {
+        return send(ZnsTemplateType.BOOKING_REQUESTED, phone,
+                bookingRequestedData(customerName, productName, orderCode, bookingStatus, bookingTime, garageLocation),
+                null, "booking requested " + orderCode).ok();
+    }
+
     @Override
-    public boolean sendBookingConfirm(String phone, String customerName, List<String> productName, String orderCode, LocalDateTime bookingTime, String garageLocation) {
-        ZaloToken zaloToken = zaloTokenRepo.getZaloTokensByState("active");
-        String accessToken = extractAccessToken(zaloToken, "confirm booking " + orderCode);
-        if (accessToken == null) {
-            return false;
-        }
-
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy");
-        String formattedTime = bookingTime.format(formatter);
-        String serviceNames;
-        if (productName == null || productName.isEmpty()) {
-            serviceNames = "Không có dịch vụ cụ thể"; // Zalo không cho phép để trống trường template
-        } else {
-            serviceNames = String.join(", ", productName);
-        }
-
-        Map<String, Object> templateData = new HashMap<>();
-        templateData.put("customer_name", customerName);
-        templateData.put("service", serviceNames);
-        templateData.put("booking_code", orderCode);
-        templateData.put("booking_time", formattedTime);
-        templateData.put("location", garageLocation);
-
-        return post(accessToken, "562453", convertPhone(phone), templateData, null, "confirm booking " + orderCode);
+    public boolean sendBookingConfirm(String phone, String customerName, List<String> productName, String orderCode,
+                                      LocalDateTime bookingTime, String garageLocation) {
+        return send(ZnsTemplateType.BOOKING_CONFIRM, phone,
+                bookingConfirmData(customerName, productName, orderCode, bookingTime, garageLocation),
+                null, "confirm booking " + orderCode).ok();
     }
 
     @Override
     public boolean sendOtpVerify(String number, String otp) {
-        ZaloToken zaloToken = zaloTokenRepo.getZaloTokenByState("active");
-        String accessToken = extractAccessToken(zaloToken, "otp");
-        if (accessToken == null) {
-            return false;
-        }
-
-        Map<String, Object> templateData = new HashMap<>();
-        templateData.put("otp", otp);
-
-        return post(accessToken, "547094", convertPhone(number), templateData, null, "otp");
+        return send(ZnsTemplateType.OTP, number, otpData(otp), null, "otp").ok();
     }
 
     @Override
     public boolean sendFeedback(String number, String name, String code) {
-        ZaloToken zaloToken = zaloTokenRepo.getZaloTokenByState("active");
-        String accessToken = extractAccessToken(zaloToken, "feedback " + code);
-        if (accessToken == null) {
-            return false;
-        }
-
-        Map<String, Object> templateData = new HashMap<>();
-        templateData.put("customer_name", name);
-        templateData.put("service_code", code);
-
-        return post(accessToken, "547146", convertPhone(number), templateData, code, "feedback " + code);
+        // tracking_id = mã phiếu: webhook user_feedback trả lại đúng mã này để gắn đánh giá vào phiếu.
+        return send(ZnsTemplateType.FEEDBACK, number, feedbackData(name, code), code, "feedback " + code).ok();
     }
 
     @Override
-    public boolean sendEstimate(String number, String customerName, List<String> productName, String orderCode, LocalDateTime createAt, String garageLocation, String totalPrice) {
-        ZaloToken zaloToken = zaloTokenRepo.getZaloTokenByState("active");
-        String accessToken = extractAccessToken(zaloToken, "estimate " + orderCode);
-        if (accessToken == null) {
-            return false;
-        }
-
-        Map<String, Object> templateData = new HashMap<>();
-        templateData.put("customer_name", customerName);
-        templateData.put("order_code", orderCode);
-        templateData.put("time", createAt);
-        templateData.put("service_price", productName);
-        templateData.put("price", totalPrice);
-        templateData.put("location", garageLocation);
-
-        return post(accessToken, "574006", convertPhone(number), templateData, null, "estimate " + orderCode);
+    public boolean sendEstimate(String number, String customerName, List<String> productName, String orderCode,
+                                LocalDateTime createAt, String garageLocation, String totalPrice) {
+        return send(ZnsTemplateType.ESTIMATE, number,
+                estimateData(customerName, productName, orderCode, createAt, garageLocation, totalPrice),
+                null, "estimate " + orderCode).ok();
     }
 
     @Override
@@ -138,34 +141,53 @@ public class ZaloNotificationSender implements NotificationSender {
         return false;
     }
 
-    public static String convertPhone(String phone) {
-        if (phone.startsWith("0")) {
-            return "84" + phone.substring(1);
-        }
-        return phone;
+    /** Gửi thử 1 tin với dữ liệu mẫu (nút "Gửi thử" ở /zalo-oa-config). Tốn phí như tin thật. */
+    public ZnsSendResult sendTest(ZnsTemplateType type, String phone) {
+        String code = "TEST-" + System.currentTimeMillis() % 100000;
+        LocalDateTime now = LocalDateTime.now();
+        List<String> items = List.of("Thay dầu động cơ (tin thử)");
+        String garage = "Michelin Sơn Tây";
+        Map<String, Object> data = switch (type) {
+            case BOOKING_REQUESTED -> bookingRequestedData("Khách thử", items, code, "Đang chờ xác nhận",
+                    now.format(BOOKING_TIME), garage);
+            case BOOKING_CONFIRM -> bookingConfirmData("Khách thử", items, code, now, garage);
+            case OTP -> otpData("123456");
+            case FEEDBACK -> feedbackData("Khách thử", code);
+            case ESTIMATE -> estimateData("Khách thử", items, code, now, garage, "500.000");
+        };
+        // Không gắn tracking_id: đánh giá của tin thử không được trùng mã một phiếu thật.
+        return send(type, phone, data, null, "test " + type);
     }
 
-    /** Lấy access token đang hoạt động; trả null (kèm log) nếu chưa có token nào dùng được. */
-    private String extractAccessToken(ZaloToken zaloToken, String context) {
-        if (zaloToken == null || zaloToken.getAccessToken() == null || zaloToken.getAccessToken().isEmpty()) {
-            log.warn("Zalo: chưa có access token hoạt động, không gửi được [{}]", context);
-            return null;
+    public static String convertPhone(String phone) {
+        if (phone == null) return null;
+        String p = phone.replaceAll("[\\s.\\-]", "");
+        if (p.startsWith("+")) p = p.substring(1);
+        if (p.startsWith("0")) {
+            return "84" + p.substring(1);
         }
-        return zaloToken.getAccessToken();
+        return p;
     }
 
     /**
      * Gọi API ZNS và đọc mã lỗi trong body.
      * Zalo trả HTTP 200 kể cả khi thất bại, phân biệt bằng trường "error" (0 = thành công).
      */
-    private boolean post(String accessToken, String templateId, String phone,
-                         Map<String, Object> templateData, String trackingId, String context) {
+    private ZnsSendResult send(ZnsTemplateType type, String phone, Map<String, Object> templateData,
+                               String trackingId, String context) {
+        String templateId = settings.templateId(type);
+        String accessToken = tokenService.currentAccessToken();
+        if (accessToken == null) {
+            log.warn("Zalo: chưa có access token hoạt động, không gửi được [{}]", context);
+            return new ZnsSendResult(false, null, "Chưa có access token Zalo OA", null, templateId);
+        }
+
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("access_token", accessToken);
 
         Map<String, Object> body = new HashMap<>();
-        body.put("phone", phone);
+        body.put("phone", convertPhone(phone));
         body.put("template_id", templateId);
         body.put("template_data", templateData);
         if (trackingId != null) {
@@ -175,35 +197,36 @@ public class ZaloNotificationSender implements NotificationSender {
         try {
             ResponseEntity<String> response = restTemplate.postForEntity(
                     ZNS_URL, new HttpEntity<>(body, headers), String.class);
-            return isSuccess(response.getBody(), context);
+            return readResult(response.getBody(), context, templateId);
         } catch (Exception e) {
             log.warn("Zalo: gửi [{}] thất bại: {}", context, e.getMessage());
-            return false;
+            return new ZnsSendResult(false, null, "Không gọi được Zalo: " + e.getMessage(), null, templateId);
         }
     }
 
-    private boolean isSuccess(String responseBody, String context) {
+    private ZnsSendResult readResult(String responseBody, String context, String templateId) {
         if (responseBody == null || responseBody.isBlank()) {
             log.warn("Zalo: gửi [{}] không nhận được phản hồi", context);
-            return false;
+            return new ZnsSendResult(false, null, "Zalo không phản hồi", null, templateId);
         }
         try {
             JsonNode root = objectMapper.readTree(responseBody);
             JsonNode errorNode = root.get("error");
             if (errorNode == null) {
                 log.warn("Zalo: phản hồi [{}] không có trường error: {}", context, responseBody);
-                return false;
+                return new ZnsSendResult(false, null, "Phản hồi lạ từ Zalo", null, templateId);
             }
-            if (errorNode.asInt(-1) == 0) {
+            int error = errorNode.asInt(-1);
+            String message = root.path("message").asText("");
+            if (error == 0) {
                 log.debug("Zalo: gửi [{}] thành công", context);
-                return true;
+                return new ZnsSendResult(true, 0, message, root.path("data").path("msg_id").asText(null), templateId);
             }
-            log.warn("Zalo: gửi [{}] bị từ chối, error={}, message={}",
-                    context, errorNode.asInt(-1), root.path("message").asText(""));
-            return false;
+            log.warn("Zalo: gửi [{}] bị từ chối, error={}, message={}", context, error, message);
+            return new ZnsSendResult(false, error, message, null, templateId);
         } catch (Exception e) {
             log.warn("Zalo: không đọc được phản hồi [{}]: {}", context, e.getMessage());
-            return false;
+            return new ZnsSendResult(false, null, "Không đọc được phản hồi Zalo", null, templateId);
         }
     }
 }

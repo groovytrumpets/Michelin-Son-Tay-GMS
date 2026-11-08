@@ -41,8 +41,8 @@ import java.util.List;
 
 @Service("catalogItemWarehouseService")
 public class CatalogItemService {
-    /** Khớp catalog_item.item_name VARCHAR(500) — changeset 049. */
-    public static final int ITEM_NAME_MAX_LENGTH = 500;
+    /** Khớp catalog_item.item_name VARCHAR(1000) — changeset 054. */
+    public static final int ITEM_NAME_MAX_LENGTH = 1000;
 
     @Autowired
     private InventoryJpaRepo inventoryJpaRepo;
@@ -317,17 +317,17 @@ public class CatalogItemService {
      * Builds a denormalized lowercase blob of every field a user might search by
      * (name, codes, brand/category/product line names, spec values, compatible cars),
      * so search can match a single column instead of joining/LIKE-ing many.
+     *
+     * Thứ tự ghép có chủ ý: blob bị cắt ở 2000 ký tự, nên các trường ngắn mà CHỈ blob này
+     * mới tìm được (hãng, dòng, danh mục, thông số, màu, xuất xứ) đứng trước; tên (tới 1000
+     * ký tự) và mô tả (dài tuỳ ý) để cuối — bị cắt cũng không sao vì tên còn được LIKE riêng.
+     * Đổi thứ tự ở đây thì sửa cả câu UPDATE trong changeset 054-6 cho khớp.
      */
     private String buildSearchKey(CatalogItem catalogItem, Brand brand, ProductLine productLine, List<Specification> specs, ItemCategory itemCategory) {
         StringBuilder searchKey = new StringBuilder();
-        appendSearchToken(searchKey, catalogItem.getItemName());
         appendSearchToken(searchKey, catalogItem.getSku());
         appendSearchToken(searchKey, catalogItem.getPartNumber());
         appendSearchToken(searchKey, catalogItem.getBarcode());
-        appendSearchToken(searchKey, catalogItem.getColor());
-        appendSearchToken(searchKey, catalogItem.getMadeIn());
-        appendSearchToken(searchKey, catalogItem.getCompatibleCars());
-        appendSearchToken(searchKey, catalogItem.getDescription());
         if (brand != null) {
             appendSearchToken(searchKey, brand.getBrandName());
         }
@@ -342,6 +342,11 @@ public class CatalogItemService {
                 appendSearchToken(searchKey, specification.getSpecValue());
             }
         }
+        appendSearchToken(searchKey, catalogItem.getColor());
+        appendSearchToken(searchKey, catalogItem.getMadeIn());
+        appendSearchToken(searchKey, catalogItem.getCompatibleCars());
+        appendSearchToken(searchKey, catalogItem.getItemName());
+        appendSearchToken(searchKey, catalogItem.getDescription());
         String result = searchKey.toString().trim().toLowerCase();
         return result.length() > 2000 ? result.substring(0, 2000) : result;
     }

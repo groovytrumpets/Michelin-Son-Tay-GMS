@@ -1,82 +1,47 @@
 package com.g42.platform.gms.notification.infrastructure;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.g42.platform.gms.notification.application.zalo.ZaloTokenService;
 import com.g42.platform.gms.notification.infrastructure.entity.ZaloToken;
-import com.g42.platform.gms.notification.infrastructure.repository.ZaloTokenRepo;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.*;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestTemplate;
 
-
+import java.time.Duration;
 import java.time.Instant;
-import java.util.Map;
 
+/**
+ * Tự làm mới access token Zalo OA (sống 25 giờ).
+ *
+ * Trước đây chạy cố định mỗi 20 giờ tính từ lúc khởi động — nghĩa là mỗi lần restart BE
+ * (devtools restart liên tục khi dev) lại đổi token một lần, còn BE tắt quá 25 giờ thì token
+ * chết mà không ai biết. Giờ cứ 30 phút kiểm tra một lần và chỉ đổi khi token sắp hết hạn
+ * (còn dưới 3 giờ) hoặc không rõ hạn.
+ */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class ZaloTokenAutoRefresher {
-    private final ZaloTokenRepo zaloTokenRepo;
-    private final RestTemplate restTemplate = new RestTemplate();
-    @Value("${zalo.app-id}")
-    private String appId;
-    @Value("${zalo.secret-key}")
-    private String secretKey;
-    @Scheduled(fixedRate = 72000000)
-//    @Scheduled(fixedRate = 60000)
-    @Transactional
-    public void refreshZaloTokenAutomatically() {
-        System.out.println("[System] Start Refreshing Zalo Token...");
 
-        // 1. Lấy token hiện tại từ Database
-        ZaloToken currentToken = zaloTokenRepo.getZaloTokenByState("active");
-        if (currentToken == null || currentToken.getRefreshToken() == null) {
-            System.err.println("Refresh token failed!");
+    private static final Duration REFRESH_BEFORE = Duration.ofHours(3);
+
+    private final ZaloTokenService tokenService;
+
+    @Scheduled(initialDelay = 120_000, fixedDelay = 1_800_000)
+    public void refreshZaloTokenAutomatically() {
+        ZaloToken current = tokenService.current();
+        if (current == null || current.getRefreshToken() == null || current.getRefreshToken().isBlank()) {
             return;
         }
-
-        // 2. Chuẩn bị gọi API đổi Token của Zalo
-        String url = "https://oauth.zaloapp.com/v4/oa/access_token";
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED); // Bắt buộc
-        headers.set("secret_key", secretKey); // Nhét Secret Key vào Header
-
-        // 3. Nối chuỗi Body dạng form-data
-        String body = "app_id=" + appId +
-                "&grant_type=refresh_token" +
-                "&refresh_token=" + currentToken.getRefreshToken();
-
-        HttpEntity<String> request = new HttpEntity<>(body, headers);
-
+        Instant expiresAt = current.getExpiresAt();
+        if (expiresAt != null && expiresAt.isAfter(Instant.now().plus(REFRESH_BEFORE))) {
+            return;
+        }
         try {
-            // 1. Ép RestTemplate nhận về String thuần túy thay vì Map
-            ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
-
-            // 2. Tự dùng ObjectMapper để bóc tách chuỗi String thành JSON
-            ObjectMapper mapper = new ObjectMapper();
-            JsonNode jsonNode = mapper.readTree(response.getBody());
-
-            // 3. Kiểm tra xem có trường access_token không
-            if (response.getStatusCode() == HttpStatus.OK && jsonNode.has("access_token")) {
-
-
-                currentToken.setAccessToken(jsonNode.get("access_token").asText());
-                currentToken.setRefreshToken(jsonNode.get("refresh_token").asText());
-                long expiresInSeconds = jsonNode.get("expires_in").asLong();
-                currentToken.setExpiresAt(Instant.now().plusSeconds(expiresInSeconds));
-                // Lưu lại vào MySQL
-                zaloTokenRepo.save(currentToken);
-                System.out.println("[System] Refreshing Zalo Token Successful!");
-            } else {
-                System.err.println("[System] Error while refreshing Zalo Token: " + response.getBody());
-            }
+            tokenService.refresh(null);
         } catch (Exception e) {
-            System.err.println("[System] Error while refreshing Zalo Token: " + e.getMessage());
-            e.printStackTrace();
+            // Lỗi đã được ghi vào zalo_token.last_refresh_error để hiện ở /zalo-oa-config.
+            log.warn("Zalo: tự làm mới token thất bại: {}", e.getMessage());
         }
     }
 }

@@ -1,0 +1,285 @@
+# Hai việc độc lập, gộp chung một file vì làm cùng đợt (2026-11-08):
+#
+# A) Màn cấu hình Zalo OA (/zalo-oa-config)
+#    1) zalo_token: bảng có từ trước Liquibase (tạo tay). Trên DB mới tinh thì tạo luôn ở đây.
+#    2) zalo_token thêm cột theo dõi: ai/lúc nào cập nhật, lần làm mới gần nhất, lỗi gần nhất,
+#       nguồn token (OAUTH = qua nút "Kết nối", MANUAL = dán tay), hạn của refresh token.
+#    3) zalo_oa_config: 1 dòng duy nhất (id = 1) giữ App ID / Secret key / Redirect URI / bảng
+#       mã mẫu ZNS. Ô nào để trống thì backend dùng giá trị trong application.properties
+#       (zalo.app-id, zalo.secret-key...) và mã mẫu cứng cũ — nên chạy changeset này xong mà
+#       chưa ai lưu gì thì hành vi gửi tin vẫn y như trước.
+#
+# B) Đánh giá sao cho từng mặt hàng (phụ tùng / dịch vụ / combo) trên website khách.
+#    KHÁC bảng feedback (đánh giá cả phiếu dịch vụ, đến từ Zalo ZNS).
+#    4) item_review: mỗi khách tối đa 1 đánh giá / mặt hàng (sửa lại được), staff ẩn/hiện + trả lời.
+#
+# 5) Mã quyền: ZALO_OA_VIEW / ZALO_OA_CONFIG (CONFIG chỉ MANAGER — xem PermissionCodes.ROLE_RESTRICTED,
+#    vì màn này lộ được secret key và token gửi tin), ITEM_REVIEW_VIEW / ITEM_REVIEW_EDIT.
+databaseChangeLog:
+  - changeSet:
+      id: 053-1-zalo-token-create-if-missing
+      author: gms
+      comment: Tạo bảng zalo_token trên DB mới (DB cũ đã có bảng này từ trước khi dùng Liquibase)
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: zalo_token
+      changes:
+        - createTable:
+            tableName: zalo_token
+            columns:
+              - column:
+                  name: idzalo_token
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: access_token
+                  type: TEXT
+              - column:
+                  name: refresh_token
+                  type: TEXT
+              - column:
+                  name: expires_at
+                  type: DATETIME
+              - column:
+                  name: created_at
+                  type: DATETIME
+              - column:
+                  name: code_verifier
+                  type: VARCHAR(255)
+              - column:
+                  name: state
+                  type: VARCHAR(40)
+      rollback:
+        - dropTable:
+            tableName: zalo_token
+
+  - changeSet:
+      id: 053-2-zalo-token-tracking-columns
+      author: gms
+      comment: Cột theo dõi trạng thái token Zalo cho màn /zalo-oa-config
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: zalo_token
+                columnName: last_refresh_at
+      changes:
+        - addColumn:
+            tableName: zalo_token
+            columns:
+              - column:
+                  name: refresh_token_expires_at
+                  type: DATETIME
+                  remarks: Hạn ước tính của refresh token (Zalo cho 3 tháng, mỗi lần làm mới cấp cái mới)
+              - column:
+                  name: updated_at
+                  type: DATETIME
+              - column:
+                  name: updated_by_staff_id
+                  type: INT
+                  remarks: Nhân viên dán tay / kết nối OAuth gần nhất (null = hệ thống tự làm mới)
+              - column:
+                  name: last_refresh_at
+                  type: DATETIME
+                  remarks: Lần gọi Zalo đổi refresh token gần nhất (thành công hay thất bại)
+              - column:
+                  name: last_refresh_error
+                  type: VARCHAR(500)
+                  remarks: Lỗi của lần làm mới gần nhất; null nếu lần đó thành công
+              - column:
+                  name: source
+                  type: VARCHAR(20)
+                  remarks: OAUTH | MANUAL
+
+  - changeSet:
+      id: 053-3-zalo-oa-config
+      author: gms
+      comment: Cấu hình ứng dụng Zalo OA (1 dòng). Ô trống = dùng giá trị application.properties
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: zalo_oa_config
+      changes:
+        - createTable:
+            tableName: zalo_oa_config
+            columns:
+              - column:
+                  name: id
+                  type: INT
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: app_id
+                  type: VARCHAR(50)
+              - column:
+                  name: secret_key
+                  type: VARCHAR(255)
+              - column:
+                  name: redirect_uri
+                  type: VARCHAR(500)
+              - column:
+                  name: template_map
+                  type: TEXT
+                  remarks: 'JSON {"OTP":"547094",...} — loại thông báo -> mã mẫu ZNS'
+              - column:
+                  name: updated_at
+                  type: DATETIME
+              - column:
+                  name: updated_by_staff_id
+                  type: INT
+      rollback:
+        - dropTable:
+            tableName: zalo_oa_config
+
+  - changeSet:
+      id: 053-4-item-review
+      author: gms
+      comment: Đánh giá sao cho từng mặt hàng trên website (khác feedback của phiếu dịch vụ)
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: item_review
+      changes:
+        - createTable:
+            tableName: item_review
+            columns:
+              - column:
+                  name: review_id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: catalog_item_id
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: customer_id
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: rating
+                  type: TINYINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: comment
+                  type: VARCHAR(2000)
+              - column:
+                  name: verified_purchase
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  remarks: Khách đã có phiếu (hoàn thành/đã thu tiền) chứa mặt hàng này lúc gửi đánh giá
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: VARCHAR(20)
+                  defaultValue: VISIBLE
+                  remarks: VISIBLE | HIDDEN (nhân viên ẩn)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: staff_reply
+                  type: VARCHAR(2000)
+              - column:
+                  name: replied_by_staff_id
+                  type: INT
+              - column:
+                  name: replied_at
+                  type: DATETIME
+              - column:
+                  name: hidden_reason
+                  type: VARCHAR(500)
+              - column:
+                  name: created_at
+                  type: DATETIME
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: DATETIME
+        - addUniqueConstraint:
+            tableName: item_review
+            columnNames: catalog_item_id, customer_id
+            constraintName: uk_item_review_item_customer
+        - createIndex:
+            tableName: item_review
+            indexName: idx_item_review_item_status
+            columns:
+              - column:
+                  name: catalog_item_id
+              - column:
+                  name: status
+        - createIndex:
+            tableName: item_review
+            indexName: idx_item_review_created
+            columns:
+              - column:
+                  name: created_at
+      rollback:
+        - dropTable:
+            tableName: item_review
+
+  - changeSet:
+      id: 053-5-permission-zalo-oa-item-review
+      author: gms
+      comment: >-
+        Mã quyền màn Zalo OA và màn đánh giá sản phẩm. ZALO_OA_VIEW/ZALO_OA_CONFIG cấp cho MANAGER;
+        ITEM_REVIEW_* cấp cho MANAGER và RECEPTIONIST (giống quyền feedback). Ghi vào cả
+        role_permission_default để "Khôi phục mặc định" không nuốt mất.
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: "0"
+            sql: SELECT COUNT(*) FROM permission WHERE code = 'ZALO_OA_VIEW'
+      changes:
+        - sql:
+            splitStatements: false
+            sql: >-
+              INSERT INTO permission (code, module_code, module_label, group_label, action_code, label, description, sort_order) VALUES
+              ('ZALO_OA_VIEW','ZALO_OA','Zalo OA & ZNS','Hệ thống','VIEW','Xem','Mở /zalo-oa-config: trạng thái token, thông tin OA, hạn mức và mẫu tin ZNS',841),
+              ('ZALO_OA_CONFIG','ZALO_OA','Zalo OA & ZNS','Hệ thống','CONFIG','Cấu hình','Dán token, đổi App ID/Secret key, kết nối lại OA, đổi mã mẫu ZNS, gửi tin thử. Chỉ Admin và Quản lý',842),
+              ('ITEM_REVIEW_VIEW','ITEM_REVIEW','Đánh giá sản phẩm','Marketing & CSKH','VIEW','Xem','Xem đánh giá sao khách gửi cho từng phụ tùng/dịch vụ',663),
+              ('ITEM_REVIEW_EDIT','ITEM_REVIEW','Đánh giá sản phẩm','Marketing & CSKH','EDIT','Sửa','Ẩn/hiện đánh giá, trả lời khách',664)
+        - sql:
+            splitStatements: false
+            sql: >-
+              INSERT INTO role_permission (role_id, permission_code)
+              SELECT r.role_id, p.code
+              FROM role r
+              JOIN permission p ON (
+                   (r.role_code = 'MANAGER' AND p.code IN ('ZALO_OA_VIEW','ZALO_OA_CONFIG','ITEM_REVIEW_VIEW','ITEM_REVIEW_EDIT'))
+                OR (r.role_code = 'RECEPTIONIST' AND p.code IN ('ITEM_REVIEW_VIEW','ITEM_REVIEW_EDIT')))
+              WHERE NOT EXISTS (
+                  SELECT 1 FROM role_permission rp
+                  WHERE rp.role_id = r.role_id AND rp.permission_code = p.code
+                )
+        - sql:
+            splitStatements: false
+            sql: >-
+              INSERT INTO role_permission_default (role_id, permission_code)
+              SELECT r.role_id, p.code
+              FROM role r
+              JOIN permission p ON (
+                   (r.role_code = 'MANAGER' AND p.code IN ('ZALO_OA_VIEW','ZALO_OA_CONFIG','ITEM_REVIEW_VIEW','ITEM_REVIEW_EDIT'))
+                OR (r.role_code = 'RECEPTIONIST' AND p.code IN ('ITEM_REVIEW_VIEW','ITEM_REVIEW_EDIT')))
+              WHERE NOT EXISTS (
+                  SELECT 1 FROM role_permission_default rpd
+                  WHERE rpd.role_id = r.role_id AND rpd.permission_code = p.code
+                )
+      rollback:
+        - sql: "DELETE FROM role_permission WHERE permission_code IN ('ZALO_OA_VIEW','ZALO_OA_CONFIG','ITEM_REVIEW_VIEW','ITEM_REVIEW_EDIT')"
+        - sql: "DELETE FROM role_permission_default WHERE permission_code IN ('ZALO_OA_VIEW','ZALO_OA_CONFIG','ITEM_REVIEW_VIEW','ITEM_REVIEW_EDIT')"
+        - sql: "DELETE FROM permission WHERE code IN ('ZALO_OA_VIEW','ZALO_OA_CONFIG','ITEM_REVIEW_VIEW','ITEM_REVIEW_EDIT')"

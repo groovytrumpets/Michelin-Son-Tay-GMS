@@ -11,7 +11,7 @@ import java.math.BigDecimal;
 public class CreatePartRequest {
 
     @NotBlank
-    @Size(max = 500, message = "Tên sản phẩm tối đa 500 ký tự")
+    @Size(max = 1000, message = "Tên sản phẩm tối đa 1000 ký tự")
     private String itemName;
 
     /** Kho sẽ tạo inventory record (qty=0) khi tạo part mới */

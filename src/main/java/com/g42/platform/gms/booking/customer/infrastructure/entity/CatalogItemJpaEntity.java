@@ -14,7 +14,7 @@ public class CatalogItemJpaEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer itemId;
 
-    @Column(nullable = false, length = 500)
+    @Column(nullable = false, length = 1000)
     private String itemName;
 
     @Column(nullable = false)

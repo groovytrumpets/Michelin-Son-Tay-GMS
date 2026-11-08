@@ -18,7 +18,7 @@ public class CatalogItemJpa {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer itemId;
 
-    @Column(nullable = false, length = 500)
+    @Column(nullable = false, length = 1000)
     private String itemName;
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

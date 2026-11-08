@@ -20,7 +20,7 @@ public class CatalogDraftJpa {
     @Column(name = "draft_type", nullable = false, length = 20)
     private String draftType;
 
-    @Column(name = "title", nullable = false, length = 500)
+    @Column(name = "title", nullable = false, length = 1000)
     private String title;
 
     @Lob

@@ -166,3 +166,9 @@ databaseChangeLog:
   - include:
       file: changes/052-service-ticket-duplicate-cancel.yaml
       relativeToChangelogFile: true
+  - include:
+      file: changes/053-zalo-oa-item-review.yaml
+      relativeToChangelogFile: true
+  - include:
+      file: changes/054-item-name-1000.yaml
+      relativeToChangelogFile: true

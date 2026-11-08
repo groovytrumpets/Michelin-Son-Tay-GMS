@@ -54,7 +54,9 @@ public class StaffJwtFilter extends OncePerRequestFilter {
                 || path.startsWith("/swagger-ui")
                 || path.startsWith("/swagger-ui.html")
                 || path.startsWith("/home")
-                || path.startsWith("/api/webhook/")
+                // Webhook do Zalo/cổng thanh toán gọi, không có token. Riêng /api/webhook/zalo/estimate/sent
+                // là nút "Gửi báo giá qua Zalo" của nhân viên nên vẫn phải đọc token để controller chặn người lạ.
+                || (path.startsWith("/api/webhook/") && !path.startsWith("/api/webhook/zalo/estimate"))
                 || path.startsWith("/zalo/callback")
                 ||  path.startsWith("/zalo/login")
                 || path.startsWith("/api/admin/analytics/google/callback")

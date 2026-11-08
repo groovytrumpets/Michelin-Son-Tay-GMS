@@ -54,6 +54,12 @@ public class BackfillCreateRequest {
     /** Báo giá DRAFT chứa các dòng hàng/dịch vụ đã làm. */
     private Integer estimateId;
 
+    /**
+     * Xưởng đã làm phiếu (ô "Xưởng" ở /create-booking). Bỏ trống = xưởng của máy đang nhập
+     * (header X-Branch-Id). SUPPLEMENT bỏ qua field này và luôn theo xưởng của phiếu gốc.
+     */
+    private Integer branchId;
+
     /** Ngày giờ khách thực tế tới/nhận hàng. */
     private LocalDateTime actualServiceAt;
 
