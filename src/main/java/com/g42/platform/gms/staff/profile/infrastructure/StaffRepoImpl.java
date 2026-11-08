@@ -57,8 +57,17 @@ public class StaffRepoImpl implements StaffRepo {
     @Override
     @Transactional
     public StaffProfile createStaff(StaffCreateDto staffCreateDto) {
-        //todo: check exits phone and email
-        if (staffAuthJpaRepo.existsByEmail(staffCreateDto.getEmail())) {
+        // SĐT bắt buộc (dùng để đăng nhập); email không bắt buộc — bỏ trống thì lưu NULL
+        // để nhiều nhân viên không có email không bị coi là "trùng email" với nhau.
+        String phone = staffCreateDto.getPhone() == null ? null : staffCreateDto.getPhone().trim();
+        if (phone == null || phone.isEmpty()) {
+            throw new StaffException("Vui lòng nhập số điện thoại!", StaffErrorCode.INVALID_PHONE);
+        }
+        staffCreateDto.setPhone(phone);
+        String email = staffCreateDto.getEmail() == null ? null : staffCreateDto.getEmail().trim();
+        staffCreateDto.setEmail(email == null || email.isEmpty() ? null : email);
+
+        if (staffCreateDto.getEmail() != null && staffAuthJpaRepo.existsByEmail(staffCreateDto.getEmail())) {
             throw new StaffException("Email đã tồn tại!", StaffErrorCode.DUPLICATE_EMAIL);
         }
         if (staffProfileJpaRepo.existsByPhone(staffCreateDto.getPhone())) {
