@@ -23,7 +23,8 @@ public class ServiceJpaEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long serviceId;
-    @Column(columnDefinition = "VARCHAR(100)")
+    // Tiêu đề trang bán hàng = tên sản phẩm (catalog_item.item_name, 1000 ký tự) — phải dài bằng.
+    @Column(columnDefinition = "VARCHAR(1000)")
     private String title;
     @Column(columnDefinition = "TEXT")
     private String shortDescription;

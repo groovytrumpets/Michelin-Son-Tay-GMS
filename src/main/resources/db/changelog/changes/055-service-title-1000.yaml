@@ -1,0 +1,24 @@
+# service.title là tiêu đề trang bán hàng của mặt hàng, lấy từ tên sản phẩm
+# (catalog_item.item_name). 054 đã nới tên sản phẩm lên 1000 ký tự nhưng bỏ sót
+# bảng này — cột vẫn VARCHAR(100) nên tạo sản phẩm tên > 100 ký tự bị lỗi
+# "Data too long for column 'title'".
+# title không có index nên VARCHAR(1000) utf8mb4 không vướng giới hạn khoá 3072 byte.
+databaseChangeLog:
+  - changeSet:
+      id: 055-1-service-title-1000
+      author: gms
+      comment: service.title VARCHAR(100) -> VARCHAR(1000)
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: 1
+            sql: >-
+              SELECT COUNT(*) FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'service'
+                AND COLUMN_NAME = 'title' AND CHARACTER_MAXIMUM_LENGTH < 1000
+      changes:
+        - sql:
+            sql: ALTER TABLE service MODIFY title VARCHAR(1000) NULL
+      rollback:
+        - sql:
+            sql: ALTER TABLE service MODIFY title VARCHAR(100) NULL
