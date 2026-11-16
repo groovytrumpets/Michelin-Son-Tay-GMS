@@ -13,6 +13,10 @@ import com.g42.platform.gms.auth.entity.StaffPrincipal;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.DuplicateCancelRequest;
 import com.g42.platform.gms.service_ticket_management.api.dto.manage.DuplicateCancelSummary;
 import com.g42.platform.gms.service_ticket_management.application.service.DuplicateTicketCancelService;
+import com.g42.platform.gms.service_ticket_management.api.dto.manage.ReassignCandidate;
+import com.g42.platform.gms.service_ticket_management.api.dto.manage.ReassignCustomerPreview;
+import com.g42.platform.gms.service_ticket_management.api.dto.manage.ReassignCustomerRequest;
+import com.g42.platform.gms.service_ticket_management.application.service.TicketCustomerReassignService;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import com.g42.platform.gms.service_ticket_management.application.service.ServiceTicketAdvisorService;
 import com.g42.platform.gms.service_ticket_management.application.service.ServiceTicketManageService;
@@ -45,6 +49,7 @@ public class ServiceTicketManageController {
     private final ServiceTicketManageService serviceTicketManageService;
     private final ServiceTicketAdvisorService serviceTicketAdvisorService;
     private final DuplicateTicketCancelService duplicateTicketCancelService;
+    private final TicketCustomerReassignService ticketCustomerReassignService;
 
     @GetMapping("/tickets")
     public ResponseEntity<ApiResponse<Page<ServiceTicketListResponse>>> getServiceTicketList(
@@ -148,6 +153,45 @@ public class ServiceTicketManageController {
         DuplicateCancelSummary result = duplicateTicketCancelService.cancel(serviceTicketId,
                 request.getDuplicateOfTicketCode(), request.getReason(), principal);
         return ResponseEntity.ok(ApiResponses.success(result, "Đã huỷ phiếu trùng " + result.getTicket().getTicketCode()));
+    }
+
+    /** Tìm khách đích cho popup "Chuyển phiếu sang khách khác" (tên / SĐT / mã / email / biển số). */
+    @GetMapping("/{serviceTicketId}/reassign-customer/candidates")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.SERVICE_TICKET_REASSIGN_CUSTOMER + "')")
+    public ResponseEntity<ApiResponse<List<ReassignCandidate>>> reassignCandidates(
+            @PathVariable Integer serviceTicketId,
+            @RequestParam(required = false) String q) {
+        return ResponseEntity.ok(ApiResponses.success(ticketCustomerReassignService.searchCandidates(q)));
+    }
+
+    /**
+     * Xem trước việc chuyển phiếu: phiếu có khoá vì đã thu tiền không, xe đích là gì, dữ liệu nào đi
+     * theo, xe cũ bỏ khỏi hồ sơ khách cũ được không. Không ghi gì. Thiếu targetCustomerId thì chỉ
+     * trả phần thông tin phiếu + lịch sử chuyển.
+     */
+    @GetMapping("/{serviceTicketId}/reassign-customer/preview")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.SERVICE_TICKET_REASSIGN_CUSTOMER + "')")
+    public ResponseEntity<ApiResponse<ReassignCustomerPreview>> previewReassignCustomer(
+            @PathVariable Integer serviceTicketId,
+            @ModelAttribute ReassignCustomerRequest request,
+            @AuthenticationPrincipal StaffPrincipal principal) {
+        return ResponseEntity.ok(ApiResponses.success(
+                ticketCustomerReassignService.preview(serviceTicketId, request, principal)));
+    }
+
+    /** Chuyển phiếu bị gán nhầm sang đúng khách / xe. Phiếu đã thu tiền: chỉ ADMIN / MANAGER. */
+    @PostMapping("/{serviceTicketId}/reassign-customer")
+    @PreAuthorize("hasAuthority('" + PermissionCodes.SERVICE_TICKET_REASSIGN_CUSTOMER + "')")
+    @Auditable(action = "UPDATE", module = "SERVICE_TICKET", severity = "WARNING",
+            description = "Chuyển phiếu dịch vụ sang khách hàng khác (gán nhầm khách / xe)",
+            targetType = "SERVICE_TICKET")
+    public ResponseEntity<ApiResponse<ReassignCustomerPreview>> reassignCustomer(
+            @PathVariable Integer serviceTicketId,
+            @RequestBody ReassignCustomerRequest request,
+            @AuthenticationPrincipal StaffPrincipal principal) {
+        ReassignCustomerPreview result = ticketCustomerReassignService.reassign(serviceTicketId, request, principal);
+        String to = result.getTo() == null ? "" : " sang " + result.getTo().getName();
+        return ResponseEntity.ok(ApiResponses.success(result, "Đã chuyển phiếu " + result.getTicketCode() + to));
     }
 
     /** Lễ tân chỉnh sửa yêu cầu khách hàng và danh sách dịch vụ. */

@@ -1,0 +1,133 @@
+# Chuyển phiếu dịch vụ sang khách hàng khác (gán nhầm khách / nhầm xe lúc tạo phiếu).
+#
+# Trước đây không có đường nào sửa: ô Họ tên / SĐT / Biển số ở /service-ticket-detail sửa THẲNG
+# hồ sơ khách và xe đang gắn với phiếu (không đổi khách của phiếu), còn huỷ rồi tạo lại thì để
+# lại phiếu "Đã huỷ" + xe rác trong hồ sơ khách bị gán nhầm.
+#
+# 1) service_ticket_customer_change: nhật ký mỗi lần chuyển (từ khách/xe nào sang khách/xe nào,
+#    ai làm, vì sao, xe cũ xử lý ra sao). Lưu kèm nhãn chữ (tên · SĐT · biển số) để còn đọc được
+#    kể cả khi hồ sơ / xe cũ sau này bị xoá.
+# 2) Mã quyền SERVICE_TICKET_REASSIGN_CUSTOMER, cấp mặc định cho các vai trò đang có
+#    SERVICE_TICKET_EDIT. Phiếu đã thu tiền (PAID / có hoá đơn đã thu) thì code kiểm tra thêm
+#    VAI TRÒ ADMIN hoặc MANAGER (TicketCustomerReassignService) — tick quyền không mở được phần đó.
+databaseChangeLog:
+  - changeSet:
+      id: 056-1-service-ticket-customer-change
+      author: gms
+      comment: Nhật ký chuyển phiếu dịch vụ sang khách hàng / xe khác
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: service_ticket_customer_change
+      changes:
+        - createTable:
+            tableName: service_ticket_customer_change
+            remarks: Nhật ký chuyển phiếu dịch vụ sang khách hàng / xe khác
+            columns:
+              - column:
+                  name: change_id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: service_ticket_id
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: from_customer_id
+                  type: INT
+              - column:
+                  name: to_customer_id
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: from_vehicle_id
+                  type: INT
+              - column:
+                  name: to_vehicle_id
+                  type: INT
+              - column:
+                  name: from_label
+                  type: VARCHAR(500)
+                  remarks: Tên · SĐT · biển số lúc chuyển (đọc được kể cả khi hồ sơ cũ bị xoá)
+              - column:
+                  name: to_label
+                  type: VARCHAR(500)
+              - column:
+                  name: old_vehicle_action
+                  type: VARCHAR(20)
+                  remarks: KEPT (giữ ở khách cũ) / TRANSFERRED (chuyển hẳn dòng xe sang khách mới) / DELETED / NONE
+              - column:
+                  name: was_paid
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: reason
+                  type: VARCHAR(500)
+              - column:
+                  name: changed_by
+                  type: INT
+                  remarks: staff_id người chuyển
+              - column:
+                  name: changed_at
+                  type: DATETIME
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: service_ticket_customer_change
+            indexName: idx_stcc_ticket
+            columns:
+              - column:
+                  name: service_ticket_id
+
+  - changeSet:
+      id: 056-2-permission-reassign-customer
+      author: gms
+      comment: >-
+        Mã quyền "Chuyển phiếu sang khách khác". Cấp mặc định cho các vai trò đang có
+        SERVICE_TICKET_EDIT (ở cả role_permission lẫn role_permission_default). Phiếu đã thu tiền
+        thì code đòi thêm vai trò ADMIN / MANAGER.
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: "0"
+            sql: SELECT COUNT(*) FROM permission WHERE code = 'SERVICE_TICKET_REASSIGN_CUSTOMER'
+      changes:
+        - sql:
+            splitStatements: false
+            sql: >-
+              INSERT INTO permission (code, module_code, module_label, group_label, action_code, label, description, sort_order) VALUES
+              ('SERVICE_TICKET_REASSIGN_CUSTOMER','SERVICE_TICKET','Phiếu dịch vụ','Dịch vụ & Xưởng','REASSIGN_CUSTOMER','Chuyển phiếu sang khách khác','Sửa phiếu bị gán nhầm khách hàng / nhầm xe: chuyển phiếu cùng lịch hẹn, số km, nhắc lịch, bảo hành sang đúng khách. Phiếu đã thu tiền chỉ Admin hoặc Quản lý mới chuyển được',209)
+        - sql:
+            splitStatements: false
+            sql: >-
+              INSERT INTO role_permission (role_id, permission_code)
+              SELECT DISTINCT rp.role_id, 'SERVICE_TICKET_REASSIGN_CUSTOMER'
+              FROM role_permission rp
+              WHERE rp.permission_code = 'SERVICE_TICKET_EDIT'
+                AND NOT EXISTS (
+                  SELECT 1 FROM role_permission x
+                  WHERE x.role_id = rp.role_id AND x.permission_code = 'SERVICE_TICKET_REASSIGN_CUSTOMER'
+                )
+        - sql:
+            splitStatements: false
+            sql: >-
+              INSERT INTO role_permission_default (role_id, permission_code)
+              SELECT DISTINCT rpd.role_id, 'SERVICE_TICKET_REASSIGN_CUSTOMER'
+              FROM role_permission_default rpd
+              WHERE rpd.permission_code = 'SERVICE_TICKET_EDIT'
+                AND NOT EXISTS (
+                  SELECT 1 FROM role_permission_default x
+                  WHERE x.role_id = rpd.role_id AND x.permission_code = 'SERVICE_TICKET_REASSIGN_CUSTOMER'
+                )
+      rollback:
+        - sql: "DELETE FROM role_permission WHERE permission_code = 'SERVICE_TICKET_REASSIGN_CUSTOMER'"
+        - sql: "DELETE FROM role_permission_default WHERE permission_code = 'SERVICE_TICKET_REASSIGN_CUSTOMER'"
+        - sql: "DELETE FROM permission WHERE code = 'SERVICE_TICKET_REASSIGN_CUSTOMER'"

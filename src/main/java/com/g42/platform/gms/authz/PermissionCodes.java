@@ -79,6 +79,11 @@ public final class PermissionCodes {
      * Chỉ ADMIN — xem ROLE_RESTRICTED. Changeset 052-4.
      */
     public static final String SERVICE_TICKET_CANCEL_DUPLICATE = "SERVICE_TICKET_CANCEL_DUPLICATE";
+    /**
+     * Chuyển phiếu bị gán nhầm sang khách hàng / xe khác. Phiếu đã thu tiền thì
+     * TicketCustomerReassignService đòi thêm vai trò ADMIN / MANAGER. Changeset 056-2.
+     */
+    public static final String SERVICE_TICKET_REASSIGN_CUSTOMER = "SERVICE_TICKET_REASSIGN_CUSTOMER";
 
     public static final String TICKET_BACKFILL_VIEW = "TICKET_BACKFILL_VIEW";
     public static final String TICKET_BACKFILL_EDIT = "TICKET_BACKFILL_EDIT";
