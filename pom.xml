@@ -5,7 +5,9 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.10</version>
+        <!-- 3.5.16 là bản OSS cuối của nhánh 3.5 (06/2026). Các thư viện mà 3.5.16
+             vẫn kéo phiên bản có lỗ hổng được ghi đè ở <properties> bên dưới. -->
+        <version>3.5.16</version>
         <relativePath/> <!-- lookup parent from implement -->
     </parent>
     <groupId>com.g42.platform</groupId>
@@ -28,7 +30,51 @@
     </scm>
     <properties>
         <java.version>17</java.version>
+
+        <!-- ===== Vá lỗ hổng bảo mật (rà bằng OSV.dev ngày 2026-11-18) =====
+             Ghi đè phiên bản Spring Boot 3.5.16 quản lý vì bản đó vẫn còn CVE.
+             Khi nâng Spring Boot lần sau: xoá dòng nào mà Boot đã quản lý bản >= số ở đây. -->
+        <!-- Boot 3.5.16 = 10.1.55: còn CVE nghiêm trọng (FORM/DIGEST auth bypass...) vá ở 10.1.58 -->
+        <tomcat.version>10.1.62</tomcat.version>
+        <!-- Boot 3.5.16 = 2.21.4: còn CVE DoS/bypass PolymorphicTypeValidator vá ở 2.21.7 -->
+        <jackson-bom.version>2.21.8</jackson-bom.version>
+        <!-- Boot 3.5.16 = 2.24.3 (kéo vào qua Apache POI): CVE-2026-49844 -->
+        <log4j2.version>2.25.5</log4j2.version>
+        <!-- Boot 3.5.16 = 3.17.0 (kéo vào qua Liquibase): CVE-2025-48924 -->
+        <commons-lang3.version>3.18.0</commons-lang3.version>
+        <!-- Client Hikvision. 5.3.1 cũ: CVE-2026-64607 (client), CVE-2026-54399/54428 (core).
+             Lưu ý: từ 5.6 API TLS mới (ClientTlsStrategyBuilder) mặc định để JSSE kiểm tra
+             hostname. HikvisionHttpClientConfig đang dùng SSLConnectionSocketFactoryBuilder
+             (API cũ) nên không bị ảnh hưởng; nếu chuyển sang API mới phải đặt
+             HostnameVerificationPolicy.CLIENT, không thì thiết bị (IP + cert tự ký) sẽ lỗi. -->
+        <httpclient5.version>5.6.5</httpclient5.version>
+        <httpcore5.version>5.4.4</httpcore5.version>
+        <!-- 1.78.1: CVE-2026-8763 (critical), CVE-2025-14813, CVE-2026-13506... -->
+        <bouncycastle.version>1.87</bouncycastle.version>
     </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- Kéo vào qua web-push 5.1.1 (bản mới nhất vẫn dùng jose4j 0.7.x):
+                 CVE-2023-31582, CVE-2024-29371... API JWS/JwtClaims không đổi. -->
+            <dependency>
+                <groupId>org.bitbucket.b_c</groupId>
+                <artifactId>jose4j</artifactId>
+                <version>0.9.6</version>
+            </dependency>
+            <!-- cloudinary-http44 kéo httpclient 4.4 (2015): CVE-2020-13956 -->
+            <dependency>
+                <groupId>org.apache.httpcomponents</groupId>
+                <artifactId>httpclient</artifactId>
+                <version>4.5.14</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.httpcomponents</groupId>
+                <artifactId>httpmime</artifactId>
+                <version>4.5.14</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -142,7 +188,8 @@
         <dependency>
             <groupId>org.jsoup</groupId>
             <artifactId>jsoup</artifactId>
-            <version>1.18.3</version>
+            <!-- 1.18.3: CVE-2026-71497 (Cleaner lọt markup) + CVE-2026-75140 -->
+            <version>1.23.2</version>
         </dependency>
 
         <dependency>
@@ -162,12 +209,12 @@
         <dependency>
             <groupId>org.apache.httpcomponents.client5</groupId>
             <artifactId>httpclient5</artifactId>
-            <version>5.3.1</version>
+            <!-- phiên bản: property httpclient5.version -->
         </dependency>
         <dependency>
             <groupId>org.apache.httpcomponents.core5</groupId>
             <artifactId>httpcore5</artifactId>
-            <version>5.2.4</version>
+            <!-- phiên bản: property httpcore5.version -->
         </dependency>
 
         <!-- jqwik for property-based testing -->
@@ -189,16 +236,26 @@
             <groupId>nl.martijndwars</groupId>
             <artifactId>web-push</artifactId>
             <version>5.1.1</version>
+            <exclusions>
+                <!-- async-http-client 2.10.4 (+ Netty 4.1.x) chỉ dùng cho PushAsyncService,
+                     dự án dùng PushService (Apache HttpAsyncClient) nên bỏ hẳn: gỡ ~45 CVE
+                     của AsyncHttpClient/Netty. Nếu sau này đổi sang PushAsyncService thì
+                     phải thêm lại async-http-client bản 3.x. -->
+                <exclusion>
+                    <groupId>org.asynchttpclient</groupId>
+                    <artifactId>async-http-client</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.bouncycastle</groupId>
             <artifactId>bcprov-jdk18on</artifactId>
-            <version>1.78.1</version>
+            <version>${bouncycastle.version}</version>
         </dependency>
         <dependency>
             <groupId>org.bouncycastle</groupId>
             <artifactId>bcpkix-jdk18on</artifactId>
-            <version>1.78.1</version>
+            <version>${bouncycastle.version}</version>
         </dependency>
     </dependencies>
 
