@@ -5,13 +5,14 @@ import com.g42.platform.gms.authz.PermissionCodes;
 import com.g42.platform.gms.branch.service.BranchDirectory;
 import com.g42.platform.gms.common.dto.ApiResponse;
 import com.g42.platform.gms.common.dto.ApiResponses;
+import com.g42.platform.gms.common.service.SensitiveActionVerificationService;
+import com.g42.platform.gms.common.service.SensitiveActionVerificationService.Challenge;
+import com.g42.platform.gms.common.service.SensitiveActionVerificationService.GrantInfo;
+import com.g42.platform.gms.common.service.SensitiveActionVerificationService.Purpose;
+import com.g42.platform.gms.common.service.SensitiveActionVerificationService.Status;
+import com.g42.platform.gms.common.service.SensitiveActionVerificationService.VerificationFailedException;
 import com.g42.platform.gms.report.api.dto.DataExportRequest;
 import com.g42.platform.gms.report.application.service.DataExportService;
-import com.g42.platform.gms.report.application.service.DataExportVerificationService;
-import com.g42.platform.gms.report.application.service.DataExportVerificationService.Challenge;
-import com.g42.platform.gms.report.application.service.DataExportVerificationService.GrantInfo;
-import com.g42.platform.gms.report.application.service.DataExportVerificationService.Status;
-import com.g42.platform.gms.report.application.service.DataExportVerificationService.VerificationFailedException;
 import com.g42.platform.gms.report.application.service.export.DataExportOptions;
 import com.g42.platform.gms.report.application.service.export.DataExportOptions.DateBasis;
 import com.g42.platform.gms.report.application.service.export.DataExportType;
@@ -64,9 +65,10 @@ public class DataExportController {
 
     private static final String AUDIT_MODULE = "REPORT_EXPORT";
     private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    private static final Purpose PURPOSE = Purpose.REPORT_EXPORT;
 
     private final DataExportService exportService;
-    private final DataExportVerificationService verification;
+    private final SensitiveActionVerificationService verification;
     private final AuditService auditService;
     private final JdbcTemplate jdbcTemplate;
     private final BranchDirectory branchDirectory;
@@ -102,16 +104,16 @@ public class DataExportController {
                             createdAt == null ? null : createdAt.toLocalDateTime().toString());
                 },
                 AUDIT_MODULE);
-        return ResponseEntity.ok(ApiResponses.success(new Overview(types, verification.status(staff), history,
-                DataExportVerificationService.CODE_TTL.toSeconds(),
-                DataExportVerificationService.GRANT_TTL.toMinutes())));
+        return ResponseEntity.ok(ApiResponses.success(new Overview(types, verification.status(PURPOSE, staff), history,
+                SensitiveActionVerificationService.CODE_TTL.toSeconds(),
+                SensitiveActionVerificationService.GRANT_TTL.toMinutes())));
     }
 
     @PostMapping("/otp")
     public ResponseEntity<ApiResponse<Challenge>> sendCode(@AuthenticationPrincipal StaffPrincipal principal,
                                                            HttpServletRequest request) {
         StaffPrincipal staff = requireStaff(principal);
-        Challenge challenge = verification.sendCode(staff, clientIp(request));
+        Challenge challenge = verification.sendCode(PURPOSE, staff, clientIp(request));
         audit("INFO", "OTHER", null, "Gửi mã xác minh xuất báo cáo tổng hợp tới " + challenge.maskedEmail());
         return ResponseEntity.ok(ApiResponses.success(challenge));
     }
@@ -121,7 +123,7 @@ public class DataExportController {
                                                          @RequestBody(required = false) VerifyRequest body) {
         StaffPrincipal staff = requireStaff(principal);
         try {
-            return ResponseEntity.ok(ApiResponses.success(verification.verify(staff, body != null ? body.code() : null)));
+            return ResponseEntity.ok(ApiResponses.success(verification.verify(PURPOSE, staff, body != null ? body.code() : null)));
         } catch (VerificationFailedException e) {
             if (e.isLocked()) {
                 audit("WARNING", "OTHER", null, "Nhập sai mã xác minh xuất báo cáo quá số lần cho phép — mã đã bị huỷ");
@@ -132,7 +134,7 @@ public class DataExportController {
 
     @DeleteMapping("/verify")
     public ResponseEntity<ApiResponse<Void>> revoke(@AuthenticationPrincipal StaffPrincipal principal) {
-        verification.revoke(requireStaff(principal));
+        verification.revoke(PURPOSE, requireStaff(principal));
         return ResponseEntity.ok(ApiResponses.successMessage("Đã kết thúc phiên xuất báo cáo"));
     }
 
@@ -141,9 +143,9 @@ public class DataExportController {
                                            @RequestBody DataExportRequest body) throws Exception {
         StaffPrincipal staff = requireStaff(principal);
         DataExportOptions options = toOptions(body);
-        verification.requireGrant(staff, body.exportToken());
+        verification.requireGrant(PURPOSE, staff, body.exportToken());
 
-        Status status = verification.status(staff);
+        Status status = verification.status(PURPOSE, staff);
         String actorName = staff.getStaffAuth().getStaffProfile() != null
                 ? staff.getStaffAuth().getStaffProfile().getFullName() : "";
         DataExportService.Result result;

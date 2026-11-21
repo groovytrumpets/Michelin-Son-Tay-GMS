@@ -1,4 +1,4 @@
-package com.g42.platform.gms.report.application.service;
+package com.g42.platform.gms.common.service;
 
 import com.g42.platform.gms.auth.entity.StaffPrincipal;
 import com.g42.platform.gms.common.util.ContactMasking;
@@ -24,16 +24,18 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Xác minh bằng email trước khi xuất báo cáo tổng hợp (/report-export).
+ * Xác minh bằng email trước khi mang dữ liệu nhạy cảm ra khỏi hệ thống — dùng chung cho
+ * "Xuất báo cáo tổng hợp" (/report-export) và "Tải bản sao lưu CSDL" (/data-backup).
  *
- * <p>File xuất chứa toàn bộ danh bạ khách + giá vốn / lợi nhuận. Chỉ có mã quyền thì ai mượn
- * được máy đang đăng nhập (hoặc lộ mật khẩu) là mang được dữ liệu ra ngoài; bắt nhập mã gửi về
- * email của CHÍNH tài khoản đó thêm một lớp "người đang ngồi máy có giữ hộp thư của tài khoản".
+ * <p>Chỉ có mã quyền thì ai mượn được máy đang đăng nhập (hoặc lộ mật khẩu) là mang được dữ liệu
+ * ra ngoài; bắt nhập mã gửi về email của CHÍNH tài khoản đó thêm một lớp "người đang ngồi máy có
+ * giữ hộp thư của tài khoản".
  *
- * <p>Luồng: {@link #sendCode} gửi mã 6 số (5 phút, sai {@value #MAX_ATTEMPTS} lần là huỷ) →
- * {@link #verify} đổi mã lấy một phiên xuất ({@link #GRANT_TTL}) → mỗi lần tải file gọi
- * {@link #requireGrant}. Phiên gắn với tài khoản + email lúc xác minh, chỉ giữ trong RAM
- * (khởi động lại BE là phải xác minh lại — chấp nhận được, và không lưu mã xuống DB).
+ * <p>Luồng: {@link #sendCode} gửi mã 6 số ({@link #CODE_TTL}, sai {@value #MAX_ATTEMPTS} lần là huỷ) →
+ * {@link #verify} đổi mã lấy một phiên ({@link #GRANT_TTL}) → mỗi lần tải file gọi
+ * {@link #requireGrant}. Mã và phiên tách riêng theo {@link Purpose}: xác minh để xuất báo cáo
+ * KHÔNG dùng được để tải bản sao lưu và ngược lại. Phiên gắn với tài khoản + email lúc xác minh,
+ * chỉ giữ trong RAM (khởi động lại BE là phải xác minh lại — chấp nhận được, và không lưu mã xuống DB).
  *
  * <p>Gửi email hỏng thì báo lỗi luôn, KHÔNG in mã ra log như OtpService: log xem được ở
  * /backend-logs, in mã ra đó là tự mở cửa sau.
@@ -41,7 +43,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class DataExportVerificationService {
+public class SensitiveActionVerificationService {
 
     public static final Duration CODE_TTL = Duration.ofMinutes(5);
     public static final Duration RESEND_COOLDOWN = Duration.ofSeconds(60);
@@ -50,12 +52,49 @@ public class DataExportVerificationService {
 
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm:ss dd/MM/yyyy");
 
+    /** Việc cần xác minh — quyết định nội dung email và phạm vi của phiên. */
+    public enum Purpose {
+        REPORT_EXPORT(
+                "Mã xác minh xuất báo cáo tổng hợp",
+                "Xác minh xuất báo cáo tổng hợp",
+                "xuất <b>báo cáo tổng hợp</b> (thông tin khách hàng, doanh thu, tồn kho, phiếu dịch vụ, biên lợi nhuận)",
+                "màn hình xuất báo cáo",
+                "xuất file",
+                "xuất báo cáo"),
+        DATA_BACKUP(
+                "Mã xác minh tải bản sao lưu dữ liệu",
+                "Xác minh tải bản sao lưu dữ liệu",
+                "tải <b>bản sao lưu toàn bộ cơ sở dữ liệu</b> (mọi thông tin khách hàng, nhân viên, hoá đơn và mật khẩu đã mã hoá)",
+                "màn hình Sao lưu &amp; Thùng rác",
+                "tải bản sao lưu",
+                "tải bản sao lưu");
+
+        private final String subject;
+        private final String heading;
+        private final String actionHtml;
+        private final String screenHtml;
+        private final String grantActionHtml;
+        private final String requirePhrase;
+
+        Purpose(String subject, String heading, String actionHtml, String screenHtml,
+                String grantActionHtml, String requirePhrase) {
+            this.subject = subject;
+            this.heading = heading;
+            this.actionHtml = actionHtml;
+            this.screenHtml = screenHtml;
+            this.grantActionHtml = grantActionHtml;
+            this.requirePhrase = requirePhrase;
+        }
+    }
+
     private final EmailNotificationSender emailSender;
     private final SecureRandom random = new SecureRandom();
-    /** staff_auth_id → mã đang chờ nhập. */
-    private final Map<Integer, PendingCode> codes = new ConcurrentHashMap<>();
-    /** staff_auth_id → phiên xuất đã xác minh. */
-    private final Map<Integer, Grant> grants = new ConcurrentHashMap<>();
+    /** (việc, staff_auth_id) → mã đang chờ nhập. */
+    private final Map<Key, PendingCode> codes = new ConcurrentHashMap<>();
+    /** (việc, staff_auth_id) → phiên đã xác minh. */
+    private final Map<Key, Grant> grants = new ConcurrentHashMap<>();
+
+    private record Key(Purpose purpose, Integer staffAuthId) {}
 
     private record PendingCode(byte[] salt, byte[] hash, String email, Instant expiresAt, Instant sentAt,
                                int attempts) {
@@ -90,10 +129,10 @@ public class DataExportVerificationService {
         }
     }
 
-    public Status status(StaffPrincipal principal) {
+    public Status status(Purpose purpose, StaffPrincipal principal) {
         purgeExpired();
         String email = emailOf(principal);
-        Integer key = principal.getAuthId();
+        Key key = keyOf(purpose, principal);
         PendingCode code = codes.get(key);
         Grant grant = grants.get(key);
         boolean grantValid = grant != null && email != null && grant.email.equalsIgnoreCase(email);
@@ -104,10 +143,10 @@ public class DataExportVerificationService {
                 grantValid ? grant.expiresAt : null);
     }
 
-    public Challenge sendCode(StaffPrincipal principal, String requestIp) {
+    public Challenge sendCode(Purpose purpose, StaffPrincipal principal, String requestIp) {
         purgeExpired();
         String email = requireEmail(principal);
-        Integer key = principal.getAuthId();
+        Key key = keyOf(purpose, principal);
         Instant now = Instant.now();
 
         PendingCode previous = codes.get(key);
@@ -128,8 +167,8 @@ public class DataExportVerificationService {
         String masked = ContactMasking.maskEmail(email);
         try {
             emailSender.sendHtmlOrThrow(List.of(email), null,
-                    "Mã xác minh xuất báo cáo tổng hợp: " + code,
-                    buildEmail(principal, code, requestIp));
+                    purpose.subject + ": " + code,
+                    buildEmail(purpose, principal, code, requestIp));
         } catch (MailDeliveryException e) {
             // Lý do chi tiết đã nằm trong log của EmailNotificationSender.
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
@@ -141,10 +180,10 @@ public class DataExportVerificationService {
         return new Challenge(masked, pending.expiresAt, pending.sentAt.plus(RESEND_COOLDOWN), MAX_ATTEMPTS);
     }
 
-    public GrantInfo verify(StaffPrincipal principal, String rawCode) {
+    public GrantInfo verify(Purpose purpose, StaffPrincipal principal, String rawCode) {
         purgeExpired();
         String email = requireEmail(principal);
-        Integer key = principal.getAuthId();
+        Key key = keyOf(purpose, principal);
         String code = rawCode == null ? "" : rawCode.replaceAll("\\s+", "");
         if (!code.matches("\\d{6}")) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Mã xác minh gồm 6 chữ số.");
@@ -176,25 +215,31 @@ public class DataExportVerificationService {
         return new GrantInfo(token, grant.expiresAt, ContactMasking.maskEmail(email));
     }
 
-    /** Ném 428 nếu tài khoản chưa xác minh, phiên hết hạn, hoặc token không phải của tài khoản này. */
-    public void requireGrant(StaffPrincipal principal, String token) {
+    /** Ném 428 nếu tài khoản chưa xác minh cho việc này, phiên hết hạn, hoặc token không phải của tài khoản này. */
+    public void requireGrant(Purpose purpose, StaffPrincipal principal, String token) {
         purgeExpired();
-        Grant grant = grants.get(principal.getAuthId());
+        Grant grant = grants.get(keyOf(purpose, principal));
         String email = emailOf(principal);
         if (token == null || token.isBlank() || grant == null || email == null
                 || !grant.email.equalsIgnoreCase(email)
                 || !MessageDigest.isEqual(grant.tokenHash, hash(new byte[0], token.trim()))) {
             throw new ResponseStatusException(HttpStatus.PRECONDITION_REQUIRED,
-                    "Cần xác minh email trước khi xuất báo cáo (phiên xác minh đã hết hạn hoặc không hợp lệ).");
+                    "Cần xác minh email trước khi " + purpose.requirePhrase
+                            + " (phiên xác minh đã hết hạn hoặc không hợp lệ).");
         }
     }
 
-    public void revoke(StaffPrincipal principal) {
-        grants.remove(principal.getAuthId());
-        codes.remove(principal.getAuthId());
+    public void revoke(Purpose purpose, StaffPrincipal principal) {
+        Key key = keyOf(purpose, principal);
+        grants.remove(key);
+        codes.remove(key);
     }
 
     // ------------------------------------------------------------------------------------------
+
+    private static Key keyOf(Purpose purpose, StaffPrincipal principal) {
+        return new Key(purpose, principal.getAuthId());
+    }
 
     private String requireEmail(StaffPrincipal principal) {
         String email = emailOf(principal);
@@ -228,17 +273,17 @@ public class DataExportVerificationService {
         }
     }
 
-    private static String buildEmail(StaffPrincipal principal, String code, String ip) {
+    private static String buildEmail(Purpose purpose, StaffPrincipal principal, String code, String ip) {
         String name = principal.getStaffAuth().getStaffProfile() != null
                 ? principal.getStaffAuth().getStaffProfile().getFullName() : null;
         return "<div style=\"font-family:Arial,Helvetica,sans-serif;max-width:540px;color:#172033\">"
-                + "<h2 style=\"margin:0 0 12px;color:#123b7a\">Xác minh xuất báo cáo tổng hợp</h2>"
+                + "<h2 style=\"margin:0 0 12px;color:#123b7a\">" + escape(purpose.heading) + "</h2>"
                 + "<p>Xin chào <b>" + escape(name != null && !name.isBlank() ? name : "bạn") + "</b>,</p>"
-                + "<p>Tài khoản của bạn vừa yêu cầu xuất <b>báo cáo tổng hợp</b> (thông tin khách hàng, doanh thu, "
-                + "tồn kho, phiếu dịch vụ, biên lợi nhuận). Nhập mã sau vào màn hình xuất báo cáo:</p>"
+                + "<p>Tài khoản của bạn vừa yêu cầu " + purpose.actionHtml + ". Nhập mã sau vào "
+                + purpose.screenHtml + ":</p>"
                 + "<p style=\"font-size:30px;font-weight:bold;letter-spacing:8px;margin:18px 0\">" + escape(code) + "</p>"
                 + "<p>Mã có hiệu lực trong " + CODE_TTL.toMinutes() + " phút và chỉ dùng được cho tài khoản của bạn. "
-                + "Sau khi xác minh, bạn có " + GRANT_TTL.toMinutes() + " phút để xuất file.</p>"
+                + "Sau khi xác minh, bạn có " + GRANT_TTL.toMinutes() + " phút để " + purpose.grantActionHtml + ".</p>"
                 + "<p style=\"color:#667085;font-size:13px\">Thời điểm yêu cầu: " + LocalDateTime.now().format(TIME)
                 + (ip != null && !ip.isBlank() ? " · Địa chỉ IP: " + escape(ip) : "") + "</p>"
                 + "<p style=\"color:#b91c1c;font-size:13px\">Nếu không phải bạn yêu cầu: KHÔNG đưa mã này cho ai, "
