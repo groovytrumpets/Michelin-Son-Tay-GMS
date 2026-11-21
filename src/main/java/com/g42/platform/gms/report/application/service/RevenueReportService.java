@@ -95,56 +95,14 @@ public class RevenueReportService {
             from = to;
             to = tmp;
         }
-        LocalDateTime start = from.atStartOfDay();
-        LocalDateTime end = to.atTime(LocalTime.MAX);
-        ZoneId zone = ZoneId.systemDefault();
-
-        // 1) Hoá đơn: đã thu trong kỳ + hoá đơn của phiếu tiếp nhận trong kỳ.
-        Map<Integer, ServiceBillJpa> billsById = new LinkedHashMap<>();
-        serviceBillJpaRepo.findByPaidAtBetween(start.atZone(zone).toInstant(), end.atZone(zone).toInstant())
-                .forEach(b -> billsById.put(b.getBillId(), b));
-
-        Map<Integer, ServiceTicketJpa> ticketsById = new HashMap<>();
-        serviceTicketRepository.findServiceTicketJpasByReceivedAtBetween(start, end)
-                .forEach(t -> ticketsById.put(t.getServiceTicketId(), t));
-        if (!ticketsById.isEmpty()) {
-            serviceBillJpaRepo.findByServiceTicketIdIn(ticketsById.keySet())
-                    .forEach(b -> billsById.putIfAbsent(b.getBillId(), b));
-        }
-
-        Set<Integer> missingTicketIds = billsById.values().stream()
-                .map(ServiceBillJpa::getServiceTicketId)
-                .filter(id -> id != null && !ticketsById.containsKey(id))
-                .collect(Collectors.toSet());
-        if (!missingTicketIds.isEmpty()) {
-            serviceTicketRepository.findAllById(missingTicketIds)
-                    .forEach(t -> ticketsById.put(t.getServiceTicketId(), t));
-        }
-
-        // Mỗi phiếu chỉ lấy một hoá đơn (ưu tiên hoá đơn đã thu mới nhất), bỏ phiếu đã xoá / huỷ.
-        Map<Integer, ServiceBillJpa> billByTicket = new HashMap<>();
-        for (ServiceBillJpa bill : billsById.values()) {
-            ServiceTicketJpa ticket = ticketsById.get(bill.getServiceTicketId());
-            if (ticket == null || !isCountable(ticket)) {
-                continue;
-            }
-            if (branchId != null && !branchId.equals(ticket.getBranchId())) {
-                continue;
-            }
-            billByTicket.merge(ticket.getServiceTicketId(), bill,
-                    (a, b) -> preferBill(b, a) ? b : a);
-        }
-
-        List<ServiceBillJpa> bills = new ArrayList<>(billByTicket.values());
-        List<ServiceTicketJpa> tickets = bills.stream()
-                .map(b -> ticketsById.get(b.getServiceTicketId())).toList();
+        // 1) Hoá đơn của kỳ (đã lọc phiếu huỷ / xoá, xưởng và ngày ghi nhận).
+        List<PeriodBill> periodBills = collectBills(from, to, branchId);
+        List<ServiceBillJpa> bills = periodBills.stream().map(PeriodBill::bill).toList();
+        List<ServiceTicketJpa> tickets = periodBills.stream().map(PeriodBill::ticket).toList();
 
         Integer defaultBranchId = branchDirectory.defaultBranchId();
-        boolean legacyInBranch = branchId == null || branchId.equals(defaultBranchId);
-        List<LegacyVisitJpa> legacyVisits = includeLegacy && legacyInBranch
-                ? legacyVisitRepository.findByVisitedAtBetweenOrderByVisitedAtAsc(start, end).stream()
-                    .filter(v -> nvl(v.getTotalAmount()).signum() > 0)
-                    .toList()
+        List<LegacyVisitJpa> legacyVisits = includeLegacy
+                ? collectLegacyVisits(from, to, branchId)
                 : List.of();
 
         // 2) Tra cứu hàng loạt: khách, xe, phương thức thu, nhân viên, dòng báo giá.
@@ -164,32 +122,18 @@ public class RevenueReportService {
                 .map(ServiceBillJpa::getEstimateId).filter(Objects::nonNull).distinct().toList());
 
         // 3) Dựng giao dịch.
-        LocalDate today = LocalDate.now();
         List<Transaction> transactions = new ArrayList<>(bills.size() + legacyVisits.size());
 
-        for (ServiceBillJpa bill : bills) {
-            ServiceTicketJpa ticket = ticketsById.get(bill.getServiceTicketId());
+        for (PeriodBill periodBill : periodBills) {
+            ServiceBillJpa bill = periodBill.bill();
+            ServiceTicketJpa ticket = periodBill.ticket();
             CustomerProfile customer = ticket.getCustomerId() != null ? customerMap.get(ticket.getCustomerId()) : null;
             Vehicle vehicle = ticket.getVehicleId() != null ? vehicleMap.get(ticket.getVehicleId()) : null;
 
-            boolean paid = bill.getPaymentStatus() == PaymentStatus.PAID;
-            LocalDateTime paidAt = paid && bill.getPaidAt() != null
-                    ? LocalDateTime.ofInstant(bill.getPaidAt(), zone) : null;
-            LocalDate receivedDate = ticket.getReceivedAt() != null ? ticket.getReceivedAt().toLocalDate() : null;
-            LocalDate date = paidAt != null ? paidAt.toLocalDate() : (receivedDate != null ? receivedDate : from);
-            // Hoá đơn đã thu ngoài kỳ nhưng phiếu tiếp nhận trong kỳ thì thuộc kỳ khác.
-            if (date.isBefore(from) || date.isAfter(to)) {
-                continue;
-            }
-
-            String status;
-            if (paid) {
-                status = "PAID";
-            } else if (receivedDate != null && receivedDate.plusDays(OVERDUE_AFTER_DAYS).isBefore(today)) {
-                status = "OVERDUE";
-            } else {
-                status = "UNPAID";
-            }
+            boolean paid = periodBill.paid();
+            LocalDateTime paidAt = periodBill.paidAt();
+            LocalDate date = periodBill.date();
+            String status = periodBill.status();
 
             BigDecimal total = nvl(bill.getFinalAmount());
             List<Line> lines = prorate(linesByEstimate.getOrDefault(bill.getEstimateId(), List.of()), total);
@@ -265,6 +209,112 @@ public class RevenueReportService {
                 .summary(summarize(from, to, includeLegacy, transactions))
                 .transactions(transactions)
                 .build();
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // Chọn hoá đơn / lượt sổ cũ của kỳ — dùng chung với báo cáo doanh thu theo khách hàng & sản phẩm
+
+    /**
+     * Một hoá đơn được tính vào kỳ.
+     *
+     * @param date   ngày ghi nhận doanh thu: ngày thu tiền nếu đã thu, ngược lại là ngày tiếp nhận phiếu
+     * @param paidAt thời điểm thu tiền, null nếu chưa thu
+     * @param status PAID | UNPAID | OVERDUE
+     */
+    public record PeriodBill(ServiceBillJpa bill, ServiceTicketJpa ticket, LocalDate date,
+                             LocalDateTime paidAt, String status) {
+        public boolean paid() {
+            return "PAID".equals(status);
+        }
+    }
+
+    /**
+     * Hoá đơn của kỳ [from, to] (from ≤ to): hoá đơn đã thu có ngày thu trong kỳ + hoá đơn chưa thu
+     * của phiếu tiếp nhận trong kỳ. Mỗi phiếu chỉ lấy một hoá đơn (ưu tiên hoá đơn đã thu mới nhất),
+     * bỏ phiếu đã xoá / huỷ / nhập bù bị từ chối và phiếu khác xưởng.
+     *
+     * @param branchId null = mọi xưởng
+     */
+    @Transactional(readOnly = true)
+    public List<PeriodBill> collectBills(LocalDate from, LocalDate to, Integer branchId) {
+        LocalDateTime start = from.atStartOfDay();
+        LocalDateTime end = to.atTime(LocalTime.MAX);
+        ZoneId zone = ZoneId.systemDefault();
+
+        Map<Integer, ServiceBillJpa> billsById = new LinkedHashMap<>();
+        serviceBillJpaRepo.findByPaidAtBetween(start.atZone(zone).toInstant(), end.atZone(zone).toInstant())
+                .forEach(b -> billsById.put(b.getBillId(), b));
+
+        Map<Integer, ServiceTicketJpa> ticketsById = new HashMap<>();
+        serviceTicketRepository.findServiceTicketJpasByReceivedAtBetween(start, end)
+                .forEach(t -> ticketsById.put(t.getServiceTicketId(), t));
+        if (!ticketsById.isEmpty()) {
+            serviceBillJpaRepo.findByServiceTicketIdIn(ticketsById.keySet())
+                    .forEach(b -> billsById.putIfAbsent(b.getBillId(), b));
+        }
+
+        Set<Integer> missingTicketIds = billsById.values().stream()
+                .map(ServiceBillJpa::getServiceTicketId)
+                .filter(id -> id != null && !ticketsById.containsKey(id))
+                .collect(Collectors.toSet());
+        if (!missingTicketIds.isEmpty()) {
+            serviceTicketRepository.findAllById(missingTicketIds)
+                    .forEach(t -> ticketsById.put(t.getServiceTicketId(), t));
+        }
+
+        Map<Integer, ServiceBillJpa> billByTicket = new HashMap<>();
+        for (ServiceBillJpa bill : billsById.values()) {
+            ServiceTicketJpa ticket = ticketsById.get(bill.getServiceTicketId());
+            if (ticket == null || !isCountable(ticket)) {
+                continue;
+            }
+            if (branchId != null && !branchId.equals(ticket.getBranchId())) {
+                continue;
+            }
+            billByTicket.merge(ticket.getServiceTicketId(), bill,
+                    (a, b) -> preferBill(b, a) ? b : a);
+        }
+
+        LocalDate today = LocalDate.now();
+        List<PeriodBill> result = new ArrayList<>(billByTicket.size());
+        for (ServiceBillJpa bill : billByTicket.values()) {
+            ServiceTicketJpa ticket = ticketsById.get(bill.getServiceTicketId());
+            boolean paid = bill.getPaymentStatus() == PaymentStatus.PAID;
+            LocalDateTime paidAt = paid && bill.getPaidAt() != null
+                    ? LocalDateTime.ofInstant(bill.getPaidAt(), zone) : null;
+            LocalDate receivedDate = ticket.getReceivedAt() != null ? ticket.getReceivedAt().toLocalDate() : null;
+            LocalDate date = paidAt != null ? paidAt.toLocalDate() : (receivedDate != null ? receivedDate : from);
+            // Hoá đơn đã thu ngoài kỳ nhưng phiếu tiếp nhận trong kỳ thì thuộc kỳ khác.
+            if (date.isBefore(from) || date.isAfter(to)) {
+                continue;
+            }
+
+            String status;
+            if (paid) {
+                status = "PAID";
+            } else if (receivedDate != null && receivedDate.plusDays(OVERDUE_AFTER_DAYS).isBefore(today)) {
+                status = "OVERDUE";
+            } else {
+                status = "UNPAID";
+            }
+            result.add(new PeriodBill(bill, ticket, date, paidAt, status));
+        }
+        return result;
+    }
+
+    /**
+     * Lượt sổ dịch vụ cũ có tiền trong kỳ. Sổ cũ không ghi xưởng nhưng toàn bộ là của xưởng mặc
+     * định, nên khi lọc xưởng khác thì không có lượt nào.
+     */
+    @Transactional(readOnly = true)
+    public List<LegacyVisitJpa> collectLegacyVisits(LocalDate from, LocalDate to, Integer branchId) {
+        if (branchId != null && !branchId.equals(branchDirectory.defaultBranchId())) {
+            return List.of();
+        }
+        return legacyVisitRepository.findByVisitedAtBetweenOrderByVisitedAtAsc(
+                        from.atStartOfDay(), to.atTime(LocalTime.MAX)).stream()
+                .filter(v -> nvl(v.getTotalAmount()).signum() > 0)
+                .toList();
     }
 
     // ------------------------------------------------------------------------------------------

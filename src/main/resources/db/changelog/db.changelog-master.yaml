@@ -178,3 +178,6 @@ databaseChangeLog:
   - include:
       file: changes/056-service-ticket-reassign-customer.yaml
       relativeToChangelogFile: true
+  - include:
+      file: changes/057-report-data-export.yaml
+      relativeToChangelogFile: true

@@ -203,6 +203,11 @@ public final class PermissionCodes {
     // ---- Báo cáo & Tài chính ----
     public static final String REPORT_CUSTOMER_VIEW = "REPORT_CUSTOMER_VIEW";
     public static final String REVENUE_VIEW = "REVENUE_VIEW";
+    /**
+     * Màn /report-export: xuất file Excel tổng hợp (danh bạ khách, doanh thu sản phẩm, tồn kho,
+     * phiếu dịch vụ, biên lợi nhuận) sau khi xác minh mã gửi về email tài khoản. Changeset 057-1.
+     */
+    public static final String REPORT_DATA_EXPORT = "REPORT_DATA_EXPORT";
     public static final String KPI_VIEW = "KPI_VIEW";
     public static final String KPI_EDIT = "KPI_EDIT";
     public static final String GOOGLE_INSIGHTS_VIEW = "GOOGLE_INSIGHTS_VIEW";
