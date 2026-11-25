@@ -24,8 +24,11 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 
@@ -75,20 +78,28 @@ public class WarehouseRepoImpl implements WarehouseRepo {
         Specification<CatalogItemJpa> specification = Specification.unrestricted();
         specification =specification.and(CatalogItemSpecification.filterCatalog(itemType,isActive,brandId,productLineId,categoryId,minPrice,maxPrice,vehicleBrand,vehicleModel));
 
-        if (search != null && !search.trim().isEmpty()) {
-            String searchLower = "%" + search.toLowerCase().trim() + "%";
-            specification = specification.and((root, query, cb) ->
-                    cb.or(
-                            cb.like(cb.lower(root.get("itemName")), searchLower),
-                            cb.like(cb.lower(root.get("sku")), searchLower),
-                            cb.like(cb.lower(root.get("partNumber")), searchLower),
-                            cb.like(cb.lower(root.get("barcode")), searchLower),
-                            cb.like(cb.lower(root.get("compatibleCars")), searchLower),
-                            // Precomputed blob (name/sku/codes/brand/category/product line/specs) — catches
-                            // matches that the individual-field LIKEs above miss, e.g. brand or category name.
-                            cb.like(root.get("searchKey"), searchLower)
-                    )
-            );
+        // Tìm theo TỪNG TỪ thay vì cả chuỗi liền: mỗi từ phải xuất hiện ở một trong các trường.
+        // Trước đây "%bugi hyundai/kia accent 1885510060%" không khớp "BUGI  HYUNDAI/KIA ACCENT 1885510060"
+        // (tên trong DB có 2 dấu cách — ~100 mục như vậy), nên dán nguyên tên vào ô tìm không ra.
+        // Tách từ còn cho phép gõ khác thứ tự / bỏ bớt chữ giữa.
+        if (search != null && !search.isBlank()) {
+            Set<String> tokens = new LinkedHashSet<>(
+                    Arrays.asList(search.trim().toLowerCase(Locale.ROOT).split("\\s+")));
+            for (String token : tokens) {
+                String like = "%" + token + "%";
+                specification = specification.and((root, query, cb) ->
+                        cb.or(
+                                cb.like(cb.lower(root.get("itemName")), like),
+                                cb.like(cb.lower(root.get("sku")), like),
+                                cb.like(cb.lower(root.get("partNumber")), like),
+                                cb.like(cb.lower(root.get("barcode")), like),
+                                cb.like(cb.lower(root.get("compatibleCars")), like),
+                                // Precomputed blob (name/sku/codes/brand/category/product line/specs) — catches
+                                // matches that the individual-field LIKEs above miss, e.g. brand or category name.
+                                cb.like(root.get("searchKey"), like)
+                        )
+                );
+            }
         }
         // Lọc kho ở server: trước đây FE tải 500 mục mới nhất rồi lọc kho phía client, nên
         // hàng cũ hơn của kho đó bị rớt hẳn khỏi danh sách.
