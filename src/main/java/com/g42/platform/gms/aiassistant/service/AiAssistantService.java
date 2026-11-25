@@ -1,6 +1,8 @@
 package com.g42.platform.gms.aiassistant.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.g42.platform.gms.aiassistant.dto.AiChatRequest;
 import com.g42.platform.gms.aiassistant.dto.AiChatResponse;
 import com.g42.platform.gms.aiassistant.dto.AiChatTurn;
@@ -9,26 +11,29 @@ import com.g42.platform.gms.aiassistant.dto.AiUsageDto;
 import com.g42.platform.gms.aiassistant.exception.AiAssistantErrorCode;
 import com.g42.platform.gms.aiassistant.exception.AiAssistantException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.HttpStatusCodeException;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
 
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.net.http.HttpTimeoutException;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AiAssistantService {
 
     private static final String GEMINI_URL_TEMPLATE =
-            "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s";
+            "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent";
 
     private static final String SYSTEM_PROMPT = """
             # Hướng dẫn Hệ thống (System Instruction) cho Trợ lý AI - Michelin Sơn Tây GMS
@@ -188,17 +193,40 @@ public class AiAssistantService {
             - KHÔNG trả lời thay garage về khiếu nại/tranh chấp cụ thể — hướng dẫn khách liên hệ trực tiếp garage.
             """;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    /** Ít hơn mức này thì không đủ cho một lần gọi nữa — báo lỗi luôn thay vì gọi rồi bỏ dở giữa chừng. */
+    private static final Duration MIN_ATTEMPT = Duration.ofSeconds(3);
+    /** Nghỉ ngắn trước lượt thử lại thứ hai: 503 "high demand" của Google thường chỉ kéo dài vài giây. */
+    private static final Duration PAUSE_BEFORE_RETRY = Duration.ofSeconds(1);
+    private static final int MAX_PASSES = 2;
+
+    /*
+     * java.net.http.HttpClient thay cho `new RestTemplate()`: RestTemplate mặc định KHÔNG có
+     * timeout, Gemini lúc quá tải có khi treo vài phút — request đứng chờ tới khi nginx (60s)
+     * cắt ngang, người dùng chỉ thấy "đang gặp sự cố". HttpClient cho đặt timeout riêng từng
+     * lần gọi, để cả chuỗi fallback gói gọn trong gemini.api.total-timeout-seconds.
+     */
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(5))
+            .build();
     private final AiQuotaTrackerService quotaTracker;
+    private final ObjectMapper objectMapper;
 
     @Value("${gemini.api.key:}")
     private String apiKey;
 
-    @Value("${gemini.api.model:gemini-3.5-flash}")
+    @Value("${gemini.api.model:gemini-3.5-flash-lite}")
     private String primaryModel;
 
-    @Value("${gemini.api.fallback-models:gemini-3.6-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3-flash,gemini-2.5-flash-lite,gemini-2.0-flash,gemini-1.5-flash}")
+    @Value("${gemini.api.fallback-models:gemini-3.1-flash-lite,gemini-3.6-flash,gemini-3.5-flash}")
     private String fallbackModelsStr;
+
+    /** Tổng thời gian tối đa cho một câu hỏi, gồm mọi lần thử — phải nhỏ hơn proxy_read_timeout của nginx (mặc định 60s). */
+    @Value("${gemini.api.total-timeout-seconds:45}")
+    private int totalTimeoutSeconds;
+
+    /** Thời gian chờ tối đa một model trả lời trước khi chuyển sang model khác. */
+    @Value("${gemini.api.attempt-timeout-seconds:20}")
+    private int attemptTimeoutSeconds;
 
     /** Lấy danh sách tất cả các model được hỗ trợ (Primary + Fallback list) để hiển thị cho FE/User chọn thủ công. */
     public List<String> getAvailableModels() {
@@ -232,76 +260,165 @@ public class AiAssistantService {
         return quotaTracker.snapshot();
     }
 
+    /**
+     * Hỏi lần lượt từng model cho tới khi có câu trả lời, trong giới hạn tổng thời gian.
+     *
+     * <ul>
+     *   <li>503/500/hết giờ (Google quá tải): chuyển NGAY sang model kế tiếp — mỗi model có
+     *       sức chứa riêng, đứng chờ model đang nghẽn chỉ phí thời gian. Hết lượt đầu mà
+     *       vẫn chưa ai trả lời thì nghỉ 1s rồi hỏi lại các model đó thêm một lượt.</li>
+     *   <li>429 (hết hạn mức của key cho model đó): bỏ model đó, không hỏi lại.</li>
+     *   <li>400/403/404 (model đã bị Google gỡ, cấu hình sai): bỏ luôn.</li>
+     * </ul>
+     */
     private AiChatResponse doChat(AiChatRequest request, String systemPrompt) {
         if (apiKey == null || apiKey.isBlank()) {
             throw new AiAssistantException(AiAssistantErrorCode.NOT_CONFIGURED);
         }
 
-        List<String> candidateModels = buildCandidateModels(request.getModel());
-
-        Map<String, Object> body = Map.of(
+        String payload = toJson(Map.of(
                 "contents", buildContents(request),
                 "systemInstruction", Map.of("parts", List.of(Map.of("text", systemPrompt)))
-        );
+        ));
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
+        long deadline = System.nanoTime() + Duration.ofSeconds(totalTimeoutSeconds).toNanos();
+        Duration attemptTimeout = Duration.ofSeconds(attemptTimeoutSeconds);
+        List<String> pending = buildCandidateModels(request.getModel());
+        boolean sawBusy = false;
+        boolean sawQuota = false;
 
-        JsonNode response = null;
-        String successfulModel = null;
-        Exception lastException = null;
-
-        for (String currentModel : candidateModels) {
-            String url = String.format(GEMINI_URL_TEMPLATE, currentModel, apiKey);
-            int maxRetries = 2;
-
-            for (int attempt = 1; attempt <= maxRetries; attempt++) {
-                try {
-                    System.out.printf("[Gemini AI] Calling model '%s' (attempt %d/%d)...%n", currentModel, attempt, maxRetries);
-                    ResponseEntity<JsonNode> result = restTemplate.postForEntity(url, entity, JsonNode.class);
-                    response = result.getBody();
-                    successfulModel = currentModel;
-                    break;
-                } catch (HttpStatusCodeException e) {
-                    lastException = e;
-                    System.err.printf("[Gemini AI] Model '%s' HTTP %d: %s%n", currentModel, e.getStatusCode().value(), e.getResponseBodyAsString());
-                    if ((e.getStatusCode().value() == 503 || e.getStatusCode().value() == 429) && attempt < maxRetries) {
-                        try {
-                            Thread.sleep(800L * attempt);
-                        } catch (InterruptedException ie) {
-                            Thread.currentThread().interrupt();
-                        }
-                    } else {
-                        break;
-                    }
-                } catch (RestClientException e) {
-                    lastException = e;
-                    System.err.printf("[Gemini AI] Model '%s' call failed: %s%n", currentModel, e.getMessage());
-                    break;
-                }
-            }
-
-            if (response != null) {
+        for (int pass = 1; pass <= MAX_PASSES && !pending.isEmpty(); pass++) {
+            if (pass > 1 && !pauseBeforeRetry(deadline)) {
                 break;
             }
-            System.err.printf("[Gemini AI Fallback] Model '%s' unavailable/overloaded. Switching to next model in chain...%n", currentModel);
+            List<String> retryLater = new ArrayList<>();
+            for (String model : pending) {
+                Duration left = Duration.ofNanos(deadline - System.nanoTime());
+                if (left.compareTo(MIN_ATTEMPT) < 0) {
+                    break;
+                }
+                Duration timeout = left.compareTo(attemptTimeout) < 0 ? left : attemptTimeout;
+                long started = System.nanoTime();
+                Attempt attempt = callModel(model, payload, timeout);
+                long elapsedMs = Duration.ofNanos(System.nanoTime() - started).toMillis();
+
+                if (attempt.body() != null) {
+                    log.info("[Gemini] {} trả lời sau {} ms (lượt {})", model, elapsedMs, pass);
+                    return toChatResponse(attempt.body(), model);
+                }
+                log.warn("[Gemini] {} không dùng được sau {} ms (lượt {}): {}", model, elapsedMs, pass, attempt.detail());
+                switch (attempt.failure()) {
+                    case BUSY -> {
+                        sawBusy = true;
+                        retryLater.add(model);
+                    }
+                    case QUOTA -> sawQuota = true;
+                    case UNUSABLE -> { /* model không còn/không hợp lệ — bỏ qua */ }
+                }
+            }
+            pending = retryLater;
         }
 
-        if (response == null) {
-            System.err.println("[Gemini AI Error] All model candidates failed. Last exception: " + (lastException != null ? lastException.getMessage() : "Unknown error"));
+        log.error("[Gemini] Không model nào trả lời trong {}s (quá tải: {}, hết hạn mức: {})",
+                totalTimeoutSeconds, sawBusy, sawQuota);
+        if (sawBusy) {
+            throw new AiAssistantException(AiAssistantErrorCode.OVERLOADED);
+        }
+        if (sawQuota) {
+            throw new AiAssistantException(AiAssistantErrorCode.QUOTA_EXHAUSTED);
+        }
+        throw new AiAssistantException(AiAssistantErrorCode.UPSTREAM_ERROR);
+    }
+
+    private enum Failure { BUSY, QUOTA, UNUSABLE }
+
+    private record Attempt(JsonNode body, Failure failure, String detail) {
+        static Attempt ok(JsonNode body) {
+            return new Attempt(body, null, null);
+        }
+
+        static Attempt failed(Failure failure, String detail) {
+            return new Attempt(null, failure, detail);
+        }
+    }
+
+    /**
+     * Một lần gọi generateContent. API key đi qua header x-goog-api-key chứ không nằm trên URL:
+     * trước đây key ở query string nên mọi thông báo lỗi kiểu "I/O error on POST request for
+     * https://...?key=..." in ra log đều kèm luôn key.
+     */
+    private Attempt callModel(String model, String payload, Duration timeout) {
+        HttpRequest httpRequest = HttpRequest.newBuilder(URI.create(String.format(GEMINI_URL_TEMPLATE, model)))
+                .timeout(timeout)
+                .header("Content-Type", "application/json")
+                .header("x-goog-api-key", apiKey)
+                .POST(HttpRequest.BodyPublishers.ofString(payload, StandardCharsets.UTF_8))
+                .build();
+        try {
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            int status = response.statusCode();
+            if (status == 200) {
+                return Attempt.ok(objectMapper.readTree(response.body()));
+            }
+            String detail = "HTTP " + status + " " + abbreviate(response.body());
+            if (status == 429) {
+                return Attempt.failed(Failure.QUOTA, detail);
+            }
+            if (status >= 500) {
+                return Attempt.failed(Failure.BUSY, detail);
+            }
+            return Attempt.failed(Failure.UNUSABLE, detail);
+        } catch (HttpTimeoutException e) {
+            return Attempt.failed(Failure.BUSY, "quá " + timeout.toSeconds() + "s chưa trả lời");
+        } catch (IOException e) {
+            return Attempt.failed(Failure.BUSY, e.getClass().getSimpleName() + ": " + e.getMessage());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
             throw new AiAssistantException(AiAssistantErrorCode.UPSTREAM_ERROR);
         }
+    }
 
+    private boolean pauseBeforeRetry(long deadline) {
+        long leftAfterPause = deadline - System.nanoTime() - PAUSE_BEFORE_RETRY.toNanos();
+        if (leftAfterPause < MIN_ATTEMPT.toNanos()) {
+            return false;
+        }
+        try {
+            Thread.sleep(PAUSE_BEFORE_RETRY.toMillis());
+            return true;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
+    private AiChatResponse toChatResponse(JsonNode response, String model) {
         String reply = extractReply(response);
         if (reply == null || reply.isBlank()) {
+            log.warn("[Gemini] {} trả về rỗng: finishReason={}, blockReason={}", model,
+                    response.path("candidates").path(0).path("finishReason").asText(""),
+                    response.path("promptFeedback").path("blockReason").asText(""));
             throw new AiAssistantException(AiAssistantErrorCode.EMPTY_RESPONSE);
         }
 
         AiUsageDto usage = extractUsage(response);
         quotaTracker.record(usage.getTotalTokens());
 
-        return new AiChatResponse(reply, usage, quotaTracker.snapshot(), successfulModel);
+        return new AiChatResponse(reply, usage, quotaTracker.snapshot(), model);
+    }
+
+    private String toJson(Object body) {
+        try {
+            return objectMapper.writeValueAsString(body);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Không dựng được nội dung gửi Gemini", e);
+        }
+    }
+
+    private static String abbreviate(String text) {
+        if (text == null) return "";
+        String flat = text.replaceAll("\\s+", " ").trim();
+        return flat.length() > 300 ? flat.substring(0, 300) + "…" : flat;
     }
 
     private List<String> buildCandidateModels(String userSelectedModel) {
@@ -317,17 +434,37 @@ public class AiAssistantService {
         return candidates;
     }
 
+    /**
+     * Dựng hội thoại gửi Gemini: bỏ lượt rỗng, bỏ các lượt "model" đứng đầu (hội thoại phải
+     * mở bằng người dùng) và gộp các lượt liền nhau cùng vai — FE đã lọc bong bóng báo lỗi
+     * khỏi lịch sử, nên hai câu hỏi có thể đứng sát nhau.
+     */
     private List<Map<String, Object>> buildContents(AiChatRequest request) {
-        List<Map<String, Object>> contents = new ArrayList<>();
+        List<String[]> turns = new ArrayList<>();
         if (request.getHistory() != null) {
             for (AiChatTurn turn : request.getHistory()) {
-                if (turn.getText() == null || turn.getText().isBlank()) continue;
+                if (turn == null || turn.getText() == null || turn.getText().isBlank()) continue;
                 String role = "model".equalsIgnoreCase(turn.getRole()) ? "model" : "user";
-                contents.add(Map.of("role", role, "parts", List.of(Map.of("text", turn.getText()))));
+                if (turns.isEmpty() && "model".equals(role)) continue;
+                appendTurn(turns, role, turn.getText().trim());
             }
         }
-        contents.add(Map.of("role", "user", "parts", List.of(Map.of("text", request.getMessage()))));
+        appendTurn(turns, "user", request.getMessage().trim());
+
+        List<Map<String, Object>> contents = new ArrayList<>();
+        for (String[] turn : turns) {
+            contents.add(Map.of("role", turn[0], "parts", List.of(Map.of("text", turn[1]))));
+        }
         return contents;
+    }
+
+    private static void appendTurn(List<String[]> turns, String role, String text) {
+        String[] last = turns.isEmpty() ? null : turns.get(turns.size() - 1);
+        if (last != null && last[0].equals(role)) {
+            last[1] = last[1] + "\n\n" + text;
+        } else {
+            turns.add(new String[]{role, text});
+        }
     }
 
     private AiUsageDto extractUsage(JsonNode response) {
@@ -341,12 +478,16 @@ public class AiAssistantService {
         return new AiUsageDto(promptTokens, responseTokens, totalTokens);
     }
 
+    /** Ghép mọi đoạn text của câu trả lời, bỏ phần "suy nghĩ" (thought) nếu model có trả kèm. */
     private String extractReply(JsonNode response) {
         if (response == null) return null;
-        JsonNode candidates = response.path("candidates");
-        if (!candidates.isArray() || candidates.isEmpty()) return null;
-        JsonNode parts = candidates.get(0).path("content").path("parts");
+        JsonNode parts = response.path("candidates").path(0).path("content").path("parts");
         if (!parts.isArray() || parts.isEmpty()) return null;
-        return parts.get(0).path("text").asText(null);
+        StringBuilder reply = new StringBuilder();
+        for (JsonNode part : parts) {
+            if (part.path("thought").asBoolean(false)) continue;
+            reply.append(part.path("text").asText(""));
+        }
+        return reply.toString();
     }
 }

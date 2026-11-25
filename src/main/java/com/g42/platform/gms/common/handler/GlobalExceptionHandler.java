@@ -361,7 +361,8 @@ public class GlobalExceptionHandler {
         HttpStatus status = switch (ex.getErrorCode()) {
             case NOT_CONFIGURED -> HttpStatus.SERVICE_UNAVAILABLE;
             case UPSTREAM_ERROR, EMPTY_RESPONSE -> HttpStatus.BAD_GATEWAY;
-            case RATE_LIMITED -> HttpStatus.TOO_MANY_REQUESTS;
+            case RATE_LIMITED, QUOTA_EXHAUSTED -> HttpStatus.TOO_MANY_REQUESTS;
+            case OVERLOADED -> HttpStatus.SERVICE_UNAVAILABLE;
         };
         return ResponseEntity
                 .status(status)
