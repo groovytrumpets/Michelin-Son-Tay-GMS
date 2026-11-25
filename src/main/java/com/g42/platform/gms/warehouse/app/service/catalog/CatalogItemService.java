@@ -6,6 +6,7 @@ import com.g42.platform.gms.estimation.api.internal.TaxRuleInternalApi;
 import com.g42.platform.gms.estimation.api.mapper.TaxRuleDtoMapper;
 import com.g42.platform.gms.marketing.service_catalog.domain.enums.ServiceStatus;
 import com.g42.platform.gms.marketing.service_catalog.infrastructure.repository.ServiceJpaRepository;
+import com.g42.platform.gms.systemlog.service.AuditNote;
 import com.g42.platform.gms.warehouse.api.dto.*;
 import com.g42.platform.gms.warehouse.api.mapper.*;
 import com.g42.platform.gms.warehouse.app.service.dto.PricingResolve;
@@ -168,6 +169,13 @@ public class CatalogItemService {
         catalogItem.setTaxRuleId(finalTaxId);
         CatalogItem saveCatalogItem = catalogItemRepo.saveCatalogItem(catalogItem);
         replaceCompatibilities(saveCatalogItem.getItemId(), createDto.getCompatibilities());
+        // Endpoint tạo không có id trên đường dẫn: ghi tên vào nhật ký, không thì không biết đã tạo mặt hàng nào
+        AuditNote.headline("Tạo mặt hàng «" + saveCatalogItem.getItemName() + "»"
+                + (saveCatalogItem.getSku() != null && !saveCatalogItem.getSku().isBlank() ? " (SKU " + saveCatalogItem.getSku() + ")" : ""));
+        AuditNote.change("Mã hệ thống: #" + saveCatalogItem.getItemId());
+        if (saveCatalogItem.getPrice() != null) {
+            AuditNote.change("Giá bán: " + money(saveCatalogItem.getPrice()));
+        }
         return catalogDtoMapper.toDto(saveCatalogItem);
     }
 
@@ -467,6 +475,17 @@ public class CatalogItemService {
         }
         List<ItemColor> domainColors = colors == null ? List.of()
                 : colors.stream().map(itemColorDtoMapper::toDomain).toList();
+        List<String> before = colorLabels(catalogItemRepo.getColorsByItemId(itemId));
+        List<String> after = colorLabels(domainColors);
+        if (before.equals(after)) {
+            // Màn sửa mặt hàng luôn gọi kèm API này sau khi lưu; màu không đổi thì không ghi nhật ký
+            AuditNote.skip();
+        } else {
+            CatalogItem item = catalogItemRepo.getCatalogItemById(itemId);
+            AuditNote.headline("Đổi màu sắc mặt hàng «" + (item != null ? item.getItemName() : "#" + itemId) + "»");
+            AuditNote.change("Màu: " + (before.isEmpty() ? "(trống)" : String.join(", ", before))
+                    + " → " + (after.isEmpty() ? "(trống)" : String.join(", ", after)));
+        }
         List<ItemColor> saved = catalogItemRepo.replaceItemColors(itemId, domainColors);
         return saved.stream().map(itemColorDtoMapper::toDto).toList();
     }
@@ -585,6 +604,9 @@ public class CatalogItemService {
         if (catalogItem == null) {
             throw new WarehouseException("Catalog item not found", WarehouseErrorCode.CATALOG_404);
         }
+        // Chụp lại giá trị cũ để Nhật ký hệ thống ghi được "đổi từ gì thành gì"
+        CatalogSnapshot before = CatalogSnapshot.of(catalogItem);
+        AuditTrail audit = new AuditTrail();
 
         // Validate SKU only if it changed
         if (updateDto.getSku() != null && !updateDto.getSku().equals(catalogItem.getSku())) {
@@ -687,6 +709,10 @@ public class CatalogItemService {
                     inventory.setItemId(itemId);
                     inventory.setWarehouseId(whDto.getWarehouseId());
                 }
+                BigDecimal quantityBefore = Qty.nz(inventory.getQuantity());
+                BigDecimal reservedBefore = Qty.nz(inventory.getReservedQuantity());
+                String warehouseLabel = audit.warehouseName(whDto.getWarehouseId());
+                int warehouseSection = audit.mark();
                 itemQuantityPolicy.validateScale(quantityRules, whDto.getQuantity(), "Tồn kho");
                 itemQuantityPolicy.validateScale(quantityRules, whDto.getReservedQuantity(), "Hàng giữ");
                 if (Boolean.TRUE.equals(catalogItem.getTracksSerial())) {
@@ -711,6 +737,10 @@ public class CatalogItemService {
                     Optional<WarehousePricing> pricingOpt = warehousePricingRepo.findByItemIdAndWarehouseId(itemId, whDto.getWarehouseId());
                     if (pricingOpt.isPresent()) {
                         WarehousePricing pricing = pricingOpt.get();
+                        if (!sameAmount(pricing.getSellingPrice(), whDto.getSellingPrice())) {
+                            audit.change("Giá bán riêng tại " + warehouseLabel + ": "
+                                    + money(pricing.getSellingPrice()) + " → " + money(whDto.getSellingPrice()));
+                        }
                         pricing.setSellingPrice(whDto.getSellingPrice());
                         pricing.setIsActive(true);
                         warehousePricingRepo.save(pricing);
@@ -725,13 +755,27 @@ public class CatalogItemService {
                         if (lotDto.getEntryItemId() == null) {
                             // Lô mới người dùng thêm tay ở popup. Trước đây nhánh này bị bỏ qua
                             // nên bấm "Thêm lô" xong lưu lại là lô biến mất.
-                            createManualLot(itemId, whDto.getWarehouseId(), lotDto, staffId);
+                            StockEntryItemJpa created = createManualLot(itemId, whDto.getWarehouseId(), lotDto, staffId);
+                            if (created != null) {
+                                audit.change("Thêm lô " + audit.entryCode(created.getEntryId()) + " tại " + warehouseLabel
+                                        + ": " + Qty.text(created.getRemainingQuantity()));
+                            }
                             continue;
                         }
                         if (lotDto.getEntryItemId() != null) {
                             Optional<StockEntryItemJpa> lotOpt = stockEntryItemJpaRepo.findById(lotDto.getEntryItemId());
                             if (lotOpt.isPresent()) {
                                 StockEntryItemJpa lotJpa = lotOpt.get();
+                                String lotLabel = "Lô " + audit.entryCode(lotJpa.getEntryId()) + " (" + warehouseLabel + ")";
+                                if (lotDto.getRemainingQuantity() != null
+                                        && !Qty.eq(lotJpa.getRemainingQuantity(), lotDto.getRemainingQuantity())) {
+                                    audit.change(lotLabel + " còn: " + Qty.text(lotJpa.getRemainingQuantity())
+                                            + " → " + Qty.text(lotDto.getRemainingQuantity()));
+                                }
+                                if (lotDto.getImportPrice() != null && !sameAmount(lotJpa.getImportPrice(), lotDto.getImportPrice())) {
+                                    audit.change(lotLabel + " giá nhập: " + money(lotJpa.getImportPrice())
+                                            + " → " + money(lotDto.getImportPrice()));
+                                }
                                 if (lotDto.getRemainingQuantity() != null) {
                                     lotJpa.setRemainingQuantity(lotDto.getRemainingQuantity());
                                 }
@@ -758,12 +802,165 @@ public class CatalogItemService {
                 }
 
                 // Chốt lại: tồn kho luôn phải bằng tổng số còn lại của các lô.
-                syncInventoryWithLots(itemId, whDto.getWarehouseId(), inventory, staffId);
+                syncInventoryWithLots(itemId, whDto.getWarehouseId(), inventory, quantityBefore, staffId, audit);
+
+                // Dòng tồn kho của kho đứng trước các dòng lô/giá của chính kho đó
+                if (!Qty.eq(quantityBefore, inventory.getQuantity())) {
+                    audit.insert(warehouseSection, "Tồn kho " + warehouseLabel + ": " + Qty.text(quantityBefore)
+                            + " → " + Qty.text(inventory.getQuantity()));
+                }
+                if (!Qty.eq(reservedBefore, inventory.getReservedQuantity())) {
+                    audit.change("Hàng giữ " + warehouseLabel + ": " + Qty.text(reservedBefore)
+                            + " → " + Qty.text(inventory.getReservedQuantity()));
+                }
             }
         }
 
         CatalogItem saved = catalogItemRepo.saveCatalogItem(catalogItem);
+        before.describeChanges(catalogItem, audit);
+        audit.publish("Sửa mặt hàng «" + catalogItem.getItemName() + "»"
+                + (catalogItem.getSku() != null && !catalogItem.getSku().isBlank() ? " (SKU " + catalogItem.getSku() + ")" : ""));
         return catalogDtoMapper.toDto(saved);
+    }
+
+    // ─── Ghi "đổi từ gì thành gì" cho Nhật ký hệ thống ────────────────────────
+
+    /** Giá trị cũ của các trường người quản lý hay cần đối chiếu. */
+    private record CatalogSnapshot(String name, String sku, String unit, BigDecimal price, BigDecimal costPrice,
+                                   Boolean active, CatalogItemType type, Integer brandId, Integer categoryId,
+                                   String description, String color, String compatibleCars, String madeIn,
+                                   Integer warrantyMonths) {
+        static CatalogSnapshot of(CatalogItem c) {
+            return new CatalogSnapshot(c.getItemName(), c.getSku(), c.getUnit(), c.getPrice(), c.getCostPrice(),
+                    c.getIsActive(), c.getItemType(), c.getBrandId(), c.getItemCategoryId(), c.getDescription(),
+                    c.getColor(), c.getCompatibleCars(), c.getMadeIn(), c.getWarrantyDurationMonths());
+        }
+
+        void describeChanges(CatalogItem after, AuditTrail audit) {
+            // Đổi thông tin mặt hàng đứng đầu danh sách, trước các dòng tồn kho/lô
+            List<String> lines = new ArrayList<>();
+            if (!sameText(name, after.getItemName())) lines.add("Tên: «" + nz(name) + "» → «" + nz(after.getItemName()) + "»");
+            if (!sameText(sku, after.getSku())) lines.add("SKU: " + nz(sku) + " → " + nz(after.getSku()));
+            if (!sameText(unit, after.getUnit())) lines.add("Đơn vị: " + nz(unit) + " → " + nz(after.getUnit()));
+            if (type != after.getItemType()) lines.add("Loại: " + type + " → " + after.getItemType());
+            if (!sameAmount(price, after.getPrice())) lines.add("Giá bán: " + money(price) + " → " + money(after.getPrice()));
+            if (!sameAmount(costPrice, after.getCostPrice())) lines.add("Giá mua vào: " + money(costPrice) + " → " + money(after.getCostPrice()));
+            if (!java.util.Objects.equals(active, after.getIsActive())) {
+                lines.add("Trạng thái: " + (Boolean.FALSE.equals(active) ? "ẩn" : "đang bán")
+                        + " → " + (Boolean.FALSE.equals(after.getIsActive()) ? "ẩn" : "đang bán"));
+            }
+            if (!java.util.Objects.equals(brandId, after.getBrandId())) {
+                lines.add("Thương hiệu: " + audit.brandName(brandId) + " → " + audit.brandName(after.getBrandId()));
+            }
+            if (!java.util.Objects.equals(categoryId, after.getItemCategoryId())) {
+                lines.add("Danh mục: " + audit.categoryName(categoryId) + " → " + audit.categoryName(after.getItemCategoryId()));
+            }
+            if (!java.util.Objects.equals(warrantyMonths, after.getWarrantyDurationMonths())) {
+                lines.add("Bảo hành (tháng): " + nz(warrantyMonths) + " → " + nz(after.getWarrantyDurationMonths()));
+            }
+            if (!sameText(madeIn, after.getMadeIn())) lines.add("Xuất xứ: " + nz(madeIn) + " → " + nz(after.getMadeIn()));
+            if (!sameText(color, after.getColor())) lines.add("Màu: " + nz(color) + " → " + nz(after.getColor()));
+            if (!sameText(compatibleCars, after.getCompatibleCars())) lines.add("Xe tương thích: đã sửa");
+            if (!sameText(description, after.getDescription())) lines.add("Mô tả: đã sửa");
+            audit.prepend(lines);
+        }
+
+        private static String nz(Object value) {
+            return value == null || value.toString().isBlank() ? "(trống)" : value.toString();
+        }
+    }
+
+    /** Gom các dòng thay đổi trong một lần lưu rồi chuyển cho AuditNote. */
+    private class AuditTrail {
+        private final List<String> lines = new ArrayList<>();
+        private final java.util.Map<Integer, String> warehouseNames = new java.util.HashMap<>();
+        private final java.util.Map<Integer, String> entryCodes = new java.util.HashMap<>();
+
+        void change(String line) {
+            lines.add(line);
+        }
+
+        /** Vị trí hiện tại, để sau này chèn dòng tóm tắt lên trước các dòng chi tiết. */
+        int mark() {
+            return lines.size();
+        }
+
+        void insert(int position, String line) {
+            lines.add(Math.min(position, lines.size()), line);
+        }
+
+        void prepend(List<String> head) {
+            lines.addAll(0, head);
+        }
+
+        String warehouseName(Integer warehouseId) {
+            if (warehouseId == null) return "(chưa chọn kho)";
+            return warehouseNames.computeIfAbsent(warehouseId, id -> warehouseRepo.findById(id)
+                    .map(Warehouse::getWarehouseName)
+                    .orElse("kho #" + id));
+        }
+
+        String entryCode(Integer entryId) {
+            if (entryId == null) return "?";
+            return entryCodes.computeIfAbsent(entryId, id -> stockEntryJpaRepo.findById(id)
+                    .map(StockEntryJpa::getEntryCode)
+                    .orElse("#" + id));
+        }
+
+        String brandName(Integer brandId) {
+            if (brandId == null) return "(trống)";
+            Brand brand = catalogItemRepo.getBrandById(brandId);
+            return brand != null && brand.getBrandName() != null ? brand.getBrandName() : "#" + brandId;
+        }
+
+        String categoryName(Integer categoryId) {
+            if (categoryId == null) return "(trống)";
+            ItemCategory category = catalogItemRepo.getItemCategoryById(categoryId);
+            return category != null && category.getCategoryName() != null ? category.getCategoryName() : "#" + categoryId;
+        }
+
+        void publish(String headline) {
+            AuditNote.headline(headline);
+            if (lines.isEmpty()) {
+                AuditNote.change("Không đổi tên, SKU, giá, tồn kho hay lô");
+            }
+            lines.forEach(AuditNote::change);
+        }
+    }
+
+    /** "Đỏ (#ff0000)" theo thứ tự hiển thị, để so màu trước/sau khi lưu. */
+    private static List<String> colorLabels(List<ItemColor> colors) {
+        if (colors == null) return List.of();
+        return colors.stream()
+                .sorted(java.util.Comparator.comparing(c -> c.getDisplayOrder() == null ? Integer.MAX_VALUE : c.getDisplayOrder()))
+                .map(c -> {
+                    String name = c.getColorName() == null ? "" : c.getColorName().trim();
+                    String code = c.getColorCode() == null ? "" : c.getColorCode().trim().toLowerCase();
+                    if (name.isEmpty()) return code;
+                    return code.isEmpty() ? name : name + " (" + code + ")";
+                })
+                .filter(s -> !s.isEmpty())
+                .toList();
+    }
+
+    private static boolean sameAmount(BigDecimal a, BigDecimal b) {
+        if (a == null || b == null) return a == b;
+        return a.compareTo(b) == 0;
+    }
+
+    private static boolean sameText(String a, String b) {
+        String x = a == null || a.isBlank() ? null : a.trim();
+        String y = b == null || b.isBlank() ? null : b.trim();
+        return java.util.Objects.equals(x, y);
+    }
+
+    /** 1234000 → "1.234.000 đ" (DecimalFormat không thread-safe nên tạo mới mỗi lần). */
+    private static String money(BigDecimal value) {
+        if (value == null) return "(trống)";
+        java.text.DecimalFormatSymbols symbols = new java.text.DecimalFormatSymbols();
+        symbols.setGroupingSeparator('.');
+        symbols.setDecimalSeparator(',');
+        return new java.text.DecimalFormat("#,##0.##", symbols).format(value) + " đ";
     }
 
     // ─── Cấu hình đo lường / đóng gói / serial ─────────────────────────────────
@@ -878,11 +1075,11 @@ public class CatalogItemService {
     /** Nhà cung cấp quy ước của phiếu nhập sinh tự động khi cân tồn kho. */
     private static final String ADJUSTMENT_SUPPLIER = "Điều chỉnh tồn kho";
 
-    /** Tạo lô mới do người dùng thêm tay ở popup sửa tồn kho. */
-    private void createManualLot(Integer itemId, Integer warehouseId, LotUpdateDto lotDto, Integer staffId) {
+    /** Tạo lô mới do người dùng thêm tay ở popup sửa tồn kho; null nếu không tạo. */
+    private StockEntryItemJpa createManualLot(Integer itemId, Integer warehouseId, LotUpdateDto lotDto, Integer staffId) {
         BigDecimal quantity = Qty.nz(lotDto.getRemainingQuantity());
         if (warehouseId == null || quantity.signum() <= 0) {
-            return;
+            return null;
         }
 
         String entryCode = lotDto.getEntryCode() != null ? lotDto.getEntryCode().trim() : "";
@@ -902,7 +1099,7 @@ public class CatalogItemService {
         lot.setImportPrice(importPrice);
         lot.setMarkupMultiplier(resolveMarkup(lotDto, importPrice));
         lot.setMarkupMultiplierWholesale(lotDto.getMarkupMultiplierWholesale());
-        stockEntryItemJpaRepo.save(lot);
+        return stockEntryItemJpaRepo.save(lot);
     }
 
     /**
@@ -912,8 +1109,13 @@ public class CatalogItemService {
      * lô gần nhất để giá vốn không bị về 0.
      * Thiếu (lô > tồn): trừ bớt lô, ưu tiên lô điều chỉnh rồi tới lô mới nhất, để
      * các lô nhập thật cũ nhất giữ nguyên thứ tự FIFO và giá vốn.
+     *
+     * Thẻ kho (inventory_transaction) ghi theo tồn kho trước → sau khi lưu, không
+     * theo phần chênh với lô: trước đây sửa cả tồn lẫn lô về cùng một số thì chênh
+     * bằng 0 nên mất dấu (NK-20261104-6: 40 cái về 0 mà thẻ kho không có dòng nào).
      */
-    private void syncInventoryWithLots(Integer itemId, Integer warehouseId, InventoryJpa inventory, Integer staffId) {
+    private void syncInventoryWithLots(Integer itemId, Integer warehouseId, InventoryJpa inventory,
+                                       BigDecimal quantityBefore, Integer staffId, AuditTrail audit) {
         if (warehouseId == null || inventory == null) {
             return;
         }
@@ -922,21 +1124,22 @@ public class CatalogItemService {
         BigDecimal lotTotal = Qty.sum(lots, StockEntryItemJpa::getRemainingQuantity);
 
         BigDecimal diff = target.subtract(lotTotal);
-        if (diff.signum() == 0) {
-            return;
-        }
-
         if (diff.signum() > 0) {
-            addToAdjustmentLot(itemId, warehouseId, diff, staffId);
-        } else {
-            reduceLots(lots, diff.negate());
+            StockEntryItemJpa lot = addToAdjustmentLot(itemId, warehouseId, diff, staffId);
+            audit.change("Tự tạo lô điều chỉnh " + audit.entryCode(lot.getEntryId()) + " ("
+                    + audit.warehouseName(warehouseId) + "): +" + Qty.text(diff));
+        } else if (diff.signum() < 0) {
+            reduceLots(lots, diff.negate(), audit);
         }
 
-        logInventoryAdjustment(warehouseId, itemId, diff, target, staffId);
+        BigDecimal change = target.subtract(Qty.nz(quantityBefore));
+        if (change.signum() != 0) {
+            logInventoryAdjustment(warehouseId, itemId, change, target, staffId);
+        }
     }
 
     /** Dồn phần tồn dôi ra vào một lô điều chỉnh mới của kho. */
-    private void addToAdjustmentLot(Integer itemId, Integer warehouseId, BigDecimal quantity, Integer staffId) {
+    private StockEntryItemJpa addToAdjustmentLot(Integer itemId, Integer warehouseId, BigDecimal quantity, Integer staffId) {
         BigDecimal importPrice = BigDecimal.ZERO;
         BigDecimal markup = null;
         BigDecimal markupWholesale = null;
@@ -958,7 +1161,7 @@ public class CatalogItemService {
         lot.setMarkupMultiplier(markup != null ? markup : BigDecimal.ONE);
         lot.setMarkupMultiplierWholesale(markupWholesale);
         lot.setNotes("Lô điều chỉnh tự động khi sửa tồn kho ở màn danh mục");
-        stockEntryItemJpaRepo.save(lot);
+        return stockEntryItemJpaRepo.save(lot);
     }
 
     /**
@@ -966,7 +1169,7 @@ public class CatalogItemService {
      * Trừ từ lô mới nhất trở về trước để lô cũ nhất (đang đứng đầu hàng FIFO)
      * giữ nguyên số lượng và giá vốn.
      */
-    private void reduceLots(List<StockEntryItemJpa> fifoLots, BigDecimal quantityToRemove) {
+    private void reduceLots(List<StockEntryItemJpa> fifoLots, BigDecimal quantityToRemove, AuditTrail audit) {
         BigDecimal remain = quantityToRemove;
         List<StockEntryItemJpa> newestFirst = new ArrayList<>(fifoLots);
         java.util.Collections.reverse(newestFirst);
@@ -978,6 +1181,8 @@ public class CatalogItemService {
             BigDecimal take = Qty.min(available, remain);
             lot.setRemainingQuantity(available.subtract(take));
             stockEntryItemJpaRepo.save(lot);
+            audit.change("Tự trừ lô " + audit.entryCode(lot.getEntryId()) + " còn: " + Qty.text(available)
+                    + " → " + Qty.text(lot.getRemainingQuantity()));
             remain = remain.subtract(take);
         }
     }

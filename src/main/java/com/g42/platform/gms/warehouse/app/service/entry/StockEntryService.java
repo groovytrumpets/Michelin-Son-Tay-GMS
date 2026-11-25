@@ -2,6 +2,7 @@ package com.g42.platform.gms.warehouse.app.service.entry;
 
 
 import com.g42.platform.gms.common.util.Qty;
+import com.g42.platform.gms.systemlog.service.AuditNote;
 /**
  * ============================================================
  * LUỒNG NHẬP KHO (Stock Entry Flow)
@@ -219,7 +220,24 @@ public class StockEntryService {
         saved.setItems(buildEntryItems(request.getItems(), saved.getEntryId()));
         StockEntry finalSaved = stockEntryRepo.save(saved);
         notifyManagersAboutStockEntry(finalSaved, "Tạo phiếu nhập kho", "Có phiếu nhập kho mới " + finalSaved.getEntryCode() + " ở trạng thái nháp.");
-        return toResponse(finalSaved);
+        StockEntryResponse response = toResponse(finalSaved);
+        // Endpoint tạo không có id trên đường dẫn: ghi mã phiếu vào Nhật ký hệ thống
+        AuditNote.headline("Tạo phiếu nhập kho " + response.getEntryCode() + " (nháp)");
+        noteEntryLines(response, "");
+        return response;
+    }
+
+    /** Ghi từng dòng hàng của phiếu vào Nhật ký hệ thống: "BUGI ... (SKU ...): +40 tại CS1". */
+    private void noteEntryLines(StockEntryResponse entry, String sign) {
+        String warehouse = entry.getWarehouseName() != null ? entry.getWarehouseName() : "kho #" + entry.getWarehouseId();
+        AuditNote.change("Kho nhập: " + warehouse + (entry.getSupplierName() != null ? " · NCC: " + entry.getSupplierName() : ""));
+        if (entry.getItems() == null) return;
+        for (var item : entry.getItems()) {
+            String name = item.getItemName() != null ? item.getItemName() : "mặt hàng #" + item.getItemId();
+            String sku = item.getSku() != null && !item.getSku().isBlank() ? " (SKU " + item.getSku() + ")" : "";
+            AuditNote.change(name + sku + ": " + sign + Qty.text(item.getQuantity())
+                    + (item.getUnit() != null ? " " + item.getUnit() : ""));
+        }
     }
 
     /**
@@ -446,7 +464,10 @@ public class StockEntryService {
         StockEntry finalSaved = stockEntryRepo.save(entry);
         notifyManagersAboutStockEntry(finalSaved, "Xác nhận phiếu nhập kho", "Phiếu nhập kho " + finalSaved.getEntryCode() + " đã được xác nhận thành công.");
 
-        return toResponse(finalSaved);
+        StockEntryResponse response = toResponse(finalSaved);
+        AuditNote.headline("Xác nhận phiếu nhập kho " + response.getEntryCode() + " — cộng tồn");
+        noteEntryLines(response, "+");
+        return response;
     }
 
     // ─────────────────────────────────────────────────────────────────────────

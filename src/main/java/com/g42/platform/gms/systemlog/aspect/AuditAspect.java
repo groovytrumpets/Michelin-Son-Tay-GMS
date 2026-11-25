@@ -1,6 +1,7 @@
 package com.g42.platform.gms.systemlog.aspect;
 
 import com.g42.platform.gms.systemlog.annotation.Auditable;
+import com.g42.platform.gms.systemlog.service.AuditNote;
 import com.g42.platform.gms.systemlog.service.AuditRecord;
 import com.g42.platform.gms.systemlog.service.AuditService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -102,6 +103,11 @@ public class AuditAspect {
             if (!argsSummary.isBlank()) {
                 description = description.isBlank() ? argsSummary : description + " (" + argsSummary + ")";
             }
+            // Service đã ghi chú thay đổi cụ thể thì dùng ghi chú đó, mô tả cố định làm tiêu đề dự phòng.
+            String noted = AuditNote.consume(null, auditable.description());
+            if (noted != null) {
+                description = noted;
+            }
             builder.description(description.isBlank() ? null : description);
             builder.targetId(resolveTargetId(joinPoint));
 
@@ -135,6 +141,7 @@ public class AuditAspect {
             for (String fragment : EXCLUDED_PACKAGE_FRAGMENTS) {
                 if (packageName.contains(fragment)) return;
             }
+            if (AuditNote.consumeSkip()) return;
 
             String[] http = currentHttp();
             String httpMethod = http[0];
@@ -148,6 +155,11 @@ public class AuditAspect {
             String base = (httpMethod != null ? httpMethod + " " : "") + (uri != null ? uri : methodName);
             String argsSummary = summarizeArgs(joinPoint);
             String description = argsSummary.isBlank() ? base : base + " (" + argsSummary + ")";
+            // Service ghi chú được "đã đổi gì" thì mô tả là câu tiếng Việt, đường dẫn API xuống dòng cuối.
+            String noted = AuditNote.consume(base, null);
+            if (noted != null) {
+                description = noted;
+            }
 
             AuditRecord.AuditRecordBuilder builder = auditService.currentContext()
                     .action(action)
